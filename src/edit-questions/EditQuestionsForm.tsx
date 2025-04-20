@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
@@ -8,14 +8,12 @@ import { Button } from '../components/Button'
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
     const retrieved = db.get<PackingListQuestionSet>("1")
-    const [savedQuestionSet, setSavedQuestions] = useState<PackingListQuestionSet>({ questions: [] })
     const { register, control, handleSubmit, setValue, watch, reset } = useForm<PackingListQuestionSet>({
         defaultValues: { questions: [] }
     });
 
     useEffect(() => {
         retrieved.then(doc => {
-            setSavedQuestions(doc)
             reset(doc)
         }).catch(err => {
             console.error('Error retrieving doc:', err)
