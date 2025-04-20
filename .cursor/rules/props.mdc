@@ -1,0 +1,7 @@
+# Props Rules
+
+- Use optional props with default values (e.g., `variant = 'primary'`)
+- Extend HTML attributes for base component props
+- Include proper TypeScript types for all props
+- Use proper prop spreading for HTML attributes
+- Keep component logic simple and focused 

@@ -1,0 +1,10 @@
+# Styling Rules
+
+- Use Tailwind CSS for all styling
+- Follow this pattern for className composition:
+  ```typescript
+  className={`${baseStyles} ${variantStyles} ${props.className || ''}`}
+  ```
+- Use consistent spacing in className strings (like in Input.tsx)
+- Include transition effects for interactive elements
+- Use proper spacing in template literals 

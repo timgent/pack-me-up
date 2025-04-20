@@ -1,0 +1,7 @@
+# TypeScript Rules
+
+- Use TypeScript interfaces for props
+- Include proper TypeScript types for all props
+- Extend HTML element attributes for base component props
+- Avoid using 'any' type
+- Use proper type inference where possible 
