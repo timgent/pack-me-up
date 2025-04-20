@@ -1,7 +1,7 @@
 import PouchDB from 'pouchdb'
 import './App.css'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 interface PackingListQuestionSet {
   questions: Question[]
@@ -39,19 +39,19 @@ interface Option {
 
 function App() {
   const db = new PouchDB('packing-list-question-set');
-  const retrieved = db.get("1")
+  const retrieved = db.get<PackingListQuestionSet>("1")
+  const [savedQuestionSet, setSavedQuestions] = useState<PackingListQuestionSet>({ questions: [] })
+  const { register, control, handleSubmit, setValue, watch, reset } = useForm<PackingListQuestionSet>({
+    defaultValues: { questions: [] }
+  });
   useEffect(() => {
     retrieved.then(doc => {
-      console.log({ doc })
+      setSavedQuestions(doc)
+      reset(doc)
     }).catch(err => {
       console.error('Error retrieving doc:', err)
     })
-  }, [])
-  const { register, control, handleSubmit, setValue, watch } = useForm<PackingListQuestionSet>({
-    defaultValues: {
-      questions: []
-    }
-  });
+  }, [reset])
 
   const { fields: questionFields, append: appendQuestion, remove: removeQuestion } = useFieldArray({
     control,
