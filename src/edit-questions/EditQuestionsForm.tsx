@@ -33,7 +33,12 @@ export function EditQuestionsForm() {
     };
 
     return (
-        <main className="p-4">
+        <div className="max-w-4xl mx-auto py-8 px-4">
+            <div className="mb-8">
+                <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
+                <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
+            </div>
+
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 {questionFields.map((question, questionIndex) => (
                     <QuestionSection
@@ -47,16 +52,19 @@ export function EditQuestionsForm() {
                     />
                 ))}
 
-                <div className="space-x-4">
+                <div className="flex items-center gap-4 pt-4">
                     <Button
                         type="button"
                         onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+                        variant="secondary"
                     >
                         Add Question
                     </Button>
-                    <Button type="submit">Save</Button>
+                    <Button type="submit">
+                        Save Changes
+                    </Button>
                 </div>
             </form>
-        </main>
+        </div>
     )
 } 
