@@ -4,6 +4,7 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
 import { PackingListQuestionSet } from './types'
+import { useRef, useEffect } from 'react'
 
 interface OptionSectionProps {
     questionIndex: number;
@@ -19,6 +20,16 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
     const allItems = [...new Set(watch('questions').flatMap((q) =>
         q.options.flatMap((o) => o.items)
     ).filter(Boolean))] as string[];
+    const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+    useEffect(() => {
+        if (selectRefs.current[items.length - 1]) {
+            const input = selectRefs.current[items.length - 1]?.querySelector('input');
+            if (input) {
+                input.focus();
+            }
+        }
+    }, [items.length]);
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
@@ -41,7 +52,7 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {items.map((item: string, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
-                        <div className="flex-1">
+                        <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <CustomCreatableSelect
                                 value={item}
                                 onChange={(value) => {
