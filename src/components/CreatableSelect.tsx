@@ -16,6 +16,7 @@ interface CreatableSelectProps {
 
 export function CustomCreatableSelect({ value, onChange, options, placeholder = 'Enter item' }: CreatableSelectProps) {
     const [inputValue, setInputValue] = useState('');
+    const [menuIsOpen, setMenuIsOpen] = useState(false);
 
     const selectOptions = options.map(option => ({
         label: option,
@@ -44,6 +45,14 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
             placeholder={placeholder}
             className="react-select-container"
             classNamePrefix="react-select"
+            menuIsOpen={menuIsOpen}
+            onMenuOpen={() => setMenuIsOpen(true)}
+            onMenuClose={() => setMenuIsOpen(false)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && !menuIsOpen) {
+                    setMenuIsOpen(true);
+                }
+            }}
             styles={{
                 control: (base) => ({
                     ...base,
@@ -55,11 +64,21 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
                 }),
                 option: (base, state) => ({
                     ...base,
-                    backgroundColor: state.isSelected ? '#f3f4f6' : 'white',
+                    backgroundColor: state.isSelected ? '#e5e7eb' : state.isFocused ? '#f3f4f6' : 'white',
                     color: state.isSelected ? '#111827' : '#374151',
                     '&:hover': {
                         backgroundColor: '#f3f4f6'
                     }
+                }),
+                menu: (base) => ({
+                    ...base,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    borderRadius: '0.375rem',
+                    marginTop: '0.25rem'
+                }),
+                menuList: (base) => ({
+                    ...base,
+                    padding: '0.25rem'
                 })
             }}
         />
