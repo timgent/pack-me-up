@@ -1,18 +1,24 @@
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
+import { CustomCreatableSelect } from '../components/CreatableSelect'
+import { UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
+import { PackingListQuestionSet } from './types'
 
 interface OptionSectionProps {
     questionIndex: number;
     optionIndex: number;
-    register: any;
-    watch: any;
-    setValue: any;
+    register: UseFormRegister<PackingListQuestionSet>;
+    watch: UseFormWatch<PackingListQuestionSet>;
+    setValue: UseFormSetValue<PackingListQuestionSet>;
     removeOption: () => void;
 }
 
 export function OptionSection({ questionIndex, optionIndex, register, watch, setValue, removeOption }: OptionSectionProps) {
     const items = watch(`questions.${questionIndex}.options.${optionIndex}.items`) || [];
+    const allItems = [...new Set(watch('questions').flatMap((q) =>
+        q.options.flatMap((o) => o.items)
+    ).filter(Boolean))] as string[];
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
@@ -33,12 +39,18 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
 
             <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {items.map((_: string, itemIndex: number) => (
+                {items.map((item: string, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1">
-                            <Input
+                            <CustomCreatableSelect
+                                value={item}
+                                onChange={(value) => {
+                                    const newItems = [...items];
+                                    newItems[itemIndex] = value;
+                                    setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
+                                }}
+                                options={allItems}
                                 placeholder="Enter item"
-                                {...register(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`)}
                             />
                         </div>
                         <CloseButton
