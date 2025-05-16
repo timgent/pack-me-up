@@ -10,6 +10,7 @@ export interface PackingListItem {
     personId: string
     questionId: string
     optionId: string
+    packed?: boolean
 }
 
 export interface PackingListFormData {
