@@ -5,6 +5,7 @@ import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
 import { useRef, useEffect } from 'react'
+import { ItemPeopleSection } from './ItemPeopleSection'
 
 interface OptionSectionProps {
     control: Control<PackingListQuestionSet>;
@@ -59,14 +60,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 {itemFields.map((item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
-                            {people.map((person) => {
-                                return (
-                                    <label key={itemIndex + person.id} className="px-1">
-                                        <span>{person.name}</span>
-                                        <input className='ml-1' type="checkbox" key={person.id} />
-                                    </label>
-                                )
-                            })}
+                            <ItemPeopleSection control={control} questionIndex={questionIndex} optionIndex={optionIndex} itemIndex={itemIndex} register={register} watch={watch} allPeople={people} />
                             <Controller
                                 control={control}
                                 name={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
