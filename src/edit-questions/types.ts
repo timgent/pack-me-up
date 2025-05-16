@@ -40,5 +40,5 @@ export interface Option {
 
 export interface Item {
     text: string
-    personSelections: { personOrder: number, selected: boolean }[]
+    personSelections: { personId: string, selected: boolean }[]
 }
