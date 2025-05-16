@@ -2,11 +2,12 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
-import { UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
+import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
 import { useRef, useEffect } from 'react'
 
 interface OptionSectionProps {
+    control: Control<PackingListQuestionSet>;
     questionIndex: number;
     optionIndex: number;
     register: UseFormRegister<PackingListQuestionSet>;
@@ -16,8 +17,11 @@ interface OptionSectionProps {
     people: Person[];
 }
 
-export function OptionSection({ questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
-    const items = watch(`questions.${questionIndex}.options.${optionIndex}.items`) || [];
+export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
+    const { fields: itemFields, append: appendItem } = useFieldArray({
+        control,
+        name: `questions.${questionIndex}.options.${optionIndex}.items`
+    })
     const allItems = [...new Set(watch('questions').flatMap((q) =>
         q.options.flatMap((o) => o.items)
     ).filter(Boolean))] as Item[];
@@ -25,13 +29,13 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     useEffect(() => {
-        if (selectRefs.current[items.length - 1]) {
-            const input = selectRefs.current[items.length - 1]?.querySelector('input');
+        if (selectRefs.current[itemFields.length - 1]) {
+            const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
             if (input) {
                 input.focus();
             }
         }
-    }, [items.length]);
+    }, [itemFields.length]);
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
@@ -52,30 +56,35 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
 
             <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {items.map((item: Item, itemIndex: number) => (
+                {itemFields.map((item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             {people.map((person) => {
                                 return (
-                                    <div key={person.order}>
-                                        {person.name}
-                                    </div>
+                                    <label key={itemIndex + person.id} className="px-1">
+                                        <span>{person.name}</span>
+                                        <input className='ml-1' type="checkbox" key={person.id} />
+                                    </label>
                                 )
                             })}
-                            <CustomCreatableSelect
-                                value={item.text}
-                                onChange={(value) => {
-                                    const newItems = [...items];
-                                    newItems[itemIndex] = { text: value, personSelections: [] };
-                                    setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
-                                }}
-                                options={allItemNames()}
-                                placeholder="Enter item"
-                            />
+                            <Controller
+                                control={control}
+                                name={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
+                                render={({ field: { value, onChange } }) =>
+                                    <CustomCreatableSelect
+                                        value={value.text}
+                                        onChange={(newValue) => {
+                                            onChange({ ...value, text: newValue })
+                                        }}
+                                        options={allItemNames()}
+                                        placeholder="Enter item"
+                                    />}
+                            >
+                            </Controller>
                         </div>
                         <CloseButton
                             onClick={() => {
-                                const newItems = items.filter((_: Item, i: number) => i !== itemIndex);
+                                const newItems = itemFields.filter((_: Item, i: number) => i !== itemIndex);
                                 setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
                             }}
                             label={`Remove item ${itemIndex + 1}`}
@@ -85,10 +94,7 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
                 <Button
                     type="button"
                     onClick={() => {
-                        setValue(
-                            `questions.${questionIndex}.options.${optionIndex}.items`,
-                            [...items, ""]
-                        );
+                        appendItem({ text: "", personSelections: [] });
                     }}
                     variant="ghost"
                     className="mt-2"

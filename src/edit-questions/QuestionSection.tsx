@@ -42,6 +42,7 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                 <div className="space-y-4">
                     {optionFields.map((option, optionIndex) => (
                         <OptionSection
+                            control={control}
                             key={option.id}
                             questionIndex={questionIndex}
                             optionIndex={optionIndex}
