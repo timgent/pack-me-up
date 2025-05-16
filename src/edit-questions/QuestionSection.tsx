@@ -1,5 +1,5 @@
 import { useFieldArray, Control } from 'react-hook-form'
-import { PackingListQuestionSet, newOption } from './types'
+import { PackingListQuestionSet, Person, newOption } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
@@ -12,9 +12,10 @@ interface QuestionSectionProps {
     watch: any;
     setValue: any;
     removeQuestion: () => void;
+    people: Person[];
 }
 
-export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion }: QuestionSectionProps) {
+export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people }: QuestionSectionProps) {
     const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options` as const
@@ -48,6 +49,7 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                             watch={watch}
                             setValue={setValue}
                             removeOption={() => removeOption(optionIndex)}
+                            people={people}
                         />
                     ))}
                     <div className="mt-4">

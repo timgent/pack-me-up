@@ -1,5 +1,11 @@
 export interface PackingListQuestionSet {
+    people: Person[]
     questions: Question[]
+}
+
+export interface Person {
+    id: string
+    name: string
 }
 
 export type Question = DraftQuestion | SavedQuestion
@@ -28,6 +34,11 @@ export function newOption(order: number) {
 
 export interface Option {
     text: string
-    items: string[]
+    items: Item[]
     order: number
-} 
+}
+
+export interface Item {
+    text: string
+    personSelections: { personOrder: number, selected: boolean }[]
+}

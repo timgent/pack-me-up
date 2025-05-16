@@ -3,7 +3,7 @@ import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
-import { PackingListQuestionSet } from './types'
+import { Item, PackingListQuestionSet, Person } from './types'
 import { useRef, useEffect } from 'react'
 
 interface OptionSectionProps {
@@ -13,13 +13,15 @@ interface OptionSectionProps {
     watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     removeOption: () => void;
+    people: Person[];
 }
 
-export function OptionSection({ questionIndex, optionIndex, register, watch, setValue, removeOption }: OptionSectionProps) {
+export function OptionSection({ questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
     const items = watch(`questions.${questionIndex}.options.${optionIndex}.items`) || [];
     const allItems = [...new Set(watch('questions').flatMap((q) =>
         q.options.flatMap((o) => o.items)
-    ).filter(Boolean))] as string[];
+    ).filter(Boolean))] as Item[];
+    const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
 
     useEffect(() => {
@@ -50,23 +52,30 @@ export function OptionSection({ questionIndex, optionIndex, register, watch, set
 
             <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {items.map((item: string, itemIndex: number) => (
+                {items.map((item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
+                            {people.map((person) => {
+                                return (
+                                    <div key={person.order}>
+                                        {person.name}
+                                    </div>
+                                )
+                            })}
                             <CustomCreatableSelect
-                                value={item}
+                                value={item.text}
                                 onChange={(value) => {
                                     const newItems = [...items];
-                                    newItems[itemIndex] = value;
+                                    newItems[itemIndex] = { text: value, personSelections: [] };
                                     setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
                                 }}
-                                options={allItems}
+                                options={allItemNames()}
                                 placeholder="Enter item"
                             />
                         </div>
                         <CloseButton
                             onClick={() => {
-                                const newItems = items.filter((_: string, i: number) => i !== itemIndex);
+                                const newItems = items.filter((_: Item, i: number) => i !== itemIndex);
                                 setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
                             }}
                             label={`Remove item ${itemIndex + 1}`}

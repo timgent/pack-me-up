@@ -1,18 +1,25 @@
 import { useEffect } from 'react'
-import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
+import { useForm, SubmitHandler, useFieldArray, ChangeHandler } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
 import { QuestionSection } from './QuestionSection'
+import { PeopleSection } from './PeopleSection'
 import { Button } from '../components/Button'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
-    const retrieved = db.get<PackingListQuestionSet>("1")
     const { register, control, handleSubmit, setValue, watch, reset } = useForm<PackingListQuestionSet>({
-        defaultValues: { questions: [] }
+        defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] }
+    });
+    const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
+        control,
+        name: "people"
     });
 
+    const people = watch("people")
+
     useEffect(() => {
+        const retrieved = db.get<PackingListQuestionSet>("1")
         retrieved.then(doc => {
             reset(doc)
         }).catch(err => {
@@ -38,6 +45,13 @@ export function EditQuestionsForm() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <PeopleSection
+                    control={control}
+                    register={register}
+                    fields={peopleFields}
+                    append={appendPeople}
+                    remove={removePeople}
+                />
                 {questionFields.map((question, questionIndex) => (
                     <QuestionSection
                         key={question.id}
@@ -47,6 +61,7 @@ export function EditQuestionsForm() {
                         watch={watch}
                         setValue={setValue}
                         removeQuestion={() => removeQuestion(questionIndex)}
+                        people={people}
                     />
                 ))}
 
@@ -61,6 +76,7 @@ export function EditQuestionsForm() {
                     <Button type="submit">
                         Save Changes
                     </Button>
+                    <Button onClick={() => reset({})}>Reset form</Button>
                 </div>
             </form>
         </div>
