@@ -11,10 +11,17 @@ export interface Person {
 export type Question = DraftQuestion | SavedQuestion
 
 export function newDraftQuestion(order: number): DraftQuestion {
-    return { type: "draft", text: "", options: [], order }
+    return {
+        id: crypto.randomUUID(),
+        type: "draft",
+        text: "",
+        options: [],
+        order
+    }
 }
 
 interface CommonQuestion {
+    id: string
     text: string
     options: Option[]
     order: number
@@ -26,6 +33,7 @@ export type SavedQuestion = CommonQuestion & { type: "saved" }
 
 export function newOption(order: number) {
     return {
+        id: crypto.randomUUID(),
         text: "",
         items: [],
         order
@@ -33,6 +41,7 @@ export function newOption(order: number) {
 }
 
 export interface Option {
+    id: string
     text: string
     items: Item[]
     order: number
