@@ -8,13 +8,27 @@ import { Button } from '../components/Button'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
-    const { register, control, handleSubmit, setValue, watch, reset } = useForm<PackingListQuestionSet>({
+    const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
         defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] }
     });
     const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
         control,
         name: "people"
     });
+
+    const removePerson = (removedIndex: number) => {
+        getValues("questions").forEach((question, questionIndex) => {
+            getValues(`questions.${questionIndex}.options`).forEach((option, optionIndex) => {
+                getValues(`questions.${questionIndex}.options.${optionIndex}.items`).forEach((item, itemIndex) => {
+                    const currentPersonSelections = getValues(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections`)
+                    const newPersonSelections = currentPersonSelections.splice(removedIndex, 1)
+                    console.log({ newPersonSelections })
+                    setValue(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections`, newPersonSelections)
+                })
+            })
+        })
+        removePeople(removedIndex)
+    }
 
     const people = watch("people")
 
@@ -50,7 +64,7 @@ export function EditQuestionsForm() {
                     register={register}
                     fields={peopleFields}
                     append={appendPeople}
-                    remove={removePeople}
+                    remove={removePerson}
                 />
                 {questionFields.map((question, questionIndex) => (
                     <QuestionSection
