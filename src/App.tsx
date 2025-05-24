@@ -7,10 +7,11 @@ import { CreatePackingList } from './create-packing-list/create-packing-list'
 import { Navigation } from './components/Navigation'
 import { PackingLists } from './packing-lists/packing-lists'
 import { ViewPackingList } from './packing-lists/view-packing-list'
+import { ToastProvider } from './components/ToastContext'
 
 function App() {
   return (
-    <>
+    <ToastProvider>
       <HashRouter>
         <Navigation />
         <div className="container mx-auto px-4 py-8">
@@ -22,7 +23,7 @@ function App() {
           </Routes>
         </div>
       </HashRouter>
-    </>
+    </ToastProvider>
   )
 }
 

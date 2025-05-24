@@ -5,11 +5,13 @@ import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList, PackingListFormData, PackingListItem } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
+import { useToast } from '../components/ToastContext'
 
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const questionsDb = new PouchDB('packing-list-question-set')
     const packingListsDb = new PouchDB('packing-lists')
+    const { showToast } = useToast()
 
     const { register, handleSubmit } = useForm<PackingListFormData>({
         defaultValues: {
@@ -66,9 +68,12 @@ export function CreatePackingList() {
                 _id: packingList.id,
                 ...packingList
             })
-            console.log('Created packing list:', packingList)
+            showToast('Packing list created successfully!', 'success')
+            // Reset the form after successful creation
+            window.location.href = '/#/view-lists'
         } catch (err) {
             console.error('Error saving packing list:', err)
+            showToast('Failed to create packing list. Please try again.', 'error')
         }
     }
 

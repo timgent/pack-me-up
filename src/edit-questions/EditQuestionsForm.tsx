@@ -5,6 +5,7 @@ import { PackingListQuestionSet, newDraftQuestion } from './types'
 import { QuestionSection } from './QuestionSection'
 import { PeopleSection } from './PeopleSection'
 import { Button } from '../components/Button'
+import { useToast } from '../components/ToastContext'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
@@ -15,6 +16,7 @@ export function EditQuestionsForm() {
         control,
         name: "people"
     });
+    const { showToast } = useToast();
 
     const removePerson = (removedIndex: number) => {
         // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -45,9 +47,14 @@ export function EditQuestionsForm() {
         name: "questions"
     });
 
-    const onSubmit: SubmitHandler<PackingListQuestionSet> = (data) => {
-        db.put({ _id: "1", ...data })
-        console.log("Form data:", data);
+    const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
+        try {
+            await db.put({ _id: "1", ...data });
+            showToast('Changes saved successfully!', 'success');
+        } catch (error) {
+            console.error('Error saving changes:', error);
+            showToast('Failed to save changes. Please try again.', 'error');
+        }
     };
 
     return (
