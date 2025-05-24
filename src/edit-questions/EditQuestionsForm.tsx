@@ -95,28 +95,11 @@ export function EditQuestionsForm() {
 
     const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
         try {
-            // First try to get the existing document
-            const existingDoc = await db.get("1").catch(err => {
-                if (err.name === 'not_found') {
-                    return null;
-                }
-                throw err;
-            });
-
-            // If document exists, update it with the new data
-            if (existingDoc) {
-                await db.put({
-                    _id: "1",
-                    _rev: existingDoc._rev,
-                    ...data
-                });
-            } else {
-                // If no document exists, create a new one
-                await db.put({
-                    _id: "1",
-                    ...data
-                });
-            }
+            // Force put with overwrite
+            await db.put({
+                _id: "1",
+                ...data
+            }, { force: true });
             showToast('Changes saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving changes:', error);
@@ -132,7 +115,7 @@ export function EditQuestionsForm() {
             </div>
             <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
                 {/* Main form content */}
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8" id="edit-questions-form">
                     <PeopleSection
                         control={control}
                         register={register}
