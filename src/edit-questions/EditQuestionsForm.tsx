@@ -125,56 +125,59 @@ export function EditQuestionsForm() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="mb-8">
+        <div className="w-full flex flex-col items-center py-8 px-4">
+            <div className="mb-8 w-full max-w-5xl">
                 <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
                 <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
             </div>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <PeopleSection
-                    control={control}
-                    register={register}
-                    fields={peopleFields}
-                    append={appendPeople}
-                    remove={removePerson}
-                />
-                {questionFields.map((question, questionIndex) => (
-                    <QuestionSection
-                        key={question.id}
-                        questionIndex={questionIndex}
+            <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+                {/* Main form content */}
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8">
+                    <PeopleSection
                         control={control}
                         register={register}
-                        watch={watch}
-                        setValue={setValue}
-                        removeQuestion={() => removeQuestion(questionIndex)}
-                        people={people}
+                        fields={peopleFields}
+                        append={appendPeople}
+                        remove={removePerson}
                     />
-                ))}
-
-                <div className="flex items-center gap-4 pt-4">
-                    <Button
-                        type="button"
-                        onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
-                        variant="secondary"
-                    >
-                        Add Question
-                    </Button>
-                    <Button type="submit">
-                        Save Changes
-                    </Button>
-                    <Button type="button" onClick={() => {
-                        reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
-                        showToast('Form has been reset to default state', 'success');
-                    }}>Reset form</Button>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="file"
-                            accept=".json"
-                            onChange={handleImport}
-                            className="hidden"
-                            id="import-file"
+                    {questionFields.map((question, questionIndex) => (
+                        <QuestionSection
+                            key={question.id}
+                            questionIndex={questionIndex}
+                            control={control}
+                            register={register}
+                            watch={watch}
+                            setValue={setValue}
+                            removeQuestion={() => removeQuestion(questionIndex)}
+                            people={people}
                         />
+                    ))}
+                    {/* Hidden import input for sticky bar/sidebar button */}
+                    <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImport}
+                        className="hidden"
+                        id="import-file"
+                    />
+                </form>
+                {/* Sticky sidebar for large screens */}
+                <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
+                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
+                        <Button
+                            type="button"
+                            onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+                            variant="secondary"
+                        >
+                            Add Question
+                        </Button>
+                        <Button type="submit" form="edit-questions-form">
+                            Save Changes
+                        </Button>
+                        <Button type="button" onClick={() => {
+                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
+                            showToast('Form has been reset to default state', 'success');
+                        }}>Reset form</Button>
                         <Button
                             type="button"
                             onClick={() => document.getElementById('import-file')?.click()}
@@ -191,7 +194,42 @@ export function EditQuestionsForm() {
                         </Button>
                     </div>
                 </div>
-            </form>
+            </div>
+            {/* Sticky bottom bar for small/medium screens */}
+            <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
+                <div className="max-w-4xl w-full px-4 pb-4">
+                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
+                        <Button
+                            type="button"
+                            onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+                            variant="secondary"
+                        >
+                            Add Question
+                        </Button>
+                        <Button type="submit" form="edit-questions-form">
+                            Save Changes
+                        </Button>
+                        <Button type="button" onClick={() => {
+                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
+                            showToast('Form has been reset to default state', 'success');
+                        }}>Reset form</Button>
+                        <Button
+                            type="button"
+                            onClick={() => document.getElementById('import-file')?.click()}
+                            variant="secondary"
+                        >
+                            Import
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleExport}
+                            variant="secondary"
+                        >
+                            Export
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 } 
