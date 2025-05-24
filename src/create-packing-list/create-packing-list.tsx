@@ -41,14 +41,17 @@ export function CreatePackingList() {
             const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
                 const selectedPeople = item.personSelections.filter((person) => (person.selected))
                 return selectedPeople.flatMap((person) => {
+                    const personName = questionSet.people.find((p) => p.id === person.personId)!.name
                     return {
-                        text: item.text,
+                        itemText: item.text,
                         personId: person.personId,
+                        personName,
                         questionId: question.id,
                         optionId: selectedOption.id,
                         packed: false
                     }
-                })
+                }
+                )
             })
             return packingListItems
         })

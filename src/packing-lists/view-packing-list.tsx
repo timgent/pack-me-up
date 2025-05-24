@@ -85,7 +85,7 @@ export function ViewPackingList() {
                                 className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                             />
                             <span className={`text-gray-700 ${item.packed ? 'line-through text-gray-400' : ''}`}>
-                                {item.text}
+                                {item.personName} - {item.itemText}
                             </span>
                         </label>
                     </div>
