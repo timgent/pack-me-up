@@ -18,6 +18,7 @@ export function ItemPeopleSection({ control, questionIndex, optionIndex, itemInd
                 return (
                     <label key={itemIndex + person.id} className="px-1" >
                         <span>{person.name}</span>
+                        <input type="hidden" {...register(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections.${personIndex}.personId`)} value={person.id} />
                         <input className='ml-1' type="checkbox" key={`${questionIndex}-${optionIndex}-${itemIndex}-${personIndex}`} {...register(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections.${personIndex}.selected`)} />
                     </label>
                 )
