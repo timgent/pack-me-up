@@ -47,6 +47,52 @@ export function EditQuestionsForm() {
         name: "questions"
     });
 
+    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const content = e.target?.result as string;
+                const data = JSON.parse(content) as PackingListQuestionSet;
+
+                // Try to get the existing document to get its _rev
+                try {
+                    const existingDoc = await db.get("1");
+                    // If we have an existing doc, merge the _rev with the imported data
+                    data._rev = existingDoc._rev;
+                } catch (err: any) {
+                    // If document doesn't exist, that's fine - we'll create a new one
+                    if (err.name !== 'not_found') {
+                        throw err;
+                    }
+                }
+
+                reset(data);
+                showToast('Questions imported successfully!', 'success');
+            } catch (error) {
+                console.error('Error importing file:', error);
+                showToast('Failed to import file. Please check the file format.', 'error');
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleExport = () => {
+        const data = getValues();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'packing-list-questions.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Questions exported successfully!', 'success');
+    };
+
     const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
         try {
             // First try to get the existing document
@@ -121,6 +167,29 @@ export function EditQuestionsForm() {
                         reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
                         showToast('Form has been reset to default state', 'success');
                     }}>Reset form</Button>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="file"
+                            accept=".json"
+                            onChange={handleImport}
+                            className="hidden"
+                            id="import-file"
+                        />
+                        <Button
+                            type="button"
+                            onClick={() => document.getElementById('import-file')?.click()}
+                            variant="secondary"
+                        >
+                            Import
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleExport}
+                            variant="secondary"
+                        >
+                            Export
+                        </Button>
+                    </div>
                 </div>
             </form>
         </div>
