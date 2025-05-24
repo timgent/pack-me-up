@@ -49,7 +49,28 @@ export function EditQuestionsForm() {
 
     const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
         try {
-            await db.put({ _id: "1", ...data });
+            // First try to get the existing document
+            const existingDoc = await db.get("1").catch(err => {
+                if (err.name === 'not_found') {
+                    return null;
+                }
+                throw err;
+            });
+
+            // If document exists, update it with the new data
+            if (existingDoc) {
+                await db.put({
+                    _id: "1",
+                    _rev: existingDoc._rev,
+                    ...data
+                });
+            } else {
+                // If no document exists, create a new one
+                await db.put({
+                    _id: "1",
+                    ...data
+                });
+            }
             showToast('Changes saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving changes:', error);
