@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
-import { PackingList, PackingListFormData } from './types'
+import { PackingList, PackingListFormData, PackingListItem } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 
@@ -11,7 +11,7 @@ export function CreatePackingList() {
     const questionsDb = new PouchDB('packing-list-question-set')
     const packingListsDb = new PouchDB('packing-lists')
 
-    const { register, handleSubmit, watch } = useForm<PackingListFormData>({
+    const { register, handleSubmit } = useForm<PackingListFormData>({
         defaultValues: {
             name: '',
             questionAnswers: []
@@ -33,37 +33,31 @@ export function CreatePackingList() {
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return
 
-        // Create a new packing list
+        const packingListItems = data.questionAnswers.flatMap((qa) => {
+            const questionId = qa.questionId
+            const selectedOptionid = qa.selectedOptionId
+            const question = questionSet.questions.find((q) => q.id === questionId)!
+            const selectedOption = question?.options.find((option) => (option.id === selectedOptionid))!
+            const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
+                const selectedPeople = item.personSelections.filter((person) => (person.selected))
+                return selectedPeople.flatMap((person) => {
+                    return {
+                        text: item.text,
+                        personId: person.personId,
+                        questionId: question.id,
+                        optionId: selectedOption.id,
+                        packed: false
+                    }
+                })
+            })
+            return packingListItems
+        })
         const packingList: PackingList = {
             id: crypto.randomUUID(),
             name: data.name,
-            created_at: new Date().toISOString(),
-            items: []
+            createdAt: new Date().toISOString(),
+            items: packingListItems
         }
-
-        // For each question answer, add the selected items to the packing list
-        data.questionAnswers.forEach(answer => {
-            const question = questionSet.questions.find(q => q.id === answer.questionId)
-            if (!question) return
-
-            const option = question.options.find(o => o.id === answer.selectedOptionId)
-            if (!option) return
-
-            // Add each item from the selected option
-            option.items.forEach(item => {
-                // Only add items that are selected for any person
-                const selectedForAnyPerson = item.personSelections.some(ps => ps.selected)
-                if (selectedForAnyPerson) {
-                    packingList.items.push({
-                        text: item.text,
-                        personId: item.personSelections.find(ps => ps.selected)?.personId || '',
-                        questionId: question.id,
-                        optionId: option.id
-                    })
-                }
-            })
-        })
-
         try {
             await packingListsDb.put({
                 _id: packingList.id,
@@ -96,6 +90,11 @@ export function CreatePackingList() {
                 {questionSet.questions.map((question, index) => (
                     <div key={question.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">{question.text}</h3>
+                        <input
+                            type="hidden"
+                            {...register(`questionAnswers.${index}.questionId`)}
+                            value={question.id}
+                        />
                         <div className="space-y-2">
                             {question.options.map((option) => (
                                 <label key={`${question.id}-${option.id}`} className="flex items-center space-x-3">
@@ -103,12 +102,6 @@ export function CreatePackingList() {
                                         type="radio"
                                         value={option.id}
                                         {...register(`questionAnswers.${index}.selectedOptionId`)}
-                                        onChange={(e) => {
-                                            register(`questionAnswers.${index}.selectedOptionId`).onChange(e);
-                                            register(`questionAnswers.${index}.questionId`).onChange({
-                                                target: { value: question.id }
-                                            });
-                                        }}
                                         className="h-4 w-4 text-blue-600"
                                     />
                                     <span className="text-gray-700">{option.text}</span>

@@ -15,7 +15,7 @@ export function PackingLists() {
                 const result = await packingListsDb.allDocs({ include_docs: true })
                 const lists = result.rows
                     .map(row => row.doc as PackingList)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 setPackingLists(lists)
             } catch (err) {
                 console.error('Error fetching packing lists:', err)
@@ -53,7 +53,7 @@ export function PackingLists() {
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-medium text-gray-900">{list.name}</h3>
                                 <span className="text-sm text-gray-500">
-                                    {new Date(list.created_at).toLocaleDateString()}
+                                    {new Date(list.createdAt).toLocaleDateString()}
                                 </span>
                             </div>
                             <div className="mt-2 text-sm text-gray-500">

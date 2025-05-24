@@ -17,6 +17,7 @@ export function EditQuestionsForm() {
     });
 
     const removePerson = (removedIndex: number) => {
+        // We need this wrapper for removing people to correctly removed the check boxes for that person
         getValues("questions").forEach((question, questionIndex) => {
             getValues(`questions.${questionIndex}.options`).forEach((option, optionIndex) => {
                 getValues(`questions.${questionIndex}.options.${optionIndex}.items`).forEach((item, itemIndex) => {

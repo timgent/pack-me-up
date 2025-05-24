@@ -68,7 +68,7 @@ export function ViewPackingList() {
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
-                <p className="mt-2 text-gray-600">Created on {new Date(packingList.created_at).toLocaleDateString()}</p>
+                <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
             </div>
 
             <div className="space-y-4 mb-8">
