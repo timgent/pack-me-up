@@ -9,6 +9,17 @@ export function PackingLists() {
     const navigate = useNavigate()
     const packingListsDb = new PouchDB('packing-lists')
 
+    const deletePackingList = async (id: string, event: React.MouseEvent) => {
+        event.stopPropagation() // Prevent navigation when clicking delete
+        try {
+            const doc = await packingListsDb.get(id)
+            await packingListsDb.remove(doc)
+            setPackingLists(packingLists.filter(list => list.id !== id))
+        } catch (err) {
+            console.error('Error deleting packing list:', err)
+        }
+    }
+
     useEffect(() => {
         const fetchPackingLists = async () => {
             try {
@@ -52,9 +63,17 @@ export function PackingLists() {
                         >
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-medium text-gray-900">{list.name}</h3>
-                                <span className="text-sm text-gray-500">
-                                    {new Date(list.createdAt).toLocaleDateString()}
-                                </span>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-500">
+                                        {new Date(list.createdAt).toLocaleDateString()}
+                                    </span>
+                                    <button
+                                        onClick={(e) => deletePackingList(list.id, e)}
+                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
                             <div className="mt-2 text-sm text-gray-500">
                                 {list.items.filter(item => item.packed).length} of {list.items.length} items packed
