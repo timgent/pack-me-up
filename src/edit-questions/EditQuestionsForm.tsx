@@ -96,7 +96,10 @@ export function EditQuestionsForm() {
                     <Button type="submit">
                         Save Changes
                     </Button>
-                    <Button onClick={() => reset({})}>Reset form</Button>
+                    <Button type="button" onClick={() => {
+                        reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
+                        showToast('Form has been reset to default state', 'success');
+                    }}>Reset form</Button>
                 </div>
             </form>
         </div>

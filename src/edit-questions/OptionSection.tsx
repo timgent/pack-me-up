@@ -23,7 +23,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
     })
-    const allItems = [...new Set(watch('questions').flatMap((q) =>
+    const allItems = [...new Set((watch('questions') ?? []).flatMap((q) =>
         q.options.flatMap((o) => o.items)
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
