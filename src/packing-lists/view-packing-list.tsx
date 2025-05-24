@@ -72,24 +72,32 @@ export function ViewPackingList() {
             </div>
 
             <div className="space-y-4 mb-8">
-                {packingList.items.map((item, index) => (
-                    <div
-                        key={`${item.questionId}-${item.optionId}`}
-                        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
-                    >
-                        <label className="flex items-center space-x-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={item.packed || false}
-                                onChange={() => toggleItemPacked(index)}
-                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                            />
-                            <span className={`text-gray-700 ${item.packed ? 'line-through text-gray-400' : ''}`}>
-                                {item.personName} - {item.itemText}
-                            </span>
-                        </label>
-                    </div>
-                ))}
+                {[...packingList.items]
+                    .sort((a, b) => {
+                        // First sort by person name
+                        const personCompare = a.personName.localeCompare(b.personName);
+                        if (personCompare !== 0) return personCompare;
+                        // If same person, sort by item text
+                        return a.itemText.localeCompare(b.itemText);
+                    })
+                    .map((item, index) => (
+                        <div
+                            key={`${item.questionId}-${item.optionId}`}
+                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                        >
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={item.packed || false}
+                                    onChange={() => toggleItemPacked(index)}
+                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                />
+                                <span className={`text-gray-700 ${item.packed ? 'line-through text-gray-400' : ''}`}>
+                                    {item.personName} - {item.itemText}
+                                </span>
+                            </label>
+                        </div>
+                    ))}
             </div>
 
             <div className="flex justify-end space-x-4">
