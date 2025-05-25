@@ -13,7 +13,7 @@ import { exampleData } from './example-data'
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
     const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
-        defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] }
+        defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] }
     });
     const [rev, setRev] = useState<string | undefined>(undefined)
     const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
@@ -51,7 +51,8 @@ export function EditQuestionsForm() {
                 const newDoc = {
                     _id: "1",
                     questions: [],
-                    people: [{ id: crypto.randomUUID(), name: "Me" }]
+                    people: [{ id: crypto.randomUUID(), name: "Me" }],
+                    alwaysNeededItems: []
                 }
                 db.put(newDoc).then(result => {
                     setRev(result.rev)
@@ -204,7 +205,7 @@ export function EditQuestionsForm() {
                             Save Changes
                         </Button>
                         <Button type="button" onClick={() => {
-                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
+                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] });
                             showToast('Form has been reset to default state', 'success');
                         }}>Reset form</Button>
                         <Button
@@ -246,7 +247,7 @@ export function EditQuestionsForm() {
                             Save Changes
                         </Button>
                         <Button type="button" onClick={() => {
-                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] });
+                            reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] });
                             showToast('Form has been reset to default state', 'success');
                         }}>Reset form</Button>
                         <Button
