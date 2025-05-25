@@ -49,9 +49,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
                                 control={control}
-                                questionIndex={-1}
-                                optionIndex={-1}
-                                itemIndex={itemIndex}
+                                basePath={`alwaysNeededItems.${itemIndex}`}
                                 register={register}
                                 watch={watch}
                                 setValue={setValue}

@@ -60,7 +60,14 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 {itemFields.map((item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
-                            <ItemPeopleSection control={control} questionIndex={questionIndex} optionIndex={optionIndex} itemIndex={itemIndex} register={register} watch={watch} setValue={setValue} allPeople={people} />
+                            <ItemPeopleSection
+                                control={control}
+                                basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
+                                register={register}
+                                watch={watch}
+                                setValue={setValue}
+                                allPeople={people}
+                            />
                             <Controller
                                 control={control}
                                 name={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}

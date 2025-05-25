@@ -1,26 +1,28 @@
 import { Control, useFieldArray, UseFormRegister, UseFormWatch, UseFormSetValue, FieldPath } from "react-hook-form";
 import { PackingListQuestionSet, Person } from "./types";
 
+type ItemPath =
+    | `alwaysNeededItems.${number}`
+    | `questions.${number}.options.${number}.items.${number}`;
+
 interface ItemPeopleSectionProps {
     control: Control<PackingListQuestionSet>;
-    questionIndex: number;
-    optionIndex: number;
-    itemIndex: number;
+    basePath: ItemPath;
     register: UseFormRegister<PackingListQuestionSet>;
     watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     allPeople: Person[];
 }
 
-export function ItemPeopleSection({ control, questionIndex, optionIndex, itemIndex, register, watch, setValue, allPeople }: ItemPeopleSectionProps) {
-    const personSelections = watch(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections`);
+export function ItemPeopleSection({ control, basePath, register, watch, setValue, allPeople }: ItemPeopleSectionProps) {
+    const personSelections = watch(`${basePath}.personSelections` as const);
     const allSelected = personSelections?.every(selection => selection.selected) ?? false;
 
     const handleToggleAll = () => {
         const newValue = !allSelected;
         allPeople.forEach((person, index) => {
             setValue(
-                `questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections.${index}`,
+                `${basePath}.personSelections.${index}` as const,
                 { personId: person.id, selected: newValue }
             );
         });
@@ -37,10 +39,10 @@ export function ItemPeopleSection({ control, questionIndex, optionIndex, itemInd
             </button>
             {allPeople.map((person, personIndex) => {
                 return (
-                    <label key={itemIndex + person.id} className="px-1" >
+                    <label key={person.id} className="px-1" >
                         <span>{person.name}</span>
-                        <input type="hidden" {...register(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections.${personIndex}.personId`)} value={person.id} />
-                        <input className='ml-1' type="checkbox" key={`${questionIndex}-${optionIndex}-${itemIndex}-${personIndex}`} {...register(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections.${personIndex}.selected`)} />
+                        <input type="hidden" {...register(`${basePath}.personSelections.${personIndex}.personId` as const)} value={person.id} />
+                        <input className='ml-1' type="checkbox" {...register(`${basePath}.personSelections.${personIndex}.selected` as const)} />
                     </label>
                 )
             })}
