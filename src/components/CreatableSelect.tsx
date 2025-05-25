@@ -34,6 +34,12 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
         setInputValue(inputValue);
     };
 
+    const handleBlur = () => {
+        if (inputValue.trim()) {
+            onChange(inputValue.trim());
+        }
+    };
+
     return (
         <CreatableSelect
             isClearable
@@ -41,6 +47,7 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
             value={value ? { label: value, value } : null}
             onChange={handleChange}
             onInputChange={handleInputChange}
+            onBlur={handleBlur}
             options={selectOptions}
             placeholder={placeholder}
             className="react-select-container"
