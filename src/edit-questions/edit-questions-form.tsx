@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
@@ -13,6 +13,11 @@ import { Callout } from '../components/Callout'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
+    console.log('PouchDB instance created:', {
+        name: db.name,
+        timestamp: new Date().toISOString()
+    });
+
     const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
         defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] }
     });
@@ -23,6 +28,7 @@ export function EditQuestionsForm() {
         name: "people"
     });
     const { showToast } = useToast();
+    const initRef = useRef(false);
 
     const removePerson = (removedIndex: number) => {
         // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -40,13 +46,27 @@ export function EditQuestionsForm() {
     const people = watch("people")
 
     useEffect(() => {
-        console.log("Loading doc")
+        // Skip if we've already initialized
+        if (initRef.current) return;
+        initRef.current = true;
+
+        console.log("Starting document load sequence")
         const retrieved = db.get<PackingListQuestionSet>("1")
         retrieved.then(doc => {
+            console.log("Document retrieved successfully:", {
+                _id: doc._id,
+                _rev: doc._rev,
+                timestamp: new Date().toISOString()
+            })
             setRev(doc._rev)
             reset(doc)
-            console.log("Loaded doc: ", doc)
         }).catch(err => {
+            console.log("Initial get error:", {
+                name: err.name,
+                message: err.message,
+                status: err.status,
+                timestamp: new Date().toISOString()
+            })
             if (err.name === 'not_found') {
                 console.log('No data yet, creating new doc')
                 const newDoc = {
@@ -55,12 +75,41 @@ export function EditQuestionsForm() {
                     people: [{ id: crypto.randomUUID(), name: "Me" }],
                     alwaysNeededItems: []
                 }
+                console.log("Attempting to create new doc:", {
+                    doc: newDoc,
+                    timestamp: new Date().toISOString()
+                })
                 db.put(newDoc).then(result => {
+                    console.log("Document created successfully:", {
+                        ok: result.ok,
+                        id: result.id,
+                        rev: result.rev,
+                        timestamp: new Date().toISOString()
+                    })
                     setRev(result.rev)
                     reset(newDoc)
-                    console.log("Created new doc: ", newDoc)
                 }).catch(putErr => {
-                    console.error('Error creating new doc:', putErr)
+                    console.error('Error creating new doc:', {
+                        name: putErr.name,
+                        message: putErr.message,
+                        status: putErr.status,
+                        docId: putErr.docId,
+                        timestamp: new Date().toISOString()
+                    })
+                    // Let's also check if the document exists now
+                    db.get("1").then(doc => {
+                        console.log("Document exists after conflict:", {
+                            _id: doc._id,
+                            _rev: doc._rev,
+                            timestamp: new Date().toISOString()
+                        })
+                    }).catch(getErr => {
+                        console.log("Document still not found after conflict:", {
+                            name: getErr.name,
+                            message: getErr.message,
+                            timestamp: new Date().toISOString()
+                        })
+                    })
                     showToast('Failed to initialize database', 'error')
                 })
             } else {

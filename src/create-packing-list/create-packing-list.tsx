@@ -6,9 +6,12 @@ import { PackingList, PackingListFormData, PackingListItem } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
+import { exampleData } from '../edit-questions/example-data'
+import { Callout } from '../components/Callout'
 
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
+    const [isExampleLoaded, setIsExampleLoaded] = useState(false)
     const questionsDb = new PouchDB('packing-list-question-set')
     const packingListsDb = new PouchDB('packing-lists')
     const { showToast } = useToast()
@@ -25,8 +28,16 @@ export function CreatePackingList() {
             try {
                 const doc = await questionsDb.get<PackingListQuestionSet>('1')
                 setQuestionSet(doc)
-            } catch (err) {
-                console.error('Error fetching question set:', err)
+            } catch (err: any) {
+                if (err.name === 'not_found') {
+                    console.log('No question set found, using example data')
+                    const exampleDoc = exampleData["Basic packing list for 1"]
+                    setQuestionSet(exampleDoc)
+                    setIsExampleLoaded(true)
+                } else {
+                    console.error('Error fetching question set:', err)
+                    showToast('Failed to load questions', 'error')
+                }
             }
         }
         fetchQuestionSet()
@@ -106,6 +117,15 @@ export function CreatePackingList() {
                 <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
                 <p className="mt-2 text-gray-600">Answer the questions below to create your packing list.</p>
             </div>
+
+            {isExampleLoaded && (
+                <div className="mb-8">
+                    <Callout
+                        title="Example Questions Loaded"
+                        description="We've loaded some example questions to help you get started. You can customize these questions later in the Edit Questions section."
+                    />
+                </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <Input

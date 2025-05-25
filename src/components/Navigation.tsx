@@ -10,7 +10,9 @@ export const Navigation = () => {
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
                         <div className="flex-shrink-0">
-                            <span className="text-xl font-bold">Pack Me Up</span>
+                            <Link to="/" className="text-xl font-bold hover:text-gray-300">
+                                Pack Me Up
+                            </Link>
                         </div>
                         <div className="hidden md:block">
                             <div className="ml-10 flex items-baseline space-x-4">
