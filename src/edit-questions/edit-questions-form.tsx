@@ -6,6 +6,7 @@ import { QuestionSection } from './question-section'
 import { PeopleSection } from './people-section'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
+import { AlwaysNeededItemsSection } from './always-needed-items-section'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
@@ -137,6 +138,13 @@ export function EditQuestionsForm() {
                         fields={peopleFields}
                         append={appendPeople}
                         remove={removePerson}
+                    />
+                    <AlwaysNeededItemsSection
+                        control={control}
+                        register={register}
+                        watch={watch}
+                        setValue={setValue}
+                        people={people}
                     />
                     {questionFields.map((question, questionIndex) => (
                         <QuestionSection

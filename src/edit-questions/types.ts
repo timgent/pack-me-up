@@ -2,6 +2,7 @@ export interface PackingListQuestionSet {
     _id?: string
     _rev?: string
     people: Person[]
+    alwaysNeededItems: Item[]
     questions: Question[]
 }
 
