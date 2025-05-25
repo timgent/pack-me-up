@@ -10,9 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.4",
+    "@types/pouchdb": "^6.4.2",
+    "@types/react-select": "^5.0.1",
+    "events": "^3.3.0",
+    "pouchdb": "^9.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.55.0",
+    "react-router-dom": "^7.6.0",
+    "react-select": "^5.10.1",
     "tailwindcss": "^4.1.4"
   },
   "devDependencies": {
