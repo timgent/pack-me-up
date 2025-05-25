@@ -55,6 +55,7 @@ export function EditQuestionsForm() {
                     people: [{ id: crypto.randomUUID(), name: "Me" }],
                     alwaysNeededItems: []
                 }
+                console.log("New doc content: ", newDoc)
                 db.put(newDoc).then(result => {
                     setRev(result.rev)
                     reset(newDoc)
