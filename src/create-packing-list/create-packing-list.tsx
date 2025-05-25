@@ -35,7 +35,8 @@ export function CreatePackingList() {
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return
 
-        const packingListItems = data.questionAnswers.flatMap((qa) => {
+        // Get items from question answers
+        const questionBasedItems = data.questionAnswers.flatMap((qa) => {
             const questionId = qa.questionId
             const selectedOptionid = qa.selectedOptionId
             const question = questionSet.questions.find((q) => q.id === questionId)!
@@ -52,16 +53,32 @@ export function CreatePackingList() {
                         optionId: selectedOption.id,
                         packed: false
                     }
-                }
-                )
+                })
             })
             return packingListItems
         })
+
+        // Get always needed items
+        const alwaysNeededItems = questionSet.alwaysNeededItems.flatMap((item) => {
+            const selectedPeople = item.personSelections.filter((person) => (person.selected))
+            return selectedPeople.flatMap((person) => {
+                const personName = questionSet.people.find((p) => p.id === person.personId)!.name
+                return {
+                    itemText: item.text,
+                    personId: person.personId,
+                    personName,
+                    questionId: 'always-needed',
+                    optionId: 'always-needed',
+                    packed: false
+                }
+            })
+        })
+
         const packingList: PackingList = {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
-            items: packingListItems
+            items: [...questionBasedItems, ...alwaysNeededItems]
         }
         try {
             await packingListsDb.put({
