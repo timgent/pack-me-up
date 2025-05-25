@@ -158,6 +158,16 @@ export function EditQuestionsForm() {
                             people={people}
                         />
                     ))}
+                    {/* Add Question button at bottom of form - only visible on large screens */}
+                    <div className="hidden lg:block">
+                        <Button
+                            type="button"
+                            onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+                            variant="secondary"
+                        >
+                            Add Question
+                        </Button>
+                    </div>
                     {/* Hidden import input for sticky bar/sidebar button */}
                     <input
                         type="file"
