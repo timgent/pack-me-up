@@ -1,4 +1,3 @@
-import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
@@ -44,7 +43,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
             </div>
 
             <div className="space-y-3">
-                {itemFields.map((item: Item, itemIndex: number) => (
+                {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection

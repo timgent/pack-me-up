@@ -1,4 +1,4 @@
-import { Control, useFieldArray, UseFormRegister, UseFormWatch, UseFormSetValue, FieldPath } from "react-hook-form";
+import { Control, UseFormRegister, UseFormWatch, UseFormSetValue } from "react-hook-form";
 import { PackingListQuestionSet, Person } from "./types";
 
 type ItemPath =
@@ -14,7 +14,7 @@ interface ItemPeopleSectionProps {
     allPeople: Person[];
 }
 
-export function ItemPeopleSection({ control, basePath, register, watch, setValue, allPeople }: ItemPeopleSectionProps) {
+export function ItemPeopleSection({ basePath, register, watch, setValue, allPeople }: ItemPeopleSectionProps) {
     const personSelections = watch(`${basePath}.personSelections` as const);
     const allSelected = personSelections?.every(selection => selection.selected) ?? false;
 

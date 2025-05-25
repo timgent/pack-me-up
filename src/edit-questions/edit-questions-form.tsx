@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useForm, SubmitHandler, useFieldArray, ChangeHandler } from "react-hook-form"
+import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
 import { QuestionSection } from './question-section'
@@ -22,9 +22,9 @@ export function EditQuestionsForm() {
 
     const removePerson = (removedIndex: number) => {
         // We need this wrapper for removing people to correctly removed the check boxes for that person
-        getValues("questions").forEach((question, questionIndex) => {
-            getValues(`questions.${questionIndex}.options`).forEach((option, optionIndex) => {
-                getValues(`questions.${questionIndex}.options.${optionIndex}.items`).forEach((item, itemIndex) => {
+        getValues("questions").forEach((_question, questionIndex) => {
+            getValues(`questions.${questionIndex}.options`).forEach((_option, optionIndex) => {
+                getValues(`questions.${questionIndex}.options.${optionIndex}.items`).forEach((_item, itemIndex) => {
                     const currentPersonSelections = getValues(`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}.personSelections`)
                     currentPersonSelections.splice(removedIndex, 1)
                 })

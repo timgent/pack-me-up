@@ -13,7 +13,7 @@ interface PeopleSectionProps {
     remove: (index: number) => void;
 }
 
-export function PeopleSection({ control, register, fields, append, remove }: PeopleSectionProps) {
+export function PeopleSection({ register, fields, append, remove }: PeopleSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
 
     return (

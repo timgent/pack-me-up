@@ -23,9 +23,10 @@ export function PackingLists() {
     useEffect(() => {
         const fetchPackingLists = async () => {
             try {
-                const result = await packingListsDb.allDocs({ include_docs: true })
+                const result = await packingListsDb.allDocs<PackingList>({ include_docs: true })
                 const lists = result.rows
-                    .map(row => row.doc as PackingList)
+                    .map(row => row.doc)
+                    .filter(doc => doc !== undefined)
                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 setPackingLists(lists)
             } catch (err) {

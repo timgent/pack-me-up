@@ -25,7 +25,7 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
 
     const handleChange = (
         newValue: OnChangeValue<Option, false>,
-        actionMeta: ActionMeta<Option>
+        _actionMeta: ActionMeta<Option>
     ) => {
         onChange(newValue?.value || '');
     };
@@ -35,6 +35,7 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
     };
 
     const handleBlur = () => {
+
         if (inputValue.trim()) {
             onChange(inputValue.trim());
         }

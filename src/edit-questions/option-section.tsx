@@ -57,7 +57,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
 
             <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {itemFields.map((item: Item, itemIndex: number) => (
+                {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
