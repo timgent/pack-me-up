@@ -5,7 +5,7 @@ import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
 import { useRef, useEffect } from 'react'
-import { ItemPeopleSection } from './ItemPeopleSection'
+import { ItemPeopleSection } from './item-people-section'
 
 interface OptionSectionProps {
     control: Control<PackingListQuestionSet>;

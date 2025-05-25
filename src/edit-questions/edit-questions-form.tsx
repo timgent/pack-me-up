@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler, useFieldArray, ChangeHandler } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
-import { QuestionSection } from './QuestionSection'
-import { PeopleSection } from './PeopleSection'
+import { QuestionSection } from './question-section'
+import { PeopleSection } from './people-section'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 

@@ -3,7 +3,7 @@ import { PackingListQuestionSet, Person, newOption } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
-import { OptionSection } from './OptionSection'
+import { OptionSection } from './option-section'
 import { useState } from 'react'
 
 interface QuestionSectionProps {
