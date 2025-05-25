@@ -85,7 +85,7 @@ export function ViewPackingList() {
                     })
                     .map((item, index) => (
                         <div
-                            key={`${item.questionId}-${item.optionId}`}
+                            key={`${item.questionId}-${item.optionId}-${item.personId}`}
                             className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
                         >
                             <label className="flex items-center space-x-3 cursor-pointer">
