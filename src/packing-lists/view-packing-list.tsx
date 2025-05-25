@@ -68,14 +68,14 @@ export function ViewPackingList() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="max-w-7xl mx-auto py-8 px-4">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
                 <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {Object.entries(
                         [...packingList.items].reduce((acc, item) => {
                             if (!acc[item.personName]) {
@@ -98,7 +98,7 @@ export function ViewPackingList() {
                                         );
                                         return (
                                             <div
-                                                key={`${item.questionId}-${item.optionId}-${item.personId}`}
+                                                key={`${item.itemText}-${item.personId}`}
                                                 className="bg-gray-50 rounded-lg p-3"
                                             >
                                                 <label className="flex items-center space-x-3 cursor-pointer">
