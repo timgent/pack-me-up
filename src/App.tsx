@@ -8,6 +8,7 @@ import { Navigation } from './components/Navigation'
 import { PackingLists } from './packing-lists/packing-lists'
 import { ViewPackingList } from './packing-lists/view-packing-list'
 import { ToastProvider } from './components/ToastContext'
+import { LandingPage } from './landing-page/landing-page'
 
 function App() {
   return (
@@ -16,7 +17,8 @@ function App() {
         <Navigation />
         <div className="container mx-auto px-4 py-8">
           <Routes>
-            <Route path="/" element={<EditQuestionsForm />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/manage-questions" element={<EditQuestionsForm />} />
             <Route path="/create-packing-list" element={<CreatePackingList />} />
             <Route path="/view-lists" element={<PackingLists />} />
             <Route path="/view-lists/:id" element={<ViewPackingList />} />
