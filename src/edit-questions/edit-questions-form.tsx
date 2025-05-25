@@ -9,6 +9,7 @@ import { useToast } from '../components/ToastContext'
 import { AlwaysNeededItemsSection } from './always-needed-items-section'
 import { Modal } from '../components/Modal'
 import { exampleData } from './example-data'
+import { Callout } from '../components/Callout'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
@@ -137,12 +138,26 @@ export function EditQuestionsForm() {
         }
     };
 
+    const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
+
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="mb-8 w-full max-w-5xl">
                 <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
                 <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
             </div>
+            {isFormEmpty && (
+                <div className="w-full max-w-5xl mb-8">
+                    <Callout
+                        title="Get Started with Example Questions"
+                        description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
+                        action={{
+                            label: "Load Example",
+                            onClick: () => setIsExampleModalOpen(true)
+                        }}
+                    />
+                </div>
+            )}
             <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
                 {/* Main form content */}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8" id="edit-questions-form">
