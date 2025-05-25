@@ -5,6 +5,10 @@ import { PackingList } from '../create-packing-list/types'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
 
+type FormData = {
+    items: Record<string, boolean>
+}
+
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
@@ -13,9 +17,9 @@ export function ViewPackingList() {
     const [isSaving, setIsSaving] = useState(false)
     const packingListsDb = new PouchDB('packing-lists')
 
-    const { register, handleSubmit, setValue, watch } = useForm({
+    const { register, handleSubmit, setValue } = useForm<FormData>({
         defaultValues: {
-            items: [] as { packed: boolean }[]
+            items: {}
         }
     })
 
@@ -24,10 +28,12 @@ export function ViewPackingList() {
             try {
                 const doc = await packingListsDb.get<PackingList>(id!)
                 setPackingList(doc)
-                // Initialize form values
-                doc.items.forEach((item, index) => {
-                    setValue(`items.${index}.packed`, item.packed)
+                // Initialize form values with a clean slate
+                const initialValues: Record<string, boolean> = {}
+                doc.items.forEach((item) => {
+                    initialValues[item.id] = item.packed
                 })
+                setValue('items', initialValues)
             } catch (err) {
                 console.error('Error fetching packing list:', err)
             } finally {
@@ -38,16 +44,16 @@ export function ViewPackingList() {
         fetchPackingList()
     }, [id, setValue])
 
-    const onSubmit = async (data: { items: { packed: boolean }[] }) => {
+    const onSubmit = async (data: FormData) => {
         if (!packingList) return
 
         setIsSaving(true)
         try {
             const updatedPackingList = {
                 ...packingList,
-                items: packingList.items.map((item, index) => ({
+                items: packingList.items.map(item => ({
                     ...item,
-                    packed: data.items[index]?.packed || false
+                    packed: data.items[item.id] ?? false
                 }))
             }
             await packingListsDb.put(updatedPackingList)
@@ -90,30 +96,23 @@ export function ViewPackingList() {
                             <div className="space-y-2">
                                 {items
                                     .sort((a, b) => a.itemText.localeCompare(b.itemText))
-                                    .map((item, index) => {
-                                        const originalIndex = packingList.items.findIndex(
-                                            i => i.questionId === item.questionId &&
-                                                i.optionId === item.optionId &&
-                                                i.personId === item.personId
-                                        );
-                                        return (
-                                            <div
-                                                key={`${item.itemText}-${item.personId}`}
-                                                className="bg-gray-50 rounded-lg p-3"
-                                            >
-                                                <label className="flex items-center space-x-3 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        {...register(`items.${originalIndex}.packed`)}
-                                                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                    />
-                                                    <span className={`text-gray-700 ${watch(`items.${originalIndex}.packed`) ? 'line-through text-gray-400' : ''}`}>
-                                                        {item.itemText}
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        );
-                                    })}
+                                    .map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="bg-gray-50 rounded-lg p-3"
+                                        >
+                                            <label className="flex items-center space-x-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    {...register(`items.${item.id}`)}
+                                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                />
+                                                <span className="text-gray-700">
+                                                    {item.itemText}
+                                                </span>
+                                            </label>
+                                        </div>
+                                    ))}
                             </div>
                         </div>
                     ))}

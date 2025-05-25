@@ -46,6 +46,7 @@ export function CreatePackingList() {
                 return selectedPeople.flatMap((person) => {
                     const personName = questionSet.people.find((p) => p.id === person.personId)!.name
                     return {
+                        id: crypto.randomUUID(),
                         itemText: item.text,
                         personId: person.personId,
                         personName,
@@ -64,6 +65,7 @@ export function CreatePackingList() {
             return selectedPeople.flatMap((person) => {
                 const personName = questionSet.people.find((p) => p.id === person.personId)!.name
                 return {
+                    id: crypto.randomUUID(),
                     itemText: item.text,
                     personId: person.personId,
                     personName,

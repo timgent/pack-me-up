@@ -6,6 +6,7 @@ export interface PackingList {
 }
 
 export interface PackingListItem {
+    id: string
     itemText: string
     personId: string
     personName: string
