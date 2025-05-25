@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler, useFieldArray, ChangeHandler } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
@@ -12,6 +12,7 @@ export function EditQuestionsForm() {
     const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
         defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] }
     });
+    const [rev, setRev] = useState<string | undefined>(undefined)
     const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
         control,
         name: "people"
@@ -34,13 +35,34 @@ export function EditQuestionsForm() {
     const people = watch("people")
 
     useEffect(() => {
+        console.log("Loading doc")
         const retrieved = db.get<PackingListQuestionSet>("1")
         retrieved.then(doc => {
+            setRev(doc._rev)
             reset(doc)
+            console.log("Loaded doc: ", doc)
         }).catch(err => {
-            console.error('Error retrieving doc:', err)
+            if (err.name === 'not_found') {
+                console.log('No data yet, creating new doc')
+                const newDoc = {
+                    _id: "1",
+                    questions: [],
+                    people: [{ id: crypto.randomUUID(), name: "Me" }]
+                }
+                db.put(newDoc).then(result => {
+                    setRev(result.rev)
+                    reset(newDoc)
+                    console.log("Created new doc: ", newDoc)
+                }).catch(putErr => {
+                    console.error('Error creating new doc:', putErr)
+                    showToast('Failed to initialize database', 'error')
+                })
+            } else {
+                console.error('Error loading doc:', err)
+                showToast('Failed to load data', 'error')
+            }
         })
-    }, [reset])
+    }, [])
 
     const { fields: questionFields, append: appendQuestion, remove: removeQuestion } = useFieldArray({
         control,
@@ -57,17 +79,8 @@ export function EditQuestionsForm() {
                 const content = e.target?.result as string;
                 const data = JSON.parse(content) as PackingListQuestionSet;
 
-                // Try to get the existing document to get its _rev
-                try {
-                    const existingDoc = await db.get("1");
-                    // If we have an existing doc, merge the _rev with the imported data
-                    data._rev = existingDoc._rev;
-                } catch (err: any) {
-                    // If document doesn't exist, that's fine - we'll create a new one
-                    if (err.name !== 'not_found') {
-                        throw err;
-                    }
-                }
+                console.log("Importing with rev: ", rev)
+                data._rev = rev;
 
                 reset(data);
                 showToast('Questions imported successfully!', 'success');
@@ -95,11 +108,13 @@ export function EditQuestionsForm() {
 
     const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
         try {
-            // Force put with overwrite
-            await db.put({
+            const docToWrite = {
                 _id: "1",
-                ...data
-            }, { force: true });
+                ...data,
+                _rev: rev,
+            }
+            const updated = await db.put(docToWrite);
+            setRev(updated.rev)
             showToast('Changes saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving changes:', error);
