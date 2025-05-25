@@ -75,47 +75,51 @@ export function ViewPackingList() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                {Object.entries(
-                    [...packingList.items].reduce((acc, item) => {
-                        if (!acc[item.personName]) {
-                            acc[item.personName] = [];
-                        }
-                        acc[item.personName].push(item);
-                        return acc;
-                    }, {} as Record<string, typeof packingList.items>)
-                ).map(([personName, items]) => (
-                    <div key={personName} className="space-y-2">
-                        <h2 className="text-xl font-semibold text-gray-800 mb-2">{personName}'s Items</h2>
-                        {items
-                            .sort((a, b) => a.itemText.localeCompare(b.itemText))
-                            .map((item, index) => {
-                                const originalIndex = packingList.items.findIndex(
-                                    i => i.questionId === item.questionId &&
-                                        i.optionId === item.optionId &&
-                                        i.personId === item.personId
-                                );
-                                return (
-                                    <div
-                                        key={`${item.questionId}-${item.optionId}-${item.personId}`}
-                                        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
-                                    >
-                                        <label className="flex items-center space-x-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                {...register(`items.${originalIndex}.packed`)}
-                                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <span className={`text-gray-700 ${watch(`items.${originalIndex}.packed`) ? 'line-through text-gray-400' : ''}`}>
-                                                {item.itemText}
-                                            </span>
-                                        </label>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.entries(
+                        [...packingList.items].reduce((acc, item) => {
+                            if (!acc[item.personName]) {
+                                acc[item.personName] = [];
+                            }
+                            acc[item.personName].push(item);
+                            return acc;
+                        }, {} as Record<string, typeof packingList.items>)
+                    ).map(([personName, items]) => (
+                        <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
+                            <div className="space-y-2">
+                                {items
+                                    .sort((a, b) => a.itemText.localeCompare(b.itemText))
+                                    .map((item, index) => {
+                                        const originalIndex = packingList.items.findIndex(
+                                            i => i.questionId === item.questionId &&
+                                                i.optionId === item.optionId &&
+                                                i.personId === item.personId
+                                        );
+                                        return (
+                                            <div
+                                                key={`${item.questionId}-${item.optionId}-${item.personId}`}
+                                                className="bg-gray-50 rounded-lg p-3"
+                                            >
+                                                <label className="flex items-center space-x-3 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        {...register(`items.${originalIndex}.packed`)}
+                                                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                    />
+                                                    <span className={`text-gray-700 ${watch(`items.${originalIndex}.packed`) ? 'line-through text-gray-400' : ''}`}>
+                                                        {item.itemText}
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end space-x-4 mt-6">
                     <Button
                         type="button"
                         variant="secondary"
