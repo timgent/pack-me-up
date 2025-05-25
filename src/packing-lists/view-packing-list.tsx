@@ -75,31 +75,45 @@ export function ViewPackingList() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                {[...packingList.items]
-                    .sort((a, b) => {
-                        // First sort by person name
-                        const personCompare = a.personName.localeCompare(b.personName);
-                        if (personCompare !== 0) return personCompare;
-                        // If same person, sort by item text
-                        return a.itemText.localeCompare(b.itemText);
-                    })
-                    .map((item, index) => (
-                        <div
-                            key={`${item.questionId}-${item.optionId}-${item.personId}`}
-                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
-                        >
-                            <label className="flex items-center space-x-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    {...register(`items.${index}.packed`)}
-                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                />
-                                <span className={`text-gray-700 ${watch(`items.${index}.packed`) ? 'line-through text-gray-400' : ''}`}>
-                                    {item.personName} - {item.itemText}
-                                </span>
-                            </label>
-                        </div>
-                    ))}
+                {Object.entries(
+                    [...packingList.items].reduce((acc, item) => {
+                        if (!acc[item.personName]) {
+                            acc[item.personName] = [];
+                        }
+                        acc[item.personName].push(item);
+                        return acc;
+                    }, {} as Record<string, typeof packingList.items>)
+                ).map(([personName, items]) => (
+                    <div key={personName} className="space-y-2">
+                        <h2 className="text-xl font-semibold text-gray-800 mb-2">{personName}'s Items</h2>
+                        {items
+                            .sort((a, b) => a.itemText.localeCompare(b.itemText))
+                            .map((item, index) => {
+                                const originalIndex = packingList.items.findIndex(
+                                    i => i.questionId === item.questionId &&
+                                        i.optionId === item.optionId &&
+                                        i.personId === item.personId
+                                );
+                                return (
+                                    <div
+                                        key={`${item.questionId}-${item.optionId}-${item.personId}`}
+                                        className="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+                                    >
+                                        <label className="flex items-center space-x-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                {...register(`items.${originalIndex}.packed`)}
+                                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                            />
+                                            <span className={`text-gray-700 ${watch(`items.${originalIndex}.packed`) ? 'line-through text-gray-400' : ''}`}>
+                                                {item.itemText}
+                                            </span>
+                                        </label>
+                                    </div>
+                                );
+                            })}
+                    </div>
+                ))}
 
                 <div className="flex justify-end space-x-4">
                     <Button
