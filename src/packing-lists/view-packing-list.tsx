@@ -98,7 +98,7 @@ export function ViewPackingList() {
                                     .sort((a, b) => a.itemText.localeCompare(b.itemText))
                                     .map((item) => (
                                         <div
-                                            key={item.id}
+                                            key={`${item.id}-${personName}`}
                                             className="bg-gray-50 rounded-lg p-3"
                                         >
                                             <label className="flex items-center space-x-3 cursor-pointer">
