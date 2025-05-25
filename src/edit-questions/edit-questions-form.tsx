@@ -7,6 +7,8 @@ import { PeopleSection } from './people-section'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { AlwaysNeededItemsSection } from './always-needed-items-section'
+import { Modal } from '../components/Modal'
+import { exampleData } from './example-data'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
@@ -14,6 +16,7 @@ export function EditQuestionsForm() {
         defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }] }
     });
     const [rev, setRev] = useState<string | undefined>(undefined)
+    const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
     const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
         control,
         name: "people"
@@ -123,6 +126,16 @@ export function EditQuestionsForm() {
         }
     };
 
+    const handleLoadExample = (exampleName: string) => {
+        const data = exampleData[exampleName as keyof typeof exampleData];
+        if (data) {
+            data._rev = rev;
+            reset(data);
+            setIsExampleModalOpen(false);
+            showToast('Example loaded successfully!', 'success');
+        }
+    };
+
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="mb-8 w-full max-w-5xl">
@@ -196,6 +209,13 @@ export function EditQuestionsForm() {
                         }}>Reset form</Button>
                         <Button
                             type="button"
+                            onClick={() => setIsExampleModalOpen(true)}
+                            variant="secondary"
+                        >
+                            Load Example
+                        </Button>
+                        <Button
+                            type="button"
                             onClick={() => document.getElementById('import-file')?.click()}
                             variant="secondary"
                         >
@@ -231,6 +251,13 @@ export function EditQuestionsForm() {
                         }}>Reset form</Button>
                         <Button
                             type="button"
+                            onClick={() => setIsExampleModalOpen(true)}
+                            variant="secondary"
+                        >
+                            Load Example
+                        </Button>
+                        <Button
+                            type="button"
                             onClick={() => document.getElementById('import-file')?.click()}
                             variant="secondary"
                         >
@@ -246,6 +273,24 @@ export function EditQuestionsForm() {
                     </div>
                 </div>
             </div>
+
+            <Modal
+                isOpen={isExampleModalOpen}
+                onClose={() => setIsExampleModalOpen(false)}
+                title="Load Example"
+            >
+                <div className="space-y-2">
+                    {Object.keys(exampleData).map((exampleName) => (
+                        <button
+                            key={exampleName}
+                            onClick={() => handleLoadExample(exampleName)}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-md transition-colors"
+                        >
+                            {exampleName}
+                        </button>
+                    ))}
+                </div>
+            </Modal>
         </div>
     )
 } 
