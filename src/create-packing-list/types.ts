@@ -1,4 +1,6 @@
 export interface PackingList {
+    _id: string
+    _rev: string
     id: string
     name: string
     createdAt: string
@@ -8,11 +10,11 @@ export interface PackingList {
 export interface PackingListItem {
     id: string
     itemText: string
-    personId: string
     personName: string
+    packed: boolean
+    personId: string
     questionId: string
     optionId: string
-    packed: boolean
 }
 
 export interface PackingListFormData {

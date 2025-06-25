@@ -1,27 +1,40 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import PouchDB from 'pouchdb'
-import { PackingList } from '../create-packing-list/types'
+import { PackingList, PackingListItem } from '../create-packing-list/types'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
+import { Modal } from '../components/Modal'
+import { Input } from '../components/Input'
+import { PackingListQuestionSet, Person } from '../edit-questions/types'
 
 type FormData = {
     items: Record<string, boolean>
+}
+
+type AddItemFormData = {
+    itemName: string
+    personIds: string[]
 }
 
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [packingList, setPackingList] = useState<PackingList | null>(null)
+    const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
+    const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false)
     const packingListsDb = new PouchDB('packing-lists')
+    const questionsDb = new PouchDB('packing-list-question-set')
 
     const { register, handleSubmit, setValue } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
     })
+
+    const addItemForm = useForm<AddItemFormData>()
 
     useEffect(() => {
         const fetchPackingList = async () => {
@@ -41,8 +54,50 @@ export function ViewPackingList() {
             }
         }
 
+        const fetchQuestionSet = async () => {
+            try {
+                const doc = await questionsDb.get<PackingListQuestionSet>('1')
+                setQuestionSet(doc)
+            } catch (err) {
+                console.error('Error fetching question set:', err)
+            }
+        }
+
         fetchPackingList()
+        fetchQuestionSet()
     }, [id, setValue])
+
+    const handleAddItem = async (data: AddItemFormData) => {
+        if (!packingList || !questionSet) return
+
+        const newItems: PackingListItem[] = data.personIds.map(personId => {
+            const person = questionSet.people.find(p => p.id === personId)!
+            return {
+                id: crypto.randomUUID(),
+                itemText: data.itemName,
+                personName: person.name,
+                packed: false,
+                personId: person.id,
+                questionId: 'custom',
+                optionId: 'custom'
+            }
+        })
+
+        const updatedPackingList = {
+            ...packingList,
+            items: [...packingList.items, ...newItems]
+        }
+
+        try {
+            await packingListsDb.put(updatedPackingList)
+            setPackingList(updatedPackingList)
+            newItems.forEach(item => setValue(`items.${item.id}`, false))
+            setIsAddItemModalOpen(false)
+            addItemForm.reset()
+        } catch (err) {
+            console.error('Error saving packing list:', err)
+        }
+    }
 
     const onSubmit = async (data: FormData) => {
         if (!packingList) return
@@ -118,22 +173,72 @@ export function ViewPackingList() {
                     ))}
                 </div>
 
-                <div className="flex justify-end space-x-4 mt-6">
+                <div className="flex justify-between items-center mt-6">
                     <Button
                         type="button"
-                        variant="secondary"
-                        onClick={() => navigate('/view-lists')}
+                        variant="outline"
+                        onClick={() => setIsAddItemModalOpen(true)}
                     >
-                        Back to Lists
+                        Add Item
                     </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                    </Button>
+                    <div className="flex justify-end space-x-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => navigate('/view-lists')}
+                        >
+                            Back to Lists
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    </div>
                 </div>
             </form>
+
+            <Modal
+                isOpen={isAddItemModalOpen}
+                onClose={() => setIsAddItemModalOpen(false)}
+                title="Add New Item"
+            >
+                <form onSubmit={addItemForm.handleSubmit(handleAddItem)} className="space-y-4">
+                    <Input
+                        label="Item Name"
+                        {...addItemForm.register('itemName', { required: true })}
+                    />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">People</label>
+                        <div className="mt-2 space-y-2">
+                            {questionSet?.people.map((person: Person) => (
+                                <label key={person.id} className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        value={person.id}
+                                        {...addItemForm.register('personIds')}
+                                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                    />
+                                    <span className="text-gray-700">{person.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex justify-end space-x-4 mt-6">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setIsAddItemModalOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit">
+                            Add Item
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     )
-} 
+}  

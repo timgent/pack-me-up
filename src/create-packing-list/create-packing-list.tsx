@@ -87,7 +87,7 @@ export function CreatePackingList() {
             })
         })
 
-        const packingList: PackingList = {
+        const packingList: Omit<PackingList, '_id' | '_rev'> = {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
