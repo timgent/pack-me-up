@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
@@ -10,6 +10,7 @@ import { AlwaysNeededItemsSection } from './always-needed-items-section'
 import { Modal } from '../components/Modal'
 import { exampleData } from './example-data'
 import { Callout } from '../components/Callout'
+import { exportFile } from '../utils/exportFile'
 
 export function EditQuestionsForm() {
     const db = new PouchDB('packing-list-question-set');
@@ -28,7 +29,6 @@ export function EditQuestionsForm() {
         name: "people"
     });
     const { showToast } = useToast();
-    const initRef = useRef(false);
 
     const removePerson = (removedIndex: number) => {
         // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -46,10 +46,6 @@ export function EditQuestionsForm() {
     const people = watch("people")
 
     useEffect(() => {
-        // Skip if we've already initialized
-        if (initRef.current) return;
-        initRef.current = true;
-
         console.log("Starting document load sequence")
         const retrieved = db.get<PackingListQuestionSet>("1")
         retrieved.then(doc => {
@@ -147,18 +143,23 @@ export function EditQuestionsForm() {
         reader.readAsText(file);
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
         const data = getValues();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'packing-list-questions.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Questions exported successfully!', 'success');
+        const json = JSON.stringify(data, null, 2);
+        try {
+            await exportFile({
+                data: json,
+                filename: 'packing-list-questions.json',
+                mimeType: 'application/json',
+            });
+            showToast('Questions exported successfully!', 'success');
+        } catch (err: any) {
+            if (err?.name !== 'AbortError') {
+                console.error('Error exporting file:', err);
+                showToast('Failed to export file.', 'error');
+            }
+            // If user cancels, do nothing
+        }
     };
 
     const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
