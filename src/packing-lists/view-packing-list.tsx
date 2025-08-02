@@ -85,7 +85,7 @@ export function ViewPackingList() {
     })
 
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4">
+        <div className="mx-auto py-8 px-4">
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
@@ -102,7 +102,7 @@ export function ViewPackingList() {
 
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="flex flex-wrap gap-4">
                     {Object.entries(
                         filteredItems.reduce((acc, item) => {
                             if (!acc[item.personName]) {
