@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import PouchDB from 'pouchdb'
+import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
@@ -18,8 +19,9 @@ export function ViewPackingList() {
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
+    const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
-    const { register, handleSubmit, setValue, watch } = useForm<FormData>({
+    const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
@@ -47,6 +49,30 @@ export function ViewPackingList() {
 
         fetchPackingList()
     }, [id, setValue])
+
+    const handleItemChange = useDebouncedCallback(async () => {
+        try {
+            setAutoSaveStatus('saving')
+            const currentFormValues = getValues('items')
+            const updatedPackingList = {
+                ...packingList!,
+                items: packingList!.items.map(item => ({
+                    ...item,
+                    packed: currentFormValues[item.id] ?? false
+                }))
+            }
+            const dbResult = await packingListsDb.put(updatedPackingList)
+            setPackingList(() => ({
+                ...updatedPackingList!,
+                _rev: dbResult.rev
+            }))
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 10000)
+        } catch (err) {
+            console.error('Error saving packing list:', err)
+            setAutoSaveStatus('error')
+        }
+    }, 5000)
 
     const onSubmit = async (data: FormData) => {
         if (!packingList) return
@@ -90,6 +116,28 @@ export function ViewPackingList() {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
                     <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
+                    {autoSaveStatus !== 'idle' && (
+                        <div className="mt-2 flex items-center space-x-2">
+                            {autoSaveStatus === 'saving' && (
+                                <>
+                                    <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                    <span className="text-sm text-blue-600">Auto-saving...</span>
+                                </>
+                            )}
+                            {autoSaveStatus === 'saved' && (
+                                <>
+                                    <div className="h-4 w-4 text-green-500">✓</div>
+                                    <span className="text-sm text-green-600">Changes saved</span>
+                                </>
+                            )}
+                            {autoSaveStatus === 'error' && (
+                                <>
+                                    <div className="h-4 w-4 text-red-500">✗</div>
+                                    <span className="text-sm text-red-600">Save failed</span>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <Button
                     type="button"
@@ -126,6 +174,7 @@ export function ViewPackingList() {
                                                 <input
                                                     type="checkbox"
                                                     {...register(`items.${item.id}`)}
+                                                    onChange={handleItemChange}
                                                     className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                 />
                                                 <span className="text-gray-700">
