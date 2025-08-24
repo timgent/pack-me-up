@@ -1,8 +1,9 @@
 import { PackingListQuestionSet } from './types';
+import { generateUUID } from '../utils/uuid';
 
 function createExampleData(numPeople: number): PackingListQuestionSet {
     const people = Array.from({ length: numPeople }, (_, i) => ({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         name: i === 0 ? "Me" : `Person ${i + 1}`
     }));
 
@@ -33,13 +34,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
         ],
         questions: [
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "What type of trip is this?",
                 order: 0,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Beach Vacation",
                         order: 0,
                         items: [
@@ -58,7 +59,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "City Break",
                         order: 1,
                         items: [
@@ -73,7 +74,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Mountain/Hiking Trip",
                         order: 2,
                         items: [
@@ -88,7 +89,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Business Trip",
                         order: 3,
                         items: [
@@ -103,7 +104,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Camping Trip",
                         order: 4,
                         items: [
@@ -118,7 +119,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Cruise",
                         order: 5,
                         items: [
@@ -133,7 +134,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Road Trip",
                         order: 6,
                         items: [
@@ -150,13 +151,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will it be hot?",
                 order: 1,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -171,7 +172,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -179,13 +180,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will it be cold?",
                 order: 2,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -200,7 +201,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -208,13 +209,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will it rain?",
                 order: 3,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -229,7 +230,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -237,19 +238,19 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "What type of accommodation?",
                 order: 4,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Hotel",
                         order: 0,
                         items: []
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Hostel",
                         order: 1,
                         items: [
@@ -264,7 +265,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Airbnb/Apartment",
                         order: 2,
                         items: [
@@ -279,7 +280,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Camping",
                         order: 3,
                         items: [
@@ -296,13 +297,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will you swim?",
                 order: 5,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -317,7 +318,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -325,13 +326,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will you visit religious sites?",
                 order: 6,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -346,7 +347,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -354,13 +355,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "Will you go to fancy restaurants?",
                 order: 7,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Yes",
                         order: 0,
                         items: [
@@ -375,7 +376,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "No",
                         order: 1,
                         items: []
@@ -383,13 +384,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "What's your trip duration?",
                 order: 8,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Weekend (1-3 days)",
                         order: 0,
                         items: [
@@ -400,7 +401,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Short Trip (4-7 days)",
                         order: 1,
                         items: [
@@ -411,7 +412,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Medium Trip (8-14 days)",
                         order: 2,
                         items: [
@@ -422,7 +423,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Long Trip (15+ days)",
                         order: 3,
                         items: [
@@ -435,13 +436,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 ]
             },
             {
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 type: "saved",
                 text: "What's your travel style?",
                 order: 9,
                 options: [
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Backpacking/Budget",
                         order: 0,
                         items: [
@@ -456,13 +457,13 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Standard",
                         order: 1,
                         items: []
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Luxury",
                         order: 2,
                         items: [
@@ -477,7 +478,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Minimalist",
                         order: 3,
                         items: [
@@ -488,7 +489,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: crypto.randomUUID(),
+                        id: generateUUID(),
                         text: "Family-Friendly",
                         order: 4,
                         items: [
