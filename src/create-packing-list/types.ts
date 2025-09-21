@@ -1,5 +1,6 @@
 export interface PackingList {
     id: string
+    _rev?: string
     name: string
     createdAt: string
     items: PackingListItem[]

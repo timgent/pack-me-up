@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
-import PouchDB from 'pouchdb'
 import { PackingListQuestionSet, newDraftQuestion } from './types'
+import { packingAppDb } from '../services/database'
+import { DatabaseMigration } from '../services/migration'
 import { QuestionSection } from './question-section'
 import { PeopleSection } from './people-section'
 import { Button } from '../components/Button'
@@ -13,11 +14,6 @@ import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
 
 export function EditQuestionsForm() {
-    const db = new PouchDB('packing-list-question-set');
-    console.log('PouchDB instance created:', {
-        name: db.name,
-        timestamp: new Date().toISOString()
-    });
 
     const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
         defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] }
@@ -46,73 +42,73 @@ export function EditQuestionsForm() {
     const people = watch("people")
 
     useEffect(() => {
-        console.log("Starting document load sequence")
-        const retrieved = db.get<PackingListQuestionSet>("1")
-        retrieved.then(doc => {
-            console.log("Document retrieved successfully:", {
-                _id: doc._id,
-                _rev: doc._rev,
-                timestamp: new Date().toISOString()
-            })
-            setRev(doc._rev)
-            reset(doc)
-        }).catch(err => {
-            console.log("Initial get error:", {
-                name: err.name,
-                message: err.message,
-                status: err.status,
-                timestamp: new Date().toISOString()
-            })
-            if (err.name === 'not_found') {
-                console.log('No data yet, creating new doc')
-                const newDoc = {
-                    _id: "1",
-                    questions: [],
-                    people: [{ id: crypto.randomUUID(), name: "Me" }],
-                    alwaysNeededItems: []
+        const loadQuestionSet = async () => {
+            console.log("Starting document load sequence")
+
+            try {
+                // Check if migration is needed
+                const migrationCheck = await DatabaseMigration.checkMigrationNeeded()
+                if (migrationCheck.needed) {
+                    console.log('Migration needed, performing automatic migration')
+                    const migrationResult = await DatabaseMigration.performMigration()
+                    if (!migrationResult.success) {
+                        console.error('Migration failed:', migrationResult.errors)
+                        showToast('Database migration failed', 'error')
+                        return
+                    }
+                    showToast('Database migrated successfully', 'success')
                 }
-                console.log("Attempting to create new doc:", {
-                    doc: newDoc,
+
+                const doc = await packingAppDb.getQuestionSet()
+                console.log("Document retrieved successfully:", {
+                    _id: doc._id,
+                    _rev: doc._rev,
                     timestamp: new Date().toISOString()
                 })
-                db.put(newDoc).then(result => {
-                    console.log("Document created successfully:", {
-                        ok: result.ok,
-                        id: result.id,
-                        rev: result.rev,
-                        timestamp: new Date().toISOString()
-                    })
-                    setRev(result.rev)
-                    reset(newDoc)
-                }).catch(putErr => {
-                    console.error('Error creating new doc:', {
-                        name: putErr.name,
-                        message: putErr.message,
-                        status: putErr.status,
-                        docId: putErr.docId,
-                        timestamp: new Date().toISOString()
-                    })
-                    // Let's also check if the document exists now
-                    db.get("1").then(doc => {
-                        console.log("Document exists after conflict:", {
-                            _id: doc._id,
-                            _rev: doc._rev,
-                            timestamp: new Date().toISOString()
-                        })
-                    }).catch(getErr => {
-                        console.log("Document still not found after conflict:", {
-                            name: getErr.name,
-                            message: getErr.message,
-                            timestamp: new Date().toISOString()
-                        })
-                    })
-                    showToast('Failed to initialize database', 'error')
+                setRev(doc._rev)
+                reset(doc)
+            } catch (err: any) {
+                console.log("Initial get error:", {
+                    name: err.name,
+                    message: err.message,
+                    timestamp: new Date().toISOString()
                 })
-            } else {
-                console.error('Error loading doc:', err)
-                showToast('Failed to load data', 'error')
+                if (err.name === 'not_found') {
+                    console.log('No data yet, creating new doc')
+                    const newDoc = {
+                        _id: "1",
+                        questions: [],
+                        people: [{ id: crypto.randomUUID(), name: "Me" }],
+                        alwaysNeededItems: []
+                    }
+                    console.log("Attempting to create new doc:", {
+                        doc: newDoc,
+                        timestamp: new Date().toISOString()
+                    })
+                    try {
+                        const result = await packingAppDb.saveQuestionSet(newDoc)
+                        console.log("Document created successfully:", {
+                            rev: result.rev,
+                            timestamp: new Date().toISOString()
+                        })
+                        setRev(result.rev)
+                        reset(newDoc)
+                    } catch (putErr: any) {
+                        console.error('Error creating new doc:', {
+                            name: putErr.name,
+                            message: putErr.message,
+                            timestamp: new Date().toISOString()
+                        })
+                        showToast('Failed to initialize database', 'error')
+                    }
+                } else {
+                    console.error('Error loading doc:', err)
+                    showToast('Failed to load data', 'error')
+                }
             }
-        })
+        }
+
+        loadQuestionSet()
     }, [])
 
     const { fields: questionFields, append: appendQuestion, remove: removeQuestion } = useFieldArray({
@@ -169,8 +165,8 @@ export function EditQuestionsForm() {
                 ...data,
                 _rev: rev,
             }
-            const updated = await db.put(docToWrite);
-            setRev(updated.rev)
+            const result = await packingAppDb.saveQuestionSet(docToWrite);
+            setRev(result.rev)
             showToast('Changes saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving changes:', error);

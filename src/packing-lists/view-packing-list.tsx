@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import PouchDB from 'pouchdb'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
+import { packingAppDb } from '../services/database'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
 
@@ -10,7 +10,6 @@ type FormData = {
     items: Record<string, boolean>
 }
 
-const packingListsDb = new PouchDB('packing-lists')
 
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
@@ -32,7 +31,7 @@ export function ViewPackingList() {
     useEffect(() => {
         const fetchPackingList = async () => {
             try {
-                const doc = await packingListsDb.get<PackingList>(id!)
+                const doc = await packingAppDb.getPackingList(id!)
                 setPackingList(doc)
                 // Initialize form values with a clean slate
                 const initialValues: Record<string, boolean> = {}
@@ -61,7 +60,7 @@ export function ViewPackingList() {
                     packed: currentFormValues[item.id] ?? false
                 }))
             }
-            const dbResult = await packingListsDb.put(updatedPackingList)
+            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
             setPackingList(() => ({
                 ...updatedPackingList!,
                 _rev: dbResult.rev
@@ -86,7 +85,7 @@ export function ViewPackingList() {
                     packed: data.items[item.id] ?? false
                 }))
             }
-            await packingListsDb.put(updatedPackingList)
+            await packingAppDb.savePackingList(updatedPackingList)
             navigate('/view-lists')
         } catch (err) {
             console.error('Error saving packing list:', err)
