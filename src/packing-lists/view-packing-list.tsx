@@ -73,6 +73,13 @@ export function ViewPackingList() {
         }
     }, 5000)
 
+    // Trigger auto-save when form values change
+    useEffect(() => {
+        if (packingList) {
+            handleItemChange()
+        }
+    }, [watchedItems, handleItemChange, packingList])
+
     const onSubmit = async (data: FormData) => {
         if (!packingList) return
 
@@ -173,7 +180,6 @@ export function ViewPackingList() {
                                                 <input
                                                     type="checkbox"
                                                     {...register(`items.${item.id}`)}
-                                                    onChange={handleItemChange}
                                                     className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                 />
                                                 <span className="text-gray-700">
