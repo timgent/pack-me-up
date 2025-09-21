@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PouchDB from 'pouchdb'
 import { PackingList } from '../create-packing-list/types'
+import { packingAppDb } from '../services/database'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const navigate = useNavigate()
-    const packingListsDb = new PouchDB('packing-lists')
 
     const deletePackingList = async (id: string, event: React.MouseEvent) => {
         event.stopPropagation() // Prevent navigation when clicking delete
         try {
-            const doc = await packingListsDb.get(id)
-            await packingListsDb.remove(doc)
+            await packingAppDb.deletePackingList(id)
             setPackingLists(packingLists.filter(list => list.id !== id))
         } catch (err) {
             console.error('Error deleting packing list:', err)
@@ -23,11 +21,7 @@ export function PackingLists() {
     useEffect(() => {
         const fetchPackingLists = async () => {
             try {
-                const result = await packingListsDb.allDocs<PackingList>({ include_docs: true })
-                const lists = result.rows
-                    .map(row => row.doc)
-                    .filter(doc => doc !== undefined)
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                const lists = await packingAppDb.getAllPackingLists()
                 setPackingLists(lists)
             } catch (err) {
                 console.error('Error fetching packing lists:', err)

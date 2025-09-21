@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
-import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList, PackingListFormData, PackingListItem } from './types'
+import { packingAppDb } from '../services/database'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
@@ -12,8 +12,6 @@ import { Callout } from '../components/Callout'
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const [isExampleLoaded, setIsExampleLoaded] = useState(false)
-    const questionsDb = new PouchDB('packing-list-question-set')
-    const packingListsDb = new PouchDB('packing-lists')
     const { showToast } = useToast()
 
     const { register, handleSubmit } = useForm<PackingListFormData>({
@@ -26,7 +24,7 @@ export function CreatePackingList() {
     useEffect(() => {
         const fetchQuestionSet = async () => {
             try {
-                const doc = await questionsDb.get<PackingListQuestionSet>('1')
+                const doc = await packingAppDb.getQuestionSet()
                 setQuestionSet(doc)
             } catch (err: any) {
                 if (err.name === 'not_found') {
@@ -94,10 +92,7 @@ export function CreatePackingList() {
             items: [...questionBasedItems, ...alwaysNeededItems]
         }
         try {
-            await packingListsDb.put({
-                _id: packingList.id,
-                ...packingList
-            })
+            await packingAppDb.savePackingList(packingList)
             showToast('Packing list created successfully!', 'success')
             // Reset the form after successful creation
             window.location.href = '/#/view-lists'
