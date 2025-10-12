@@ -12,6 +12,7 @@ import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
+import { login } from "@inrupt/solid-client-authn-browser"
 
 export function EditQuestionsForm() {
 
@@ -184,6 +185,14 @@ export function EditQuestionsForm() {
         }
     };
 
+    const handleSolidLogin = () => {
+        return login({
+            oidcIssuer: "https://login.inrupt.com",
+            redirectUrl: new URL("/pod-auth-callback.html", window.location.href).toString(),
+            clientName: "Pack Me Up",
+        });
+    };
+
     const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
     return (
@@ -257,6 +266,13 @@ export function EditQuestionsForm() {
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
                         <Button
                             type="button"
+                            onClick={handleSolidLogin}
+                            variant="secondary"
+                        >
+                            Solid Pod Login
+                        </Button>
+                        <Button
+                            type="button"
                             onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
                             variant="secondary"
                         >
@@ -297,6 +313,13 @@ export function EditQuestionsForm() {
             <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
                 <div className="max-w-4xl w-full px-4 pb-4">
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
+                        <Button
+                            type="button"
+                            onClick={handleSolidLogin}
+                            variant="secondary"
+                        >
+                            Solid Pod Login
+                        </Button>
                         <Button
                             type="button"
                             onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
