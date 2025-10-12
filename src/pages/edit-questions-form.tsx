@@ -13,6 +13,7 @@ import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
 import { useSolidPod } from '../components/SolidPodContext'
+import { getPodUrlAll, saveFileInContainer, getFile, overwriteFile } from '@inrupt/solid-client'
 
 export function EditQuestionsForm() {
 
@@ -26,7 +27,7 @@ export function EditQuestionsForm() {
         name: "people"
     });
     const { showToast } = useToast();
-    const { login, isLoggedIn } = useSolidPod();
+    const { login, isLoggedIn, session } = useSolidPod();
 
     console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -193,8 +194,103 @@ export function EditQuestionsForm() {
     };
 
     const handleSaveToPod = async () => {
-        // TODO: Implement save to Solid Pod functionality
-        showToast('Save to Pod functionality coming soon!', 'info');
+        if (!session || !session.info.isLoggedIn || !session.info.webId) {
+            showToast('You must be logged in to save to Pod', 'error');
+            return;
+        }
+
+        try {
+            // Get the user's pod URLs
+            const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch });
+
+            if (!podUrls || podUrls.length === 0) {
+                showToast('No pod found for your account', 'error');
+                return;
+            }
+
+            // Use the first pod
+            const podUrl = podUrls[0];
+            const containerUrl = `${podUrl}pack-me-up/`;
+
+            // Get current form data
+            const data = getValues();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const file = new File([blob], 'packing-list-questions.json', { type: 'application/json' });
+
+            console.log(`Saving file to container: ${containerUrl}`);
+
+            // Try saveFileInContainer first
+            try {
+                const savedFile = await saveFileInContainer(
+                    containerUrl,
+                    file,
+                    {
+                        fetch: session.fetch,
+                        slug: 'packing-list-questions.json'
+                    }
+                );
+                console.log('File saved at:', savedFile.internal_resourceInfo.sourceIri);
+            } catch (saveError: any) {
+                // If we get 404 or 409, use overwriteFile instead
+                if (saveError.statusCode === 404 || saveError.statusCode === 409) {
+                    console.log(`Container issue (${saveError.statusCode}), using overwriteFile...`);
+                    const fileUrl = `${containerUrl}packing-list-questions.json`;
+                    await overwriteFile(fileUrl, blob, {
+                        fetch: session.fetch,
+                        contentType: 'application/json'
+                    });
+                    console.log('File saved at:', fileUrl);
+                } else {
+                    throw saveError;
+                }
+            }
+
+            showToast('Successfully saved to Solid Pod!', 'success');
+        } catch (error) {
+            console.error('Error saving to pod:', error);
+            showToast('Failed to save to Pod. Please try again.', 'error');
+        }
+    };
+
+    const handleLoadFromPod = async () => {
+        if (!session || !session.info.isLoggedIn || !session.info.webId) {
+            showToast('You must be logged in to load from Pod', 'error');
+            return;
+        }
+
+        try {
+            // Get the user's pod URLs
+            const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch });
+
+            if (!podUrls || podUrls.length === 0) {
+                showToast('No pod found for your account', 'error');
+                return;
+            }
+
+            // Use the first pod
+            const podUrl = podUrls[0];
+            const fileUrl = `${podUrl}pack-me-up/packing-list-questions.json`;
+
+            console.log(`Loading from pod: ${fileUrl}`);
+
+            // Get the file from the pod
+            const file = await getFile(fileUrl, { fetch: session.fetch });
+
+            // Read the file content
+            const text = await file.text();
+            const data = JSON.parse(text) as PackingListQuestionSet;
+
+            // Preserve the current revision
+            data._rev = rev;
+
+            // Load the data into the form
+            reset(data);
+            showToast('Questions loaded from Pod successfully!', 'success');
+        } catch (error) {
+            console.error('Error loading from pod:', error);
+            showToast('Failed to load from Pod. Please try again.', 'error');
+        }
     };
 
     const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
@@ -269,13 +365,22 @@ export function EditQuestionsForm() {
                 <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
                         {isLoggedIn ? (
-                            <Button
-                                type="button"
-                                onClick={handleSaveToPod}
-                                variant="secondary"
-                            >
-                                Save to Pod
-                            </Button>
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={handleSaveToPod}
+                                    variant="secondary"
+                                >
+                                    Save to Pod
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleLoadFromPod}
+                                    variant="secondary"
+                                >
+                                    Load from Pod
+                                </Button>
+                            </>
                         ) : (
                             <Button
                                 type="button"
@@ -328,13 +433,22 @@ export function EditQuestionsForm() {
                 <div className="max-w-4xl w-full px-4 pb-4">
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
                         {isLoggedIn ? (
-                            <Button
-                                type="button"
-                                onClick={handleSaveToPod}
-                                variant="secondary"
-                            >
-                                Save to Pod
-                            </Button>
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={handleSaveToPod}
+                                    variant="secondary"
+                                >
+                                    Save to Pod
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleLoadFromPod}
+                                    variant="secondary"
+                                >
+                                    Load from Pod
+                                </Button>
+                            </>
                         ) : (
                             <Button
                                 type="button"
