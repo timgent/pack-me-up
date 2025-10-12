@@ -12,7 +12,7 @@ import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
-import { login } from "@inrupt/solid-client-authn-browser"
+import { useSolidPod } from '../components/SolidPodContext'
 
 export function EditQuestionsForm() {
 
@@ -26,6 +26,9 @@ export function EditQuestionsForm() {
         name: "people"
     });
     const { showToast } = useToast();
+    const { login, isLoggedIn } = useSolidPod();
+
+    console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
     const removePerson = (removedIndex: number) => {
         // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -186,11 +189,12 @@ export function EditQuestionsForm() {
     };
 
     const handleSolidLogin = () => {
-        return login({
-            oidcIssuer: "https://login.inrupt.com",
-            redirectUrl: new URL("/pod-auth-callback.html", window.location.href).toString(),
-            clientName: "Pack Me Up",
-        });
+        return login();
+    };
+
+    const handleSaveToPod = async () => {
+        // TODO: Implement save to Solid Pod functionality
+        showToast('Save to Pod functionality coming soon!', 'info');
     };
 
     const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
@@ -264,13 +268,23 @@ export function EditQuestionsForm() {
                 {/* Sticky sidebar for large screens */}
                 <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
-                        <Button
-                            type="button"
-                            onClick={handleSolidLogin}
-                            variant="secondary"
-                        >
-                            Solid Pod Login
-                        </Button>
+                        {isLoggedIn ? (
+                            <Button
+                                type="button"
+                                onClick={handleSaveToPod}
+                                variant="secondary"
+                            >
+                                Save to Pod
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={handleSolidLogin}
+                                variant="secondary"
+                            >
+                                Solid Pod Login
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
@@ -313,13 +327,23 @@ export function EditQuestionsForm() {
             <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
                 <div className="max-w-4xl w-full px-4 pb-4">
                     <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
-                        <Button
-                            type="button"
-                            onClick={handleSolidLogin}
-                            variant="secondary"
-                        >
-                            Solid Pod Login
-                        </Button>
+                        {isLoggedIn ? (
+                            <Button
+                                type="button"
+                                onClick={handleSaveToPod}
+                                variant="secondary"
+                            >
+                                Save to Pod
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={handleSolidLogin}
+                                variant="secondary"
+                            >
+                                Solid Pod Login
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}

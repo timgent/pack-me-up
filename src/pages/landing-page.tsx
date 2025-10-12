@@ -2,13 +2,16 @@ import { Link } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 
 export const LandingPage = () => {
-    const solidPod = useSolidPod()
+    const { isLoggedIn, webId } = useSolidPod()
     return (
         <>
-            <div>
-                <h1 className="text-lg">Here is some solid pod context stuff!</h1>
-                {solidPod}
-            </div>
+            {isLoggedIn && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-green-800">
+                        Logged in as: <span className="font-semibold">{webId}</span>
+                    </p>
+                </div>
+            )}
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-bold mb-4">Smart Packing Made Simple</h1>
