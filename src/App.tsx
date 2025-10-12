@@ -10,7 +10,6 @@ import { CreatePackingList } from './pages/create-packing-list'
 import { PackingLists } from './pages/packing-lists'
 import { ViewPackingList } from './pages/view-packing-list'
 import { SolidPodProvider } from './components/SolidPodContext'
-import { SolidPodLogin } from './pages/solid-pod-login'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 
 function App() {
@@ -26,7 +25,6 @@ function App() {
               <Route path="/create-packing-list" element={<CreatePackingList />} />
               <Route path="/view-lists" element={<PackingLists />} />
               <Route path="/view-lists/:id" element={<ViewPackingList />} />
-              <Route path="/solid-pod-login" element={<SolidPodLogin />} />
               <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
             </Routes>
           </div>
