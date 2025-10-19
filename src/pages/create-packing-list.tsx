@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { PackingListQuestionSet } from '../edit-questions/types'
-import { PackingList, PackingListFormData, PackingListItem } from './types'
+import { PackingList, PackingListFormData, PackingListItem } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
@@ -45,7 +45,7 @@ export function CreatePackingList() {
         if (!questionSet) return
 
         // Get items from question answers
-        const questionBasedItems = data.questionAnswers.flatMap((qa) => {
+        const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionId: string }) => {
             const questionId = qa.questionId
             const selectedOptionid = qa.selectedOptionId
             const question = questionSet.questions.find((q) => q.id === questionId)!
