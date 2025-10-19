@@ -21,6 +21,7 @@ const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefine
 export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [, setSessionVersion] = useState(0);
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -33,8 +34,8 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           webId: currentSession.info.webId,
           sessionId: currentSession.info.sessionId
         });
-        // Create a new object to ensure React detects the change
-        setSession({ ...currentSession });
+        setSession(currentSession);
+        setSessionVersion(v => v + 1);
       } catch (error) {
         console.error("Error initializing session:", error);
       } finally {
@@ -60,7 +61,8 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await solidLogout();
     const updatedSession = getDefaultSession();
-    setSession({ ...updatedSession });
+    setSession(updatedSession);
+    setSessionVersion(v => v + 1);
   };
 
   const value: SolidPodContextValue = {
