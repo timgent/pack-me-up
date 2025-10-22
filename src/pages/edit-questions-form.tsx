@@ -11,7 +11,6 @@ import { AlwaysNeededItemsSection } from '../edit-questions/always-needed-items-
 import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
-import { exportFile } from '../utils/exportFile'
 import { useSolidPod } from '../components/SolidPodContext'
 import { getPodUrlAll, saveFileInContainer, getFile, overwriteFile } from '@inrupt/solid-client'
 
@@ -120,48 +119,6 @@ export function EditQuestionsForm() {
     control,
     name: "questions"
   });
-
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const content = e.target?.result as string;
-        const data = JSON.parse(content) as PackingListQuestionSet;
-
-        console.log("Importing with rev: ", rev)
-        data._rev = rev;
-
-        reset(data);
-        showToast('Questions imported successfully!', 'success');
-      } catch (error) {
-        console.error('Error importing file:', error);
-        showToast('Failed to import file. Please check the file format.', 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleExport = async () => {
-    const data = getValues();
-    const json = JSON.stringify(data, null, 2);
-    try {
-      await exportFile({
-        data: json,
-        filename: 'packing-list-questions.json',
-        mimeType: 'application/json',
-      });
-      showToast('Questions exported successfully!', 'success');
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        console.error('Error exporting file:', err);
-        showToast('Failed to export file.', 'error');
-      }
-      // If user cancels, do nothing
-    }
-  };
 
   const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
     try {
@@ -348,14 +305,6 @@ export function EditQuestionsForm() {
               Add Question
             </Button>
           </div>
-          {/* Hidden import input for sticky bar/sidebar button */}
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-            id="import-file"
-          />
         </form>
         {/* Sticky sidebar for large screens */}
         <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
@@ -398,20 +347,6 @@ export function EditQuestionsForm() {
               variant="secondary"
             >
               Load Example
-            </Button>
-            <Button
-              type="button"
-              onClick={() => document.getElementById('import-file')?.click()}
-              variant="secondary"
-            >
-              Import
-            </Button>
-            <Button
-              type="button"
-              onClick={handleExport}
-              variant="secondary"
-            >
-              Export
             </Button>
           </div>
         </div>
@@ -458,20 +393,6 @@ export function EditQuestionsForm() {
               variant="secondary"
             >
               Load Example
-            </Button>
-            <Button
-              type="button"
-              onClick={() => document.getElementById('import-file')?.click()}
-              variant="secondary"
-            >
-              Import
-            </Button>
-            <Button
-              type="button"
-              onClick={handleExport}
-              variant="secondary"
-            >
-              Export
             </Button>
           </div>
         </div>
