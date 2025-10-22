@@ -150,6 +150,9 @@ export function PackingLists() {
                     const text = await file.text()
                     const list = JSON.parse(text) as PackingList
 
+                    // Remove _rev to avoid conflicts with local database version
+                    delete list._rev
+
                     // Save to local database
                     await packingAppDb.savePackingList(list)
                     loadedLists.push(list)
