@@ -1,6 +1,15 @@
 {
   "hooks": {},
   "instructions": "This project uses the RIPER workflow with 3 consolidated agents (research-innovate, plan-execute, review). See .claude/project-info.md for detailed context.",
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    }
+  },
   "project": {
     "description": "Your project description here",
     "name": "your-project-name"
