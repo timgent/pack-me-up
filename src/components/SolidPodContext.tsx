@@ -12,7 +12,7 @@ interface SolidPodContextValue {
   isLoggedIn: boolean;
   webId: string | undefined;
   isLoading: boolean;
-  login: (returnTo?: string) => Promise<void>;
+  login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -46,13 +46,13 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     initializeSession();
   }, []);
 
-  const login = async (returnTo?: string) => {
+  const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
     const redirectUrl = new URL("/pod-auth-callback.html", window.location.href);
     redirectUrl.searchParams.set("returnTo", currentLocation);
 
     return solidLogin({
-      oidcIssuer: "https://login.inrupt.com",
+      oidcIssuer,
       redirectUrl: redirectUrl.toString(),
       clientName: "Pack Me Up",
     });

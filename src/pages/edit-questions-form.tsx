@@ -13,6 +13,7 @@ import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
 import { useSolidPod } from '../components/SolidPodContext'
+import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPodUrlAll, saveFileInContainer, getFile, overwriteFile } from '@inrupt/solid-client'
 
 export function EditQuestionsForm() {
@@ -22,6 +23,7 @@ export function EditQuestionsForm() {
   });
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
+  const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
@@ -190,7 +192,11 @@ export function EditQuestionsForm() {
   };
 
   const handleSolidLogin = () => {
-    return login();
+    setIsProviderSelectorOpen(true);
+  };
+
+  const handleProviderSelect = (issuer: string) => {
+    return login(issuer);
   };
 
   const handleSaveToPod = async () => {
@@ -514,6 +520,12 @@ export function EditQuestionsForm() {
           ))}
         </div>
       </Modal>
+
+      <SolidProviderSelector
+        isOpen={isProviderSelectorOpen}
+        onClose={() => setIsProviderSelectorOpen(false)}
+        onSelect={handleProviderSelect}
+      />
     </div>
   )
 } 
