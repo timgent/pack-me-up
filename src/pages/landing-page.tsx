@@ -48,6 +48,18 @@ export const LandingPage = () => {
                             Simple and intuitive interface that makes packing preparation a breeze.
                         </p>
                     </div>
+
+                    <div className="bg-blue-50 p-6 rounded-lg shadow-md border-2 border-blue-200">
+                        <h2 className="text-2xl font-semibold mb-3">Own Your Data</h2>
+                        <p className="text-gray-600 mb-4">
+                            Login with your Solid Pod to store your questions and lists in personal storage that you control. Your data stays private and portable.
+                        </p>
+                        {!isLoggedIn && (
+                            <p className="text-sm text-blue-600 font-medium">
+                                → Click "Login with Solid Pod" above to get started
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="text-center">

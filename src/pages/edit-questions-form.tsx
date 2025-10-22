@@ -311,10 +311,6 @@ export function EditQuestionsForm() {
           <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
             {isLoggedIn ? (
               <>
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                  <p className="text-xs text-gray-700 font-medium mb-1">Solid Pod Storage</p>
-                  <p className="text-xs text-gray-600">Your questions are stored in your personal Pod</p>
-                </div>
                 <Button
                   type="button"
                   onClick={handleSaveToPod}
