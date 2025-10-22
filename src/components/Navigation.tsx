@@ -55,7 +55,7 @@ export const Navigation = () => {
                             </div>
                         </div>
                         {/* Solid Login/Logout section */}
-                        <div className="hidden md:flex items-center">
+                        <div className="hidden md:flex items-center gap-2">
                             {isLoggedIn ? (
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm text-gray-300 truncate max-w-xs" title={webId}>
@@ -69,12 +69,16 @@ export const Navigation = () => {
                                     </button>
                                 </div>
                             ) : (
-                                <button
-                                    onClick={handleSolidLogin}
-                                    className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 transition-colors"
-                                >
-                                    Solid Login
-                                </button>
+                                <div className="flex flex-col items-end">
+                                    <button
+                                        onClick={handleSolidLogin}
+                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 transition-colors"
+                                        title="Store your packing lists in your own personal Pod - you own your data"
+                                    >
+                                        Login with Solid Pod
+                                    </button>
+                                    <span className="text-xs text-gray-400 mt-1">Own your data</span>
+                                </div>
                             )}
                         </div>
                         {/* Mobile menu button */}
@@ -152,15 +156,19 @@ export const Navigation = () => {
                                     </button>
                                 </>
                             ) : (
-                                <button
-                                    onClick={() => {
-                                        handleSolidLogin()
-                                        setIsOpen(false)
-                                    }}
-                                    className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-blue-600 hover:bg-blue-700"
-                                >
-                                    Solid Login
-                                </button>
+                                <div>
+                                    <button
+                                        onClick={() => {
+                                            handleSolidLogin()
+                                            setIsOpen(false)
+                                        }}
+                                        className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-blue-600 hover:bg-blue-700"
+                                        title="Store your packing lists in your own personal Pod - you own your data"
+                                    >
+                                        Login with Solid Pod
+                                    </button>
+                                    <p className="px-3 py-1 text-xs text-gray-400">Own your data</p>
+                                </div>
                             )}
                         </div>
                     </div>
