@@ -12,7 +12,7 @@ import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { useSolidPod } from '../components/SolidPodContext'
-import { getPodUrlAll, saveFileInContainer, getFile, overwriteFile } from '@inrupt/solid-client'
+import { getPrimaryPodUrl, saveFileToPod, loadFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 
 export function EditQuestionsForm() {
 
@@ -147,92 +147,46 @@ export function EditQuestionsForm() {
   };
 
   const handleSaveToPod = async () => {
-    if (!session || !session.info.isLoggedIn || !session.info.webId) {
-      showToast('You must be logged in to save to Pod', 'error');
+    const podUrl = await getPrimaryPodUrl(session);
+
+    if (!podUrl) {
+      showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error');
       return;
     }
 
     try {
-      // Get the user's pod URLs
-      const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch });
-
-      if (!podUrls || podUrls.length === 0) {
-        showToast('No pod found for your account', 'error');
-        return;
-      }
-
-      // Use the first pod
-      const podUrl = podUrls[0];
-      const containerUrl = `${podUrl}pack-me-up/`;
-
-      // Get current form data
       const data = getValues();
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const file = new File([blob], 'packing-list-questions.json', { type: 'application/json' });
+      const containerUrl = `${podUrl}${POD_CONTAINERS.ROOT}`;
 
-      console.log(`Saving file to container: ${containerUrl}`);
-
-      // Try saveFileInContainer first
-      try {
-        const savedFile = await saveFileInContainer(
-          containerUrl,
-          file,
-          {
-            fetch: session.fetch,
-            slug: 'packing-list-questions.json'
-          }
-        );
-        console.log('File saved at:', savedFile.internal_resourceInfo.sourceIri);
-      } catch (saveError: any) {
-        // If we get 404 or 409, use overwriteFile instead
-        if (saveError.statusCode === 404 || saveError.statusCode === 409) {
-          console.log(`Container issue (${saveError.statusCode}), using overwriteFile...`);
-          const fileUrl = `${containerUrl}packing-list-questions.json`;
-          await overwriteFile(fileUrl, blob, {
-            fetch: session.fetch,
-            contentType: 'application/json'
-          });
-          console.log('File saved at:', fileUrl);
-        } else {
-          throw saveError;
-        }
-      }
+      await saveFileToPod({
+        session: session!,
+        containerPath: containerUrl,
+        filename: 'packing-list-questions.json',
+        data
+      });
 
       showToast('Successfully saved to Solid Pod!', 'success');
     } catch (error) {
       console.error('Error saving to pod:', error);
-      showToast('Failed to save to Pod. Please try again.', 'error');
+      showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error');
     }
   };
 
   const handleLoadFromPod = async () => {
-    if (!session || !session.info.isLoggedIn || !session.info.webId) {
-      showToast('You must be logged in to load from Pod', 'error');
+    const podUrl = await getPrimaryPodUrl(session);
+
+    if (!podUrl) {
+      showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error');
       return;
     }
 
     try {
-      // Get the user's pod URLs
-      const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch });
+      const fileUrl = `${podUrl}${POD_CONTAINERS.QUESTIONS}`;
 
-      if (!podUrls || podUrls.length === 0) {
-        showToast('No pod found for your account', 'error');
-        return;
-      }
-
-      // Use the first pod
-      const podUrl = podUrls[0];
-      const fileUrl = `${podUrl}pack-me-up/packing-list-questions.json`;
-
-      console.log(`Loading from pod: ${fileUrl}`);
-
-      // Get the file from the pod
-      const file = await getFile(fileUrl, { fetch: session.fetch });
-
-      // Read the file content
-      const text = await file.text();
-      const data = JSON.parse(text) as PackingListQuestionSet;
+      const data = await loadFileFromPod<PackingListQuestionSet>({
+        session: session!,
+        fileUrl
+      });
 
       // Preserve the current revision
       data._rev = rev;
@@ -242,7 +196,7 @@ export function EditQuestionsForm() {
       showToast('Questions loaded from Pod successfully!', 'success');
     } catch (error) {
       console.error('Error loading from pod:', error);
-      showToast('Failed to load from Pod. Please try again.', 'error');
+      showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error');
     }
   };
 

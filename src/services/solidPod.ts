@@ -1,0 +1,244 @@
+import { Session } from '@inrupt/solid-client-authn-browser'
+import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile } from '@inrupt/solid-client'
+
+/**
+ * Pod container paths under the user's Pod root
+ */
+export const POD_CONTAINERS = {
+    ROOT: 'pack-me-up/',
+    QUESTIONS: 'pack-me-up/packing-list-questions.json',
+    PACKING_LISTS: 'pack-me-up/packing-lists/',
+} as const
+
+/**
+ * User-facing error messages for Pod operations
+ */
+export const POD_ERROR_MESSAGES = {
+    NOT_LOGGED_IN: 'You must be logged in to save to Pod',
+    NOT_LOGGED_IN_LOAD: 'You must be logged in to load from Pod',
+    NO_POD_FOUND: 'No pod found for your account',
+    SAVE_FAILED: 'Failed to save to Pod. Please try again.',
+    LOAD_FAILED: 'Failed to load from Pod. Please try again.',
+    NO_DATA_FOUND: (resourceType: string) => `No ${resourceType} found in Pod`,
+} as const
+
+/**
+ * Result of a Pod sync operation
+ */
+export interface PodSyncResult {
+    success: boolean
+    successCount: number
+    failCount: number
+    totalCount: number
+}
+
+/**
+ * Options for saving data to Pod
+ */
+export interface SaveToPodOptions {
+    session: Session
+    containerPath: string
+    filename: string
+    data: any
+    onError?: (error: Error) => void
+}
+
+/**
+ * Options for loading data from Pod
+ */
+export interface LoadFromPodOptions {
+    session: Session
+    fileUrl: string
+    onError?: (error: Error) => void
+}
+
+/**
+ * Options for batch loading files from a Pod container
+ */
+export interface LoadMultipleFromPodOptions<T> {
+    session: Session
+    containerPath: string
+    onFileLoaded?: (data: T) => void
+    onError?: (fileUrl: string, error: Error) => void
+}
+
+/**
+ * Validates session and retrieves the user's primary Pod URL
+ * @returns Pod URL if valid, null otherwise
+ */
+export async function getPrimaryPodUrl(session: Session | null): Promise<string | null> {
+    if (!session || !session.info.isLoggedIn || !session.info.webId) {
+        return null
+    }
+
+    const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
+
+    if (!podUrls || podUrls.length === 0) {
+        return null
+    }
+
+    return podUrls[0]
+}
+
+/**
+ * Saves a file to a Pod container with automatic fallback to overwrite
+ * Handles both saveFileInContainer (creates) and overwriteFile (updates) strategies
+ */
+export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
+    const { session, containerPath, filename, data } = options
+
+    const json = JSON.stringify(data, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const file = new File([blob], filename, { type: 'application/json' })
+
+    // Try saveFileInContainer first (creates new file in container)
+    try {
+        await saveFileInContainer(
+            containerPath,
+            file,
+            {
+                fetch: session.fetch,
+                slug: filename
+            }
+        )
+    } catch (saveError: any) {
+        // If container doesn't exist (404) or file already exists (409),
+        // use overwriteFile instead
+        if (saveError.statusCode === 404 || saveError.statusCode === 409) {
+            const fileUrl = `${containerPath}${filename}`
+            await overwriteFile(fileUrl, blob, {
+                fetch: session.fetch,
+                contentType: 'application/json'
+            })
+        } else {
+            throw saveError
+        }
+    }
+}
+
+/**
+ * Loads a single file from a Pod
+ */
+export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T> {
+    const { session, fileUrl } = options
+
+    const file = await getFile(fileUrl, { fetch: session.fetch })
+    const text = await file.text()
+    return JSON.parse(text) as T
+}
+
+/**
+ * Saves multiple items as separate files in a Pod container
+ * Returns a sync result with success/failure counts
+ */
+export async function saveMultipleFilesToPod<T extends { id: string }>(
+    session: Session,
+    containerUrl: string,
+    items: T[]
+): Promise<PodSyncResult> {
+    let successCount = 0
+    let failCount = 0
+
+    for (const item of items) {
+        try {
+            await saveFileToPod({
+                session,
+                containerPath: containerUrl,
+                filename: `${item.id}.json`,
+                data: item
+            })
+            successCount++
+        } catch (error) {
+            console.error(`Error saving item ${item.id}:`, error)
+            failCount++
+        }
+    }
+
+    return {
+        success: failCount === 0,
+        successCount,
+        failCount,
+        totalCount: items.length
+    }
+}
+
+/**
+ * Loads all JSON files from a Pod container
+ * Returns an array of parsed data and sync stats
+ */
+export async function loadMultipleFilesFromPod<T>(
+    options: LoadMultipleFromPodOptions<T>
+): Promise<{ data: T[], result: PodSyncResult }> {
+    const { session, containerPath, onFileLoaded, onError } = options
+
+    // Get the container dataset to list all files
+    let dataset
+    try {
+        dataset = await getSolidDataset(containerPath, { fetch: session.fetch })
+    } catch (error: any) {
+        if (error.statusCode === 404) {
+            return {
+                data: [],
+                result: {
+                    success: false,
+                    successCount: 0,
+                    failCount: 0,
+                    totalCount: 0
+                }
+            }
+        }
+        throw error
+    }
+
+    const fileUrls = getContainedResourceUrlAll(dataset)
+    const jsonFileUrls = fileUrls.filter(url => url.endsWith('.json'))
+
+    if (jsonFileUrls.length === 0) {
+        return {
+            data: [],
+            result: {
+                success: true,
+                successCount: 0,
+                failCount: 0,
+                totalCount: 0
+            }
+        }
+    }
+
+    const loadedData: T[] = []
+    let successCount = 0
+    let failCount = 0
+
+    // Load each file
+    for (const fileUrl of jsonFileUrls) {
+        try {
+            const file = await getFile(fileUrl, { fetch: session.fetch })
+            const text = await file.text()
+            const item = JSON.parse(text) as T
+
+            loadedData.push(item)
+            successCount++
+
+            if (onFileLoaded) {
+                onFileLoaded(item)
+            }
+        } catch (error) {
+            console.error(`Error loading file ${fileUrl}:`, error)
+            failCount++
+
+            if (onError) {
+                onError(fileUrl, error as Error)
+            }
+        }
+    }
+
+    return {
+        data: loadedData,
+        result: {
+            success: failCount === 0,
+            successCount,
+            failCount,
+            totalCount: jsonFileUrls.length
+        }
+    }
+}
