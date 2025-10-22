@@ -5,7 +5,7 @@ import { packingAppDb } from '../services/database'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
-import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile } from '@inrupt/solid-client'
+import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
@@ -27,154 +27,73 @@ export function PackingLists() {
     }
 
     const handleSaveToPod = async () => {
-        if (!session || !session.info.isLoggedIn || !session.info.webId) {
-            showToast('You must be logged in to save to Pod', 'error')
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
             return
         }
 
         setIsSaving(true)
         try {
-            // Get the user's pod URLs
-            const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
+            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
 
-            if (!podUrls || podUrls.length === 0) {
-                showToast('No pod found for your account', 'error')
-                return
-            }
+            const result = await saveMultipleFilesToPod(session!, containerUrl, packingLists)
 
-            // Use the first pod
-            const podUrl = podUrls[0]
-            const containerUrl = `${podUrl}pack-me-up/packing-lists/`
-
-            let successCount = 0
-            let failCount = 0
-
-            // Save each packing list as a separate file
-            for (const list of packingLists) {
-                try {
-                    const json = JSON.stringify(list, null, 2)
-                    const blob = new Blob([json], { type: 'application/json' })
-                    const file = new File([blob], `${list.id}.json`, { type: 'application/json' })
-
-                    // Try saveFileInContainer first
-                    try {
-                        await saveFileInContainer(
-                            containerUrl,
-                            file,
-                            {
-                                fetch: session.fetch,
-                                slug: `${list.id}.json`
-                            }
-                        )
-                        successCount++
-                    } catch (saveError: any) {
-                        // If we get 404 or 409, use overwriteFile instead
-                        if (saveError.statusCode === 404 || saveError.statusCode === 409) {
-                            const fileUrl = `${containerUrl}${list.id}.json`
-                            await overwriteFile(fileUrl, blob, {
-                                fetch: session.fetch,
-                                contentType: 'application/json'
-                            })
-                            successCount++
-                        } else {
-                            throw saveError
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Error saving packing list ${list.id}:`, error)
-                    failCount++
-                }
-            }
-
-            if (failCount === 0) {
-                showToast(`Successfully saved ${successCount} packing list(s) to Solid Pod!`, 'success')
+            if (result.success) {
+                showToast(`Successfully saved ${result.successCount} packing list(s) to Solid Pod!`, 'success')
             } else {
-                showToast(`Saved ${successCount}/${packingLists.length} packing list(s). ${failCount} failed.`, 'error')
+                showToast(`Saved ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
             }
         } catch (error) {
             console.error('Error saving to pod:', error)
-            showToast('Failed to save to Pod. Please try again.', 'error')
+            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
         } finally {
             setIsSaving(false)
         }
     }
 
     const handleLoadFromPod = async () => {
-        if (!session || !session.info.isLoggedIn || !session.info.webId) {
-            showToast('You must be logged in to load from Pod', 'error')
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
             return
         }
 
         setIsLoadingFromPod(true)
         try {
-            // Get the user's pod URLs
-            const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
+            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
 
-            if (!podUrls || podUrls.length === 0) {
-                showToast('No pod found for your account', 'error')
+            const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
+                session: session!,
+                containerPath: containerUrl
+            })
+
+            if (result.totalCount === 0) {
+                showToast(POD_ERROR_MESSAGES.NO_DATA_FOUND('packing lists'), 'error')
                 return
             }
 
-            // Use the first pod
-            const podUrl = podUrls[0]
-            const containerUrl = `${podUrl}pack-me-up/packing-lists/`
-
-            // Get the container dataset to list all files
-            let dataset
-            try {
-                dataset = await getSolidDataset(containerUrl, { fetch: session.fetch })
-            } catch (error: any) {
-                if (error.statusCode === 404) {
-                    showToast('No packing lists found in Pod', 'error')
-                    return
-                }
-                throw error
-            }
-
-            const fileUrls = getContainedResourceUrlAll(dataset)
-            const jsonFileUrls = fileUrls.filter(url => url.endsWith('.json'))
-
-            if (jsonFileUrls.length === 0) {
-                showToast('No packing lists found in Pod', 'error')
-                return
-            }
-
-            let successCount = 0
-            let failCount = 0
-            const loadedLists: PackingList[] = []
-
-            // Load each file
-            for (const fileUrl of jsonFileUrls) {
-                try {
-                    const file = await getFile(fileUrl, { fetch: session.fetch })
-                    const text = await file.text()
-                    const list = JSON.parse(text) as PackingList
-
-                    // Remove _rev to avoid conflicts with local database version
-                    delete list._rev
-
-                    // Save to local database
-                    await packingAppDb.savePackingList(list)
-                    loadedLists.push(list)
-                    successCount++
-                } catch (error) {
-                    console.error(`Error loading file ${fileUrl}:`, error)
-                    failCount++
-                }
+            // Save each loaded list to local database
+            for (const list of loadedLists) {
+                // Remove _rev to avoid conflicts with local database version
+                delete list._rev
+                await packingAppDb.savePackingList(list)
             }
 
             // Refresh the local list
             const allLists = await packingAppDb.getAllPackingLists()
             setPackingLists(allLists)
 
-            if (failCount === 0) {
-                showToast(`Successfully loaded ${successCount} packing list(s) from Solid Pod!`, 'success')
+            if (result.success) {
+                showToast(`Successfully loaded ${result.successCount} packing list(s) from Solid Pod!`, 'success')
             } else {
-                showToast(`Loaded ${successCount}/${jsonFileUrls.length} packing list(s). ${failCount} failed.`, 'error')
+                showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
             }
         } catch (error) {
             console.error('Error loading from pod:', error)
-            showToast('Failed to load from Pod. Please try again.', 'error')
+            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
         } finally {
             setIsLoadingFromPod(false)
         }
