@@ -348,14 +348,6 @@ export function EditQuestionsForm() {
               Add Question
             </Button>
           </div>
-          {/* Hidden import input for sticky bar/sidebar button */}
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-            id="import-file"
-          />
         </form>
         {/* Sticky sidebar for large screens */}
         <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
@@ -398,20 +390,6 @@ export function EditQuestionsForm() {
               variant="secondary"
             >
               Load Example
-            </Button>
-            <Button
-              type="button"
-              onClick={() => document.getElementById('import-file')?.click()}
-              variant="secondary"
-            >
-              Import
-            </Button>
-            <Button
-              type="button"
-              onClick={handleExport}
-              variant="secondary"
-            >
-              Export
             </Button>
           </div>
         </div>
@@ -458,20 +436,6 @@ export function EditQuestionsForm() {
               variant="secondary"
             >
               Load Example
-            </Button>
-            <Button
-              type="button"
-              onClick={() => document.getElementById('import-file')?.click()}
-              variant="secondary"
-            >
-              Import
-            </Button>
-            <Button
-              type="button"
-              onClick={handleExport}
-              variant="secondary"
-            >
-              Export
             </Button>
           </div>
         </div>
