@@ -309,7 +309,7 @@ export function EditQuestionsForm() {
         {/* Sticky sidebar for large screens */}
         <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
           <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
-            {isLoggedIn && (
+            {isLoggedIn ? (
               <>
                 <Button
                   type="button"
@@ -326,6 +326,12 @@ export function EditQuestionsForm() {
                   Load from Pod
                 </Button>
               </>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs text-gray-700 font-semibold mb-1">💡 Store in Your Pod</p>
+                <p className="text-xs text-gray-600 mb-2">Login with Solid Pod to save your questions privately in storage you control.</p>
+                <p className="text-xs text-blue-600">→ Click "Login with Solid Pod" above</p>
+              </div>
             )}
             <Button
               type="button"
@@ -354,7 +360,13 @@ export function EditQuestionsForm() {
       {/* Sticky bottom bar for small/medium screens */}
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
         <div className="max-w-4xl w-full px-4 pb-4">
-          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
+          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto">
+            {!isLoggedIn && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mx-2">
+                <p className="text-xs text-gray-700 font-semibold">💡 Login with Solid Pod to save privately</p>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3 justify-center">
             {isLoggedIn && (
               <>
                 <Button
@@ -394,6 +406,7 @@ export function EditQuestionsForm() {
             >
               Load Example
             </Button>
+            </div>
           </div>
         </div>
       </div>

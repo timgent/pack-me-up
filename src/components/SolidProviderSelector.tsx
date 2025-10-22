@@ -52,11 +52,36 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Select Solid Pod Provider">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Login with Your Solid Pod">
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
-          Choose your Solid Pod provider from the list below or enter a custom one.
-        </p>
+        {/* Explanation section */}
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-2">
+          <h3 className="font-semibold text-gray-900 text-sm">What is a Solid Pod?</h3>
+          <p className="text-sm text-gray-700">
+            A Solid Pod is your personal data storage that <strong>you control</strong>. Instead of storing your packing lists on our servers, they're stored in your own secure space.
+          </p>
+          <ul className="text-sm text-gray-700 space-y-1 ml-4 list-disc">
+            <li><strong>You own your data</strong> - it stays in your Pod</li>
+            <li><strong>Privacy-focused</strong> - you choose who can access it</li>
+            <li><strong>Portable</strong> - use your Pod with any Solid app</li>
+          </ul>
+          <p className="text-xs text-gray-600 mt-2">
+            <a
+              href="https://solidproject.org/users/get-a-pod"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              Learn more about Solid
+            </a>
+          </p>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4">
+          <p className="text-sm text-gray-600 mb-3">
+            Choose your Solid Pod provider to get started:
+          </p>
+        </div>
 
         <div className="space-y-2">
           {COMMON_PROVIDERS.map((provider) => (
