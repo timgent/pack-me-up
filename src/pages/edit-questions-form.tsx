@@ -13,7 +13,6 @@ import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { exportFile } from '../utils/exportFile'
 import { useSolidPod } from '../components/SolidPodContext'
-import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPodUrlAll, saveFileInContainer, getFile, overwriteFile } from '@inrupt/solid-client'
 
 export function EditQuestionsForm() {
@@ -23,13 +22,12 @@ export function EditQuestionsForm() {
   });
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
-  const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
   });
   const { showToast } = useToast();
-  const { login, isLoggedIn, session } = useSolidPod();
+  const { isLoggedIn, session } = useSolidPod();
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -189,14 +187,6 @@ export function EditQuestionsForm() {
       setIsExampleModalOpen(false);
       showToast('Example loaded successfully!', 'success');
     }
-  };
-
-  const handleSolidLogin = () => {
-    setIsProviderSelectorOpen(true);
-  };
-
-  const handleProviderSelect = (issuer: string) => {
-    return login(issuer);
   };
 
   const handleSaveToPod = async () => {
@@ -370,7 +360,7 @@ export function EditQuestionsForm() {
         {/* Sticky sidebar for large screens */}
         <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
           <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <>
                 <Button
                   type="button"
@@ -387,14 +377,6 @@ export function EditQuestionsForm() {
                   Load from Pod
                 </Button>
               </>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSolidLogin}
-                variant="secondary"
-              >
-                Solid Pod Login
-              </Button>
             )}
             <Button
               type="button"
@@ -438,7 +420,7 @@ export function EditQuestionsForm() {
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
         <div className="max-w-4xl w-full px-4 pb-4">
           <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-wrap items-center gap-4 justify-center py-4 pointer-events-auto">
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <>
                 <Button
                   type="button"
@@ -455,14 +437,6 @@ export function EditQuestionsForm() {
                   Load from Pod
                 </Button>
               </>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSolidLogin}
-                variant="secondary"
-              >
-                Solid Pod Login
-              </Button>
             )}
             <Button
               type="button"
@@ -520,12 +494,6 @@ export function EditQuestionsForm() {
           ))}
         </div>
       </Modal>
-
-      <SolidProviderSelector
-        isOpen={isProviderSelectorOpen}
-        onClose={() => setIsProviderSelectorOpen(false)}
-        onSelect={handleProviderSelect}
-      />
     </div>
   )
 } 
