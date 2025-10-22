@@ -1,8 +1,24 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
+import { useSolidPod } from './SolidPodContext'
+import { SolidProviderSelector } from './SolidProviderSelector'
 
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
+    const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
+    const { login, logout, isLoggedIn, webId } = useSolidPod()
+
+    const handleSolidLogin = () => {
+        setIsProviderSelectorOpen(true)
+    }
+
+    const handleProviderSelect = (issuer: string) => {
+        return login(issuer)
+    }
+
+    const handleLogout = async () => {
+        await logout()
+    }
 
     return (
         <nav className="bg-gray-800 text-white shadow-lg">
@@ -36,6 +52,29 @@ export const Navigation = () => {
                                 </Link>
                             </div>
                         </div>
+                    </div>
+                    {/* Solid Login/Logout section */}
+                    <div className="hidden md:flex items-center">
+                        {isLoggedIn ? (
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-300 truncate max-w-xs" title={webId}>
+                                    {webId}
+                                </span>
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleSolidLogin}
+                                className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 transition-colors"
+                            >
+                                Solid Login
+                            </button>
+                        )}
                     </div>
                     {/* Mobile menu button */}
                     <div className="md:hidden">
@@ -94,8 +133,44 @@ export const Navigation = () => {
                     >
                         View Lists
                     </Link>
+                    {/* Mobile Solid Login/Logout */}
+                    <div className="border-t border-gray-700 pt-2 mt-2">
+                        {isLoggedIn ? (
+                            <>
+                                <div className="px-3 py-2 text-sm text-gray-300 truncate" title={webId}>
+                                    {webId}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        handleLogout()
+                                        setIsOpen(false)
+                                    }}
+                                    className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-gray-700 hover:bg-gray-600"
+                                >
+                                    Logout
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    handleSolidLogin()
+                                    setIsOpen(false)
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-blue-600 hover:bg-blue-700"
+                            >
+                                Solid Login
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* Solid Provider Selector Modal */}
+            <SolidProviderSelector
+                isOpen={isProviderSelectorOpen}
+                onClose={() => setIsProviderSelectorOpen(false)}
+                onSelect={handleProviderSelect}
+            />
         </nav>
     )
 } 
