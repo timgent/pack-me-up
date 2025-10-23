@@ -14,7 +14,7 @@ export function CreatePackingList() {
     const [isExampleLoaded, setIsExampleLoaded] = useState(false)
     const { showToast } = useToast()
 
-    const { register, handleSubmit } = useForm<PackingListFormData>({
+    const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
         defaultValues: {
             name: '',
             questionAnswers: []
@@ -166,17 +166,32 @@ export function CreatePackingList() {
                                 ))
                             ) : (
                                 // Multiple choice - checkboxes
-                                question.options.map((option) => (
+                                question.options.map((option) => {
+                                    const currentSelectedIds = watch(`questionAnswers.${index}.selectedOptionIds`) || []
+                                    const isChecked = currentSelectedIds.includes(option.id)
+
+                                    return (
                                     <label key={`${question.id}-${option.id}`} className="flex items-center space-x-3">
                                         <input
                                             type="checkbox"
                                             value={option.id}
-                                            {...register(`questionAnswers.${index}.selectedOptionIds`)}
-                                            className="h-4 w-4 text-blue-600"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                                const currentIds = watch(`questionAnswers.${index}.selectedOptionIds`) || []
+                                                if (e.target.checked) {
+                                                    // Add the option to the array
+                                                    setValue(`questionAnswers.${index}.selectedOptionIds`, [...currentIds, option.id])
+                                                } else {
+                                                    // Remove the option from the array
+                                                    setValue(`questionAnswers.${index}.selectedOptionIds`, currentIds.filter((id: string) => id !== option.id))
+                                                }
+                                            }}
+                                            className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                                         />
                                         <span className="text-gray-700">{option.text}</span>
                                     </label>
-                                ))
+                                    )
+                                })
                             )}
                         </div>
                     </div>
