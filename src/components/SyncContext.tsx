@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { SyncService } from '../services/sync/SyncService'
 import { SyncState, SyncResult, ConflictStrategy } from '../services/sync/types'
 import { packingAppDb } from '../services/database'
@@ -18,6 +19,7 @@ interface SyncContextValue {
 const SyncContext = createContext<SyncContextValue | undefined>(undefined)
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const location = useLocation()
     const { session, isLoggedIn, isLoading } = useSolidPod()
     const { showToast } = useToast()
     const [syncService] = useState(() => new SyncService(packingAppDb))
@@ -54,36 +56,33 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // 1. User just logged in
         // 2. Session is available and fully loaded
         // 3. Haven't already synced on this login
-        if (justLoggedIn && session && !isLoading && !hasSyncedOnLogin.current) {
-            console.log('User just logged in, scheduling sync...')
+        // 4. Not currently on the redirect page (wait for navigation to complete)
+        const isOnRedirectPage = location.pathname === '/solid-pod-handle-redirect'
+
+        if (justLoggedIn && session && !isLoading && !hasSyncedOnLogin.current && !isOnRedirectPage) {
+            console.log('User just logged in and navigation complete, triggering sync...')
             hasSyncedOnLogin.current = true
 
-            // Small delay to ensure redirect is complete and DOM is ready
-            const syncTimeout = setTimeout(() => {
-                console.log('Starting login sync...')
-                showToast('Syncing with your Pod...', 'info')
+            showToast('Syncing with your Pod...', 'info')
 
-                syncService.syncAll()
-                    .then(result => {
-                        if (result.success) {
-                            if (result.synced > 0) {
-                                showToast(`Synced ${result.synced} item${result.synced !== 1 ? 's' : ''} successfully`, 'success')
-                            } else {
-                                showToast('Everything is up to date', 'success')
-                            }
-                        } else if (result.conflicts > 0) {
-                            showToast(`Sync completed with ${result.conflicts} conflict${result.conflicts !== 1 ? 's' : ''}. Please review.`, 'warning')
+            syncService.syncAll()
+                .then(result => {
+                    if (result.success) {
+                        if (result.synced > 0) {
+                            showToast(`Synced ${result.synced} item${result.synced !== 1 ? 's' : ''} successfully`, 'success')
                         } else {
-                            showToast('Sync completed with errors: ' + result.errors.join(', '), 'error')
+                            showToast('Everything is up to date', 'success')
                         }
-                    })
-                    .catch(err => {
-                        console.error('Error during login sync:', err)
-                        showToast('Failed to sync with Pod: ' + err.message, 'error')
-                    })
-            }, 500) // 500ms delay to ensure everything is ready
-
-            return () => clearTimeout(syncTimeout)
+                    } else if (result.conflicts > 0) {
+                        showToast(`Sync completed with ${result.conflicts} conflict${result.conflicts !== 1 ? 's' : ''}. Please review.`, 'warning')
+                    } else {
+                        showToast('Sync completed with errors: ' + result.errors.join(', '), 'error')
+                    }
+                })
+                .catch(err => {
+                    console.error('Error during login sync:', err)
+                    showToast('Failed to sync with Pod: ' + err.message, 'error')
+                })
         }
 
         // Reset sync flag when user logs out
@@ -92,7 +91,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         previousLoginState.current = isLoggedIn
-    }, [isLoggedIn, session, isLoading, syncService, showToast])
+    }, [isLoggedIn, session, isLoading, location.pathname, syncService, showToast])
 
     // Cleanup on unmount
     useEffect(() => {
