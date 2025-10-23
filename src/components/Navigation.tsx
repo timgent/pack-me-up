@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useSolidPod } from './SolidPodContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
+import { useSync } from './SyncContext'
 
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { login, logout, isLoggedIn, webId } = useSolidPod()
+    const { syncState } = useSync()
 
     const handleSolidLogin = () => {
         setIsProviderSelectorOpen(true)
@@ -19,6 +21,8 @@ export const Navigation = () => {
     const handleLogout = async () => {
         await logout()
     }
+
+    const isOnline = syncState?.online ?? true
 
     return (
         <>
@@ -54,8 +58,17 @@ export const Navigation = () => {
                                 </div>
                             </div>
                         </div>
-                        {/* Solid Login/Logout section */}
-                        <div className="hidden md:flex items-center gap-2">
+                        {/* Online/Offline Status & Solid Login/Logout section */}
+                        <div className="hidden md:flex items-center gap-4">
+                            {/* Online/Offline Indicator */}
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                                     title={isOnline ? 'Online' : 'Offline'} />
+                                <span className="text-xs text-gray-400">
+                                    {isOnline ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
+
                             {isLoggedIn ? (
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm text-gray-300 truncate max-w-xs" title={webId}>
@@ -117,6 +130,15 @@ export const Navigation = () => {
                 {/* Mobile menu */}
                 <div className={`${isOpen ? 'block' : 'hidden'} md:hidden`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                        {/* Online/Offline Indicator - Mobile */}
+                        <div className="flex items-center gap-2 px-3 py-2">
+                            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                                 title={isOnline ? 'Online' : 'Offline'} />
+                            <span className="text-xs text-gray-400">
+                                {isOnline ? 'Online' : 'Offline'}
+                            </span>
+                        </div>
+
                         <Link
                             to="/manage-questions"
                             className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 hover:text-white"
