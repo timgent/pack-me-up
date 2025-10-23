@@ -1,6 +1,8 @@
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
+import { SyncMetadata } from './sync/types'
+import { getDeviceId, calculateChecksum } from './sync/utils'
 
 export type DocumentType = 'question-set' | 'packing-list'
 
@@ -10,6 +12,7 @@ export interface BaseDocument {
     docType: DocumentType
     createdAt: string
     updatedAt: string
+    syncMetadata?: SyncMetadata
 }
 
 export interface QuestionSetDocument extends BaseDocument {
@@ -43,6 +46,20 @@ export class PackingAppDatabase {
         return PackingAppDatabase.instance
     }
 
+    /**
+     * Create or update sync metadata for a document
+     */
+    private updateSyncMetadata(existingMetadata?: SyncMetadata): SyncMetadata {
+        const version = (existingMetadata?.version || 0) + 1
+
+        return {
+            version,
+            lastSyncedAt: existingMetadata?.lastSyncedAt || null,
+            deviceId: getDeviceId(),
+            checksum: '', // Will be calculated after document is created
+        }
+    }
+
 
     public async getQuestionSet(): Promise<PackingListQuestionSet> {
         try {
@@ -63,6 +80,31 @@ export class PackingAppDatabase {
         }
     }
 
+    /**
+     * Get the raw question set document with metadata (for sync operations)
+     */
+    public async getQuestionSetDocument(): Promise<QuestionSetDocument> {
+        const doc = await this.db.get('question-set:1')
+        if (doc.docType !== 'question-set') {
+            throw new Error('Invalid document type for question set')
+        }
+        return doc
+    }
+
+    /**
+     * Update sync metadata for question set (for sync operations)
+     * This updates only the sync metadata without changing the data or incrementing version
+     */
+    public async updateQuestionSetSyncMetadata(lastSyncedAt: string): Promise<void> {
+        const doc = await this.db.get('question-set:1')
+        if (doc.docType !== 'question-set' || !doc.syncMetadata) {
+            throw new Error('Invalid document or missing sync metadata')
+        }
+
+        doc.syncMetadata.lastSyncedAt = lastSyncedAt
+        await this.db.put(doc)
+    }
+
     public async saveQuestionSet(questionSet: PackingListQuestionSet): Promise<{ rev: string }> {
         const docId = 'question-set:1'
         const now = new Date().toISOString()
@@ -80,6 +122,9 @@ export class PackingAppDatabase {
                 }
             }
 
+            // Update sync metadata
+            const syncMetadata = this.updateSyncMetadata(existingDoc?.syncMetadata)
+
             const docToSave: QuestionSetDocument = {
                 _id: docId,
                 _rev: questionSet._rev || existingDoc?._rev,
@@ -90,8 +135,12 @@ export class PackingAppDatabase {
                     people: questionSet.people,
                     alwaysNeededItems: questionSet.alwaysNeededItems,
                     questions: questionSet.questions
-                }
+                },
+                syncMetadata
             }
+
+            // Calculate checksum after document is created
+            docToSave.syncMetadata!.checksum = calculateChecksum(docToSave)
 
             const result = await this.db.put(docToSave)
             return { rev: result.rev }
@@ -137,6 +186,9 @@ export class PackingAppDatabase {
                 }
             }
 
+            // Update sync metadata
+            const syncMetadata = this.updateSyncMetadata(existingDoc?.syncMetadata)
+
             const docToSave: PackingListDocument = {
                 _id: docId,
                 _rev: packingList._rev || existingDoc?._rev,
@@ -147,8 +199,12 @@ export class PackingAppDatabase {
                     name: packingList.name,
                     createdAt: packingList.createdAt,
                     items: packingList.items
-                }
+                },
+                syncMetadata
             }
+
+            // Calculate checksum after document is created
+            docToSave.syncMetadata!.checksum = calculateChecksum(docToSave)
 
             const result = await this.db.put(docToSave)
             return { rev: result.rev }
@@ -242,6 +298,54 @@ export class PackingAppDatabase {
 
     public getInfo() {
         return this.db.info()
+    }
+
+    /**
+     * Migrate existing documents to add sync metadata
+     * This should be called once when the app loads to ensure all documents have sync metadata
+     */
+    public async migrateSyncMetadata(): Promise<{ migrated: number, skipped: number }> {
+        let migrated = 0
+        let skipped = 0
+
+        try {
+            const result = await this.db.allDocs({ include_docs: true })
+
+            for (const row of result.rows) {
+                if (!row.doc) continue
+
+                // Skip if already has sync metadata
+                if (row.doc.syncMetadata) {
+                    skipped++
+                    continue
+                }
+
+                // Add sync metadata
+                const syncMetadata: SyncMetadata = {
+                    version: 1,
+                    lastSyncedAt: null,
+                    deviceId: getDeviceId(),
+                    checksum: '', // Will be calculated
+                }
+
+                const updatedDoc = {
+                    ...row.doc,
+                    syncMetadata
+                }
+
+                // Calculate checksum
+                updatedDoc.syncMetadata.checksum = calculateChecksum(updatedDoc)
+
+                await this.db.put(updatedDoc)
+                migrated++
+            }
+
+            console.log(`Sync metadata migration complete: ${migrated} migrated, ${skipped} skipped`)
+            return { migrated, skipped }
+        } catch (err) {
+            console.error('Error migrating sync metadata:', err)
+            throw err
+        }
     }
 }
 

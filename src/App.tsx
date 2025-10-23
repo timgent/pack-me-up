@@ -11,12 +11,16 @@ import { PackingLists } from './pages/packing-lists'
 import { ViewPackingList } from './pages/view-packing-list'
 import { SolidPodProvider } from './components/SolidPodContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
+import { SyncProvider } from './components/SyncContext'
+import { AppInitializer } from './components/AppInitializer'
 
 function App() {
   return (
     <ToastProvider>
       <SolidPodProvider>
-        <HashRouter>
+        <SyncProvider>
+          <AppInitializer>
+          <HashRouter>
           <Navigation />
           <div className="container mx-auto px-4 py-8">
             <Routes>
@@ -29,6 +33,8 @@ function App() {
             </Routes>
           </div>
         </HashRouter>
+          </AppInitializer>
+        </SyncProvider>
       </SolidPodProvider>
     </ToastProvider>
   )
