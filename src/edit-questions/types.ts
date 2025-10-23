@@ -13,13 +13,16 @@ export interface Person {
 
 export type Question = DraftQuestion | SavedQuestion
 
+export type QuestionType = "single-choice" | "multiple-choice"
+
 export function newDraftQuestion(order: number): DraftQuestion {
     return {
         id: crypto.randomUUID(),
         type: "draft",
         text: "",
         options: [],
-        order
+        order,
+        questionType: "single-choice"
     }
 }
 
@@ -28,6 +31,7 @@ interface CommonQuestion {
     text: string
     options: Option[]
     order: number
+    questionType?: QuestionType  // Optional for backward compatibility
 }
 
 export type DraftQuestion = CommonQuestion & { type: "draft" }

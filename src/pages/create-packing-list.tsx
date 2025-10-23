@@ -45,27 +45,31 @@ export function CreatePackingList() {
         if (!questionSet) return
 
         // Get items from question answers
-        const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionId: string }) => {
+        const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionIds: string[] }) => {
             const questionId = qa.questionId
-            const selectedOptionid = qa.selectedOptionId
+            const selectedOptionIds = qa.selectedOptionIds || []
             const question = questionSet.questions.find((q) => q.id === questionId)!
-            const selectedOption = question?.options.find((option) => (option.id === selectedOptionid))!
-            const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
-                const selectedPeople = item.personSelections.filter((person) => (person.selected))
-                return selectedPeople.flatMap((person) => {
-                    const personName = questionSet.people.find((p) => p.id === person.personId)!.name
-                    return {
-                        id: crypto.randomUUID(),
-                        itemText: item.text,
-                        personId: person.personId,
-                        personName,
-                        questionId: question.id,
-                        optionId: selectedOption.id,
-                        packed: false
-                    }
+
+            // For each selected option, get all items
+            return selectedOptionIds.flatMap((selectedOptionId) => {
+                const selectedOption = question?.options.find((option) => (option.id === selectedOptionId))!
+                const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
+                    const selectedPeople = item.personSelections.filter((person) => (person.selected))
+                    return selectedPeople.flatMap((person) => {
+                        const personName = questionSet.people.find((p) => p.id === person.personId)!.name
+                        return {
+                            id: crypto.randomUUID(),
+                            itemText: item.text,
+                            personId: person.personId,
+                            personName,
+                            questionId: question.id,
+                            optionId: selectedOption.id,
+                            packed: false
+                        }
+                    })
                 })
+                return packingListItems
             })
-            return packingListItems
         })
 
         // Get always needed items
@@ -129,29 +133,55 @@ export function CreatePackingList() {
                     {...register('name', { required: true })}
                 />
 
-                {questionSet.questions.map((question, index) => (
+                {questionSet.questions.map((question, index) => {
+                    // Default to single-choice for backward compatibility
+                    const questionType = question.questionType || "single-choice"
+
+                    return (
                     <div key={question.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">{question.text}</h3>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            {question.text}
+                            {questionType === "multiple-choice" && (
+                                <span className="ml-2 text-sm text-gray-500">(select all that apply)</span>
+                            )}
+                        </h3>
                         <input
                             type="hidden"
                             {...register(`questionAnswers.${index}.questionId`)}
                             value={question.id}
                         />
                         <div className="space-y-2">
-                            {question.options.map((option) => (
-                                <label key={`${question.id}-${option.id}`} className="flex items-center space-x-3">
-                                    <input
-                                        type="radio"
-                                        value={option.id}
-                                        {...register(`questionAnswers.${index}.selectedOptionId`)}
-                                        className="h-4 w-4 text-blue-600"
-                                    />
-                                    <span className="text-gray-700">{option.text}</span>
-                                </label>
-                            ))}
+                            {questionType === "single-choice" ? (
+                                // Single choice - radio buttons
+                                question.options.map((option) => (
+                                    <label key={`${question.id}-${option.id}`} className="flex items-center space-x-3">
+                                        <input
+                                            type="radio"
+                                            value={option.id}
+                                            {...register(`questionAnswers.${index}.selectedOptionIds.0`)}
+                                            className="h-4 w-4 text-blue-600"
+                                        />
+                                        <span className="text-gray-700">{option.text}</span>
+                                    </label>
+                                ))
+                            ) : (
+                                // Multiple choice - checkboxes
+                                question.options.map((option) => (
+                                    <label key={`${question.id}-${option.id}`} className="flex items-center space-x-3">
+                                        <input
+                                            type="checkbox"
+                                            value={option.id}
+                                            {...register(`questionAnswers.${index}.selectedOptionIds`)}
+                                            className="h-4 w-4 text-blue-600"
+                                        />
+                                        <span className="text-gray-700">{option.text}</span>
+                                    </label>
+                                ))
+                            )}
                         </div>
                     </div>
-                ))}
+                    )
+                })}
 
                 <div className="flex justify-end">
                     <Button type="submit">

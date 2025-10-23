@@ -56,8 +56,34 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                 </div>
 
                 {isExpanded && (
-                    <div className="space-y-4">
-                        {optionFields.map((option, optionIndex) => (
+                    <>
+                        <div className="mb-4 pb-4 border-b border-gray-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Question Type
+                            </label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        value="single-choice"
+                                        {...register(`questions.${questionIndex}.questionType`)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm text-gray-700">Single Choice</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        value="multiple-choice"
+                                        {...register(`questions.${questionIndex}.questionType`)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm text-gray-700">Multiple Choice</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            {optionFields.map((option, optionIndex) => (
                             <OptionSection
                                 control={control}
                                 key={option.id}
@@ -79,7 +105,8 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                                 Add Option
                             </Button>
                         </div>
-                    </div>
+                        </div>
+                    </>
                 )}
             </div>
         </div>

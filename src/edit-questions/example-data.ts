@@ -38,6 +38,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "What type of trip is this?",
                 order: 0,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -155,6 +156,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will it be hot?",
                 order: 1,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -184,6 +186,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will it be cold?",
                 order: 2,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -213,6 +216,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will it rain?",
                 order: 3,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -242,6 +246,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "What type of accommodation?",
                 order: 4,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -301,6 +306,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will you swim?",
                 order: 5,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -330,6 +336,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will you visit religious sites?",
                 order: 6,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -359,6 +366,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "Will you go to fancy restaurants?",
                 order: 7,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -388,6 +396,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "What's your trip duration?",
                 order: 8,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
@@ -440,6 +449,7 @@ function createExampleData(numPeople: number): PackingListQuestionSet {
                 type: "saved",
                 text: "What's your travel style?",
                 order: 9,
+                questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
