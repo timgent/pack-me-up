@@ -19,25 +19,25 @@ function App() {
   return (
     <ToastProvider>
       <SolidPodProvider>
-        <SyncProvider>
-          <SyncConflictHandler>
-            <AppInitializer>
-          <HashRouter>
-          <Navigation />
-          <div className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/manage-questions" element={<EditQuestionsForm />} />
-              <Route path="/create-packing-list" element={<CreatePackingList />} />
-              <Route path="/view-lists" element={<PackingLists />} />
-              <Route path="/view-lists/:id" element={<ViewPackingList />} />
-              <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
-            </Routes>
-          </div>
+        <HashRouter>
+          <SyncProvider>
+            <SyncConflictHandler>
+              <AppInitializer>
+                <Navigation />
+                <div className="container mx-auto px-4 py-8">
+                  <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/manage-questions" element={<EditQuestionsForm />} />
+                    <Route path="/create-packing-list" element={<CreatePackingList />} />
+                    <Route path="/view-lists" element={<PackingLists />} />
+                    <Route path="/view-lists/:id" element={<ViewPackingList />} />
+                    <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
+                  </Routes>
+                </div>
+              </AppInitializer>
+            </SyncConflictHandler>
+          </SyncProvider>
         </HashRouter>
-            </AppInitializer>
-          </SyncConflictHandler>
-        </SyncProvider>
       </SolidPodProvider>
     </ToastProvider>
   )
