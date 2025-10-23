@@ -18,11 +18,12 @@ interface SyncContextValue {
 const SyncContext = createContext<SyncContextValue | undefined>(undefined)
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { session, isLoggedIn } = useSolidPod()
+    const { session, isLoggedIn, isLoading } = useSolidPod()
     const { showToast } = useToast()
     const [syncService] = useState(() => new SyncService(packingAppDb))
     const [syncState, setSyncState] = useState<SyncState | null>(null)
     const previousLoginState = useRef<boolean>(false)
+    const hasSyncedOnLogin = useRef<boolean>(false)
 
     // Initialize sync service when session changes
     useEffect(() => {
@@ -49,32 +50,49 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const justLoggedIn = !previousLoginState.current && isLoggedIn
 
-        if (justLoggedIn && session) {
-            console.log('User just logged in, triggering sync...')
-            showToast('Syncing with your Pod...', 'info')
+        // Only sync if:
+        // 1. User just logged in
+        // 2. Session is available and fully loaded
+        // 3. Haven't already synced on this login
+        if (justLoggedIn && session && !isLoading && !hasSyncedOnLogin.current) {
+            console.log('User just logged in, scheduling sync...')
+            hasSyncedOnLogin.current = true
 
-            syncService.syncAll()
-                .then(result => {
-                    if (result.success) {
-                        if (result.synced > 0) {
-                            showToast(`Synced ${result.synced} item${result.synced !== 1 ? 's' : ''} successfully`, 'success')
+            // Small delay to ensure redirect is complete and DOM is ready
+            const syncTimeout = setTimeout(() => {
+                console.log('Starting login sync...')
+                showToast('Syncing with your Pod...', 'info')
+
+                syncService.syncAll()
+                    .then(result => {
+                        if (result.success) {
+                            if (result.synced > 0) {
+                                showToast(`Synced ${result.synced} item${result.synced !== 1 ? 's' : ''} successfully`, 'success')
+                            } else {
+                                showToast('Everything is up to date', 'success')
+                            }
+                        } else if (result.conflicts > 0) {
+                            showToast(`Sync completed with ${result.conflicts} conflict${result.conflicts !== 1 ? 's' : ''}. Please review.`, 'warning')
                         } else {
-                            showToast('Everything is up to date', 'success')
+                            showToast('Sync completed with errors: ' + result.errors.join(', '), 'error')
                         }
-                    } else if (result.conflicts > 0) {
-                        showToast(`Sync completed with ${result.conflicts} conflict${result.conflicts !== 1 ? 's' : ''}. Please review.`, 'warning')
-                    } else {
-                        showToast('Sync completed with errors: ' + result.errors.join(', '), 'error')
-                    }
-                })
-                .catch(err => {
-                    console.error('Error during login sync:', err)
-                    showToast('Failed to sync with Pod: ' + err.message, 'error')
-                })
+                    })
+                    .catch(err => {
+                        console.error('Error during login sync:', err)
+                        showToast('Failed to sync with Pod: ' + err.message, 'error')
+                    })
+            }, 500) // 500ms delay to ensure everything is ready
+
+            return () => clearTimeout(syncTimeout)
+        }
+
+        // Reset sync flag when user logs out
+        if (!isLoggedIn) {
+            hasSyncedOnLogin.current = false
         }
 
         previousLoginState.current = isLoggedIn
-    }, [isLoggedIn, session, syncService, showToast])
+    }, [isLoggedIn, session, isLoading, syncService, showToast])
 
     // Cleanup on unmount
     useEffect(() => {
