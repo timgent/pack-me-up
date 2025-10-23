@@ -20,6 +20,6 @@ export interface PackingListFormData {
     name: string
     questionAnswers: {
         questionId: string
-        selectedOptionId: string
+        selectedOptionIds: string[]
     }[]
 } 
