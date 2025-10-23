@@ -13,13 +13,15 @@ import { SolidPodProvider } from './components/SolidPodContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 import { SyncProvider } from './components/SyncContext'
 import { AppInitializer } from './components/AppInitializer'
+import { SyncConflictHandler } from './components/SyncConflictHandler'
 
 function App() {
   return (
     <ToastProvider>
       <SolidPodProvider>
         <SyncProvider>
-          <AppInitializer>
+          <SyncConflictHandler>
+            <AppInitializer>
           <HashRouter>
           <Navigation />
           <div className="container mx-auto px-4 py-8">
@@ -33,7 +35,8 @@ function App() {
             </Routes>
           </div>
         </HashRouter>
-          </AppInitializer>
+            </AppInitializer>
+          </SyncConflictHandler>
         </SyncProvider>
       </SolidPodProvider>
     </ToastProvider>

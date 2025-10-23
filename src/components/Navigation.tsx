@@ -24,6 +24,74 @@ export const Navigation = () => {
 
     const isOnline = syncState?.online ?? true
 
+    // Get sync status for display
+    const getSyncStatusIcon = () => {
+        if (!syncState) return null
+
+        const status = syncState.questionSet.status
+
+        if (status === 'syncing') {
+            return (
+                <svg className="w-3 h-3 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            )
+        } else if (status === 'conflict') {
+            return <span className="text-yellow-400">⚠️</span>
+        } else if (status === 'error') {
+            return <span className="text-red-400">❌</span>
+        } else {
+            // idle
+            return <span className="text-green-400">✓</span>
+        }
+    }
+
+    const getSyncStatusText = () => {
+        if (!syncState) return 'Unknown'
+
+        const status = syncState.questionSet.status
+
+        if (status === 'syncing') return 'Syncing...'
+        if (status === 'conflict') return 'Conflict'
+        if (status === 'error') return 'Error'
+
+        // idle - show last synced time if available
+        const lastSynced = syncState.questionSet.lastSyncedAt
+        if (lastSynced) {
+            const date = new Date(lastSynced)
+            const now = new Date()
+            const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+
+            if (diffMinutes < 1) return 'Synced just now'
+            if (diffMinutes < 60) return `Synced ${diffMinutes}m ago`
+
+            const diffHours = Math.floor(diffMinutes / 60)
+            if (diffHours < 24) return `Synced ${diffHours}h ago`
+
+            return 'Synced'
+        }
+
+        return 'Not synced'
+    }
+
+    const getSyncStatusTitle = () => {
+        if (!syncState) return ''
+
+        const status = syncState.questionSet.status
+        const lastSynced = syncState.questionSet.lastSyncedAt
+
+        if (status === 'syncing') return 'Syncing with your Pod...'
+        if (status === 'conflict') return 'Sync conflict detected - review required'
+        if (status === 'error') return 'Sync error occurred'
+
+        if (lastSynced) {
+            return `Last synced: ${new Date(lastSynced).toLocaleString()}`
+        }
+
+        return 'Not yet synced with Pod'
+    }
+
     return (
         <>
             <nav className="bg-gray-800 text-white shadow-lg">
@@ -68,6 +136,16 @@ export const Navigation = () => {
                                     {isOnline ? 'Online' : 'Offline'}
                                 </span>
                             </div>
+
+                            {/* Sync Status Indicator */}
+                            {isLoggedIn && syncState && (
+                                <div className="flex items-center gap-2" title={getSyncStatusTitle()}>
+                                    {getSyncStatusIcon()}
+                                    <span className="text-xs text-gray-400">
+                                        {getSyncStatusText()}
+                                    </span>
+                                </div>
+                            )}
 
                             {isLoggedIn ? (
                                 <div className="flex items-center gap-3">
@@ -138,6 +216,16 @@ export const Navigation = () => {
                                 {isOnline ? 'Online' : 'Offline'}
                             </span>
                         </div>
+
+                        {/* Sync Status Indicator - Mobile */}
+                        {isLoggedIn && syncState && (
+                            <div className="flex items-center gap-2 px-3 py-2" title={getSyncStatusTitle()}>
+                                {getSyncStatusIcon()}
+                                <span className="text-xs text-gray-400">
+                                    {getSyncStatusText()}
+                                </span>
+                            </div>
+                        )}
 
                         <Link
                             to="/manage-questions"

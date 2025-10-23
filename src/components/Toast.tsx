@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
-export type ToastType = 'success' | 'error';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastProps {
     message: string;
@@ -19,7 +19,11 @@ export function Toast({ message, type, onClose, duration = 3000 }: ToastProps) {
         return () => clearTimeout(timer);
     }, [duration, onClose]);
 
-    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const bgColor =
+        type === 'success' ? 'bg-green-500' :
+        type === 'error' ? 'bg-red-500' :
+        type === 'warning' ? 'bg-yellow-500' :
+        'bg-blue-500'; // info
 
     return (
         <div className={`fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 min-w-[200px]`}>

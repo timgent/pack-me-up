@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { SyncService } from '../services/sync/SyncService'
 import { SyncState, SyncResult, ConflictStrategy } from '../services/sync/types'
 import { packingAppDb } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
+import { useToast } from './ToastContext'
 
 interface SyncContextValue {
     syncService: SyncService | null
@@ -17,9 +18,11 @@ interface SyncContextValue {
 const SyncContext = createContext<SyncContextValue | undefined>(undefined)
 
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { session } = useSolidPod()
+    const { session, isLoggedIn } = useSolidPod()
+    const { showToast } = useToast()
     const [syncService] = useState(() => new SyncService(packingAppDb))
     const [syncState, setSyncState] = useState<SyncState | null>(null)
+    const previousLoginState = useRef<boolean>(false)
 
     // Initialize sync service when session changes
     useEffect(() => {
@@ -41,6 +44,37 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
             unsubscribe()
         }
     }, [session, syncService])
+
+    // Trigger sync when user logs in
+    useEffect(() => {
+        const justLoggedIn = !previousLoginState.current && isLoggedIn
+
+        if (justLoggedIn && session) {
+            console.log('User just logged in, triggering sync...')
+            showToast('Syncing with your Pod...', 'info')
+
+            syncService.syncAll()
+                .then(result => {
+                    if (result.success) {
+                        if (result.synced > 0) {
+                            showToast(`Synced ${result.synced} item${result.synced !== 1 ? 's' : ''} successfully`, 'success')
+                        } else {
+                            showToast('Everything is up to date', 'success')
+                        }
+                    } else if (result.conflicts > 0) {
+                        showToast(`Sync completed with ${result.conflicts} conflict${result.conflicts !== 1 ? 's' : ''}. Please review.`, 'warning')
+                    } else {
+                        showToast('Sync completed with errors: ' + result.errors.join(', '), 'error')
+                    }
+                })
+                .catch(err => {
+                    console.error('Error during login sync:', err)
+                    showToast('Failed to sync with Pod: ' + err.message, 'error')
+                })
+        }
+
+        previousLoginState.current = isLoggedIn
+    }, [isLoggedIn, session, syncService, showToast])
 
     // Cleanup on unmount
     useEffect(() => {
