@@ -5,6 +5,9 @@ import { PackingList } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
+import { useSolidPod } from '../components/SolidPodContext'
+import { useToast } from '../components/ToastContext'
+import { getPrimaryPodUrl, saveFileToPod, loadFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 
 type FormData = {
     items: Record<string, boolean>
@@ -19,6 +22,10 @@ export function ViewPackingList() {
     const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+    const [isSavingToPod, setIsSavingToPod] = useState(false)
+    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
+    const { isLoggedIn, session } = useSolidPod()
+    const { showToast } = useToast()
 
     const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
         defaultValues: {
@@ -101,6 +108,85 @@ export function ViewPackingList() {
         }
     }
 
+    const handleSaveToPod = async () => {
+        if (!packingList) return
+
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
+            return
+        }
+
+        setIsSavingToPod(true)
+        try {
+            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+            const filename = `${packingList.id}.json`
+
+            await saveFileToPod({
+                session: session!,
+                containerPath,
+                filename,
+                data: packingList
+            })
+
+            showToast('Successfully saved packing list to Solid Pod!', 'success')
+        } catch (error) {
+            console.error('Error saving to pod:', error)
+            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
+        } finally {
+            setIsSavingToPod(false)
+        }
+    }
+
+    const handleLoadFromPod = async () => {
+        if (!packingList) return
+
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
+            return
+        }
+
+        setIsLoadingFromPod(true)
+        try {
+            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+            const filename = `${packingList.id}.json`
+
+            const loadedList = await loadFileFromPod<PackingList>({
+                session: session!,
+                fileUrl: `${containerPath}${filename}`
+            })
+
+            // Remove _rev to avoid conflicts with local database version
+            delete loadedList._rev
+
+            // Save to local database
+            const dbResult = await packingAppDb.savePackingList(loadedList)
+
+            // Update the local state and form
+            setPackingList({
+                ...loadedList,
+                _rev: dbResult.rev
+            })
+
+            // Update form values
+            const formValues: Record<string, boolean> = {}
+            loadedList.items.forEach((item) => {
+                formValues[item.id] = item.packed
+            })
+            setValue('items', formValues)
+
+            showToast('Successfully loaded packing list from Solid Pod!', 'success')
+        } catch (error) {
+            console.error('Error loading from pod:', error)
+            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
+        } finally {
+            setIsLoadingFromPod(false)
+        }
+    }
+
     if (isLoading) {
         return <div className="max-w-4xl mx-auto py-8 px-4">Loading packing list...</div>
     }
@@ -117,98 +203,127 @@ export function ViewPackingList() {
     })
 
     return (
-        <div className="mx-auto py-8 px-4">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
-                    <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
-                    {autoSaveStatus !== 'idle' && (
-                        <div className="mt-2 flex items-center space-x-2">
-                            {autoSaveStatus === 'saving' && (
-                                <>
-                                    <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                    <span className="text-sm text-blue-600">Auto-saving...</span>
-                                </>
-                            )}
-                            {autoSaveStatus === 'saved' && (
-                                <>
-                                    <div className="h-4 w-4 text-green-500">✓</div>
-                                    <span className="text-sm text-green-600">Changes saved</span>
-                                </>
-                            )}
-                            {autoSaveStatus === 'error' && (
-                                <>
-                                    <div className="h-4 w-4 text-red-500">✗</div>
-                                    <span className="text-sm text-red-600">Save failed</span>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setShowPacked(!showPacked)}
-                >
-                    {showPacked ? 'Hide Packed' : 'Show Packed'}
-                </Button>
-            </div>
-
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                <div className="flex flex-wrap gap-4">
-                    {Object.entries(
-                        filteredItems.reduce((acc, item) => {
-                            if (!acc[item.personName]) {
-                                acc[item.personName] = [];
-                            }
-                            acc[item.personName].push(item);
-                            return acc;
-                        }, {} as Record<string, typeof filteredItems>)
-                    ).map(([personName, items]) => (
-                        <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
-                            <div className="space-y-2">
-                                {items
-                                    .sort((a, b) => a.itemText.localeCompare(b.itemText))
-                                    .map((item) => (
-                                        <div
-                                            key={`${item.id}-${personName}`}
-                                            className="bg-gray-50 rounded-lg p-3"
+        <div className="w-full flex flex-col items-center py-8 px-4">
+            {/* Sticky top toolbar */}
+            <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
+                <div className="w-full max-w-screen-2xl">
+                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
+                                {autoSaveStatus !== 'idle' && (
+                                    <div className="flex items-center space-x-2">
+                                        {autoSaveStatus === 'saving' && (
+                                            <>
+                                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                                <span className="text-sm text-blue-600">Auto-saving...</span>
+                                            </>
+                                        )}
+                                        {autoSaveStatus === 'saved' && (
+                                            <>
+                                                <div className="h-4 w-4 text-green-500">✓</div>
+                                                <span className="text-sm text-green-600">Saved</span>
+                                            </>
+                                        )}
+                                        {autoSaveStatus === 'error' && (
+                                            <>
+                                                <div className="h-4 w-4 text-red-500">✗</div>
+                                                <span className="text-sm text-red-600">Error</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setShowPacked(!showPacked)}
+                                >
+                                    {showPacked ? 'Hide Packed' : 'Show Packed'}
+                                </Button>
+                                {isLoggedIn && (
+                                    <>
+                                        <Button
+                                            type="button"
+                                            onClick={handleLoadFromPod}
+                                            disabled={isLoadingFromPod}
+                                            variant="secondary"
                                         >
-                                            <label className="flex items-center space-x-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    {...register(`items.${item.id}`)}
-                                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-gray-700">
-                                                    {item.itemText}
-                                                </span>
-                                            </label>
-                                        </div>
-                                    ))}
+                                            {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={handleSaveToPod}
+                                            disabled={isSavingToPod}
+                                            variant="secondary"
+                                        >
+                                            {isSavingToPod ? 'Saving...' : 'Save to Pod'}
+                                        </Button>
+                                    </>
+                                )}
+                                <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
+                                    {isSaving ? 'Saving...' : 'Save & Return'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => navigate('/view-lists')}
+                                >
+                                    Back to Lists
+                                </Button>
                             </div>
                         </div>
-                    ))}
+                        {!isLoggedIn && (
+                            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2">
+                                <p className="text-xs text-gray-700">💡 Login with Solid Pod to save your packing list privately in storage you control.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
+            </div>
 
-                <div className="flex justify-end space-x-4 mt-6">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => navigate('/view-lists')}
-                    >
-                        Back to Lists
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                </div>
-            </form>
+            {/* Main content */}
+            <div className="w-full">
+                <form onSubmit={handleSubmit(onSubmit)} id="view-packing-list-form">
+                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+                        {Object.entries(
+                            filteredItems.reduce((acc, item) => {
+                                if (!acc[item.personName]) {
+                                    acc[item.personName] = [];
+                                }
+                                acc[item.personName].push(item);
+                                return acc;
+                            }, {} as Record<string, typeof filteredItems>)
+                        ).map(([personName, items]) => (
+                            <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                                <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
+                                <div className="space-y-2">
+                                    {items
+                                        .sort((a, b) => a.itemText.localeCompare(b.itemText))
+                                        .map((item) => (
+                                            <div
+                                                key={`${item.id}-${personName}`}
+                                                className="bg-gray-50 rounded-lg p-3"
+                                            >
+                                                <label className="flex items-center space-x-3 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        {...register(`items.${item.id}`)}
+                                                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                    />
+                                                    <span className="text-gray-700">
+                                                        {item.itemText}
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </form>
+            </div>
         </div>
     )
 }
