@@ -24,6 +24,7 @@ export function ViewPackingList() {
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [isSavingToPod, setIsSavingToPod] = useState(false)
     const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
+    const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
 
@@ -187,6 +188,91 @@ export function ViewPackingList() {
         }
     }
 
+    const handleDeleteItem = async (itemId: string) => {
+        if (!packingList) return
+
+        try {
+            setAutoSaveStatus('saving')
+
+            // Remove the item from the packing list
+            const updatedItems = packingList.items.filter(item => item.id !== itemId)
+            const updatedPackingList = {
+                ...packingList,
+                items: updatedItems
+            }
+
+            // Save to database
+            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
+
+            // Update local state
+            setPackingList({
+                ...updatedPackingList,
+                _rev: dbResult.rev
+            })
+
+            // Remove from form values
+            const currentFormValues = getValues('items')
+            delete currentFormValues[itemId]
+            setValue('items', currentFormValues)
+
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+        } catch (err) {
+            console.error('Error deleting item:', err)
+            setAutoSaveStatus('error')
+        }
+    }
+
+    const handleAddItem = async (personName: string) => {
+        if (!packingList) return
+
+        const newItemText = newItemInputs[personName]?.trim()
+        if (!newItemText) return
+
+        try {
+            setAutoSaveStatus('saving')
+
+            // Create new item
+            const newItem = {
+                id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                itemText: newItemText,
+                personName: personName,
+                personId: '', // Manual items don't have a person ID from the question flow
+                questionId: '', // Manual items don't have a question ID
+                optionId: '', // Manual items don't have an option ID
+                packed: false
+            }
+
+            // Add the item to the packing list
+            const updatedItems = [...packingList.items, newItem]
+            const updatedPackingList = {
+                ...packingList,
+                items: updatedItems
+            }
+
+            // Save to database
+            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
+
+            // Update local state
+            setPackingList({
+                ...updatedPackingList,
+                _rev: dbResult.rev
+            })
+
+            // Add to form values
+            setValue(`items.${newItem.id}`, false)
+
+            // Clear the input
+            setNewItemInputs({ ...newItemInputs, [personName]: '' })
+
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+        } catch (err) {
+            console.error('Error adding item:', err)
+            setAutoSaveStatus('error')
+        }
+    }
+
     if (isLoading) {
         return <div className="max-w-4xl mx-auto py-8 px-4">Loading packing list...</div>
     }
@@ -306,18 +392,56 @@ export function ViewPackingList() {
                                                 key={`${item.id}-${personName}`}
                                                 className="bg-gray-50 rounded-lg p-3"
                                             >
-                                                <label className="flex items-center space-x-3 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        {...register(`items.${item.id}`)}
-                                                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                    />
-                                                    <span className="text-gray-700">
-                                                        {item.itemText}
-                                                    </span>
-                                                </label>
+                                                <div className="flex items-center justify-between">
+                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            {...register(`items.${item.id}`)}
+                                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                        />
+                                                        <span className="text-gray-700">
+                                                            {item.itemText}
+                                                        </span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteItem(item.id)}
+                                                        className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
+                                                        title="Delete item"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
+
+                                    {/* Add new item input */}
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={newItemInputs[personName] || ''}
+                                                onChange={(e) => setNewItemInputs({ ...newItemInputs, [personName]: e.target.value })}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault()
+                                                        handleAddItem(personName)
+                                                    }
+                                                }}
+                                                placeholder="Add new item..."
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddItem(personName)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))}
