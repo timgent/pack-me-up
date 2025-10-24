@@ -1,5 +1,5 @@
 import { Session } from '@inrupt/solid-client-authn-browser'
-import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile } from '@inrupt/solid-client'
+import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile } from '@inrupt/solid-client'
 
 /**
  * Pod container paths under the user's Pod root
@@ -130,6 +130,7 @@ export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T
 /**
  * Saves multiple items as separate files in a Pod container
  * Returns a sync result with success/failure counts
+ * Also removes files from the pod that no longer exist in the items array
  */
 export async function saveMultipleFilesToPod<T extends { id: string }>(
     session: Session,
@@ -138,7 +139,40 @@ export async function saveMultipleFilesToPod<T extends { id: string }>(
 ): Promise<PodSyncResult> {
     let successCount = 0
     let failCount = 0
+    let deleteCount = 0
 
+    // Get existing files in the container to identify orphaned files
+    try {
+        const dataset = await getSolidDataset(containerUrl, { fetch: session.fetch })
+        const fileUrls = getContainedResourceUrlAll(dataset)
+        const jsonFileUrls = fileUrls.filter(url => url.endsWith('.json'))
+
+        // Create a set of current item IDs for efficient lookup
+        const currentItemIds = new Set(items.map(item => item.id))
+
+        // Delete files that no longer correspond to current items
+        for (const fileUrl of jsonFileUrls) {
+            const filename = fileUrl.split('/').pop()
+            const itemId = filename?.replace('.json', '')
+
+            if (itemId && !currentItemIds.has(itemId)) {
+                try {
+                    await deleteFile(fileUrl, { fetch: session.fetch })
+                    deleteCount++
+                } catch (error) {
+                    console.error(`Error deleting file ${fileUrl}:`, error)
+                    failCount++
+                }
+            }
+        }
+    } catch (error: any) {
+        // If container doesn't exist (404), that's fine - no files to delete
+        if (error.statusCode !== 404) {
+            console.error('Error checking for orphaned files:', error)
+        }
+    }
+
+    // Save current items
     for (const item of items) {
         try {
             await saveFileToPod({
@@ -158,7 +192,7 @@ export async function saveMultipleFilesToPod<T extends { id: string }>(
         success: failCount === 0,
         successCount,
         failCount,
-        totalCount: items.length
+        totalCount: items.length + deleteCount
     }
 }
 
