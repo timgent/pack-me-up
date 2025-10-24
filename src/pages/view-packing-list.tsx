@@ -5,6 +5,9 @@ import { PackingList } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
+import { useSolidPod } from '../components/SolidPodContext'
+import { useToast } from '../components/ToastContext'
+import { getPrimaryPodUrl, saveFileToPod, loadFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 
 type FormData = {
     items: Record<string, boolean>
@@ -19,6 +22,10 @@ export function ViewPackingList() {
     const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+    const [isSavingToPod, setIsSavingToPod] = useState(false)
+    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
+    const { isLoggedIn, session } = useSolidPod()
+    const { showToast } = useToast()
 
     const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
         defaultValues: {
@@ -98,6 +105,85 @@ export function ViewPackingList() {
             console.error('Error saving packing list:', err)
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    const handleSaveToPod = async () => {
+        if (!packingList) return
+
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
+            return
+        }
+
+        setIsSavingToPod(true)
+        try {
+            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+            const filename = `${packingList.id}.json`
+
+            await saveFileToPod({
+                session: session!,
+                containerPath,
+                filename,
+                data: packingList
+            })
+
+            showToast('Successfully saved packing list to Solid Pod!', 'success')
+        } catch (error) {
+            console.error('Error saving to pod:', error)
+            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
+        } finally {
+            setIsSavingToPod(false)
+        }
+    }
+
+    const handleLoadFromPod = async () => {
+        if (!packingList) return
+
+        const podUrl = await getPrimaryPodUrl(session)
+
+        if (!podUrl) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
+            return
+        }
+
+        setIsLoadingFromPod(true)
+        try {
+            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+            const filename = `${packingList.id}.json`
+
+            const loadedList = await loadFileFromPod<PackingList>({
+                session: session!,
+                fileUrl: `${containerPath}${filename}`
+            })
+
+            // Remove _rev to avoid conflicts with local database version
+            delete loadedList._rev
+
+            // Save to local database
+            const dbResult = await packingAppDb.savePackingList(loadedList)
+
+            // Update the local state and form
+            setPackingList({
+                ...loadedList,
+                _rev: dbResult.rev
+            })
+
+            // Update form values
+            const formValues: Record<string, boolean> = {}
+            loadedList.items.forEach((item) => {
+                formValues[item.id] = item.packed
+            })
+            setValue('items', formValues)
+
+            showToast('Successfully loaded packing list from Solid Pod!', 'success')
+        } catch (error) {
+            console.error('Error loading from pod:', error)
+            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
+        } finally {
+            setIsLoadingFromPod(false)
         }
     }
 
@@ -193,7 +279,7 @@ export function ViewPackingList() {
                     ))}
                 </div>
 
-                <div className="flex justify-end space-x-4 mt-6">
+                <div className="flex justify-between items-center mt-6">
                     <Button
                         type="button"
                         variant="secondary"
@@ -201,12 +287,34 @@ export function ViewPackingList() {
                     >
                         Back to Lists
                     </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                    </Button>
+                    <div className="flex space-x-4">
+                        {isLoggedIn && (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={handleLoadFromPod}
+                                    disabled={isLoadingFromPod}
+                                >
+                                    {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={handleSaveToPod}
+                                    disabled={isSavingToPod}
+                                >
+                                    {isSavingToPod ? 'Saving to Pod...' : 'Save to Pod'}
+                                </Button>
+                            </>
+                        )}
+                        <Button
+                            type="submit"
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    </div>
                 </div>
             </form>
         </div>
