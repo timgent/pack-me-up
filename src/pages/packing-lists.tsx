@@ -75,7 +75,13 @@ export function PackingLists() {
                 return
             }
 
-            // Save each loaded list to local database
+            // First, delete all existing local packing lists
+            const existingLists = await packingAppDb.getAllPackingLists()
+            for (const existingList of existingLists) {
+                await packingAppDb.deletePackingList(existingList.id)
+            }
+
+            // Then save each loaded list to local database
             for (const list of loadedLists) {
                 // Remove _rev to avoid conflicts with local database version
                 delete list._rev
