@@ -117,98 +117,133 @@ export function ViewPackingList() {
     })
 
     return (
-        <div className="mx-auto py-8 px-4">
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
-                    <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
-                    {autoSaveStatus !== 'idle' && (
-                        <div className="mt-2 flex items-center space-x-2">
-                            {autoSaveStatus === 'saving' && (
-                                <>
-                                    <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                    <span className="text-sm text-blue-600">Auto-saving...</span>
-                                </>
-                            )}
-                            {autoSaveStatus === 'saved' && (
-                                <>
-                                    <div className="h-4 w-4 text-green-500">✓</div>
-                                    <span className="text-sm text-green-600">Changes saved</span>
-                                </>
-                            )}
-                            {autoSaveStatus === 'error' && (
-                                <>
-                                    <div className="h-4 w-4 text-red-500">✗</div>
-                                    <span className="text-sm text-red-600">Save failed</span>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setShowPacked(!showPacked)}
-                >
-                    {showPacked ? 'Hide Packed' : 'Show Packed'}
-                </Button>
+        <div className="w-full flex flex-col items-center py-8 px-4">
+            <div className="mb-8 w-full max-w-5xl">
+                <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
+                <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
+                {autoSaveStatus !== 'idle' && (
+                    <div className="mt-2 flex items-center space-x-2">
+                        {autoSaveStatus === 'saving' && (
+                            <>
+                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                <span className="text-sm text-blue-600">Auto-saving...</span>
+                            </>
+                        )}
+                        {autoSaveStatus === 'saved' && (
+                            <>
+                                <div className="h-4 w-4 text-green-500">✓</div>
+                                <span className="text-sm text-green-600">Changes saved</span>
+                            </>
+                        )}
+                        {autoSaveStatus === 'error' && (
+                            <>
+                                <div className="h-4 w-4 text-red-500">✗</div>
+                                <span className="text-sm text-red-600">Save failed</span>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mb-8">
-                <div className="flex flex-wrap gap-4">
-                    {Object.entries(
-                        filteredItems.reduce((acc, item) => {
-                            if (!acc[item.personName]) {
-                                acc[item.personName] = [];
-                            }
-                            acc[item.personName].push(item);
-                            return acc;
-                        }, {} as Record<string, typeof filteredItems>)
-                    ).map(([personName, items]) => (
-                        <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
-                            <div className="space-y-2">
-                                {items
-                                    .sort((a, b) => a.itemText.localeCompare(b.itemText))
-                                    .map((item) => (
-                                        <div
-                                            key={`${item.id}-${personName}`}
-                                            className="bg-gray-50 rounded-lg p-3"
-                                        >
-                                            <label className="flex items-center space-x-3 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    {...register(`items.${item.id}`)}
-                                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <span className="text-gray-700">
-                                                    {item.itemText}
-                                                </span>
-                                            </label>
-                                        </div>
-                                    ))}
+            <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+                {/* Main form content */}
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 flex-1 pb-32 lg:pb-8" id="view-packing-list-form">
+                    <div className="flex flex-wrap gap-4">
+                        {Object.entries(
+                            filteredItems.reduce((acc, item) => {
+                                if (!acc[item.personName]) {
+                                    acc[item.personName] = [];
+                                }
+                                acc[item.personName].push(item);
+                                return acc;
+                            }, {} as Record<string, typeof filteredItems>)
+                        ).map(([personName, items]) => (
+                            <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                                <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
+                                <div className="space-y-2">
+                                    {items
+                                        .sort((a, b) => a.itemText.localeCompare(b.itemText))
+                                        .map((item) => (
+                                            <div
+                                                key={`${item.id}-${personName}`}
+                                                className="bg-gray-50 rounded-lg p-3"
+                                            >
+                                                <label className="flex items-center space-x-3 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        {...register(`items.${item.id}`)}
+                                                        className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                    />
+                                                    <span className="text-gray-700">
+                                                        {item.itemText}
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                </form>
 
-                <div className="flex justify-end space-x-4 mt-6">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => navigate('/view-lists')}
-                    >
-                        Back to Lists
-                    </Button>
-                    <Button
-                        type="submit"
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                    </Button>
+                {/* Sticky sidebar for large screens */}
+                <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
+                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setShowPacked(!showPacked)}
+                        >
+                            {showPacked ? 'Hide Packed' : 'Show Packed'}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => navigate('/view-lists')}
+                        >
+                            Back to Lists
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="view-packing-list-form"
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    </div>
                 </div>
-            </form>
+            </div>
+
+            {/* Sticky bottom bar for small/medium screens */}
+            <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
+                <div className="max-w-4xl w-full px-4 pb-4">
+                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto">
+                        <div className="flex flex-wrap items-center gap-3 justify-center">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setShowPacked(!showPacked)}
+                            >
+                                {showPacked ? 'Hide Packed' : 'Show Packed'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => navigate('/view-lists')}
+                            >
+                                Back to Lists
+                            </Button>
+                            <Button
+                                type="submit"
+                                form="view-packing-list-form"
+                                disabled={isSaving}
+                            >
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

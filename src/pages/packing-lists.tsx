@@ -119,15 +119,54 @@ export function PackingLists() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Packing Lists</h1>
-                        <p className="mt-2 text-gray-600">View all your created packing lists.</p>
-                    </div>
-                    {isLoggedIn && (
-                        <div className="flex gap-2">
+        <div className="w-full flex flex-col items-center py-8 px-4">
+            <div className="mb-8 w-full max-w-4xl">
+                <h1 className="text-2xl font-bold text-gray-900">Packing Lists</h1>
+                <p className="mt-2 text-gray-600">View all your created packing lists.</p>
+            </div>
+
+            <div className="w-full max-w-4xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+                {/* Main content */}
+                <div className="flex-1 pb-32 lg:pb-8">
+                    {packingLists.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            No packing lists found. Create your first packing list to get started.
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {packingLists.map((list) => (
+                                <div
+                                    key={list.id}
+                                    onClick={() => navigate(`/view-lists/${list.id}`)}
+                                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-medium text-gray-900">{list.name}</h3>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm text-gray-500">
+                                                {new Date(list.createdAt).toLocaleDateString()}
+                                            </span>
+                                            <button
+                                                onClick={(e) => deletePackingList(list.id, e)}
+                                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 text-sm text-gray-500">
+                                        {list.items.filter(item => item.packed).length} of {list.items.length} items packed
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Sticky sidebar for large screens */}
+                {isLoggedIn && (
+                    <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
+                        <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
                             <Button
                                 type="button"
                                 onClick={handleSaveToPod}
@@ -145,41 +184,35 @@ export function PackingLists() {
                                 {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
                             </Button>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
-            {packingLists.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                    No packing lists found. Create your first packing list to get started.
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {packingLists.map((list) => (
-                        <div
-                            key={list.id}
-                            onClick={() => navigate(`/view-lists/${list.id}`)}
-                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                        >
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-medium text-gray-900">{list.name}</h3>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-sm text-gray-500">
-                                        {new Date(list.createdAt).toLocaleDateString()}
-                                    </span>
-                                    <button
-                                        onClick={(e) => deletePackingList(list.id, e)}
-                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="mt-2 text-sm text-gray-500">
-                                {list.items.filter(item => item.packed).length} of {list.items.length} items packed
+            {/* Sticky bottom bar for small/medium screens */}
+            {isLoggedIn && (
+                <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
+                    <div className="max-w-4xl w-full px-4 pb-4">
+                        <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto">
+                            <div className="flex flex-wrap items-center gap-3 justify-center">
+                                <Button
+                                    type="button"
+                                    onClick={handleSaveToPod}
+                                    disabled={isSaving || packingLists.length === 0}
+                                    variant="secondary"
+                                >
+                                    {isSaving ? 'Saving...' : 'Save to Pod'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleLoadFromPod}
+                                    disabled={isLoadingFromPod}
+                                    variant="secondary"
+                                >
+                                    {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
+                                </Button>
                             </div>
                         </div>
-                    ))}
+                    </div>
                 </div>
             )}
         </div>
