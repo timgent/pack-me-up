@@ -204,48 +204,89 @@ export function ViewPackingList() {
 
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
-            <div className="mb-8 w-full max-w-5xl">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{packingList.name}</h1>
-                        <p className="mt-2 text-gray-600">Created on {new Date(packingList.createdAt).toLocaleDateString()}</p>
-                        {autoSaveStatus !== 'idle' && (
-                            <div className="mt-2 flex items-center space-x-2">
-                                {autoSaveStatus === 'saving' && (
+            {/* Sticky top toolbar */}
+            <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
+                <div className="w-full max-w-screen-2xl">
+                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
+                                {autoSaveStatus !== 'idle' && (
+                                    <div className="flex items-center space-x-2">
+                                        {autoSaveStatus === 'saving' && (
+                                            <>
+                                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                                <span className="text-sm text-blue-600">Auto-saving...</span>
+                                            </>
+                                        )}
+                                        {autoSaveStatus === 'saved' && (
+                                            <>
+                                                <div className="h-4 w-4 text-green-500">✓</div>
+                                                <span className="text-sm text-green-600">Saved</span>
+                                            </>
+                                        )}
+                                        {autoSaveStatus === 'error' && (
+                                            <>
+                                                <div className="h-4 w-4 text-red-500">✗</div>
+                                                <span className="text-sm text-red-600">Error</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setShowPacked(!showPacked)}
+                                >
+                                    {showPacked ? 'Hide Packed' : 'Show Packed'}
+                                </Button>
+                                {isLoggedIn && (
                                     <>
-                                        <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                        <span className="text-sm text-blue-600">Auto-saving...</span>
+                                        <Button
+                                            type="button"
+                                            onClick={handleLoadFromPod}
+                                            disabled={isLoadingFromPod}
+                                            variant="secondary"
+                                        >
+                                            {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={handleSaveToPod}
+                                            disabled={isSavingToPod}
+                                            variant="secondary"
+                                        >
+                                            {isSavingToPod ? 'Saving...' : 'Save to Pod'}
+                                        </Button>
                                     </>
                                 )}
-                                {autoSaveStatus === 'saved' && (
-                                    <>
-                                        <div className="h-4 w-4 text-green-500">✓</div>
-                                        <span className="text-sm text-green-600">Changes saved</span>
-                                    </>
-                                )}
-                                {autoSaveStatus === 'error' && (
-                                    <>
-                                        <div className="h-4 w-4 text-red-500">✗</div>
-                                        <span className="text-sm text-red-600">Save failed</span>
-                                    </>
-                                )}
+                                <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
+                                    {isSaving ? 'Saving...' : 'Save & Return'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => navigate('/view-lists')}
+                                >
+                                    Back to Lists
+                                </Button>
+                            </div>
+                        </div>
+                        {!isLoggedIn && (
+                            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2">
+                                <p className="text-xs text-gray-700">💡 Login with Solid Pod to save your packing list privately in storage you control.</p>
                             </div>
                         )}
                     </div>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setShowPacked(!showPacked)}
-                    >
-                        {showPacked ? 'Hide Packed' : 'Show Packed'}
-                    </Button>
                 </div>
             </div>
 
-            <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
-                {/* Main form content */}
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 flex-1 pb-32 lg:pb-8" id="view-packing-list-form">
-                    <div className="flex flex-wrap gap-4">
+            {/* Main content */}
+            <div className="w-full max-w-screen-2xl">
+                <form onSubmit={handleSubmit(onSubmit)} id="view-packing-list-form">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {Object.entries(
                             filteredItems.reduce((acc, item) => {
                                 if (!acc[item.personName]) {
@@ -282,93 +323,6 @@ export function ViewPackingList() {
                         ))}
                     </div>
                 </form>
-
-                {/* Sticky sidebar for large screens */}
-                <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
-                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
-                        {isLoggedIn ? (
-                            <>
-                                <Button
-                                    type="button"
-                                    onClick={handleLoadFromPod}
-                                    disabled={isLoadingFromPod}
-                                    variant="secondary"
-                                >
-                                    {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={handleSaveToPod}
-                                    disabled={isSavingToPod}
-                                    variant="secondary"
-                                >
-                                    {isSavingToPod ? 'Saving to Pod...' : 'Save to Pod'}
-                                </Button>
-                            </>
-                        ) : (
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                                <p className="text-xs text-gray-700 font-semibold mb-1">💡 Store in Your Pod</p>
-                                <p className="text-xs text-gray-600 mb-2">Login with Solid Pod to save your packing list privately in storage you control.</p>
-                                <p className="text-xs text-blue-600">→ Click "Login with Solid Pod" above</p>
-                            </div>
-                        )}
-                        <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
-                            {isSaving ? 'Saving...' : 'Save & Return'}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => navigate('/view-lists')}
-                        >
-                            Back to Lists
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Sticky bottom bar for small/medium screens */}
-            <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
-                <div className="max-w-4xl w-full px-4 pb-4">
-                    <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto">
-                        {!isLoggedIn && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mx-2">
-                                <p className="text-xs text-gray-700 font-semibold">💡 Login with Solid Pod to save privately</p>
-                            </div>
-                        )}
-                        <div className="flex flex-wrap items-center gap-3 justify-center">
-                            {isLoggedIn && (
-                                <>
-                                    <Button
-                                        type="button"
-                                        onClick={handleLoadFromPod}
-                                        disabled={isLoadingFromPod}
-                                        variant="secondary"
-                                    >
-                                        {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={handleSaveToPod}
-                                        disabled={isSavingToPod}
-                                        variant="secondary"
-                                    >
-                                        {isSavingToPod ? 'Saving...' : 'Save to Pod'}
-                                    </Button>
-                                </>
-                            )}
-                            <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
-                                {isSaving ? 'Saving...' : 'Save & Return'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => navigate('/view-lists')}
-                            >
-                                Back to Lists
-                            </Button>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     )
