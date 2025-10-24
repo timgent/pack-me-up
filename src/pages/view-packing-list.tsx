@@ -284,9 +284,9 @@ export function ViewPackingList() {
             </div>
 
             {/* Main content */}
-            <div className="w-full max-w-screen-2xl">
+            <div className="w-full">
                 <form onSubmit={handleSubmit(onSubmit)} id="view-packing-list-form">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                         {Object.entries(
                             filteredItems.reduce((acc, item) => {
                                 if (!acc[item.personName]) {
