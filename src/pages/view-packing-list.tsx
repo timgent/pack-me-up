@@ -295,7 +295,7 @@ export function ViewPackingList() {
                                 acc[item.personName].push(item);
                                 return acc;
                             }, {} as Record<string, typeof filteredItems>)
-                        ).map(([personName, items]) => (
+                        ).sort(([nameA], [nameB]) => nameA.localeCompare(nameB)).map(([personName, items]) => (
                             <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                                 <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
                                 <div className="space-y-2">
