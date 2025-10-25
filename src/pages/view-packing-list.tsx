@@ -7,7 +7,6 @@ import { Button } from '../components/Button'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
-import { POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePackingListSync } from '../hooks/usePackingListSync'
 
 type FormData = {
@@ -20,7 +19,6 @@ export function ViewPackingList() {
     const navigate = useNavigate()
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
@@ -32,7 +30,7 @@ export function ViewPackingList() {
     const isLocalChangeRef = useRef(false);
     const lastSyncedDataRef = useRef<string | null>(null);
 
-    const { register, handleSubmit, setValue, getValues, control } = useForm<FormData>({
+    const { register, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
@@ -133,7 +131,7 @@ export function ViewPackingList() {
     }, [showToast]);
 
     // Set up automatic Pod sync with polling
-    const { saveToPod, syncFromPod } = usePackingListSync({
+    const { saveToPod } = usePackingListSync({
         packingListId: id || null,
         pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
@@ -253,86 +251,6 @@ export function ViewPackingList() {
             console.log('Skipping handleItemChange - packingList is null')
         }
     }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
-
-    const onSubmit = async (data: FormData) => {
-        if (!packingList) return
-
-        setIsSaving(true)
-        try {
-            const updatedPackingList = {
-                ...packingList,
-                items: packingList.items.map(item => ({
-                    ...item,
-                    packed: data.items[item.id] ?? false
-                }))
-            }
-            await packingAppDb.savePackingList(updatedPackingList)
-            navigate('/view-lists')
-        } catch (err) {
-            console.error('Error saving packing list:', err)
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const handleSaveToPod = async () => {
-        if (!isLoggedIn) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error');
-            return;
-        }
-
-        if (!packingList) return;
-
-        try {
-            // Get current form values and create updated packing list
-            const currentFormValues = getValues('items')
-            const updatedPackingList: PackingList = {
-                ...packingList,
-                items: packingList.items.map(item => ({
-                    ...item,
-                    packed: currentFormValues[item.id] ?? false
-                })),
-                lastModified: new Date().toISOString()
-            }
-
-            // Save to local DB first
-            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-            const savedPackingList = {
-                ...updatedPackingList,
-                _rev: dbResult.rev
-            }
-            setPackingList(savedPackingList)
-
-            // Then save to Pod
-            isLocalChangeRef.current = true;
-            await saveToPod(savedPackingList);
-            // Reset the flag after a short delay
-            setTimeout(() => {
-                isLocalChangeRef.current = false;
-            }, 2000);
-            showToast('Successfully saved packing list to Solid Pod!', 'success');
-        } catch (error) {
-            console.error('Error saving to pod:', error);
-            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error');
-        }
-    };
-
-    const handleLoadFromPod = async () => {
-        if (!isLoggedIn) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error');
-            return;
-        }
-
-        try {
-            // Force a manual sync - this will trigger onSyncSuccess which handles the update
-            await syncFromPod();
-            // Show success toast for manual sync only
-            showToast('Packing list synced from Pod!', 'success');
-        } catch (error) {
-            console.error('Error loading from pod:', error);
-            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error');
-        }
-    };
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return
@@ -504,28 +422,6 @@ export function ViewPackingList() {
                                 >
                                     {showPacked ? 'Hide Packed' : 'Show Packed'}
                                 </Button>
-                                {isLoggedIn && (
-                                    <>
-                                        <Button
-                                            type="button"
-                                            onClick={handleLoadFromPod}
-                                            disabled={syncingFromPod}
-                                            variant="secondary"
-                                        >
-                                            {syncingFromPod ? 'Syncing...' : 'Sync Now'}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            onClick={handleSaveToPod}
-                                            variant="secondary"
-                                        >
-                                            Save to Pod
-                                        </Button>
-                                    </>
-                                )}
-                                <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
-                                    {isSaving ? 'Saving...' : 'Save & Return'}
-                                </Button>
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -546,7 +442,7 @@ export function ViewPackingList() {
 
             {/* Main content */}
             <div className="w-full">
-                <form onSubmit={handleSubmit(onSubmit)} id="view-packing-list-form">
+                <div>
                     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                         {Object.entries(
                             filteredItems.reduce((acc, item) => {
@@ -621,7 +517,7 @@ export function ViewPackingList() {
                             </div>
                         ))}
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     )
