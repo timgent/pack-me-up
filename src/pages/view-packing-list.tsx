@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Button } from '../components/Button'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
-import { getPrimaryPodUrl, saveFileToPod, loadFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { usePackingListSync } from '../hooks/usePackingListSync'
 
 type FormData = {
     items: Record<string, boolean>
@@ -19,22 +19,127 @@ export function ViewPackingList() {
     const navigate = useNavigate()
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-    const [isSavingToPod, setIsSavingToPod] = useState(false)
-    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
-    const { isLoggedIn, session } = useSolidPod()
+    const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
+    const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
 
-    const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
+    // Track if we're currently handling a local change to prevent sync loops
+    const isLocalChangeRef = useRef(false);
+    const lastSyncedDataRef = useRef<string | null>(null);
+
+    const { register, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
     })
 
-    const watchedItems = watch('items')
+    // Use useWatch instead of watch() for proper re-renders on form changes
+    const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
+
+    // Memoize callbacks to prevent usePackingListSync from re-running unnecessarily
+    const handleSyncSuccess = useCallback(async (data: PackingList) => {
+        // Only update form if this isn't a local change we just made
+        if (!isLocalChangeRef.current) {
+            // Compare the incoming data with what we last synced
+            const incomingDataString = JSON.stringify(data);
+
+            // Only update if the data has actually changed AND is newer than our local version
+            const syncedModifiedTime = data.lastModified ? new Date(data.lastModified).getTime() : 0;
+            const localModifiedTime = packingList?.lastModified ? new Date(packingList.lastModified).getTime() : 0;
+
+            if (lastSyncedDataRef.current !== incomingDataString) {
+                // Only apply sync if the synced version is newer
+                if (syncedModifiedTime > localModifiedTime) {
+                    console.log('Synced packing list from Pod - newer version found, updating form');
+                    setSyncingFromPod(true);
+
+                    // Save the currently focused element
+                    const activeElement = document.activeElement as HTMLElement;
+                    const activeElementId = activeElement?.id;
+                    const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+                    const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+
+                    try {
+                        // Remove _rev to avoid conflicts with local database version
+                        delete data._rev;
+
+                        // Save to local database to get the proper _rev
+                        const dbResult = await packingAppDb.savePackingList(data);
+
+                        // Update the packing list state with synced data and new _rev
+                        setPackingList({
+                            ...data,
+                            _rev: dbResult.rev
+                        });
+
+                        // Update form values
+                        const formValues: Record<string, boolean> = {};
+                        data.items.forEach((item) => {
+                            formValues[item.id] = item.packed;
+                        });
+                        setValue('items', formValues);
+
+                        lastSyncedDataRef.current = incomingDataString;
+
+                        // Show sync indicator briefly
+                        setTimeout(() => setSyncingFromPod(false), 2000);
+
+                        // Restore focus after a brief delay to allow the DOM to update
+                        setTimeout(() => {
+                            if (activeElementId) {
+                                const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+                                if (elementToFocus) {
+                                    elementToFocus.focus();
+                                    if (selectionStart !== null && selectionEnd !== null) {
+                                        elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                                    }
+                                }
+                            }
+                        }, 0);
+                    } catch (err) {
+                        console.error('Error saving synced data to local database:', err);
+                        setSyncingFromPod(false);
+                    }
+                } else {
+                    console.log('Synced packing list from Pod - local version is newer or same, keeping local');
+                }
+            } else {
+                console.log('Synced packing list from Pod - no changes detected');
+            }
+        }
+    }, [setValue, packingList]);
+
+    const handleSyncError = useCallback((error: string) => {
+        console.error('Sync error:', error);
+        // Don't show toast for errors - too noisy for automatic sync
+    }, []);
+
+    const handleSaveSuccess = useCallback(() => {
+        console.log('Saved packing list to Pod successfully');
+        // Update the last synced data ref
+        if (packingList) {
+            lastSyncedDataRef.current = JSON.stringify(packingList);
+        }
+    }, [packingList]);
+
+    const handleSaveError = useCallback((error: string) => {
+        console.error('Save to Pod error:', error);
+        showToast(`Failed to save to Pod: ${error}`, 'error');
+    }, [showToast]);
+
+    // Set up automatic Pod sync with polling
+    const { saveToPod } = usePackingListSync({
+        packingListId: id || null,
+        pollInterval: 5000, // Poll every 5 seconds for faster sync
+        enabled: isLoggedIn, // Only sync when logged in
+        onSyncSuccess: handleSyncSuccess,
+        onSyncError: handleSyncError,
+        onSaveSuccess: handleSaveSuccess,
+        onSaveError: handleSaveError,
+    });
 
     useEffect(() => {
         const fetchPackingList = async () => {
@@ -47,6 +152,8 @@ export function ViewPackingList() {
                     initialValues[item.id] = item.packed
                 })
                 setValue('items', initialValues)
+                // Initialize the lastSyncedDataRef with the loaded data
+                lastSyncedDataRef.current = JSON.stringify(doc)
             } catch (err) {
                 console.error('Error fetching packing list:', err)
             } finally {
@@ -58,135 +165,92 @@ export function ViewPackingList() {
     }, [id, setValue])
 
     const handleItemChange = useDebouncedCallback(async () => {
+        if (!packingList) {
+            console.log('handleItemChange: packingList is null, skipping')
+            return
+        }
+
         try {
-            setAutoSaveStatus('saving')
             const currentFormValues = getValues('items')
-            const updatedPackingList = {
-                ...packingList!,
-                items: packingList!.items.map(item => ({
-                    ...item,
-                    packed: currentFormValues[item.id] ?? false
-                }))
+            console.log('handleItemChange: checking for changes', {
+                itemCount: packingList.items.length,
+                formValueCount: Object.keys(currentFormValues).length
+            })
+
+            // Check if any items have actually changed
+            const hasChanges = packingList.items.some(item => {
+                const currentPacked = currentFormValues[item.id] ?? false
+                const changed = item.packed !== currentPacked
+                if (changed) {
+                    console.log('handleItemChange: detected change', {
+                        itemId: item.id,
+                        itemText: item.itemText,
+                        oldPacked: item.packed,
+                        newPacked: currentPacked
+                    })
+                }
+                return changed
+            })
+
+            // Only save if there are actual changes
+            if (!hasChanges) {
+                console.log('handleItemChange: No changes detected, skipping save')
+                return
             }
-            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-            setPackingList(() => ({
-                ...updatedPackingList!,
-                _rev: dbResult.rev
-            }))
-            setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 10000)
-        } catch (err) {
-            console.error('Error saving packing list:', err)
-            setAutoSaveStatus('error')
-        }
-    }, 5000)
 
-    // Trigger auto-save when form values change
-    useEffect(() => {
-        if (packingList) {
-            handleItemChange()
-        }
-    }, [watchedItems, handleItemChange, packingList])
-
-    const onSubmit = async (data: FormData) => {
-        if (!packingList) return
-
-        setIsSaving(true)
-        try {
-            const updatedPackingList = {
+            console.log('handleItemChange: Changes detected, saving...')
+            setAutoSaveStatus('saving')
+            const updatedPackingList: PackingList = {
                 ...packingList,
                 items: packingList.items.map(item => ({
                     ...item,
-                    packed: data.items[item.id] ?? false
-                }))
+                    packed: currentFormValues[item.id] ?? false
+                })),
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
-            await packingAppDb.savePackingList(updatedPackingList)
-            navigate('/view-lists')
-        } catch (err) {
-            console.error('Error saving packing list:', err)
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const handleSaveToPod = async () => {
-        if (!packingList) return
-
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
-            return
-        }
-
-        setIsSavingToPod(true)
-        try {
-            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-            const filename = `${packingList.id}.json`
-
-            await saveFileToPod({
-                session: session!,
-                containerPath,
-                filename,
-                data: packingList
-            })
-
-            showToast('Successfully saved packing list to Solid Pod!', 'success')
-        } catch (error) {
-            console.error('Error saving to pod:', error)
-            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
-        } finally {
-            setIsSavingToPod(false)
-        }
-    }
-
-    const handleLoadFromPod = async () => {
-        if (!packingList) return
-
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
-            return
-        }
-
-        setIsLoadingFromPod(true)
-        try {
-            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-            const filename = `${packingList.id}.json`
-
-            const loadedList = await loadFileFromPod<PackingList>({
-                session: session!,
-                fileUrl: `${containerPath}${filename}`
-            })
-
-            // Remove _rev to avoid conflicts with local database version
-            delete loadedList._rev
-
-            // Save to local database
-            const dbResult = await packingAppDb.savePackingList(loadedList)
-
-            // Update the local state and form
-            setPackingList({
-                ...loadedList,
+            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
+            const savedPackingList = {
+                ...updatedPackingList,
                 _rev: dbResult.rev
-            })
+            }
+            setPackingList(savedPackingList)
+            console.log('handleItemChange: Saved to local DB')
 
-            // Update form values
-            const formValues: Record<string, boolean> = {}
-            loadedList.items.forEach((item) => {
-                formValues[item.id] = item.packed
-            })
-            setValue('items', formValues)
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                console.log('handleItemChange: Saving to Pod...')
+                isLocalChangeRef.current = true;
+                await saveToPod(savedPackingList);
+                console.log('handleItemChange: Saved to Pod')
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
 
-            showToast('Successfully loaded packing list from Solid Pod!', 'success')
-        } catch (error) {
-            console.error('Error loading from pod:', error)
-            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
-        } finally {
-            setIsLoadingFromPod(false)
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 2000) // Show "saved" for 2 seconds
+        } catch (err) {
+            console.error('handleItemChange: Error saving packing list:', err)
+            setAutoSaveStatus('error')
         }
-    }
+    }, 800) // Reduced to 800ms for faster saves while still batching rapid changes
+
+    // Trigger auto-save when form values change (not when packingList state changes from sync)
+    useEffect(() => {
+        console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
+            hasPackingList: !!packingList,
+            watchedItems: watchedItems,
+            watchedItemsCount: Object.keys(watchedItems).length,
+            watchedItemsKeys: Object.keys(watchedItems)
+        })
+        if (packingList) {
+            console.log('Calling handleItemChange...')
+            handleItemChange()
+        } else {
+            console.log('Skipping handleItemChange - packingList is null')
+        }
+    }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return
@@ -196,27 +260,39 @@ export function ViewPackingList() {
 
             // Remove the item from the packing list
             const updatedItems = packingList.items.filter(item => item.id !== itemId)
-            const updatedPackingList = {
+            const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems
+                items: updatedItems,
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
 
             // Save to database
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
 
-            // Update local state
-            setPackingList({
+            // Update local state with new _rev
+            const savedPackingList = {
                 ...updatedPackingList,
                 _rev: dbResult.rev
-            })
+            }
+            setPackingList(savedPackingList)
 
             // Remove from form values
             const currentFormValues = getValues('items')
             delete currentFormValues[itemId]
             setValue('items', currentFormValues)
 
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                isLocalChangeRef.current = true;
+                await saveToPod(savedPackingList);
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
+
             setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
             console.error('Error deleting item:', err)
             setAutoSaveStatus('error')
@@ -245,19 +321,21 @@ export function ViewPackingList() {
 
             // Add the item to the packing list
             const updatedItems = [...packingList.items, newItem]
-            const updatedPackingList = {
+            const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems
+                items: updatedItems,
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
 
             // Save to database
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
 
-            // Update local state
-            setPackingList({
+            // Update local state with new _rev
+            const savedPackingList = {
                 ...updatedPackingList,
                 _rev: dbResult.rev
-            })
+            }
+            setPackingList(savedPackingList)
 
             // Add to form values
             setValue(`items.${newItem.id}`, false)
@@ -265,8 +343,18 @@ export function ViewPackingList() {
             // Clear the input
             setNewItemInputs({ ...newItemInputs, [personName]: '' })
 
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                isLocalChangeRef.current = true;
+                await saveToPod(savedPackingList);
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
+
             setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
             console.error('Error adding item:', err)
             setAutoSaveStatus('error')
@@ -293,32 +381,39 @@ export function ViewPackingList() {
             {/* Sticky top toolbar */}
             <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
                 <div className="w-full max-w-screen-2xl">
-                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3">
+                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3 relative">
+                        {/* Sync indicator - absolutely positioned to avoid layout shift */}
+                        {isLoggedIn && syncingFromPod && (
+                            <div className="absolute top-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 flex items-center gap-1.5 shadow-sm">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs text-blue-700 whitespace-nowrap">Syncing...</span>
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
-                                {autoSaveStatus !== 'idle' && (
-                                    <div className="flex items-center space-x-2">
-                                        {autoSaveStatus === 'saving' && (
-                                            <>
-                                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                                <span className="text-sm text-blue-600">Auto-saving...</span>
-                                            </>
-                                        )}
-                                        {autoSaveStatus === 'saved' && (
-                                            <>
-                                                <div className="h-4 w-4 text-green-500">✓</div>
-                                                <span className="text-sm text-green-600">Saved</span>
-                                            </>
-                                        )}
-                                        {autoSaveStatus === 'error' && (
-                                            <>
-                                                <div className="h-4 w-4 text-red-500">✗</div>
-                                                <span className="text-sm text-red-600">Error</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                {/* Always reserve space for auto-save status to prevent layout jump */}
+                                <div className={`flex items-center space-x-2 min-w-[120px] transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
+                                    {autoSaveStatus === 'saving' && (
+                                        <>
+                                            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                            <span className="text-sm text-blue-600">Auto-saving...</span>
+                                        </>
+                                    )}
+                                    {autoSaveStatus === 'saved' && (
+                                        <>
+                                            <div className="h-4 w-4 text-green-500">✓</div>
+                                            <span className="text-sm text-green-600">Saved</span>
+                                        </>
+                                    )}
+                                    {autoSaveStatus === 'error' && (
+                                        <>
+                                            <div className="h-4 w-4 text-red-500">✗</div>
+                                            <span className="text-sm text-red-600">Error</span>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button
@@ -327,29 +422,6 @@ export function ViewPackingList() {
                                     onClick={() => setShowPacked(!showPacked)}
                                 >
                                     {showPacked ? 'Hide Packed' : 'Show Packed'}
-                                </Button>
-                                {isLoggedIn && (
-                                    <>
-                                        <Button
-                                            type="button"
-                                            onClick={handleLoadFromPod}
-                                            disabled={isLoadingFromPod}
-                                            variant="secondary"
-                                        >
-                                            {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            onClick={handleSaveToPod}
-                                            disabled={isSavingToPod}
-                                            variant="secondary"
-                                        >
-                                            {isSavingToPod ? 'Saving...' : 'Save to Pod'}
-                                        </Button>
-                                    </>
-                                )}
-                                <Button type="submit" form="view-packing-list-form" disabled={isSaving}>
-                                    {isSaving ? 'Saving...' : 'Save & Return'}
                                 </Button>
                                 <Button
                                     type="button"
@@ -371,7 +443,7 @@ export function ViewPackingList() {
 
             {/* Main content */}
             <div className="w-full">
-                <form onSubmit={handleSubmit(onSubmit)} id="view-packing-list-form">
+                <div>
                     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                         {Object.entries(
                             filteredItems.reduce((acc, item) => {
@@ -446,7 +518,7 @@ export function ViewPackingList() {
                             </div>
                         ))}
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     )
