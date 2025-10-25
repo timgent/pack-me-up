@@ -46,58 +46,66 @@ export function ViewPackingList() {
             // Compare the incoming data with what we last synced
             const incomingDataString = JSON.stringify(data);
 
-            // Only update if the data has actually changed
+            // Only update if the data has actually changed AND is newer than our local version
+            const syncedModifiedTime = data.lastModified ? new Date(data.lastModified).getTime() : 0;
+            const localModifiedTime = packingList?.lastModified ? new Date(packingList.lastModified).getTime() : 0;
+
             if (lastSyncedDataRef.current !== incomingDataString) {
-                console.log('Synced packing list from Pod - data has changed, updating form');
+                // Only apply sync if the synced version is newer
+                if (syncedModifiedTime > localModifiedTime) {
+                    console.log('Synced packing list from Pod - newer version found, updating form');
 
-                // Save the currently focused element
-                const activeElement = document.activeElement as HTMLElement;
-                const activeElementId = activeElement?.id;
-                const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-                const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+                    // Save the currently focused element
+                    const activeElement = document.activeElement as HTMLElement;
+                    const activeElementId = activeElement?.id;
+                    const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+                    const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
 
-                try {
-                    // Remove _rev to avoid conflicts with local database version
-                    delete data._rev;
+                    try {
+                        // Remove _rev to avoid conflicts with local database version
+                        delete data._rev;
 
-                    // Save to local database to get the proper _rev
-                    const dbResult = await packingAppDb.savePackingList(data);
+                        // Save to local database to get the proper _rev
+                        const dbResult = await packingAppDb.savePackingList(data);
 
-                    // Update the packing list state with synced data and new _rev
-                    setPackingList({
-                        ...data,
-                        _rev: dbResult.rev
-                    });
+                        // Update the packing list state with synced data and new _rev
+                        setPackingList({
+                            ...data,
+                            _rev: dbResult.rev
+                        });
 
-                    // Update form values
-                    const formValues: Record<string, boolean> = {};
-                    data.items.forEach((item) => {
-                        formValues[item.id] = item.packed;
-                    });
-                    setValue('items', formValues);
+                        // Update form values
+                        const formValues: Record<string, boolean> = {};
+                        data.items.forEach((item) => {
+                            formValues[item.id] = item.packed;
+                        });
+                        setValue('items', formValues);
 
-                    lastSyncedDataRef.current = incomingDataString;
+                        lastSyncedDataRef.current = incomingDataString;
 
-                    // Restore focus after a brief delay to allow the DOM to update
-                    setTimeout(() => {
-                        if (activeElementId) {
-                            const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-                            if (elementToFocus) {
-                                elementToFocus.focus();
-                                if (selectionStart !== null && selectionEnd !== null) {
-                                    elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                        // Restore focus after a brief delay to allow the DOM to update
+                        setTimeout(() => {
+                            if (activeElementId) {
+                                const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+                                if (elementToFocus) {
+                                    elementToFocus.focus();
+                                    if (selectionStart !== null && selectionEnd !== null) {
+                                        elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                                    }
                                 }
                             }
-                        }
-                    }, 0);
-                } catch (err) {
-                    console.error('Error saving synced data to local database:', err);
+                        }, 0);
+                    } catch (err) {
+                        console.error('Error saving synced data to local database:', err);
+                    }
+                } else {
+                    console.log('Synced packing list from Pod - local version is newer or same, keeping local');
                 }
             } else {
                 console.log('Synced packing list from Pod - no changes detected');
             }
         }
-    }, [setValue]);
+    }, [setValue, packingList]);
 
     const handleSyncError = useCallback((error: string) => {
         console.error('Sync error:', error);
@@ -120,7 +128,7 @@ export function ViewPackingList() {
     // Set up automatic Pod sync with polling
     const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = usePackingListSync({
         packingListId: id || null,
-        pollInterval: 10000, // Poll every 10 seconds
+        pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
         onSyncSuccess: handleSyncSuccess,
         onSyncError: handleSyncError,
@@ -155,12 +163,13 @@ export function ViewPackingList() {
         try {
             setAutoSaveStatus('saving')
             const currentFormValues = getValues('items')
-            const updatedPackingList = {
+            const updatedPackingList: PackingList = {
                 ...packingList!,
                 items: packingList!.items.map(item => ({
                     ...item,
                     packed: currentFormValues[item.id] ?? false
-                }))
+                })),
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
             const savedPackingList = {
@@ -185,7 +194,7 @@ export function ViewPackingList() {
             console.error('Error saving packing list:', err)
             setAutoSaveStatus('error')
         }
-    }, 5000)
+    }, 800) // Reduced to 800ms for faster saves while still batching rapid changes
 
     // Trigger auto-save when form values change
     useEffect(() => {
@@ -262,9 +271,10 @@ export function ViewPackingList() {
 
             // Remove the item from the packing list
             const updatedItems = packingList.items.filter(item => item.id !== itemId)
-            const updatedPackingList = {
+            const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems
+                items: updatedItems,
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
 
             // Save to database
@@ -322,9 +332,10 @@ export function ViewPackingList() {
 
             // Add the item to the packing list
             const updatedItems = [...packingList.items, newItem]
-            const updatedPackingList = {
+            const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems
+                items: updatedItems,
+                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
             }
 
             // Save to database

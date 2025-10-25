@@ -3,6 +3,7 @@ export interface PackingList {
     _rev?: string
     name: string
     createdAt: string
+    lastModified?: string // ISO timestamp for conflict resolution
     items: PackingListItem[]
 }
 
