@@ -467,37 +467,36 @@ export function ViewPackingList() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
-                                {autoSaveStatus !== 'idle' && (
-                                    <div className="flex items-center space-x-2">
-                                        {autoSaveStatus === 'saving' && (
-                                            <>
-                                                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                                <span className="text-sm text-blue-600">Auto-saving...</span>
-                                            </>
-                                        )}
-                                        {autoSaveStatus === 'saved' && (
-                                            <>
-                                                <div className="h-4 w-4 text-green-500">✓</div>
-                                                <span className="text-sm text-green-600">Saved</span>
-                                            </>
-                                        )}
-                                        {autoSaveStatus === 'error' && (
-                                            <>
-                                                <div className="h-4 w-4 text-red-500">✗</div>
-                                                <span className="text-sm text-red-600">Error</span>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                {/* Always reserve space for auto-save status to prevent layout jump */}
+                                <div className={`flex items-center space-x-2 min-w-[120px] transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
+                                    {autoSaveStatus === 'saving' && (
+                                        <>
+                                            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                            <span className="text-sm text-blue-600">Auto-saving...</span>
+                                        </>
+                                    )}
+                                    {autoSaveStatus === 'saved' && (
+                                        <>
+                                            <div className="h-4 w-4 text-green-500">✓</div>
+                                            <span className="text-sm text-green-600">Saved</span>
+                                        </>
+                                    )}
+                                    {autoSaveStatus === 'error' && (
+                                        <>
+                                            <div className="h-4 w-4 text-red-500">✗</div>
+                                            <span className="text-sm text-red-600">Error</span>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {/* Only show sync status when actively pulling newer data from Pod */}
-                                {isLoggedIn && syncingFromPod && (
-                                    <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-2">
+                                <div className={`transition-opacity duration-200 ${isLoggedIn && syncingFromPod ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-2 whitespace-nowrap">
                                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                                         <span className="text-xs text-blue-700">Syncing from Pod...</span>
                                     </div>
-                                )}
+                                </div>
                                 <Button
                                     type="button"
                                     variant="secondary"
