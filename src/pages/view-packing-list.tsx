@@ -381,7 +381,15 @@ export function ViewPackingList() {
             {/* Sticky top toolbar */}
             <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
                 <div className="w-full max-w-screen-2xl">
-                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3">
+                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3 relative">
+                        {/* Sync indicator - absolutely positioned to avoid layout shift */}
+                        {isLoggedIn && syncingFromPod && (
+                            <div className="absolute top-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 flex items-center gap-1.5 shadow-sm">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                <span className="text-xs text-blue-700 whitespace-nowrap">Syncing...</span>
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
@@ -408,13 +416,6 @@ export function ViewPackingList() {
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                {/* Only show sync status when actively pulling newer data from Pod */}
-                                <div className={`transition-opacity duration-200 ${isLoggedIn && syncingFromPod ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-2 whitespace-nowrap">
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                        <span className="text-xs text-blue-700">Syncing from Pod...</span>
-                                    </div>
-                                </div>
                                 <Button
                                     type="button"
                                     variant="secondary"
