@@ -38,6 +38,24 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         setSessionVersion(v => v + 1);
       } catch (error) {
         console.error("Error initializing session:", error);
+        console.log("Session restoration failed, clearing any corrupted session data...");
+
+        // Clear any corrupted session data by logging out
+        // This handles cases where an invalid client_id or expired session data
+        // is stored in the browser, causing authentication failures
+        try {
+          await solidLogout();
+          const clearedSession = getDefaultSession();
+          setSession(clearedSession);
+          setSessionVersion(v => v + 1);
+          console.log("Session data cleared successfully");
+        } catch (logoutError) {
+          console.error("Error clearing session data:", logoutError);
+          // Even if logout fails, try to set a fresh session
+          const currentSession = getDefaultSession();
+          setSession(currentSession);
+          setSessionVersion(v => v + 1);
+        }
       } finally {
         setIsLoading(false);
       }
