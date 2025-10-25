@@ -40,7 +40,7 @@ export function ViewPackingList() {
     const watchedItems = watch('items')
 
     // Memoize callbacks to prevent usePackingListSync from re-running unnecessarily
-    const handleSyncSuccess = useCallback((data: PackingList) => {
+    const handleSyncSuccess = useCallback(async (data: PackingList) => {
         // Only update form if this isn't a local change we just made
         if (!isLocalChangeRef.current) {
             // Compare the incoming data with what we last synced
@@ -56,30 +56,43 @@ export function ViewPackingList() {
                 const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
                 const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
 
-                // Update the packing list state with the synced data
-                setPackingList(data);
+                try {
+                    // Remove _rev to avoid conflicts with local database version
+                    delete data._rev;
 
-                // Update form values
-                const formValues: Record<string, boolean> = {};
-                data.items.forEach((item) => {
-                    formValues[item.id] = item.packed;
-                });
-                setValue('items', formValues);
+                    // Save to local database to get the proper _rev
+                    const dbResult = await packingAppDb.savePackingList(data);
 
-                lastSyncedDataRef.current = incomingDataString;
+                    // Update the packing list state with synced data and new _rev
+                    setPackingList({
+                        ...data,
+                        _rev: dbResult.rev
+                    });
 
-                // Restore focus after a brief delay to allow the DOM to update
-                setTimeout(() => {
-                    if (activeElementId) {
-                        const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-                        if (elementToFocus) {
-                            elementToFocus.focus();
-                            if (selectionStart !== null && selectionEnd !== null) {
-                                elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                    // Update form values
+                    const formValues: Record<string, boolean> = {};
+                    data.items.forEach((item) => {
+                        formValues[item.id] = item.packed;
+                    });
+                    setValue('items', formValues);
+
+                    lastSyncedDataRef.current = incomingDataString;
+
+                    // Restore focus after a brief delay to allow the DOM to update
+                    setTimeout(() => {
+                        if (activeElementId) {
+                            const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+                            if (elementToFocus) {
+                                elementToFocus.focus();
+                                if (selectionStart !== null && selectionEnd !== null) {
+                                    elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                                }
                             }
                         }
-                    }
-                }, 0);
+                    }, 0);
+                } catch (err) {
+                    console.error('Error saving synced data to local database:', err);
+                }
             } else {
                 console.log('Synced packing list from Pod - no changes detected');
             }
@@ -150,15 +163,16 @@ export function ViewPackingList() {
                 }))
             }
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-            setPackingList(() => ({
-                ...updatedPackingList!,
+            const savedPackingList = {
+                ...updatedPackingList,
                 _rev: dbResult.rev
-            }))
+            }
+            setPackingList(savedPackingList)
 
             // If logged in, also save to Pod automatically
             if (isLoggedIn) {
                 isLocalChangeRef.current = true;
-                await saveToPod(updatedPackingList);
+                await saveToPod(savedPackingList);
                 // Reset the flag after a short delay to allow sync to complete
                 setTimeout(() => {
                     isLocalChangeRef.current = false;
@@ -256,11 +270,12 @@ export function ViewPackingList() {
             // Save to database
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
 
-            // Update local state
-            setPackingList({
+            // Update local state with new _rev
+            const savedPackingList = {
                 ...updatedPackingList,
                 _rev: dbResult.rev
-            })
+            }
+            setPackingList(savedPackingList)
 
             // Remove from form values
             const currentFormValues = getValues('items')
@@ -270,7 +285,7 @@ export function ViewPackingList() {
             // If logged in, also save to Pod automatically
             if (isLoggedIn) {
                 isLocalChangeRef.current = true;
-                await saveToPod(updatedPackingList);
+                await saveToPod(savedPackingList);
                 // Reset the flag after a short delay to allow sync to complete
                 setTimeout(() => {
                     isLocalChangeRef.current = false;
@@ -315,11 +330,12 @@ export function ViewPackingList() {
             // Save to database
             const dbResult = await packingAppDb.savePackingList(updatedPackingList)
 
-            // Update local state
-            setPackingList({
+            // Update local state with new _rev
+            const savedPackingList = {
                 ...updatedPackingList,
                 _rev: dbResult.rev
-            })
+            }
+            setPackingList(savedPackingList)
 
             // Add to form values
             setValue(`items.${newItem.id}`, false)
@@ -330,7 +346,7 @@ export function ViewPackingList() {
             // If logged in, also save to Pod automatically
             if (isLoggedIn) {
                 isLocalChangeRef.current = true;
-                await saveToPod(updatedPackingList);
+                await saveToPod(savedPackingList);
                 // Reset the flag after a short delay to allow sync to complete
                 setTimeout(() => {
                     isLocalChangeRef.current = false;
