@@ -166,25 +166,44 @@ export function ViewPackingList() {
     }, [id, setValue])
 
     const handleItemChange = useDebouncedCallback(async () => {
+        if (!packingList) {
+            console.log('handleItemChange: packingList is null, skipping')
+            return
+        }
+
         try {
             const currentFormValues = getValues('items')
+            console.log('handleItemChange: checking for changes', {
+                itemCount: packingList.items.length,
+                formValueCount: Object.keys(currentFormValues).length
+            })
 
             // Check if any items have actually changed
-            const hasChanges = packingList!.items.some(item => {
+            const hasChanges = packingList.items.some(item => {
                 const currentPacked = currentFormValues[item.id] ?? false
-                return item.packed !== currentPacked
+                const changed = item.packed !== currentPacked
+                if (changed) {
+                    console.log('handleItemChange: detected change', {
+                        itemId: item.id,
+                        itemText: item.itemText,
+                        oldPacked: item.packed,
+                        newPacked: currentPacked
+                    })
+                }
+                return changed
             })
 
             // Only save if there are actual changes
             if (!hasChanges) {
-                console.log('No changes detected, skipping save')
+                console.log('handleItemChange: No changes detected, skipping save')
                 return
             }
 
+            console.log('handleItemChange: Changes detected, saving...')
             setAutoSaveStatus('saving')
             const updatedPackingList: PackingList = {
-                ...packingList!,
-                items: packingList!.items.map(item => ({
+                ...packingList,
+                items: packingList.items.map(item => ({
                     ...item,
                     packed: currentFormValues[item.id] ?? false
                 })),
@@ -196,11 +215,14 @@ export function ViewPackingList() {
                 _rev: dbResult.rev
             }
             setPackingList(savedPackingList)
+            console.log('handleItemChange: Saved to local DB')
 
             // If logged in, also save to Pod automatically
             if (isLoggedIn) {
+                console.log('handleItemChange: Saving to Pod...')
                 isLocalChangeRef.current = true;
                 await saveToPod(savedPackingList);
+                console.log('handleItemChange: Saved to Pod')
                 // Reset the flag after a short delay to allow sync to complete
                 setTimeout(() => {
                     isLocalChangeRef.current = false;
@@ -210,14 +232,19 @@ export function ViewPackingList() {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000) // Show "saved" for 2 seconds
         } catch (err) {
-            console.error('Error saving packing list:', err)
+            console.error('handleItemChange: Error saving packing list:', err)
             setAutoSaveStatus('error')
         }
     }, 800) // Reduced to 800ms for faster saves while still batching rapid changes
 
     // Trigger auto-save when form values change (not when packingList state changes from sync)
     useEffect(() => {
+        console.log('useEffect for auto-save triggered', {
+            hasPackingList: !!packingList,
+            watchedItemsCount: Object.keys(watchedItems).length
+        })
         if (packingList) {
+            console.log('Calling handleItemChange...')
             handleItemChange()
         }
     }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
@@ -252,8 +279,28 @@ export function ViewPackingList() {
         if (!packingList) return;
 
         try {
+            // Get current form values and create updated packing list
+            const currentFormValues = getValues('items')
+            const updatedPackingList: PackingList = {
+                ...packingList,
+                items: packingList.items.map(item => ({
+                    ...item,
+                    packed: currentFormValues[item.id] ?? false
+                })),
+                lastModified: new Date().toISOString()
+            }
+
+            // Save to local DB first
+            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
+            const savedPackingList = {
+                ...updatedPackingList,
+                _rev: dbResult.rev
+            }
+            setPackingList(savedPackingList)
+
+            // Then save to Pod
             isLocalChangeRef.current = true;
-            await saveToPod(packingList);
+            await saveToPod(savedPackingList);
             // Reset the flag after a short delay
             setTimeout(() => {
                 isLocalChangeRef.current = false;
