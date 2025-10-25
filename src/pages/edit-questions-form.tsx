@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
 import { packingAppDb } from '../services/database'
@@ -35,62 +35,71 @@ export function EditQuestionsForm() {
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
+  // Memoize callbacks to prevent useQuestionSetSync from re-running unnecessarily
+  const handleSyncSuccess = useCallback((data: PackingListQuestionSet) => {
+    // Only update form if this isn't a local change we just made
+    if (!isLocalChangeRef.current) {
+      // Compare the incoming data with what we last synced
+      const incomingDataString = JSON.stringify(data);
+
+      // Only update if the data has actually changed
+      if (lastSyncedDataRef.current !== incomingDataString) {
+        console.log('Synced data from Pod - data has changed, updating form');
+
+        // Save the currently focused element
+        const activeElement = document.activeElement as HTMLElement;
+        const activeElementId = activeElement?.id;
+        const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+        const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+
+        // Preserve the current _rev for PouchDB
+        data._rev = rev;
+        reset(data);
+        lastSyncedDataRef.current = incomingDataString;
+
+        // Restore focus after a brief delay to allow the DOM to update
+        setTimeout(() => {
+          if (activeElementId) {
+            const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+            if (elementToFocus) {
+              elementToFocus.focus();
+              if (selectionStart !== null && selectionEnd !== null) {
+                elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+              }
+            }
+          }
+        }, 0);
+      } else {
+        console.log('Synced data from Pod - no changes detected');
+      }
+    }
+  }, [rev, reset]);
+
+  const handleSyncError = useCallback((error: string) => {
+    console.error('Sync error:', error);
+    // Don't show toast for errors - too noisy for automatic sync
+  }, []);
+
+  const handleSaveSuccess = useCallback(() => {
+    console.log('Saved to Pod successfully');
+    // Update the last synced data ref
+    const currentData = getValues();
+    lastSyncedDataRef.current = JSON.stringify(currentData);
+  }, [getValues]);
+
+  const handleSaveError = useCallback((error: string) => {
+    console.error('Save to Pod error:', error);
+    showToast(`Failed to save to Pod: ${error}`, 'error');
+  }, [showToast]);
+
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = useQuestionSetSync({
     pollInterval: 10000, // Poll every 10 seconds
     enabled: isLoggedIn, // Only sync when logged in
-    onSyncSuccess: (data) => {
-      // Only update form if this isn't a local change we just made
-      if (!isLocalChangeRef.current) {
-        // Compare the incoming data with what we last synced
-        const incomingDataString = JSON.stringify(data);
-
-        // Only update if the data has actually changed
-        if (lastSyncedDataRef.current !== incomingDataString) {
-          console.log('Synced data from Pod - data has changed, updating form');
-
-          // Save the currently focused element
-          const activeElement = document.activeElement as HTMLElement;
-          const activeElementId = activeElement?.id;
-          const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-          const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
-
-          // Preserve the current _rev for PouchDB
-          data._rev = rev;
-          reset(data);
-          lastSyncedDataRef.current = incomingDataString;
-
-          // Restore focus after a brief delay to allow the DOM to update
-          setTimeout(() => {
-            if (activeElementId) {
-              const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-              if (elementToFocus) {
-                elementToFocus.focus();
-                if (selectionStart !== null && selectionEnd !== null) {
-                  elementToFocus.setSelectionRange(selectionStart, selectionEnd);
-                }
-              }
-            }
-          }, 0);
-        } else {
-          console.log('Synced data from Pod - no changes detected');
-        }
-      }
-    },
-    onSyncError: (error) => {
-      console.error('Sync error:', error);
-      // Don't show toast for errors - too noisy for automatic sync
-    },
-    onSaveSuccess: () => {
-      console.log('Saved to Pod successfully');
-      // Update the last synced data ref
-      const currentData = getValues();
-      lastSyncedDataRef.current = JSON.stringify(currentData);
-    },
-    onSaveError: (error) => {
-      console.error('Save to Pod error:', error);
-      showToast(`Failed to save to Pod: ${error}`, 'error');
-    },
+    onSyncSuccess: handleSyncSuccess,
+    onSyncError: handleSyncError,
+    onSaveSuccess: handleSaveSuccess,
+    onSaveError: handleSaveError,
   });
 
   const removePerson = (removedIndex: number) => {
