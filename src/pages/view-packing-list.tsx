@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
@@ -7,7 +7,8 @@ import { Button } from '../components/Button'
 import { useForm } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
-import { getPrimaryPodUrl, saveFileToPod, loadFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { POD_ERROR_MESSAGES } from '../services/solidPod'
+import { usePackingListSync } from '../hooks/usePackingListSync'
 
 type FormData = {
     items: Record<string, boolean>
@@ -22,11 +23,13 @@ export function ViewPackingList() {
     const [isSaving, setIsSaving] = useState(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-    const [isSavingToPod, setIsSavingToPod] = useState(false)
-    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
-    const { isLoggedIn, session } = useSolidPod()
+    const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
+
+    // Track if we're currently handling a local change to prevent sync loops
+    const isLocalChangeRef = useRef(false);
+    const lastSyncedDataRef = useRef<string | null>(null);
 
     const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
         defaultValues: {
@@ -35,6 +38,82 @@ export function ViewPackingList() {
     })
 
     const watchedItems = watch('items')
+
+    // Memoize callbacks to prevent usePackingListSync from re-running unnecessarily
+    const handleSyncSuccess = useCallback((data: PackingList) => {
+        // Only update form if this isn't a local change we just made
+        if (!isLocalChangeRef.current) {
+            // Compare the incoming data with what we last synced
+            const incomingDataString = JSON.stringify(data);
+
+            // Only update if the data has actually changed
+            if (lastSyncedDataRef.current !== incomingDataString) {
+                console.log('Synced packing list from Pod - data has changed, updating form');
+
+                // Save the currently focused element
+                const activeElement = document.activeElement as HTMLElement;
+                const activeElementId = activeElement?.id;
+                const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+                const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+
+                // Update the packing list state with the synced data
+                setPackingList(data);
+
+                // Update form values
+                const formValues: Record<string, boolean> = {};
+                data.items.forEach((item) => {
+                    formValues[item.id] = item.packed;
+                });
+                setValue('items', formValues);
+
+                lastSyncedDataRef.current = incomingDataString;
+
+                // Restore focus after a brief delay to allow the DOM to update
+                setTimeout(() => {
+                    if (activeElementId) {
+                        const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+                        if (elementToFocus) {
+                            elementToFocus.focus();
+                            if (selectionStart !== null && selectionEnd !== null) {
+                                elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                            }
+                        }
+                    }
+                }, 0);
+            } else {
+                console.log('Synced packing list from Pod - no changes detected');
+            }
+        }
+    }, [setValue]);
+
+    const handleSyncError = useCallback((error: string) => {
+        console.error('Sync error:', error);
+        // Don't show toast for errors - too noisy for automatic sync
+    }, []);
+
+    const handleSaveSuccess = useCallback(() => {
+        console.log('Saved packing list to Pod successfully');
+        // Update the last synced data ref
+        if (packingList) {
+            lastSyncedDataRef.current = JSON.stringify(packingList);
+        }
+    }, [packingList]);
+
+    const handleSaveError = useCallback((error: string) => {
+        console.error('Save to Pod error:', error);
+        showToast(`Failed to save to Pod: ${error}`, 'error');
+    }, [showToast]);
+
+    // Set up automatic Pod sync with polling
+    const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = usePackingListSync({
+        packingListId: id || null,
+        pollInterval: 10000, // Poll every 10 seconds
+        enabled: isLoggedIn, // Only sync when logged in
+        onSyncSuccess: handleSyncSuccess,
+        onSyncError: handleSyncError,
+        onSaveSuccess: handleSaveSuccess,
+        onSaveError: handleSaveError,
+    });
 
     useEffect(() => {
         const fetchPackingList = async () => {
@@ -47,6 +126,8 @@ export function ViewPackingList() {
                     initialValues[item.id] = item.packed
                 })
                 setValue('items', initialValues)
+                // Initialize the lastSyncedDataRef with the loaded data
+                lastSyncedDataRef.current = JSON.stringify(doc)
             } catch (err) {
                 console.error('Error fetching packing list:', err)
             } finally {
@@ -73,6 +154,17 @@ export function ViewPackingList() {
                 ...updatedPackingList!,
                 _rev: dbResult.rev
             }))
+
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                isLocalChangeRef.current = true;
+                await saveToPod(updatedPackingList);
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
+
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 10000)
         } catch (err) {
@@ -110,83 +202,43 @@ export function ViewPackingList() {
     }
 
     const handleSaveToPod = async () => {
-        if (!packingList) return
-
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
-            return
+        if (!isLoggedIn) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error');
+            return;
         }
 
-        setIsSavingToPod(true)
+        if (!packingList) return;
+
         try {
-            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-            const filename = `${packingList.id}.json`
-
-            await saveFileToPod({
-                session: session!,
-                containerPath,
-                filename,
-                data: packingList
-            })
-
-            showToast('Successfully saved packing list to Solid Pod!', 'success')
+            isLocalChangeRef.current = true;
+            await saveToPod(packingList);
+            // Reset the flag after a short delay
+            setTimeout(() => {
+                isLocalChangeRef.current = false;
+            }, 2000);
+            showToast('Successfully saved packing list to Solid Pod!', 'success');
         } catch (error) {
-            console.error('Error saving to pod:', error)
-            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
-        } finally {
-            setIsSavingToPod(false)
+            console.error('Error saving to pod:', error);
+            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error');
         }
-    }
+    };
 
     const handleLoadFromPod = async () => {
-        if (!packingList) return
-
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
-            return
+        if (!isLoggedIn) {
+            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error');
+            return;
         }
 
-        setIsLoadingFromPod(true)
         try {
-            const containerPath = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-            const filename = `${packingList.id}.json`
-
-            const loadedList = await loadFileFromPod<PackingList>({
-                session: session!,
-                fileUrl: `${containerPath}${filename}`
-            })
-
-            // Remove _rev to avoid conflicts with local database version
-            delete loadedList._rev
-
-            // Save to local database
-            const dbResult = await packingAppDb.savePackingList(loadedList)
-
-            // Update the local state and form
-            setPackingList({
-                ...loadedList,
-                _rev: dbResult.rev
-            })
-
-            // Update form values
-            const formValues: Record<string, boolean> = {}
-            loadedList.items.forEach((item) => {
-                formValues[item.id] = item.packed
-            })
-            setValue('items', formValues)
-
-            showToast('Successfully loaded packing list from Solid Pod!', 'success')
+            // Force a manual sync - this will trigger onSyncSuccess which handles the update
+            await syncFromPod();
+            // Show success toast for manual sync only
+            showToast('Packing list synced from Pod!', 'success');
         } catch (error) {
-            console.error('Error loading from pod:', error)
-            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
-        } finally {
-            setIsLoadingFromPod(false)
+            console.error('Error loading from pod:', error);
+            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error');
         }
-    }
+    };
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return
@@ -214,6 +266,16 @@ export function ViewPackingList() {
             const currentFormValues = getValues('items')
             delete currentFormValues[itemId]
             setValue('items', currentFormValues)
+
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                isLocalChangeRef.current = true;
+                await saveToPod(updatedPackingList);
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
 
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 3000)
@@ -265,6 +327,16 @@ export function ViewPackingList() {
             // Clear the input
             setNewItemInputs({ ...newItemInputs, [personName]: '' })
 
+            // If logged in, also save to Pod automatically
+            if (isLoggedIn) {
+                isLocalChangeRef.current = true;
+                await saveToPod(updatedPackingList);
+                // Reset the flag after a short delay to allow sync to complete
+                setTimeout(() => {
+                    isLocalChangeRef.current = false;
+                }, 2000);
+            }
+
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 3000)
         } catch (err) {
@@ -280,6 +352,19 @@ export function ViewPackingList() {
     if (!packingList) {
         return <div className="max-w-4xl mx-auto py-8 px-4">Packing list not found</div>
     }
+
+    // Format last sync time for display
+    const formatLastSync = (date: Date | null) => {
+        if (!date) return 'Never';
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffSecs = Math.floor(diffMs / 1000);
+
+        if (diffSecs < 60) return 'Just now';
+        if (diffSecs < 120) return '1 minute ago';
+        if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)} minutes ago`;
+        return date.toLocaleTimeString();
+    };
 
     const filteredItems = packingList.items.filter(item => {
         if (showPacked) {
@@ -321,6 +406,26 @@ export function ViewPackingList() {
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
+                                {isLoggedIn && (
+                                    <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-1.5 flex items-center gap-2">
+                                        {isSyncing ? (
+                                            <>
+                                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                                <span className="text-xs text-gray-600">Syncing...</span>
+                                            </>
+                                        ) : syncError ? (
+                                            <>
+                                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                                <span className="text-xs text-red-600">Sync Error</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                <span className="text-xs text-gray-600">Last sync: {formatLastSync(lastSync)}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -333,18 +438,17 @@ export function ViewPackingList() {
                                         <Button
                                             type="button"
                                             onClick={handleLoadFromPod}
-                                            disabled={isLoadingFromPod}
+                                            disabled={isSyncing}
                                             variant="secondary"
                                         >
-                                            {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
+                                            {isSyncing ? 'Syncing...' : 'Sync Now'}
                                         </Button>
                                         <Button
                                             type="button"
                                             onClick={handleSaveToPod}
-                                            disabled={isSavingToPod}
                                             variant="secondary"
                                         >
-                                            {isSavingToPod ? 'Saving...' : 'Save to Pod'}
+                                            Save to Pod
                                         </Button>
                                     </>
                                 )}
