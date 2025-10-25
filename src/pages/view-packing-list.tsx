@@ -24,6 +24,7 @@ export function ViewPackingList() {
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
+    const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
     const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
 
@@ -54,6 +55,7 @@ export function ViewPackingList() {
                 // Only apply sync if the synced version is newer
                 if (syncedModifiedTime > localModifiedTime) {
                     console.log('Synced packing list from Pod - newer version found, updating form');
+                    setSyncingFromPod(true);
 
                     // Save the currently focused element
                     const activeElement = document.activeElement as HTMLElement;
@@ -83,6 +85,9 @@ export function ViewPackingList() {
 
                         lastSyncedDataRef.current = incomingDataString;
 
+                        // Show sync indicator briefly
+                        setTimeout(() => setSyncingFromPod(false), 2000);
+
                         // Restore focus after a brief delay to allow the DOM to update
                         setTimeout(() => {
                             if (activeElementId) {
@@ -97,6 +102,7 @@ export function ViewPackingList() {
                         }, 0);
                     } catch (err) {
                         console.error('Error saving synced data to local database:', err);
+                        setSyncingFromPod(false);
                     }
                 } else {
                     console.log('Synced packing list from Pod - local version is newer or same, keeping local');
@@ -126,7 +132,7 @@ export function ViewPackingList() {
     }, [showToast]);
 
     // Set up automatic Pod sync with polling
-    const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = usePackingListSync({
+    const { saveToPod, syncFromPod } = usePackingListSync({
         packingListId: id || null,
         pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
@@ -189,7 +195,7 @@ export function ViewPackingList() {
             }
 
             setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 10000)
+            setTimeout(() => setAutoSaveStatus('idle'), 2000) // Show "saved" for 2 seconds
         } catch (err) {
             console.error('Error saving packing list:', err)
             setAutoSaveStatus('error')
@@ -303,7 +309,7 @@ export function ViewPackingList() {
             }
 
             setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
             console.error('Error deleting item:', err)
             setAutoSaveStatus('error')
@@ -365,7 +371,7 @@ export function ViewPackingList() {
             }
 
             setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 3000)
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
             console.error('Error adding item:', err)
             setAutoSaveStatus('error')
@@ -379,19 +385,6 @@ export function ViewPackingList() {
     if (!packingList) {
         return <div className="max-w-4xl mx-auto py-8 px-4">Packing list not found</div>
     }
-
-    // Format last sync time for display
-    const formatLastSync = (date: Date | null) => {
-        if (!date) return 'Never';
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffSecs = Math.floor(diffMs / 1000);
-
-        if (diffSecs < 60) return 'Just now';
-        if (diffSecs < 120) return '1 minute ago';
-        if (diffSecs < 3600) return `${Math.floor(diffSecs / 60)} minutes ago`;
-        return date.toLocaleTimeString();
-    };
 
     const filteredItems = packingList.items.filter(item => {
         if (showPacked) {
@@ -433,24 +426,11 @@ export function ViewPackingList() {
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                {isLoggedIn && (
-                                    <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-1.5 flex items-center gap-2">
-                                        {isSyncing ? (
-                                            <>
-                                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                                <span className="text-xs text-gray-600">Syncing...</span>
-                                            </>
-                                        ) : syncError ? (
-                                            <>
-                                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                                <span className="text-xs text-red-600">Sync Error</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                <span className="text-xs text-gray-600">Last sync: {formatLastSync(lastSync)}</span>
-                                            </>
-                                        )}
+                                {/* Only show sync status when actively pulling newer data from Pod */}
+                                {isLoggedIn && syncingFromPod && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                        <span className="text-xs text-blue-700">Syncing from Pod...</span>
                                     </div>
                                 )}
                                 <Button
@@ -465,10 +445,10 @@ export function ViewPackingList() {
                                         <Button
                                             type="button"
                                             onClick={handleLoadFromPod}
-                                            disabled={isSyncing}
+                                            disabled={syncingFromPod}
                                             variant="secondary"
                                         >
-                                            {isSyncing ? 'Syncing...' : 'Sync Now'}
+                                            {syncingFromPod ? 'Syncing...' : 'Sync Now'}
                                         </Button>
                                         <Button
                                             type="button"
