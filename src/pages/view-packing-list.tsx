@@ -167,8 +167,21 @@ export function ViewPackingList() {
 
     const handleItemChange = useDebouncedCallback(async () => {
         try {
-            setAutoSaveStatus('saving')
             const currentFormValues = getValues('items')
+
+            // Check if any items have actually changed
+            const hasChanges = packingList!.items.some(item => {
+                const currentPacked = currentFormValues[item.id] ?? false
+                return item.packed !== currentPacked
+            })
+
+            // Only save if there are actual changes
+            if (!hasChanges) {
+                console.log('No changes detected, skipping save')
+                return
+            }
+
+            setAutoSaveStatus('saving')
             const updatedPackingList: PackingList = {
                 ...packingList!,
                 items: packingList!.items.map(item => ({
@@ -202,12 +215,12 @@ export function ViewPackingList() {
         }
     }, 800) // Reduced to 800ms for faster saves while still batching rapid changes
 
-    // Trigger auto-save when form values change
+    // Trigger auto-save when form values change (not when packingList state changes from sync)
     useEffect(() => {
         if (packingList) {
             handleItemChange()
         }
-    }, [watchedItems, handleItemChange, packingList])
+    }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
 
     const onSubmit = async (data: FormData) => {
         if (!packingList) return
