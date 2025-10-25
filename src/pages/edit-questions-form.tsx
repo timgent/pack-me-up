@@ -31,6 +31,7 @@ export function EditQuestionsForm() {
 
   // Track if we're currently handling a local change to prevent sync loops
   const isLocalChangeRef = useRef(false);
+  const lastSyncedDataRef = useRef<string | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -41,22 +42,50 @@ export function EditQuestionsForm() {
     onSyncSuccess: (data) => {
       // Only update form if this isn't a local change we just made
       if (!isLocalChangeRef.current) {
-        console.log('Synced data from Pod:', data);
-        // Preserve the current _rev for PouchDB
-        data._rev = rev;
-        reset(data);
-        showToast('Questions synced from Pod', 'success');
+        // Compare the incoming data with what we last synced
+        const incomingDataString = JSON.stringify(data);
+
+        // Only update if the data has actually changed
+        if (lastSyncedDataRef.current !== incomingDataString) {
+          console.log('Synced data from Pod - data has changed, updating form');
+
+          // Save the currently focused element
+          const activeElement = document.activeElement as HTMLElement;
+          const activeElementId = activeElement?.id;
+          const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+          const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+
+          // Preserve the current _rev for PouchDB
+          data._rev = rev;
+          reset(data);
+          lastSyncedDataRef.current = incomingDataString;
+
+          // Restore focus after a brief delay to allow the DOM to update
+          setTimeout(() => {
+            if (activeElementId) {
+              const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+              if (elementToFocus) {
+                elementToFocus.focus();
+                if (selectionStart !== null && selectionEnd !== null) {
+                  elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                }
+              }
+            }
+          }, 0);
+        } else {
+          console.log('Synced data from Pod - no changes detected');
+        }
       }
     },
     onSyncError: (error) => {
       console.error('Sync error:', error);
-      // Don't show toast for 404 errors (file doesn't exist yet)
-      if (!error.includes('404')) {
-        showToast(`Sync error: ${error}`, 'error');
-      }
+      // Don't show toast for errors - too noisy for automatic sync
     },
     onSaveSuccess: () => {
       console.log('Saved to Pod successfully');
+      // Update the last synced data ref
+      const currentData = getValues();
+      lastSyncedDataRef.current = JSON.stringify(currentData);
     },
     onSaveError: (error) => {
       console.error('Save to Pod error:', error);
@@ -105,6 +134,8 @@ export function EditQuestionsForm() {
         })
         setRev(doc._rev)
         reset(doc)
+        // Initialize the lastSyncedDataRef with the loaded data
+        lastSyncedDataRef.current = JSON.stringify(doc)
       } catch (err: any) {
         console.log("Initial get error:", {
           name: err.name,
@@ -131,6 +162,8 @@ export function EditQuestionsForm() {
             })
             setRev(result.rev)
             reset(newDoc)
+            // Initialize the lastSyncedDataRef with the new doc
+            lastSyncedDataRef.current = JSON.stringify(newDoc)
           } catch (putErr: any) {
             console.error('Error creating new doc:', {
               name: putErr.name,
@@ -187,6 +220,8 @@ export function EditQuestionsForm() {
     if (data) {
       data._rev = rev;
       reset(data);
+      // Update the lastSyncedDataRef when loading example
+      lastSyncedDataRef.current = JSON.stringify(data);
       setIsExampleModalOpen(false);
       showToast('Example loaded successfully!', 'success');
     }
@@ -220,9 +255,10 @@ export function EditQuestionsForm() {
     }
 
     try {
-      // Use the sync hook's function for consistency
+      // Force a manual sync - this will trigger onSyncSuccess which handles the update
       await syncFromPod();
-      showToast('Questions loaded from Pod successfully!', 'success');
+      // Show success toast for manual sync only
+      showToast('Questions synced from Pod!', 'success');
     } catch (error) {
       console.error('Error loading from pod:', error);
       showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error');
