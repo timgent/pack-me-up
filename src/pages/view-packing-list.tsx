@@ -239,13 +239,17 @@ export function ViewPackingList() {
 
     // Trigger auto-save when form values change (not when packingList state changes from sync)
     useEffect(() => {
-        console.log('useEffect for auto-save triggered', {
+        console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
             hasPackingList: !!packingList,
-            watchedItemsCount: Object.keys(watchedItems).length
+            watchedItems: watchedItems,
+            watchedItemsCount: Object.keys(watchedItems).length,
+            watchedItemsKeys: Object.keys(watchedItems)
         })
         if (packingList) {
             console.log('Calling handleItemChange...')
             handleItemChange()
+        } else {
+            console.log('Skipping handleItemChange - packingList is null')
         }
     }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
 
