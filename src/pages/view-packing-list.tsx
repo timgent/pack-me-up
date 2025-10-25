@@ -4,7 +4,7 @@ import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Button } from '../components/Button'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { POD_ERROR_MESSAGES } from '../services/solidPod'
@@ -32,13 +32,14 @@ export function ViewPackingList() {
     const isLocalChangeRef = useRef(false);
     const lastSyncedDataRef = useRef<string | null>(null);
 
-    const { register, handleSubmit, setValue, watch, getValues } = useForm<FormData>({
+    const { register, handleSubmit, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
     })
 
-    const watchedItems = watch('items')
+    // Use useWatch instead of watch() for proper re-renders on form changes
+    const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
 
     // Memoize callbacks to prevent usePackingListSync from re-running unnecessarily
     const handleSyncSuccess = useCallback(async (data: PackingList) => {
