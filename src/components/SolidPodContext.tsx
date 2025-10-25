@@ -14,6 +14,7 @@ interface SolidPodContextValue {
   isLoading: boolean;
   login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearStorage: () => void;
 }
 
 const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
@@ -23,7 +24,48 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
 
+  const clearAllSolidStorage = () => {
+    // Clear all localStorage keys related to Solid authentication
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.startsWith('solidClientAuthenticationUser') ||
+        key.includes('clientId') ||
+        key.includes('solid') ||
+        key.includes('inrupt')
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => {
+      console.log(`Removing localStorage key: ${key}`);
+      localStorage.removeItem(key);
+    });
+
+    // Clear all sessionStorage keys related to Solid
+    const sessionKeysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && (
+        key.startsWith('solidClientAuthenticationUser') ||
+        key.includes('clientId') ||
+        key.includes('solid') ||
+        key.includes('inrupt')
+      )) {
+        sessionKeysToRemove.push(key);
+      }
+    }
+    sessionKeysToRemove.forEach(key => {
+      console.log(`Removing sessionStorage key: ${key}`);
+      sessionStorage.removeItem(key);
+    });
+
+    console.log(`Cleared ${keysToRemove.length} localStorage and ${sessionKeysToRemove.length} sessionStorage keys`);
+  };
+
   useEffect(() => {
+
     const initializeSession = async () => {
       try {
         console.log("Initializing Solid session...");
@@ -45,13 +87,20 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         // is stored in the browser, causing authentication failures
         try {
           await solidLogout();
+
+          // Additionally, manually clear all Solid-related browser storage
+          // This ensures that any orphaned client_id or session data is removed
+          clearAllSolidStorage();
+
           const clearedSession = getDefaultSession();
           setSession(clearedSession);
           setSessionVersion(v => v + 1);
           console.log("Session data cleared successfully");
         } catch (logoutError) {
           console.error("Error clearing session data:", logoutError);
-          // Even if logout fails, try to set a fresh session
+
+          // Even if logout fails, manually clear storage and try to set a fresh session
+          clearAllSolidStorage();
           const currentSession = getDefaultSession();
           setSession(currentSession);
           setSessionVersion(v => v + 1);
@@ -62,6 +111,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     };
 
     initializeSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
@@ -78,6 +128,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await solidLogout();
+    clearAllSolidStorage();
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
@@ -90,6 +141,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
+    clearStorage: clearAllSolidStorage,
   };
 
   return (
