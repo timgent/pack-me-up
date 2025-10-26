@@ -133,22 +133,26 @@ export function PackingLists() {
                         <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                     </div>
                     {isLoggedIn && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                             <Button
                                 type="button"
                                 onClick={handleSaveToPod}
                                 disabled={isSaving || packingLists.length === 0}
-                                variant="secondary"
+                                variant="ghost"
+                                className="text-base"
                             >
-                                {isSaving ? '💾 Saving...' : '💾 Save to Pod'}
+                                <span className="text-2xl mr-2">☁️</span>
+                                {isSaving ? 'Saving to Pod...' : 'Save to Pod'}
                             </Button>
                             <Button
                                 type="button"
                                 onClick={handleLoadFromPod}
                                 disabled={isLoadingFromPod}
-                                variant="secondary"
+                                variant="ghost"
+                                className="text-base"
                             >
-                                {isLoadingFromPod ? '⬇️ Loading...' : '⬇️ Load from Pod'}
+                                <span className="text-2xl mr-2">📥</span>
+                                {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
                             </Button>
                         </div>
                     )}
