@@ -29,6 +29,7 @@ export function EditQuestionsForm() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
   const [jsonValue, setJsonValue] = useState<string>('')
+  const [originalJsonValue, setOriginalJsonValue] = useState<string>('')
   const [jsonError, setJsonError] = useState<string | null>(null)
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
@@ -171,19 +172,25 @@ export function EditQuestionsForm() {
     }
   }, 800); // 800ms debounce to batch rapid changes
 
-  // Trigger auto-save when form values change
+  // Trigger auto-save when form values change (but not in JSON mode)
   useEffect(() => {
     console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
       hasCurrentQuestionSet: !!currentQuestionSet,
-      watchedFormValues: watchedFormValues
+      watchedFormValues: watchedFormValues,
+      editorMode: editorMode
     });
+    // Skip auto-save in JSON mode - user will manually save
+    if (editorMode === 'json') {
+      console.log('Skipping handleAutoSave - in JSON editor mode');
+      return;
+    }
     if (currentQuestionSet) {
       console.log('Calling handleAutoSave...');
       handleAutoSave();
     } else {
       console.log('Skipping handleAutoSave - currentQuestionSet is null');
     }
-  }, [watchedFormValues, handleAutoSave]);
+  }, [watchedFormValues, handleAutoSave, editorMode]);
 
   const removePerson = (removedIndex: number) => {
     // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -337,6 +344,7 @@ export function EditQuestionsForm() {
     const { _id, _rev, lastModified, ...cleanData } = formData as any;
     const formatted = JSON.stringify(cleanData, null, 2);
     setJsonValue(formatted);
+    setOriginalJsonValue(formatted); // Track original for diff
     setJsonError(null);
   }, [getValues]);
 
@@ -362,6 +370,66 @@ export function EditQuestionsForm() {
       return false;
     }
   }, [jsonValue, reset, rev]);
+
+  // Manual save handler for JSON mode
+  const handleSaveJson = useCallback(async () => {
+    try {
+      const parsed = JSON.parse(jsonValue);
+
+      // Validate structure
+      const validation = validateQuestionSet(parsed);
+      if (!validation.valid) {
+        setJsonError(validation.error || 'Invalid question set structure');
+        showToast('Cannot save: JSON validation failed', 'error');
+        return;
+      }
+
+      setAutoSaveStatus('saving');
+
+      // Prepare data with ID and internal fields
+      const dataToSave = {
+        _id: "1",
+        ...parsed,
+        _rev: rev,
+      };
+
+      // Save logic similar to visual mode
+      if (isLoggedIn) {
+        const savedData = await saveWithSyncPrevention(dataToSave, saveToPod);
+        if (savedData) {
+          setRev(savedData._rev);
+          setCurrentQuestionSet(savedData);
+          // Update original to mark as saved
+          const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+          setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
+        }
+      } else {
+        const dataWithTimestamp = {
+          ...dataToSave,
+          lastModified: new Date().toISOString()
+        };
+        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const savedData = {
+          ...dataWithTimestamp,
+          _rev: result.rev
+        };
+        setRev(result.rev);
+        setCurrentQuestionSet(savedData);
+        // Update original to mark as saved
+        const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+        setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
+      }
+
+      setJsonError(null);
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      showToast('JSON saved successfully!', 'success');
+    } catch (e: any) {
+      setJsonError(`Invalid JSON: ${e.message}`);
+      setAutoSaveStatus('error');
+      showToast('Failed to save JSON', 'error');
+    }
+  }, [jsonValue, rev, isLoggedIn, saveWithSyncPrevention, saveToPod, showToast]);
 
   const handleModeChange = useCallback((newMode: 'visual' | 'json') => {
     if (newMode === 'json') {
@@ -685,6 +753,9 @@ export function EditQuestionsForm() {
             value={jsonValue}
             onChange={setJsonValue}
             error={jsonError}
+            originalValue={originalJsonValue}
+            onSave={handleSaveJson}
+            hasUnsavedChanges={jsonValue !== originalJsonValue}
           />
         </div>
       )}

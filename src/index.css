@@ -290,3 +290,98 @@
     width: 100%;
   }
 }
+
+/* JSON Editor Save Button Styles */
+.json-editor-save-section {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.json-editor-save-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  width: 100%;
+  background-color: #6b7280;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.json-editor-save-button.has-changes {
+  background-color: #0d9488;
+  box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.3);
+}
+
+.json-editor-save-button.has-changes:hover:not(:disabled) {
+  background-color: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 8px -1px rgba(13, 148, 136, 0.4);
+}
+
+.json-editor-save-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.json-editor-save-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.json-editor-save-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.json-editor-save-hint {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: #ea580c;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Scroll to Top Button Styles */
+.json-editor-scroll-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  background-color: #0d9488;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+  transition: all 0.2s;
+}
+
+.json-editor-scroll-top:hover {
+  background-color: #0f766e;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.5);
+}
+
+.json-editor-scroll-top:active {
+  transform: translateY(0);
+}
+
+.json-editor-scroll-top svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}

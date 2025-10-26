@@ -4,17 +4,22 @@ interface JsonEditorProps {
   value: string
   onChange: (value: string) => void
   error: string | null
+  originalValue: string
+  onSave: () => void
+  hasUnsavedChanges: boolean
 }
 
 /**
  * JSON editor component for advanced users to edit question data directly.
- * Provides a textarea with monospace font, line numbers, error display, and LLM prompt generation.
+ * Provides a textarea with monospace font, line numbers, error display, LLM prompt generation,
+ * save button, and scroll to top functionality.
  */
-export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, onSave, hasUnsavedChanges }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [userPrompt, setUserPrompt] = useState('')
   const [copySuccess, setCopySuccess] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
 
   // Count lines in the value
   const lineCount = value.split('\n').length
@@ -23,6 +28,15 @@ export function JsonEditor({ value, onChange, error }: JsonEditorProps) {
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop
+      // Show scroll to top button when scrolled down
+      setShowScrollTop(textareaRef.current.scrollTop > 200)
+    }
+  }, [])
+
+  // Scroll to top of JSON editor
+  const scrollToTop = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = 0
     }
   }, [])
 
@@ -161,6 +175,40 @@ ${userPrompt}`
         <div className="json-editor-error">
           <strong>Validation Error:</strong> {error}
         </div>
+      )}
+
+      {/* Save Button */}
+      <div className="json-editor-save-section">
+        <button
+          type="button"
+          onClick={onSave}
+          className={`json-editor-save-button ${hasUnsavedChanges ? 'has-changes' : ''}`}
+          disabled={!!error}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          {hasUnsavedChanges ? 'Save JSON Changes' : 'No Changes to Save'}
+        </button>
+        {hasUnsavedChanges && (
+          <p className="json-editor-save-hint">
+            You have unsaved changes in the JSON editor
+          </p>
+        )}
+      </div>
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="json-editor-scroll-top"
+          title="Scroll to top"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
       )}
     </div>
   )
