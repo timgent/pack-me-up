@@ -49,8 +49,14 @@ export function EditQuestionsForm() {
       const localModifiedTime = currentQuestionSet?.lastModified ? new Date(currentQuestionSet.lastModified).getTime() : 0;
 
       if (lastSyncedDataRef.current !== incomingDataString) {
-        // Only apply sync if the synced version is newer
-        if (syncedModifiedTime > localModifiedTime) {
+        // Determine if we should apply the synced data
+        const shouldApplySync =
+          // If local has no timestamp but Pod does, Pod wins (handles fresh page loads)
+          (!currentQuestionSet?.lastModified && data.lastModified) ||
+          // Otherwise, only apply if Pod version is newer
+          (syncedModifiedTime > localModifiedTime);
+
+        if (shouldApplySync) {
           console.log('Synced data from Pod - newer version found, updating form');
           setSyncingFromPod(true);
 
@@ -97,7 +103,10 @@ export function EditQuestionsForm() {
             setSyncingFromPod(false);
           }
         } else {
-          console.log('Synced data from Pod - local version is newer or same, keeping local');
+          console.log('Synced data from Pod - local version is newer or same, keeping local', {
+            localTime: currentQuestionSet?.lastModified,
+            syncedTime: data.lastModified
+          });
         }
       } else {
         console.log('Synced data from Pod - no changes detected');
