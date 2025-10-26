@@ -78,4 +78,15 @@
   --color-danger-200: #fecaca;
   --color-danger-100: #fee2e2;
   --color-danger-50: #fef2f2;
+
+  /* Custom Background Gradients */
+  --background-image-gradient-primary: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  --background-image-gradient-secondary: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  --background-image-gradient-accent: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+
+  /* Custom Box Shadows */
+  --box-shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+  --box-shadow-glow-primary: 0 0 20px rgba(20, 184, 166, 0.4);
+  --box-shadow-glow-secondary: 0 0 20px rgba(249, 115, 22, 0.4);
+  --box-shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
 }
