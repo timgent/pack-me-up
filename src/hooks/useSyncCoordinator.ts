@@ -177,19 +177,11 @@ export function useSyncCoordinator<T extends TimestampedData>(
     async (data: T) => {
       // Only update if this isn't a local change we just made
       if (isLocalChangeRef.current) {
+        console.log('Synced data from Pod - skipping because local change is in progress');
         return;
       }
 
-      // Compare the incoming data with what we last synced
-      const incomingDataString = JSON.stringify(data);
-
-      // Check if data actually changed
-      if (lastSyncedDataRef.current === incomingDataString) {
-        console.log('Synced data from Pod - no changes detected');
-        return;
-      }
-
-      // Check if we should apply the synced data
+      // Check if we should apply the synced data based on timestamps
       if (!shouldApplyPodData(data)) {
         console.log('Synced data from Pod - local version is newer or same, keeping local', {
           localTime: currentData?.lastModified,
@@ -198,7 +190,17 @@ export function useSyncCoordinator<T extends TimestampedData>(
         return;
       }
 
-      console.log('Synced data from Pod - newer version found, updating form');
+      // Compare the incoming data with what we last synced (to avoid unnecessary re-renders)
+      const incomingDataString = JSON.stringify(data);
+      if (lastSyncedDataRef.current === incomingDataString) {
+        console.log('Synced data from Pod - timestamps indicate update, but data is identical (skipping re-render)');
+        return;
+      }
+
+      console.log('Synced data from Pod - applying update', {
+        hasTimestamp: !!data.lastModified,
+        timestamp: data.lastModified,
+      });
       setSyncingFromPod(true);
 
       try {

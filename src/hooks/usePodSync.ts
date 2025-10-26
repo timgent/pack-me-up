@@ -271,7 +271,10 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     return () => {
       clearInterval(interval);
     };
-  }, [enabled, isLoggedIn, pollInterval, pathConfig, syncFromPod]);
+    // Note: syncFromPod is intentionally omitted from deps to prevent interval churn
+    // The interval only needs to restart when config changes, not when the function is recreated
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, isLoggedIn, pollInterval, pathConfig]);
 
   return {
     lastSync,
