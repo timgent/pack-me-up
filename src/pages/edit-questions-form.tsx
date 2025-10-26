@@ -360,6 +360,8 @@ export function EditQuestionsForm() {
         return;
       }
       setEditorMode('visual');
+      // Scroll to top of page for better UX
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [syncVisualToJson, syncJsonToVisual, showToast]);
 
