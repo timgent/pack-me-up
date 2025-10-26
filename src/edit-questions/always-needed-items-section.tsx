@@ -3,7 +3,7 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { ItemPeopleSection } from './item-people-section'
 
 interface AlwaysNeededItemsSectionProps {
@@ -15,6 +15,8 @@ interface AlwaysNeededItemsSectionProps {
 }
 
 export function AlwaysNeededItemsSection({ control, register, watch, setValue, people }: AlwaysNeededItemsSectionProps) {
+    const [isExpanded, setIsExpanded] = useState(true);
+
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: "alwaysNeededItems"
@@ -36,13 +38,28 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
     }, [itemFields.length]);
 
     return (
-        <div className="bg-gray-50 rounded-lg p-4">
-            <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Always Needed Items</h2>
-                <p className="text-sm text-gray-600">Items that should always be included in the packing list.</p>
-            </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+            <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center gap-2 mb-4 w-full text-left hover:bg-gray-50 -mx-4 -mt-4 px-4 pt-4 rounded-t-lg transition-colors duration-200"
+            >
+                <svg
+                    className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <div>
+                    <h2 className="text-lg font-medium text-gray-900">Always Needed Items</h2>
+                    <p className="text-sm text-gray-600">Items that should always be included in the packing list.</p>
+                </div>
+            </button>
 
-            <div className="space-y-3">
+            {isExpanded && (
+                <div className="space-y-3">
                 {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
@@ -88,6 +105,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                     Add Item
                 </Button>
             </div>
+            )}
         </div>
     );
 } 
