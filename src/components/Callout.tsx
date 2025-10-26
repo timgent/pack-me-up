@@ -15,7 +15,7 @@ export function Callout({ title, description, action }: CalloutProps) {
             <div className="flex">
                 <div className="flex-1">
                     <h3 className="text-lg font-bold text-primary-900">{title}</h3>
-                    <div className="mt-3 text-sm text-primary-700 leading-relaxed">
+                    <div className="mt-3 text-sm text-gray-700 leading-relaxed">
                         <p>{description}</p>
                     </div>
                     {action && (

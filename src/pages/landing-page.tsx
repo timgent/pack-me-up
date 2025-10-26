@@ -14,10 +14,10 @@ export const LandingPage = () => {
             )}
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12 animate-slide-up">
-                    <h1 className="text-5xl font-bold mb-4 bg-gradient-fun bg-clip-text text-transparent">
+                    <h1 className="text-5xl font-bold mb-4 text-primary-900">
                         Smart Packing Made Simple
                     </h1>
-                    <p className="text-xl text-primary-700 font-medium">
+                    <p className="text-xl text-gray-700 font-medium">
                         Never forget an essential item again. Create personalized packing lists based on your specific needs.
                     </p>
                 </div>
@@ -26,7 +26,7 @@ export const LandingPage = () => {
                     <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-2xl shadow-soft hover:shadow-glow-primary transition-all duration-300 hover:scale-105 border-2 border-primary-200">
                         <div className="text-3xl mb-2">📋</div>
                         <h2 className="text-2xl font-bold mb-3 text-primary-900">Smart Questionnaires</h2>
-                        <p className="text-primary-700">
+                        <p className="text-gray-700">
                             Answer a few simple questions about your trip, and we'll generate a customized packing list tailored to your needs.
                         </p>
                     </div>
@@ -34,7 +34,7 @@ export const LandingPage = () => {
                     <div className="bg-gradient-to-br from-secondary-50 to-secondary-100 p-6 rounded-2xl shadow-soft hover:shadow-glow-secondary transition-all duration-300 hover:scale-105 border-2 border-secondary-200">
                         <div className="text-3xl mb-2">💾</div>
                         <h2 className="text-2xl font-bold mb-3 text-secondary-900">Save & Reuse Lists</h2>
-                        <p className="text-secondary-700">
+                        <p className="text-gray-700">
                             Save your packing lists for future trips and easily modify them for different occasions.
                         </p>
                     </div>
@@ -42,7 +42,7 @@ export const LandingPage = () => {
                     <div className="bg-gradient-to-br from-accent-50 to-accent-100 p-6 rounded-2xl shadow-soft hover:shadow-glow-accent transition-all duration-300 hover:scale-105 border-2 border-accent-200">
                         <div className="text-3xl mb-2">✏️</div>
                         <h2 className="text-2xl font-bold mb-3 text-accent-900">Customizable Items</h2>
-                        <p className="text-accent-700">
+                        <p className="text-gray-700">
                             Add, remove, or modify items to perfectly match your packing requirements.
                         </p>
                     </div>
@@ -50,7 +50,7 @@ export const LandingPage = () => {
                     <div className="bg-gradient-to-br from-success-50 to-success-100 p-6 rounded-2xl shadow-soft hover:shadow-lg transition-all duration-300 hover:scale-105 border-2 border-success-200">
                         <div className="text-3xl mb-2">✨</div>
                         <h2 className="text-2xl font-bold mb-3 text-success-900">Easy to Use</h2>
-                        <p className="text-success-700">
+                        <p className="text-gray-700">
                             Simple and intuitive interface that makes packing preparation a breeze.
                         </p>
                     </div>

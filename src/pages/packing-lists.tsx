@@ -121,7 +121,7 @@ export function PackingLists() {
     }, [])
 
     if (isLoading) {
-        return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-primary-700 font-semibold">Loading packing lists...</div>
+        return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>
     }
 
     return (
@@ -130,7 +130,7 @@ export function PackingLists() {
                 <div className="flex justify-between items-start mb-2">
                     <div>
                         <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                        <p className="mt-2 text-lg text-primary-600 font-medium">View all your created packing lists.</p>
+                        <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                     </div>
                     {isLoggedIn && (
                         <div className="flex gap-2">
@@ -157,7 +157,7 @@ export function PackingLists() {
 
             {packingLists.length === 0 ? (
                 <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
-                    <p className="text-lg text-primary-700 font-semibold">
+                    <p className="text-lg text-gray-800 font-semibold">
                         No packing lists found. Create your first packing list to get started! 🎒
                     </p>
                 </div>

@@ -8,7 +8,7 @@ export function Input({ label, ...props }: InputProps) {
     return (
         <div className="flex-1">
             {label && (
-                <label className="block text-sm font-semibold text-primary-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
                     {label}
                 </label>
             )}
