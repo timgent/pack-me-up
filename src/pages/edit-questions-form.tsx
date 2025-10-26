@@ -12,7 +12,6 @@ import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { useSolidPod } from '../components/SolidPodContext'
-import { POD_ERROR_MESSAGES } from '../services/solidPod'
 import { useQuestionSetSync } from '../hooks/useQuestionSetSync'
 
 export function EditQuestionsForm() {
@@ -133,7 +132,7 @@ export function EditQuestionsForm() {
   }, [showToast]);
 
   // Set up automatic Pod sync with polling
-  const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = useQuestionSetSync({
+  const { lastSync, isSyncing, error: syncError, saveToPod } = useQuestionSetSync({
     pollInterval: 5000, // Poll every 5 seconds for faster sync
     enabled: isLoggedIn, // Only sync when logged in
     onSyncSuccess: handleSyncSuccess,
@@ -294,44 +293,6 @@ export function EditQuestionsForm() {
     }
   };
 
-  const handleSaveToPod = async () => {
-    if (!isLoggedIn) {
-      showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error');
-      return;
-    }
-
-    try {
-      const data = getValues();
-      isLocalChangeRef.current = true;
-      await saveToPod(data);
-      // Reset the flag after a short delay
-      setTimeout(() => {
-        isLocalChangeRef.current = false;
-      }, 2000);
-      showToast('Successfully saved to Solid Pod!', 'success');
-    } catch (error) {
-      console.error('Error saving to pod:', error);
-      showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error');
-    }
-  };
-
-  const handleLoadFromPod = async () => {
-    if (!isLoggedIn) {
-      showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error');
-      return;
-    }
-
-    try {
-      // Force a manual sync - this will trigger onSyncSuccess which handles the update
-      await syncFromPod();
-      // Show success toast for manual sync only
-      showToast('Questions synced from Pod!', 'success');
-    } catch (error) {
-      console.error('Error loading from pod:', error);
-      showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error');
-    }
-  };
-
   const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
   // Format last sync time for display
@@ -443,21 +404,6 @@ export function EditQuestionsForm() {
                     <p className="text-xs text-red-500 mt-1">{syncError}</p>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleSaveToPod}
-                  variant="secondary"
-                >
-                  Save to Pod
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleLoadFromPod}
-                  variant="secondary"
-                  disabled={isSyncing}
-                >
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
-                </Button>
               </>
             ) : (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
@@ -526,25 +472,6 @@ export function EditQuestionsForm() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3 justify-center">
-            {isLoggedIn && (
-              <>
-                <Button
-                  type="button"
-                  onClick={handleSaveToPod}
-                  variant="secondary"
-                >
-                  Save to Pod
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleLoadFromPod}
-                  variant="secondary"
-                  disabled={isSyncing}
-                >
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
-                </Button>
-              </>
-            )}
             <Button
               type="button"
               onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
