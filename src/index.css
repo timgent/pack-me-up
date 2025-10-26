@@ -385,3 +385,129 @@
   width: 1.5rem;
   height: 1.5rem;
 }
+
+/* Diff View Styles */
+.diff-toggle-section {
+  margin: 1rem 0;
+}
+
+.diff-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background-color: #f3f4f6;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-toggle-button:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.diff-toggle-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.diff-view-container {
+  margin: 1rem 0;
+  border: 2px solid #d1d5db;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: white;
+}
+
+.diff-view-header {
+  display: grid;
+  grid-template-columns: 3rem 1fr 1fr;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #d1d5db;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.diff-view-column-header {
+  padding: 0.75rem 1rem;
+  border-right: 1px solid #e5e7eb;
+}
+
+.diff-view-column-header:last-child {
+  border-right: none;
+}
+
+.diff-view-content {
+  max-height: 600px;
+  overflow-y: auto;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 3rem 1fr 1fr;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.diff-line-number {
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  text-align: right;
+  color: #9ca3af;
+  user-select: none;
+}
+
+.diff-line-content {
+  padding: 0.5rem 1rem;
+  border-right: 1px solid #f3f4f6;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.diff-line-content:last-child {
+  border-right: none;
+}
+
+/* Diff status colors */
+.diff-line-added {
+  background-color: #d1fae5;
+}
+
+.diff-line-added .diff-line-content:last-child {
+  background-color: #a7f3d0;
+  font-weight: 500;
+}
+
+.diff-line-removed {
+  background-color: #fee2e2;
+}
+
+.diff-line-removed .diff-line-content:first-of-type {
+  background-color: #fecaca;
+  font-weight: 500;
+}
+
+.diff-line-modified {
+  background-color: #fef3c7;
+}
+
+.diff-line-modified .diff-line-content {
+  background-color: #fde68a;
+}
+
+.diff-line-unchanged {
+  background-color: white;
+}
+
+.diff-line-unchanged .diff-line-content {
+  color: #6b7280;
+}

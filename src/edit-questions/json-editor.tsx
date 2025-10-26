@@ -14,12 +14,13 @@ interface JsonEditorProps {
  * Provides a textarea with monospace font, line numbers, error display, LLM prompt generation,
  * save button, and scroll to top functionality.
  */
-export function JsonEditor({ value, onChange, error, onSave, hasUnsavedChanges }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, originalValue, onSave, hasUnsavedChanges }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [userPrompt, setUserPrompt] = useState('')
   const [copySuccess, setCopySuccess] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [showDiff, setShowDiff] = useState(false)
 
   // Count lines in the value
   const lineCount = value.split('\n').length
@@ -102,6 +103,41 @@ ${userPrompt}`
     }
   }, [generatePrompt])
 
+  // Compute line-by-line diff
+  const computeDiff = useCallback(() => {
+    const originalLines = originalValue.split('\n')
+    const currentLines = value.split('\n')
+    const maxLines = Math.max(originalLines.length, currentLines.length)
+
+    const diff: Array<{
+      lineNum: number
+      original: string | null
+      current: string | null
+      status: 'added' | 'removed' | 'modified' | 'unchanged'
+    }> = []
+
+    for (let i = 0; i < maxLines; i++) {
+      const originalLine = originalLines[i]
+      const currentLine = currentLines[i]
+
+      if (originalLine === undefined && currentLine !== undefined) {
+        // Line added
+        diff.push({ lineNum: i + 1, original: null, current: currentLine, status: 'added' })
+      } else if (originalLine !== undefined && currentLine === undefined) {
+        // Line removed
+        diff.push({ lineNum: i + 1, original: originalLine, current: null, status: 'removed' })
+      } else if (originalLine !== currentLine) {
+        // Line modified
+        diff.push({ lineNum: i + 1, original: originalLine, current: currentLine, status: 'modified' })
+      } else {
+        // Line unchanged
+        diff.push({ lineNum: i + 1, original: originalLine, current: currentLine, status: 'unchanged' })
+      }
+    }
+
+    return diff
+  }, [originalValue, value])
+
   return (
     <div className="json-editor-container">
       <div className="json-editor-header">
@@ -151,6 +187,45 @@ ${userPrompt}`
           </button>
         </div>
       </div>
+
+      {/* Diff View Toggle */}
+      {hasUnsavedChanges && (
+        <div className="diff-toggle-section">
+          <button
+            type="button"
+            onClick={() => setShowDiff(!showDiff)}
+            className="diff-toggle-button"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            {showDiff ? 'Hide' : 'Show'} Changes (Diff View)
+          </button>
+        </div>
+      )}
+
+      {/* Diff View */}
+      {showDiff && hasUnsavedChanges && (
+        <div className="diff-view-container">
+          <div className="diff-view-header">
+            <div className="diff-view-column-header">Original</div>
+            <div className="diff-view-column-header">Current</div>
+          </div>
+          <div className="diff-view-content">
+            {computeDiff().map((line, idx) => (
+              <div key={idx} className={`diff-line diff-line-${line.status}`}>
+                <div className="diff-line-number">{line.lineNum}</div>
+                <div className="diff-line-content">
+                  {line.original !== null ? line.original : ''}
+                </div>
+                <div className="diff-line-content">
+                  {line.current !== null ? line.current : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="json-editor-wrapper">
         <div className="json-editor-line-numbers" ref={lineNumbersRef}>
