@@ -22,6 +22,7 @@ export function EditQuestionsForm() {
   });
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
+  const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
@@ -32,48 +33,77 @@ export function EditQuestionsForm() {
   // Track if we're currently handling a local change to prevent sync loops
   const isLocalChangeRef = useRef(false);
   const lastSyncedDataRef = useRef<string | null>(null);
+  const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
   // Memoize callbacks to prevent useQuestionSetSync from re-running unnecessarily
-  const handleSyncSuccess = useCallback((data: PackingListQuestionSet) => {
+  const handleSyncSuccess = useCallback(async (data: PackingListQuestionSet) => {
     // Only update form if this isn't a local change we just made
     if (!isLocalChangeRef.current) {
       // Compare the incoming data with what we last synced
       const incomingDataString = JSON.stringify(data);
 
-      // Only update if the data has actually changed
+      // Only update if the data has actually changed AND is newer than our local version
+      const syncedModifiedTime = data.lastModified ? new Date(data.lastModified).getTime() : 0;
+      const localModifiedTime = currentQuestionSet?.lastModified ? new Date(currentQuestionSet.lastModified).getTime() : 0;
+
       if (lastSyncedDataRef.current !== incomingDataString) {
-        console.log('Synced data from Pod - data has changed, updating form');
+        // Only apply sync if the synced version is newer
+        if (syncedModifiedTime > localModifiedTime) {
+          console.log('Synced data from Pod - newer version found, updating form');
+          setSyncingFromPod(true);
 
-        // Save the currently focused element
-        const activeElement = document.activeElement as HTMLElement;
-        const activeElementId = activeElement?.id;
-        const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-        const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+          // Save the currently focused element
+          const activeElement = document.activeElement as HTMLElement;
+          const activeElementId = activeElement?.id;
+          const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
+          const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
 
-        // Preserve the current _rev for PouchDB
-        data._rev = rev;
-        reset(data);
-        lastSyncedDataRef.current = incomingDataString;
+          try {
+            // Remove _rev to avoid conflicts with local database version
+            delete data._rev;
 
-        // Restore focus after a brief delay to allow the DOM to update
-        setTimeout(() => {
-          if (activeElementId) {
-            const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-            if (elementToFocus) {
-              elementToFocus.focus();
-              if (selectionStart !== null && selectionEnd !== null) {
-                elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+            // Save to local database to get the proper _rev
+            const dbResult = await packingAppDb.saveQuestionSet(data);
+
+            // Update state with synced data and new _rev
+            const updatedData = {
+              ...data,
+              _rev: dbResult.rev
+            };
+            setRev(dbResult.rev);
+            setCurrentQuestionSet(updatedData);
+            reset(updatedData);
+            lastSyncedDataRef.current = incomingDataString;
+
+            // Show sync indicator briefly
+            setTimeout(() => setSyncingFromPod(false), 2000);
+
+            // Restore focus after a brief delay to allow the DOM to update
+            setTimeout(() => {
+              if (activeElementId) {
+                const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
+                if (elementToFocus) {
+                  elementToFocus.focus();
+                  if (selectionStart !== null && selectionEnd !== null) {
+                    elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+                  }
+                }
               }
-            }
+            }, 0);
+          } catch (err) {
+            console.error('Error saving synced data to local database:', err);
+            setSyncingFromPod(false);
           }
-        }, 0);
+        } else {
+          console.log('Synced data from Pod - local version is newer or same, keeping local');
+        }
       } else {
         console.log('Synced data from Pod - no changes detected');
       }
     }
-  }, [rev, reset]);
+  }, [rev, reset, currentQuestionSet]);
 
   const handleSyncError = useCallback((error: string) => {
     console.error('Sync error:', error);
@@ -82,9 +112,10 @@ export function EditQuestionsForm() {
 
   const handleSaveSuccess = useCallback(() => {
     console.log('Saved to Pod successfully');
-    // Update the last synced data ref
+    // Update the last synced data ref and current question set
     const currentData = getValues();
     lastSyncedDataRef.current = JSON.stringify(currentData);
+    setCurrentQuestionSet(currentData);
   }, [getValues]);
 
   const handleSaveError = useCallback((error: string) => {
@@ -94,7 +125,7 @@ export function EditQuestionsForm() {
 
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod, syncFromPod } = useQuestionSetSync({
-    pollInterval: 10000, // Poll every 10 seconds
+    pollInterval: 5000, // Poll every 5 seconds for faster sync
     enabled: isLoggedIn, // Only sync when logged in
     onSyncSuccess: handleSyncSuccess,
     onSyncError: handleSyncError,
@@ -142,6 +173,7 @@ export function EditQuestionsForm() {
           timestamp: new Date().toISOString()
         })
         setRev(doc._rev)
+        setCurrentQuestionSet(doc)
         reset(doc)
         // Initialize the lastSyncedDataRef with the loaded data
         lastSyncedDataRef.current = JSON.stringify(doc)
@@ -169,7 +201,12 @@ export function EditQuestionsForm() {
               rev: result.rev,
               timestamp: new Date().toISOString()
             })
+            const savedNewDoc = {
+              ...newDoc,
+              _rev: result.rev
+            };
             setRev(result.rev)
+            setCurrentQuestionSet(savedNewDoc)
             reset(newDoc)
             // Initialize the lastSyncedDataRef with the new doc
             lastSyncedDataRef.current = JSON.stringify(newDoc)
@@ -198,19 +235,30 @@ export function EditQuestionsForm() {
 
   const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
     try {
+      // Add timestamp for conflict resolution
+      const dataWithTimestamp = {
+        ...data,
+        lastModified: new Date().toISOString()
+      };
+
       // Save to local PouchDB first
       const docToWrite = {
         _id: "1",
-        ...data,
+        ...dataWithTimestamp,
         _rev: rev,
       }
       const result = await packingAppDb.saveQuestionSet(docToWrite);
-      setRev(result.rev)
+      const savedData = {
+        ...dataWithTimestamp,
+        _rev: result.rev
+      };
+      setRev(result.rev);
+      setCurrentQuestionSet(savedData);
 
       // If logged in, also save to Pod automatically
       if (isLoggedIn) {
         isLocalChangeRef.current = true;
-        await saveToPod(data);
+        await saveToPod(dataWithTimestamp);
         // Reset the flag after a short delay to allow sync to complete
         setTimeout(() => {
           isLocalChangeRef.current = false;
@@ -227,10 +275,11 @@ export function EditQuestionsForm() {
   const handleLoadExample = (exampleName: string) => {
     const data = exampleData[exampleName as keyof typeof exampleData];
     if (data) {
-      data._rev = rev;
-      reset(data);
+      const dataWithRev = { ...data, _rev: rev };
+      reset(dataWithRev);
+      setCurrentQuestionSet(dataWithRev);
       // Update the lastSyncedDataRef when loading example
-      lastSyncedDataRef.current = JSON.stringify(data);
+      lastSyncedDataRef.current = JSON.stringify(dataWithRev);
       setIsExampleModalOpen(false);
       showToast('Example loaded successfully!', 'success');
     }
@@ -349,7 +398,14 @@ export function EditQuestionsForm() {
         </form>
         {/* Sticky sidebar for large screens */}
         <div className="hidden lg:block lg:w-64 lg:sticky lg:top-24 flex-shrink-0">
-          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4">
+          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col items-stretch gap-4 py-6 px-4 relative">
+            {/* Sync from Pod indicator - absolutely positioned to avoid layout shift */}
+            {isLoggedIn && syncingFromPod && (
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10 bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Syncing from Pod...</span>
+              </div>
+            )}
             {isLoggedIn ? (
               <>
                 {/* Sync Status */}
@@ -359,7 +415,7 @@ export function EditQuestionsForm() {
                     {isSyncing ? (
                       <>
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <p className="text-xs text-gray-600">Syncing...</p>
+                        <p className="text-xs text-gray-600">Polling...</p>
                       </>
                     ) : syncError ? (
                       <>
@@ -412,7 +468,9 @@ export function EditQuestionsForm() {
               Save Changes
             </Button>
             <Button type="button" onClick={() => {
-              reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] });
+              const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
+              reset(defaultData);
+              setCurrentQuestionSet(defaultData);
               showToast('Form has been reset to default state', 'success');
             }}>Reset form</Button>
             <Button
@@ -428,7 +486,14 @@ export function EditQuestionsForm() {
       {/* Sticky bottom bar for small/medium screens */}
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
         <div className="max-w-4xl w-full px-4 pb-4">
-          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto">
+          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto relative">
+            {/* Sync from Pod indicator - absolutely positioned to avoid layout shift */}
+            {isLoggedIn && syncingFromPod && (
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10 bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Syncing from Pod...</span>
+              </div>
+            )}
             {isLoggedIn ? (
               <div className="bg-gray-50 border border-gray-200 rounded-md p-2 mx-2">
                 <div className="flex items-center justify-between">
@@ -441,7 +506,7 @@ export function EditQuestionsForm() {
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     )}
                     <p className="text-xs text-gray-600">
-                      {isSyncing ? 'Syncing...' : `Synced ${formatLastSync(lastSync)}`}
+                      {isSyncing ? 'Polling...' : `Synced ${formatLastSync(lastSync)}`}
                     </p>
                   </div>
                 </div>
@@ -482,7 +547,9 @@ export function EditQuestionsForm() {
               Save Changes
             </Button>
             <Button type="button" onClick={() => {
-              reset({ questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] });
+              const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
+              reset(defaultData);
+              setCurrentQuestionSet(defaultData);
               showToast('Form has been reset to default state', 'success');
             }}>Reset form</Button>
             <Button

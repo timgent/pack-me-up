@@ -4,6 +4,7 @@ export interface PackingListQuestionSet {
     people: Person[]
     alwaysNeededItems: Item[]
     questions: Question[]
+    lastModified?: string // ISO timestamp for sync conflict resolution
 }
 
 export interface Person {
