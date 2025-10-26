@@ -333,7 +333,9 @@ export function EditQuestionsForm() {
   // JSON Editor sync functions
   const syncVisualToJson = useCallback(() => {
     const formData = getValues();
-    const formatted = JSON.stringify(formData, null, 2);
+    // Remove internal database fields that users shouldn't edit
+    const { _id, _rev, lastModified, ...cleanData } = formData as any;
+    const formatted = JSON.stringify(cleanData, null, 2);
     setJsonValue(formatted);
     setJsonError(null);
   }, [getValues]);
@@ -349,7 +351,7 @@ export function EditQuestionsForm() {
         return false;
       }
 
-      // Update form state
+      // Restore internal fields from current state before updating
       const dataWithRev = { ...parsed, _rev: rev };
       reset(dataWithRev);
       setCurrentQuestionSet(dataWithRev);
