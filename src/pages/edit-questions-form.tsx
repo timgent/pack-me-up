@@ -44,6 +44,21 @@ export function EditQuestionsForm() {
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
+  // Scroll to top on initial mount
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  // Scroll to top when switching to visual mode (after render completes)
+  useEffect(() => {
+    if (editorMode === 'visual') {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 0);
+    }
+  }, [editorMode]);
+
   // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
   const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
     useSyncCoordinator<PackingListQuestionSet>({
@@ -360,8 +375,7 @@ export function EditQuestionsForm() {
         return;
       }
       setEditorMode('visual');
-      // Scroll to top of page for better UX
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Scroll handled by useEffect to ensure DOM has updated
     }
   }, [syncVisualToJson, syncJsonToVisual, showToast]);
 
