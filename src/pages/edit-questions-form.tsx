@@ -473,19 +473,19 @@ export function EditQuestionsForm() {
                 )}
                 {autoSaveStatus === 'saved' && (
                   <>
-                    <div className="h-3 w-3 text-green-500">✓</div>
+                    <div className="h-3 w-3 flex items-center justify-center text-green-500">✓</div>
                     <span className="text-xs text-green-600">Saved</span>
                   </>
                 )}
                 {autoSaveStatus === 'error' && (
                   <>
-                    <div className="h-3 w-3 text-red-500">✗</div>
+                    <div className="h-3 w-3 flex items-center justify-center text-red-500">✗</div>
                     <span className="text-xs text-red-600">Error</span>
                   </>
                 )}
                 {autoSaveStatus === 'idle' && (
                   <>
-                    <div className="h-3 w-3 text-gray-500">✓</div>
+                    <div className="h-3 w-3 flex items-center justify-center text-gray-500">✓</div>
                     <span className="text-xs text-gray-600">All changes saved</span>
                   </>
                 )}
@@ -575,19 +575,19 @@ export function EditQuestionsForm() {
                   )}
                   {autoSaveStatus === 'saved' && (
                     <>
-                      <div className="h-3 w-3 text-green-500">✓</div>
+                      <div className="h-3 w-3 flex items-center justify-center text-green-500">✓</div>
                       <span className="text-xs text-green-600">Saved</span>
                     </>
                   )}
                   {autoSaveStatus === 'error' && (
                     <>
-                      <div className="h-3 w-3 text-red-500">✗</div>
+                      <div className="h-3 w-3 flex items-center justify-center text-red-500">✗</div>
                       <span className="text-xs text-red-600">Error</span>
                     </>
                   )}
                   {autoSaveStatus === 'idle' && (
                     <>
-                      <div className="h-3 w-3 text-gray-500">✓</div>
+                      <div className="h-3 w-3 flex items-center justify-center text-gray-500">✓</div>
                       <span className="text-xs text-gray-600">All changes saved</span>
                     </>
                   )}
