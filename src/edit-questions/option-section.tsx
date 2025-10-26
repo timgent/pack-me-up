@@ -28,14 +28,19 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const previousLengthRef = useRef(itemFields.length);
 
     useEffect(() => {
-        if (selectRefs.current[itemFields.length - 1]) {
-            const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
-            if (input) {
-                input.focus();
+        // Only focus if an item was added (not on initial render or removal)
+        if (itemFields.length > previousLengthRef.current) {
+            if (selectRefs.current[itemFields.length - 1]) {
+                const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
+                if (input) {
+                    input.focus();
+                }
             }
         }
+        previousLengthRef.current = itemFields.length;
     }, [itemFields.length]);
 
     return (
