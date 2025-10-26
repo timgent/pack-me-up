@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSolidPod } from '../components/SolidPodContext';
 import { getPrimaryPodUrl, loadFileFromPod, saveFileToPod } from '../services/solidPod';
 
@@ -112,6 +112,14 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
 
   // Use ref to prevent concurrent syncs
   const isSyncingRef = useRef(false);
+
+  // Create a stable key for pathConfig to use in useEffect dependencies
+  // This prevents the interval from restarting when pathConfig object reference changes
+  const pathConfigKey = useMemo(() => {
+    const { container, filename, resourceId } = pathConfig;
+    const filenameKey = typeof filename === 'function' ? 'function' : filename;
+    return `${container}:${filenameKey}:${resourceId || ''}`;
+  }, [pathConfig.container, pathConfig.filename, pathConfig.resourceId]);
 
   /**
    * Resolve the full file URL from the path configuration
@@ -272,9 +280,10 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       clearInterval(interval);
     };
     // Note: syncFromPod is intentionally omitted from deps to prevent interval churn
-    // The interval only needs to restart when config changes, not when the function is recreated
+    // pathConfigKey is a stable string representation of pathConfig to avoid object reference issues
+    // The interval only needs to restart when the actual config values change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, isLoggedIn, pollInterval, pathConfig]);
+  }, [enabled, isLoggedIn, pollInterval, pathConfigKey]);
 
   return {
     lastSync,
