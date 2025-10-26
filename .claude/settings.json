@@ -8,6 +8,13 @@
         "-y",
         "chrome-devtools-mcp@latest"
       ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp-server@latest"
+      ]
     }
   },
   "project": {
