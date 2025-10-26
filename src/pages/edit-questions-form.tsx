@@ -51,8 +51,8 @@ export function EditQuestionsForm() {
       if (lastSyncedDataRef.current !== incomingDataString) {
         // Determine if we should apply the synced data
         const shouldApplySync =
-          // If local has no timestamp but Pod does, Pod wins (handles fresh page loads)
-          (!currentQuestionSet?.lastModified && data.lastModified) ||
+          // If local has no timestamp, Pod wins regardless (handles fresh loads and old Pod data)
+          !currentQuestionSet?.lastModified ||
           // Otherwise, only apply if Pod version is newer
           (syncedModifiedTime > localModifiedTime);
 
