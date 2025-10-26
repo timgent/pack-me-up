@@ -1,1 +1,81 @@
 @import "tailwindcss";
+
+@theme {
+  /* Primary - Very Dark Teal for navigation */
+  --color-primary-950: #042f2e;
+  --color-primary-900: #134e4a;
+  --color-primary-800: #115e59;
+  --color-primary-700: #0f766e;
+  --color-primary-600: #0d9488;
+  --color-primary-500: #14b8a6;
+  --color-primary-400: #2dd4bf;
+  --color-primary-300: #5eead4;
+  --color-primary-200: #99f6e4;
+  --color-primary-100: #ccfbf1;
+  --color-primary-50: #f0fdfa;
+
+  /* Secondary - Warm Coral */
+  --color-secondary-950: #431407;
+  --color-secondary-900: #7c2d12;
+  --color-secondary-800: #9a3412;
+  --color-secondary-700: #c2410c;
+  --color-secondary-600: #ea580c;
+  --color-secondary-500: #f97316;
+  --color-secondary-400: #fb923c;
+  --color-secondary-300: #fdba74;
+  --color-secondary-200: #fed7aa;
+  --color-secondary-100: #ffedd5;
+  --color-secondary-50: #fff7ed;
+
+  /* Accent - Purple */
+  --color-accent-950: #3b0764;
+  --color-accent-900: #581c87;
+  --color-accent-800: #6b21a8;
+  --color-accent-700: #7e22ce;
+  --color-accent-600: #9333ea;
+  --color-accent-500: #a855f7;
+  --color-accent-400: #c084fc;
+  --color-accent-300: #d8b4fe;
+  --color-accent-200: #e9d5ff;
+  --color-accent-100: #f3e8ff;
+  --color-accent-50: #faf5ff;
+
+  /* Success - Green */
+  --color-success-950: #052e16;
+  --color-success-900: #14532d;
+  --color-success-800: #166534;
+  --color-success-700: #15803d;
+  --color-success-600: #16a34a;
+  --color-success-500: #22c55e;
+  --color-success-400: #4ade80;
+  --color-success-300: #86efac;
+  --color-success-200: #bbf7d0;
+  --color-success-100: #dcfce7;
+  --color-success-50: #f0fdf4;
+
+  /* Warning - Yellow */
+  --color-warning-950: #422006;
+  --color-warning-900: #713f12;
+  --color-warning-800: #854d0e;
+  --color-warning-700: #a16207;
+  --color-warning-600: #ca8a04;
+  --color-warning-500: #eab308;
+  --color-warning-400: #facc15;
+  --color-warning-300: #fde047;
+  --color-warning-200: #fef08a;
+  --color-warning-100: #fef9c3;
+  --color-warning-50: #fefce8;
+
+  /* Danger - Red */
+  --color-danger-950: #450a0a;
+  --color-danger-900: #7f1d1d;
+  --color-danger-800: #991b1b;
+  --color-danger-700: #b91c1c;
+  --color-danger-600: #dc2626;
+  --color-danger-500: #ef4444;
+  --color-danger-400: #f87171;
+  --color-danger-300: #fca5a5;
+  --color-danger-200: #fecaca;
+  --color-danger-100: #fee2e2;
+  --color-danger-50: #fef2f2;
+}

@@ -121,7 +121,7 @@ export function PackingLists() {
     }, [])
 
     if (isLoading) {
-        return <div className="max-w-4xl mx-auto py-8 px-4">Loading packing lists...</div>
+        return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>
     }
 
     return (
@@ -129,26 +129,30 @@ export function PackingLists() {
             <div className="mb-8">
                 <div className="flex justify-between items-start mb-2">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Packing Lists</h1>
-                        <p className="mt-2 text-gray-600">View all your created packing lists.</p>
+                        <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
+                        <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                     </div>
                     {isLoggedIn && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                             <Button
                                 type="button"
                                 onClick={handleSaveToPod}
                                 disabled={isSaving || packingLists.length === 0}
-                                variant="secondary"
+                                variant="ghost"
+                                className="text-base"
                             >
-                                {isSaving ? 'Saving...' : 'Save to Pod'}
+                                <span className="text-2xl mr-2">☁️</span>
+                                {isSaving ? 'Saving to Pod...' : 'Save to Pod'}
                             </Button>
                             <Button
                                 type="button"
                                 onClick={handleLoadFromPod}
                                 disabled={isLoadingFromPod}
-                                variant="secondary"
+                                variant="ghost"
+                                className="text-base"
                             >
-                                {isLoadingFromPod ? 'Loading...' : 'Load from Pod'}
+                                <span className="text-2xl mr-2">📥</span>
+                                {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
                             </Button>
                         </div>
                     )}
@@ -156,36 +160,61 @@ export function PackingLists() {
             </div>
 
             {packingLists.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                    No packing lists found. Create your first packing list to get started.
+                <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
+                    <p className="text-lg text-gray-800 font-semibold">
+                        No packing lists found. Create your first packing list to get started! 🎒
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {packingLists.map((list) => (
-                        <div
-                            key={list.id}
-                            onClick={() => navigate(`/view-lists/${list.id}`)}
-                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                        >
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-medium text-gray-900">{list.name}</h3>
+                    {packingLists.map((list, index) => {
+                        const packedCount = list.items.filter(item => item.packed).length
+                        const totalCount = list.items.length
+                        const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
+
+                        // Rotate through gradient colors
+                        const gradients = [
+                            'from-primary-50 to-primary-100 border-primary-300',
+                            'from-secondary-50 to-secondary-100 border-secondary-300',
+                            'from-accent-50 to-accent-100 border-accent-300',
+                            'from-success-50 to-success-100 border-success-300'
+                        ]
+                        const gradient = gradients[index % gradients.length]
+
+                        return (
+                            <div
+                                key={list.id}
+                                onClick={() => navigate(`/view-lists/${list.id}`)}
+                                className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-soft border-2 p-6 hover:shadow-glow-primary hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
+                            >
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-xl font-bold text-gray-900">✈️ {list.name}</h3>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm font-medium text-gray-600 bg-white/60 px-3 py-1 rounded-lg">
+                                            📅 {new Date(list.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <button
+                                            onClick={(e) => deletePackingList(list.id, e)}
+                                            className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                                        >
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="flex items-center gap-4">
-                                    <span className="text-sm text-gray-500">
-                                        {new Date(list.createdAt).toLocaleDateString()}
+                                    <div className="flex-1 bg-white/40 rounded-full h-3 overflow-hidden">
+                                        <div
+                                            className="bg-gradient-primary h-full transition-all duration-500 rounded-full"
+                                            style={{ width: `${percentComplete}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="text-sm font-bold text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
+                                        {packedCount} / {totalCount} ({percentComplete}%)
                                     </span>
-                                    <button
-                                        onClick={(e) => deletePackingList(list.id, e)}
-                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                    >
-                                        Delete
-                                    </button>
                                 </div>
                             </div>
-                            <div className="mt-2 text-sm text-gray-500">
-                                {list.items.filter(item => item.packed).length} of {list.items.length} items packed
-                            </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
         </div>

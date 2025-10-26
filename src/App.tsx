@@ -17,16 +17,18 @@ function App() {
     <ToastProvider>
       <SolidPodProvider>
         <HashRouter>
-          <Navigation />
-          <div className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/manage-questions" element={<EditQuestionsForm />} />
-              <Route path="/create-packing-list" element={<CreatePackingList />} />
-              <Route path="/view-lists" element={<PackingLists />} />
-              <Route path="/view-lists/:id" element={<ViewPackingList />} />
-              <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
-            </Routes>
+          <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
+            <Navigation />
+            <div className="container mx-auto px-4 py-8">
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/manage-questions" element={<EditQuestionsForm />} />
+                <Route path="/create-packing-list" element={<CreatePackingList />} />
+                <Route path="/view-lists" element={<PackingLists />} />
+                <Route path="/view-lists/:id" element={<ViewPackingList />} />
+                <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
+              </Routes>
+            </div>
           </div>
         </HashRouter>
       </SolidPodProvider>
