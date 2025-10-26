@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
+import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
+import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
 import { packingAppDb } from '../services/database'
 import { DatabaseMigration } from '../services/migration'
@@ -22,12 +23,16 @@ export function EditQuestionsForm() {
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
   const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
   });
   const { showToast } = useToast();
   const { isLoggedIn } = useSolidPod();
+
+  // Watch all form values for auto-save
+  const watchedFormValues = useWatch({ control });
 
   // Track if we're currently handling a local change to prevent sync loops
   const isLocalChangeRef = useRef(false);
@@ -241,6 +246,85 @@ export function EditQuestionsForm() {
     name: "questions"
   });
 
+  // Auto-save handler with debouncing
+  const handleAutoSave = useDebouncedCallback(async () => {
+    const currentData = getValues();
+
+    // Skip if there's no data yet or we're syncing from Pod
+    if (!currentQuestionSet) {
+      console.log('handleAutoSave: currentQuestionSet is null, skipping');
+      return;
+    }
+
+    try {
+      // Check if data has actually changed
+      const currentDataString = JSON.stringify(currentData);
+      const lastDataString = JSON.stringify(currentQuestionSet);
+
+      if (currentDataString === lastDataString) {
+        console.log('handleAutoSave: No changes detected, skipping save');
+        return;
+      }
+
+      console.log('handleAutoSave: Changes detected, auto-saving...');
+      setAutoSaveStatus('saving');
+
+      // Add timestamp for conflict resolution
+      const dataWithTimestamp = {
+        ...currentData,
+        lastModified: new Date().toISOString()
+      };
+
+      // Save to local PouchDB first
+      const docToWrite = {
+        _id: "1",
+        ...dataWithTimestamp,
+        _rev: rev,
+      };
+      const result = await packingAppDb.saveQuestionSet(docToWrite);
+      const savedData = {
+        ...dataWithTimestamp,
+        _rev: result.rev
+      };
+      setRev(result.rev);
+      setCurrentQuestionSet(savedData);
+      console.log('handleAutoSave: Saved to local DB');
+
+      // If logged in, also save to Pod automatically
+      if (isLoggedIn) {
+        console.log('handleAutoSave: Saving to Pod...');
+        isLocalChangeRef.current = true;
+        await saveToPod(dataWithTimestamp);
+        console.log('handleAutoSave: Saved to Pod');
+        // Reset the flag after a short delay to allow sync to complete
+        setTimeout(() => {
+          isLocalChangeRef.current = false;
+        }, 2000);
+      }
+
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000); // Show "saved" for 2 seconds
+    } catch (error) {
+      console.error('handleAutoSave: Error saving changes:', error);
+      setAutoSaveStatus('error');
+      showToast('Auto-save failed. Please try again.', 'error');
+    }
+  }, 800); // 800ms debounce to batch rapid changes
+
+  // Trigger auto-save when form values change
+  useEffect(() => {
+    console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
+      hasCurrentQuestionSet: !!currentQuestionSet,
+      watchedFormValues: watchedFormValues
+    });
+    if (currentQuestionSet) {
+      console.log('Calling handleAutoSave...');
+      handleAutoSave();
+    } else {
+      console.log('Skipping handleAutoSave - currentQuestionSet is null');
+    }
+  }, [watchedFormValues, handleAutoSave]);
+
   const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
     try {
       // Add timestamp for conflict resolution
@@ -376,11 +460,43 @@ export function EditQuestionsForm() {
                 <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Syncing from Pod...</span>
               </div>
             )}
+
+            {/* Auto-save Status */}
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+              <p className="text-xs font-semibold text-gray-700 mb-2">Auto-Save Status</p>
+              <div className={`flex items-center gap-2 transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-60' : 'opacity-100'}`}>
+                {autoSaveStatus === 'saving' && (
+                  <>
+                    <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    <span className="text-xs text-blue-600">Saving...</span>
+                  </>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <>
+                    <div className="h-3 w-3 text-green-500">✓</div>
+                    <span className="text-xs text-green-600">Saved</span>
+                  </>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <>
+                    <div className="h-3 w-3 text-red-500">✗</div>
+                    <span className="text-xs text-red-600">Error</span>
+                  </>
+                )}
+                {autoSaveStatus === 'idle' && (
+                  <>
+                    <div className="h-3 w-3 text-gray-500">✓</div>
+                    <span className="text-xs text-gray-600">All changes saved</span>
+                  </>
+                )}
+              </div>
+            </div>
+
             {isLoggedIn ? (
               <>
-                {/* Sync Status */}
+                {/* Pod Sync Status */}
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
-                  <p className="text-xs font-semibold text-gray-700 mb-1">Auto-Sync Status</p>
+                  <p className="text-xs font-semibold text-gray-700 mb-1">Pod Sync Status</p>
                   <div className="flex items-center gap-2 mb-1">
                     {isSyncing ? (
                       <>
@@ -419,9 +535,6 @@ export function EditQuestionsForm() {
             >
               Add Question
             </Button>
-            <Button type="submit" form="edit-questions-form">
-              Save Changes
-            </Button>
             <Button type="button" onClick={() => {
               const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
               reset(defaultData);
@@ -449,7 +562,40 @@ export function EditQuestionsForm() {
                 <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Syncing from Pod...</span>
               </div>
             )}
-            {isLoggedIn ? (
+
+            {/* Auto-save Status */}
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-2 mx-2">
+              <div className="flex items-center justify-between">
+                <div className={`flex items-center gap-2 transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-60' : 'opacity-100'}`}>
+                  {autoSaveStatus === 'saving' && (
+                    <>
+                      <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      <span className="text-xs text-blue-600">Auto-saving...</span>
+                    </>
+                  )}
+                  {autoSaveStatus === 'saved' && (
+                    <>
+                      <div className="h-3 w-3 text-green-500">✓</div>
+                      <span className="text-xs text-green-600">Saved</span>
+                    </>
+                  )}
+                  {autoSaveStatus === 'error' && (
+                    <>
+                      <div className="h-3 w-3 text-red-500">✗</div>
+                      <span className="text-xs text-red-600">Error</span>
+                    </>
+                  )}
+                  {autoSaveStatus === 'idle' && (
+                    <>
+                      <div className="h-3 w-3 text-gray-500">✓</div>
+                      <span className="text-xs text-gray-600">All changes saved</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {isLoggedIn && (
               <div className="bg-gray-50 border border-gray-200 rounded-md p-2 mx-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -461,16 +607,19 @@ export function EditQuestionsForm() {
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     )}
                     <p className="text-xs text-gray-600">
-                      {isSyncing ? 'Polling...' : `Synced ${formatLastSync(lastSync)}`}
+                      {isSyncing ? 'Pod polling...' : `Pod synced ${formatLastSync(lastSync)}`}
                     </p>
                   </div>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {!isLoggedIn && (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mx-2">
                 <p className="text-xs text-gray-700 font-semibold">💡 Login with Solid Pod to save privately</p>
               </div>
             )}
+
             <div className="flex flex-wrap items-center gap-3 justify-center">
             <Button
               type="button"
@@ -478,9 +627,6 @@ export function EditQuestionsForm() {
               variant="secondary"
             >
               Add Question
-            </Button>
-            <Button type="submit" form="edit-questions-form">
-              Save Changes
             </Button>
             <Button type="button" onClick={() => {
               const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
