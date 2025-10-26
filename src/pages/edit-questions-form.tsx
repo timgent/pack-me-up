@@ -16,6 +16,8 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { JsonEditor } from '../edit-questions/json-editor'
+import { validateQuestionSet } from '../edit-questions/validation'
 
 export function EditQuestionsForm() {
 
@@ -25,6 +27,9 @@ export function EditQuestionsForm() {
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
+  const [jsonValue, setJsonValue] = useState<string>('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
@@ -310,6 +315,54 @@ export function EditQuestionsForm() {
     }
   };
 
+  // JSON Editor sync functions
+  const syncVisualToJson = useCallback(() => {
+    const formData = getValues();
+    const formatted = JSON.stringify(formData, null, 2);
+    setJsonValue(formatted);
+    setJsonError(null);
+  }, [getValues]);
+
+  const syncJsonToVisual = useCallback((): boolean => {
+    try {
+      const parsed = JSON.parse(jsonValue);
+
+      // Validate structure
+      const validation = validateQuestionSet(parsed);
+      if (!validation.valid) {
+        setJsonError(validation.error || 'Invalid question set structure');
+        return false;
+      }
+
+      // Update form state
+      const dataWithRev = { ...parsed, _rev: rev };
+      reset(dataWithRev);
+      setCurrentQuestionSet(dataWithRev);
+      setJsonError(null);
+      return true;
+    } catch (e: any) {
+      setJsonError(`Invalid JSON: ${e.message}`);
+      return false;
+    }
+  }, [jsonValue, reset, rev]);
+
+  const handleModeChange = useCallback((newMode: 'visual' | 'json') => {
+    if (newMode === 'json') {
+      // Switching TO JSON: sync current form state
+      syncVisualToJson();
+      setEditorMode('json');
+    } else {
+      // Switching FROM JSON: validate and apply changes
+      const success = syncJsonToVisual();
+      if (!success) {
+        // Show error, don't switch mode
+        showToast('Please fix JSON errors before switching to visual editor', 'error');
+        return;
+      }
+      setEditorMode('visual');
+    }
+  }, [syncVisualToJson, syncJsonToVisual, showToast]);
+
   const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
   // Format last sync time for display
@@ -330,20 +383,49 @@ export function EditQuestionsForm() {
       <div className="mb-8 w-full max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
         <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
-      </div>
-      {isFormEmpty && (
-        <div className="w-full max-w-5xl mb-8">
-          <Callout
-            title="Get Started with Example Questions"
-            description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
-            action={{
-              label: "Load Example",
-              onClick: () => setIsExampleModalOpen(true)
-            }}
-          />
+
+        {/* Editor Mode Toggle */}
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleModeChange('visual')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              editorMode === 'visual'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Visual Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('json')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              editorMode === 'json'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            JSON Editor
+          </button>
+          <span className="text-sm text-gray-500 ml-2">(Advanced)</span>
         </div>
-      )}
-      <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+      </div>
+      {editorMode === 'visual' ? (
+        <>
+          {isFormEmpty && (
+            <div className="w-full max-w-5xl mb-8">
+              <Callout
+                title="Get Started with Example Questions"
+                description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
+                action={{
+                  label: "Load Example",
+                  onClick: () => setIsExampleModalOpen(true)
+                }}
+              />
+            </div>
+          )}
+          <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
         {/* Main form content */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8" id="edit-questions-form">
           <PeopleSection
@@ -578,6 +660,16 @@ export function EditQuestionsForm() {
           </div>
         </div>
       </div>
+        </>
+      ) : (
+        <div className="w-full max-w-5xl">
+          <JsonEditor
+            value={jsonValue}
+            onChange={setJsonValue}
+            error={jsonError}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isExampleModalOpen}

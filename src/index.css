@@ -90,3 +90,70 @@
   --box-shadow-glow-secondary: 0 0 20px rgba(249, 115, 22, 0.4);
   --box-shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
 }
+
+/* JSON Editor Styles */
+.json-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.json-editor-header {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1rem;
+}
+
+.json-editor-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.json-editor-help {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.json-editor-textarea {
+  width: 100%;
+  min-height: 600px;
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  color: #111827;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.json-editor-textarea:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.json-editor-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.json-editor-error {
+  padding: 1rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.json-editor-error strong {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
