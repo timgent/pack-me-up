@@ -55,7 +55,7 @@ export const LandingPage = () => {
                         </p>
                     </div>
 
-                    <div className="md:col-span-2 bg-gradient-to-r from-primary-700 to-primary-600 p-6 rounded-2xl shadow-glow-primary border-2 border-primary-500 text-white">
+                    <div className="md:col-span-2 bg-gradient-to-r from-primary-800 to-primary-900 p-6 rounded-2xl shadow-glow-primary border-2 border-primary-700 text-white">
                         <div className="text-4xl mb-2">🔒</div>
                         <h2 className="text-2xl font-bold mb-3">Own Your Data</h2>
                         <p className="mb-4 text-white">

@@ -22,7 +22,7 @@ export const Navigation = () => {
 
     return (
         <>
-            <nav className="bg-gradient-to-r from-primary-700 via-primary-600 to-primary-700 text-white shadow-soft">
+            <nav className="bg-gradient-to-r from-primary-800 via-primary-900 to-primary-800 text-white shadow-soft">
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
@@ -77,7 +77,7 @@ export const Navigation = () => {
                                     >
                                         Login with Solid Pod
                                     </button>
-                                    <span className="text-xs text-white/80 mt-1 font-medium">Own your data</span>
+                                    <span className="text-xs text-white mt-1 font-medium">Own your data</span>
                                 </div>
                             )}
                         </div>
@@ -115,7 +115,7 @@ export const Navigation = () => {
                 </div>
 
                 {/* Mobile menu */}
-                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-800/95 backdrop-blur-md`}>
+                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-900`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             to="/manage-questions"
@@ -167,7 +167,7 @@ export const Navigation = () => {
                                     >
                                         Login with Solid Pod
                                     </button>
-                                    <p className="px-3 py-1 text-xs text-white/80 font-medium">Own your data</p>
+                                    <p className="px-3 py-1 text-xs text-white font-medium">Own your data</p>
                                 </div>
                             )}
                         </div>
