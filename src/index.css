@@ -293,11 +293,15 @@
 
 /* JSON Editor Save Button Styles */
 .json-editor-save-section {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
   margin-top: 1.5rem;
   padding: 1.25rem;
   background: #f9fafb;
   border: 2px solid #e5e7eb;
   border-radius: 0.75rem;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .json-editor-save-button {
@@ -356,18 +360,18 @@
   position: fixed;
   bottom: 2rem;
   right: 2rem;
-  z-index: 50;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
+  width: 3.5rem;
+  height: 3.5rem;
   background-color: #0d9488;
   color: white;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 8px 16px rgba(13, 148, 136, 0.5);
   transition: all 0.2s;
 }
 
@@ -426,7 +430,7 @@
 
 .diff-view-header {
   display: grid;
-  grid-template-columns: 3rem 1fr 1fr;
+  grid-template-columns: 6rem 1fr 1fr;
   background-color: #f9fafb;
   border-bottom: 2px solid #d1d5db;
   font-weight: 600;
@@ -453,17 +457,28 @@
 
 .diff-line {
   display: grid;
-  grid-template-columns: 3rem 1fr 1fr;
+  grid-template-columns: 6rem 1fr 1fr;
   border-bottom: 1px solid #f3f4f6;
 }
 
-.diff-line-number {
-  padding: 0.5rem;
+.diff-line-numbers {
+  display: flex;
+  flex-direction: row;
   background-color: #f9fafb;
   border-right: 1px solid #e5e7eb;
+  user-select: none;
+}
+
+.diff-line-num {
+  flex: 1;
+  padding: 0.5rem;
   text-align: right;
   color: #9ca3af;
-  user-select: none;
+  font-size: 0.75rem;
+}
+
+.diff-line-num:first-child {
+  border-right: 1px solid #e5e7eb;
 }
 
 .diff-line-content {
@@ -479,7 +494,7 @@
 
 /* Diff status colors */
 .diff-line-added {
-  background-color: #d1fae5;
+  background-color: #ecfdf5;
 }
 
 .diff-line-added .diff-line-content:last-child {
@@ -488,20 +503,14 @@
 }
 
 .diff-line-removed {
-  background-color: #fee2e2;
+  background-color: #fef2f2;
 }
 
 .diff-line-removed .diff-line-content:first-of-type {
   background-color: #fecaca;
   font-weight: 500;
-}
-
-.diff-line-modified {
-  background-color: #fef3c7;
-}
-
-.diff-line-modified .diff-line-content {
-  background-color: #fde68a;
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 .diff-line-unchanged {
@@ -510,4 +519,5 @@
 
 .diff-line-unchanged .diff-line-content {
   color: #6b7280;
+  opacity: 0.6;
 }

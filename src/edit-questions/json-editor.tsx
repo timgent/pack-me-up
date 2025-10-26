@@ -103,35 +103,70 @@ ${userPrompt}`
     }
   }, [generatePrompt])
 
-  // Compute line-by-line diff
+  // Compute line-by-line diff using LCS algorithm
   const computeDiff = useCallback(() => {
     const originalLines = originalValue.split('\n')
     const currentLines = value.split('\n')
-    const maxLines = Math.max(originalLines.length, currentLines.length)
 
+    // Build LCS table
+    const m = originalLines.length
+    const n = currentLines.length
+    const lcs: number[][] = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0))
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (originalLines[i - 1] === currentLines[j - 1]) {
+          lcs[i][j] = lcs[i - 1][j - 1] + 1
+        } else {
+          lcs[i][j] = Math.max(lcs[i - 1][j], lcs[i][j - 1])
+        }
+      }
+    }
+
+    // Trace back to build diff
     const diff: Array<{
-      lineNum: number
+      originalLineNum: number | null
+      currentLineNum: number | null
       original: string | null
       current: string | null
-      status: 'added' | 'removed' | 'modified' | 'unchanged'
+      status: 'added' | 'removed' | 'unchanged'
     }> = []
 
-    for (let i = 0; i < maxLines; i++) {
-      const originalLine = originalLines[i]
-      const currentLine = currentLines[i]
+    let i = m
+    let j = n
 
-      if (originalLine === undefined && currentLine !== undefined) {
-        // Line added
-        diff.push({ lineNum: i + 1, original: null, current: currentLine, status: 'added' })
-      } else if (originalLine !== undefined && currentLine === undefined) {
-        // Line removed
-        diff.push({ lineNum: i + 1, original: originalLine, current: null, status: 'removed' })
-      } else if (originalLine !== currentLine) {
-        // Line modified
-        diff.push({ lineNum: i + 1, original: originalLine, current: currentLine, status: 'modified' })
-      } else {
-        // Line unchanged
-        diff.push({ lineNum: i + 1, original: originalLine, current: currentLine, status: 'unchanged' })
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && originalLines[i - 1] === currentLines[j - 1]) {
+        // Lines match - unchanged
+        diff.unshift({
+          originalLineNum: i,
+          currentLineNum: j,
+          original: originalLines[i - 1],
+          current: currentLines[j - 1],
+          status: 'unchanged'
+        })
+        i--
+        j--
+      } else if (j > 0 && (i === 0 || lcs[i][j - 1] >= lcs[i - 1][j])) {
+        // Line added in current
+        diff.unshift({
+          originalLineNum: null,
+          currentLineNum: j,
+          original: null,
+          current: currentLines[j - 1],
+          status: 'added'
+        })
+        j--
+      } else if (i > 0) {
+        // Line removed from original
+        diff.unshift({
+          originalLineNum: i,
+          currentLineNum: null,
+          original: originalLines[i - 1],
+          current: null,
+          status: 'removed'
+        })
+        i--
       }
     }
 
@@ -208,13 +243,17 @@ ${userPrompt}`
       {showDiff && hasUnsavedChanges && (
         <div className="diff-view-container">
           <div className="diff-view-header">
+            <div className="diff-view-column-header">Line</div>
             <div className="diff-view-column-header">Original</div>
             <div className="diff-view-column-header">Current</div>
           </div>
           <div className="diff-view-content">
             {computeDiff().map((line, idx) => (
               <div key={idx} className={`diff-line diff-line-${line.status}`}>
-                <div className="diff-line-number">{line.lineNum}</div>
+                <div className="diff-line-numbers">
+                  <div className="diff-line-num">{line.originalLineNum || ''}</div>
+                  <div className="diff-line-num">{line.currentLineNum || ''}</div>
+                </div>
                 <div className="diff-line-content">
                   {line.original !== null ? line.original : ''}
                 </div>
