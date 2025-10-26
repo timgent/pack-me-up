@@ -22,7 +22,7 @@ export const Navigation = () => {
 
     return (
         <>
-            <nav className="bg-gradient-to-r from-primary-800 via-primary-900 to-primary-800 text-white shadow-soft">
+            <nav className="bg-primary-950 text-white shadow-soft">
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
@@ -115,7 +115,7 @@ export const Navigation = () => {
                 </div>
 
                 {/* Mobile menu */}
-                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-900`}>
+                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-950`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             to="/manage-questions"
