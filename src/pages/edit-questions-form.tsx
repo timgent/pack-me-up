@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
@@ -13,7 +13,9 @@ import { Modal } from '../components/Modal'
 import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { useSolidPod } from '../components/SolidPodContext'
-import { useQuestionSetSync } from '../hooks/useQuestionSetSync'
+import { usePodSync } from '../hooks/usePodSync'
+import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
+import { POD_CONTAINERS } from '../services/solidPod'
 
 export function EditQuestionsForm() {
 
@@ -22,7 +24,6 @@ export function EditQuestionsForm() {
   });
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
-  const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
@@ -34,110 +35,51 @@ export function EditQuestionsForm() {
   // Watch all form values for auto-save
   const watchedFormValues = useWatch({ control });
 
-  // Track if we're currently handling a local change to prevent sync loops
-  const isLocalChangeRef = useRef(false);
-  const lastSyncedDataRef = useRef<string | null>(null);
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
-  // Memoize callbacks to prevent useQuestionSetSync from re-running unnecessarily
-  const handleSyncSuccess = useCallback(async (data: PackingListQuestionSet) => {
-    // Only update form if this isn't a local change we just made
-    if (!isLocalChangeRef.current) {
-      // Compare the incoming data with what we last synced
-      const incomingDataString = JSON.stringify(data);
+  // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
+  const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
+    useSyncCoordinator<PackingListQuestionSet>({
+      currentData: currentQuestionSet,
+      saveToLocalDb: async (data) => {
+        const docToWrite = {
+          _id: "1",
+          ...data,
+          _rev: rev,
+        };
+        return await packingAppDb.saveQuestionSet(docToWrite);
+      },
+      updateFormAndState: (data, newRev) => {
+        const updatedData = {
+          ...data,
+          _rev: newRev
+        };
+        setRev(newRev);
+        setCurrentQuestionSet(updatedData);
+        reset(updatedData);
+      },
+      conflictStrategy: 'fallback-to-pod', // Pod wins if local has no timestamp (handles fresh loads)
+    });
 
-      // Only update if the data has actually changed AND is newer than our local version
-      const syncedModifiedTime = data.lastModified ? new Date(data.lastModified).getTime() : 0;
-      const localModifiedTime = currentQuestionSet?.lastModified ? new Date(currentQuestionSet.lastModified).getTime() : 0;
-
-      if (lastSyncedDataRef.current !== incomingDataString) {
-        // Determine if we should apply the synced data
-        const shouldApplySync =
-          // If local has no timestamp, Pod wins regardless (handles fresh loads and old Pod data)
-          !currentQuestionSet?.lastModified ||
-          // Otherwise, only apply if Pod version is newer
-          (syncedModifiedTime > localModifiedTime);
-
-        if (shouldApplySync) {
-          console.log('Synced data from Pod - newer version found, updating form');
-          setSyncingFromPod(true);
-
-          // Save the currently focused element
-          const activeElement = document.activeElement as HTMLElement;
-          const activeElementId = activeElement?.id;
-          const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-          const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
-
-          try {
-            // Remove _rev to avoid conflicts with local database version
-            delete data._rev;
-
-            // Save to local database to get the proper _rev
-            const dbResult = await packingAppDb.saveQuestionSet(data);
-
-            // Update state with synced data and new _rev
-            const updatedData = {
-              ...data,
-              _rev: dbResult.rev
-            };
-            setRev(dbResult.rev);
-            setCurrentQuestionSet(updatedData);
-            reset(updatedData);
-            lastSyncedDataRef.current = incomingDataString;
-
-            // Show sync indicator briefly
-            setTimeout(() => setSyncingFromPod(false), 2000);
-
-            // Restore focus after a brief delay to allow the DOM to update
-            setTimeout(() => {
-              if (activeElementId) {
-                const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-                if (elementToFocus) {
-                  elementToFocus.focus();
-                  if (selectionStart !== null && selectionEnd !== null) {
-                    elementToFocus.setSelectionRange(selectionStart, selectionEnd);
-                  }
-                }
-              }
-            }, 0);
-          } catch (err) {
-            console.error('Error saving synced data to local database:', err);
-            setSyncingFromPod(false);
-          }
-        } else {
-          console.log('Synced data from Pod - local version is newer or same, keeping local', {
-            localTime: currentQuestionSet?.lastModified,
-            syncedTime: data.lastModified
-          });
-        }
-      } else {
-        console.log('Synced data from Pod - no changes detected');
-      }
-    }
-  }, [rev, reset, currentQuestionSet]);
-
-  const handleSyncError = useCallback((error: string) => {
-    console.error('Sync error:', error);
-    // Don't show toast for errors - too noisy for automatic sync
-  }, []);
-
+  // Callback when save to Pod succeeds
   const handleSaveSuccess = useCallback(() => {
     console.log('Saved to Pod successfully');
-    // Update the last synced data ref and current question set
-    const currentData = getValues();
-    lastSyncedDataRef.current = JSON.stringify(currentData);
-    setCurrentQuestionSet(currentData);
-  }, [getValues]);
+  }, []);
 
+  // Callback when save to Pod fails
   const handleSaveError = useCallback((error: string) => {
     console.error('Save to Pod error:', error);
     showToast(`Failed to save to Pod: ${error}`, 'error');
   }, [showToast]);
 
   // Set up automatic Pod sync with polling
-  const { lastSync, isSyncing, error: syncError, saveToPod } = useQuestionSetSync({
+  const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
+    pathConfig: {
+      container: POD_CONTAINERS.ROOT,
+      filename: 'packing-list-questions.json'
+    },
     pollInterval: 5000, // Poll every 5 seconds for faster sync
     enabled: isLoggedIn, // Only sync when logged in
     onSyncSuccess: handleSyncSuccess,
@@ -145,6 +87,83 @@ export function EditQuestionsForm() {
     onSaveSuccess: handleSaveSuccess,
     onSaveError: handleSaveError,
   });
+
+  // Auto-save handler with debouncing
+  const handleAutoSave = useDebouncedCallback(async () => {
+    const currentData = getValues();
+
+    // Skip if there's no data yet or we're syncing from Pod
+    if (!currentQuestionSet) {
+      console.log('handleAutoSave: currentQuestionSet is null, skipping');
+      return;
+    }
+
+    try {
+      // Check if data has actually changed
+      const currentDataString = JSON.stringify(currentData);
+      const lastDataString = JSON.stringify(currentQuestionSet);
+
+      if (currentDataString === lastDataString) {
+        console.log('handleAutoSave: No changes detected, skipping save');
+        return;
+      }
+
+      console.log('handleAutoSave: Changes detected, auto-saving...');
+      setAutoSaveStatus('saving');
+
+      // Prepare data with ID
+      const dataToSave = {
+        _id: "1",
+        ...currentData,
+        _rev: rev,
+      };
+
+      // If logged in, use saveWithSyncPrevention (handles local + Pod save)
+      if (isLoggedIn) {
+        const savedData = await saveWithSyncPrevention(dataToSave, saveToPod);
+        if (savedData) {
+          setRev(savedData._rev);
+          setCurrentQuestionSet(savedData);
+          console.log('handleAutoSave: Saved to local DB and Pod');
+        }
+      } else {
+        // Not logged in, just save locally
+        const dataWithTimestamp = {
+          ...dataToSave,
+          lastModified: new Date().toISOString()
+        };
+        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const savedData = {
+          ...dataWithTimestamp,
+          _rev: result.rev
+        };
+        setRev(result.rev);
+        setCurrentQuestionSet(savedData);
+        console.log('handleAutoSave: Saved to local DB');
+      }
+
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000); // Show "saved" for 2 seconds
+    } catch (error) {
+      console.error('handleAutoSave: Error saving:', error);
+      setAutoSaveStatus('error');
+      showToast('Auto-save failed. Please try again.', 'error');
+    }
+  }, 800); // 800ms debounce to batch rapid changes
+
+  // Trigger auto-save when form values change
+  useEffect(() => {
+    console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
+      hasCurrentQuestionSet: !!currentQuestionSet,
+      watchedFormValues: watchedFormValues
+    });
+    if (currentQuestionSet) {
+      console.log('Calling handleAutoSave...');
+      handleAutoSave();
+    } else {
+      console.log('Skipping handleAutoSave - currentQuestionSet is null');
+    }
+  }, [watchedFormValues, handleAutoSave]);
 
   const removePerson = (removedIndex: number) => {
     // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -188,8 +207,6 @@ export function EditQuestionsForm() {
         setRev(doc._rev)
         setCurrentQuestionSet(doc)
         reset(doc)
-        // Initialize the lastSyncedDataRef with the loaded data
-        lastSyncedDataRef.current = JSON.stringify(doc)
       } catch (err: any) {
         console.log("Initial get error:", {
           name: err.name,
@@ -221,8 +238,6 @@ export function EditQuestionsForm() {
             setRev(result.rev)
             setCurrentQuestionSet(savedNewDoc)
             reset(newDoc)
-            // Initialize the lastSyncedDataRef with the new doc
-            lastSyncedDataRef.current = JSON.stringify(newDoc)
           } catch (putErr: any) {
             console.error('Error creating new doc:', {
               name: putErr.name,
@@ -246,115 +261,35 @@ export function EditQuestionsForm() {
     name: "questions"
   });
 
-  // Auto-save handler with debouncing
-  const handleAutoSave = useDebouncedCallback(async () => {
-    const currentData = getValues();
-
-    // Skip if there's no data yet or we're syncing from Pod
-    if (!currentQuestionSet) {
-      console.log('handleAutoSave: currentQuestionSet is null, skipping');
-      return;
-    }
-
-    try {
-      // Check if data has actually changed
-      const currentDataString = JSON.stringify(currentData);
-      const lastDataString = JSON.stringify(currentQuestionSet);
-
-      if (currentDataString === lastDataString) {
-        console.log('handleAutoSave: No changes detected, skipping save');
-        return;
-      }
-
-      console.log('handleAutoSave: Changes detected, auto-saving...');
-      setAutoSaveStatus('saving');
-
-      // Add timestamp for conflict resolution
-      const dataWithTimestamp = {
-        ...currentData,
-        lastModified: new Date().toISOString()
-      };
-
-      // Save to local PouchDB first
-      const docToWrite = {
-        _id: "1",
-        ...dataWithTimestamp,
-        _rev: rev,
-      };
-      const result = await packingAppDb.saveQuestionSet(docToWrite);
-      const savedData = {
-        ...dataWithTimestamp,
-        _rev: result.rev
-      };
-      setRev(result.rev);
-      setCurrentQuestionSet(savedData);
-      console.log('handleAutoSave: Saved to local DB');
-
-      // If logged in, also save to Pod automatically
-      if (isLoggedIn) {
-        console.log('handleAutoSave: Saving to Pod...');
-        isLocalChangeRef.current = true;
-        await saveToPod(dataWithTimestamp);
-        console.log('handleAutoSave: Saved to Pod');
-        // Reset the flag after a short delay to allow sync to complete
-        setTimeout(() => {
-          isLocalChangeRef.current = false;
-        }, 2000);
-      }
-
-      setAutoSaveStatus('saved');
-      setTimeout(() => setAutoSaveStatus('idle'), 2000); // Show "saved" for 2 seconds
-    } catch (error) {
-      console.error('handleAutoSave: Error saving changes:', error);
-      setAutoSaveStatus('error');
-      showToast('Auto-save failed. Please try again.', 'error');
-    }
-  }, 800); // 800ms debounce to batch rapid changes
-
-  // Trigger auto-save when form values change
-  useEffect(() => {
-    console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
-      hasCurrentQuestionSet: !!currentQuestionSet,
-      watchedFormValues: watchedFormValues
-    });
-    if (currentQuestionSet) {
-      console.log('Calling handleAutoSave...');
-      handleAutoSave();
-    } else {
-      console.log('Skipping handleAutoSave - currentQuestionSet is null');
-    }
-  }, [watchedFormValues, handleAutoSave]);
-
   const onSubmit: SubmitHandler<PackingListQuestionSet> = async (data) => {
     try {
-      // Add timestamp for conflict resolution
-      const dataWithTimestamp = {
-        ...data,
-        lastModified: new Date().toISOString()
-      };
-
-      // Save to local PouchDB first
-      const docToWrite = {
+      // Prepare data with ID
+      const dataToSave = {
         _id: "1",
-        ...dataWithTimestamp,
+        ...data,
         _rev: rev,
-      }
-      const result = await packingAppDb.saveQuestionSet(docToWrite);
-      const savedData = {
-        ...dataWithTimestamp,
-        _rev: result.rev
       };
-      setRev(result.rev);
-      setCurrentQuestionSet(savedData);
 
-      // If logged in, also save to Pod automatically
+      // If logged in, use saveWithSyncPrevention (handles local + Pod save)
       if (isLoggedIn) {
-        isLocalChangeRef.current = true;
-        await saveToPod(dataWithTimestamp);
-        // Reset the flag after a short delay to allow sync to complete
-        setTimeout(() => {
-          isLocalChangeRef.current = false;
-        }, 2000);
+        const savedData = await saveWithSyncPrevention(dataToSave, saveToPod);
+        if (savedData) {
+          setRev(savedData._rev);
+          setCurrentQuestionSet(savedData);
+        }
+      } else {
+        // Not logged in, just save locally
+        const dataWithTimestamp = {
+          ...dataToSave,
+          lastModified: new Date().toISOString()
+        };
+        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const savedData = {
+          ...dataWithTimestamp,
+          _rev: result.rev
+        };
+        setRev(result.rev);
+        setCurrentQuestionSet(savedData);
       }
 
       showToast('Changes saved successfully!', 'success');
@@ -370,8 +305,6 @@ export function EditQuestionsForm() {
       const dataWithRev = { ...data, _rev: rev };
       reset(dataWithRev);
       setCurrentQuestionSet(dataWithRev);
-      // Update the lastSyncedDataRef when loading example
-      lastSyncedDataRef.current = JSON.stringify(dataWithRev);
       setIsExampleModalOpen(false);
       showToast('Example loaded successfully!', 'success');
     }

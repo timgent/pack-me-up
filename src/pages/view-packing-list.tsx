@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
@@ -7,7 +7,9 @@ import { Button } from '../components/Button'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
-import { usePackingListSync } from '../hooks/usePackingListSync'
+import { usePodSync } from '../hooks/usePodSync'
+import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
+import { POD_CONTAINERS } from '../services/solidPod'
 
 type FormData = {
     items: Record<string, boolean>
@@ -22,13 +24,8 @@ export function ViewPackingList() {
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
-    const [syncingFromPod, setSyncingFromPod] = useState(false) // Only show when actively pulling newer data from Pod
     const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
-
-    // Track if we're currently handling a local change to prevent sync loops
-    const isLocalChangeRef = useRef(false);
-    const lastSyncedDataRef = useRef<string | null>(null);
 
     const { register, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
@@ -39,100 +36,46 @@ export function ViewPackingList() {
     // Use useWatch instead of watch() for proper re-renders on form changes
     const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
 
-    // Memoize callbacks to prevent usePackingListSync from re-running unnecessarily
-    const handleSyncSuccess = useCallback(async (data: PackingList) => {
-        // Only update form if this isn't a local change we just made
-        if (!isLocalChangeRef.current) {
-            // Compare the incoming data with what we last synced
-            const incomingDataString = JSON.stringify(data);
+    // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
+    const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
+        useSyncCoordinator<PackingList>({
+            currentData: packingList,
+            saveToLocalDb: async (data) => {
+                return await packingAppDb.savePackingList(data);
+            },
+            updateFormAndState: (data, newRev) => {
+                setPackingList({
+                    ...data,
+                    _rev: newRev
+                });
+                // Update form values
+                const formValues: Record<string, boolean> = {};
+                data.items.forEach((item) => {
+                    formValues[item.id] = item.packed;
+                });
+                setValue('items', formValues);
+            },
+            conflictStrategy: 'fallback-to-pod', // Use same strategy as edit questions for consistency
+        });
 
-            // Only update if the data has actually changed AND is newer than our local version
-            const syncedModifiedTime = data.lastModified ? new Date(data.lastModified).getTime() : 0;
-            const localModifiedTime = packingList?.lastModified ? new Date(packingList.lastModified).getTime() : 0;
-
-            if (lastSyncedDataRef.current !== incomingDataString) {
-                // Only apply sync if the synced version is newer
-                if (syncedModifiedTime > localModifiedTime) {
-                    console.log('Synced packing list from Pod - newer version found, updating form');
-                    setSyncingFromPod(true);
-
-                    // Save the currently focused element
-                    const activeElement = document.activeElement as HTMLElement;
-                    const activeElementId = activeElement?.id;
-                    const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-                    const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
-
-                    try {
-                        // Remove _rev to avoid conflicts with local database version
-                        delete data._rev;
-
-                        // Save to local database to get the proper _rev
-                        const dbResult = await packingAppDb.savePackingList(data);
-
-                        // Update the packing list state with synced data and new _rev
-                        setPackingList({
-                            ...data,
-                            _rev: dbResult.rev
-                        });
-
-                        // Update form values
-                        const formValues: Record<string, boolean> = {};
-                        data.items.forEach((item) => {
-                            formValues[item.id] = item.packed;
-                        });
-                        setValue('items', formValues);
-
-                        lastSyncedDataRef.current = incomingDataString;
-
-                        // Show sync indicator briefly
-                        setTimeout(() => setSyncingFromPod(false), 2000);
-
-                        // Restore focus after a brief delay to allow the DOM to update
-                        setTimeout(() => {
-                            if (activeElementId) {
-                                const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
-                                if (elementToFocus) {
-                                    elementToFocus.focus();
-                                    if (selectionStart !== null && selectionEnd !== null) {
-                                        elementToFocus.setSelectionRange(selectionStart, selectionEnd);
-                                    }
-                                }
-                            }
-                        }, 0);
-                    } catch (err) {
-                        console.error('Error saving synced data to local database:', err);
-                        setSyncingFromPod(false);
-                    }
-                } else {
-                    console.log('Synced packing list from Pod - local version is newer or same, keeping local');
-                }
-            } else {
-                console.log('Synced packing list from Pod - no changes detected');
-            }
-        }
-    }, [setValue, packingList]);
-
-    const handleSyncError = useCallback((error: string) => {
-        console.error('Sync error:', error);
-        // Don't show toast for errors - too noisy for automatic sync
-    }, []);
-
+    // Callback when save to Pod succeeds
     const handleSaveSuccess = useCallback(() => {
         console.log('Saved packing list to Pod successfully');
-        // Update the last synced data ref
-        if (packingList) {
-            lastSyncedDataRef.current = JSON.stringify(packingList);
-        }
-    }, [packingList]);
+    }, []);
 
+    // Callback when save to Pod fails
     const handleSaveError = useCallback((error: string) => {
         console.error('Save to Pod error:', error);
         showToast(`Failed to save to Pod: ${error}`, 'error');
     }, [showToast]);
 
     // Set up automatic Pod sync with polling
-    const { saveToPod } = usePackingListSync({
-        packingListId: id || null,
+    const { saveToPod } = usePodSync<PackingList>({
+        pathConfig: {
+            container: POD_CONTAINERS.PACKING_LISTS,
+            filename: (id) => `${id}.json`,
+            resourceId: id || null
+        },
         pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
         onSyncSuccess: handleSyncSuccess,
@@ -152,8 +95,6 @@ export function ViewPackingList() {
                     initialValues[item.id] = item.packed
                 })
                 setValue('items', initialValues)
-                // Initialize the lastSyncedDataRef with the loaded data
-                lastSyncedDataRef.current = JSON.stringify(doc)
             } catch (err) {
                 console.error('Error fetching packing list:', err)
             } finally {
@@ -205,27 +146,30 @@ export function ViewPackingList() {
                 items: packingList.items.map(item => ({
                     ...item,
                     packed: currentFormValues[item.id] ?? false
-                })),
-                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
+                }))
             }
-            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-            const savedPackingList = {
-                ...updatedPackingList,
-                _rev: dbResult.rev
-            }
-            setPackingList(savedPackingList)
-            console.log('handleItemChange: Saved to local DB')
 
-            // If logged in, also save to Pod automatically
+            // Save with sync prevention (handles local DB + Pod save)
             if (isLoggedIn) {
-                console.log('handleItemChange: Saving to Pod...')
-                isLocalChangeRef.current = true;
-                await saveToPod(savedPackingList);
-                console.log('handleItemChange: Saved to Pod')
-                // Reset the flag after a short delay to allow sync to complete
-                setTimeout(() => {
-                    isLocalChangeRef.current = false;
-                }, 2000);
+                console.log('handleItemChange: Saving to local DB and Pod...')
+                const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
+                if (savedPackingList) {
+                    setPackingList(savedPackingList);
+                    console.log('handleItemChange: Saved to local DB and Pod')
+                }
+            } else {
+                // Not logged in, just save locally
+                const dataWithTimestamp = {
+                    ...updatedPackingList,
+                    lastModified: new Date().toISOString()
+                };
+                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const savedPackingList = {
+                    ...dataWithTimestamp,
+                    _rev: dbResult.rev
+                };
+                setPackingList(savedPackingList);
+                console.log('handleItemChange: Saved to local DB')
             }
 
             setAutoSaveStatus('saved')
@@ -262,33 +206,32 @@ export function ViewPackingList() {
             const updatedItems = packingList.items.filter(item => item.id !== itemId)
             const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems,
-                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
+                items: updatedItems
             }
-
-            // Save to database
-            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-
-            // Update local state with new _rev
-            const savedPackingList = {
-                ...updatedPackingList,
-                _rev: dbResult.rev
-            }
-            setPackingList(savedPackingList)
 
             // Remove from form values
             const currentFormValues = getValues('items')
             delete currentFormValues[itemId]
             setValue('items', currentFormValues)
 
-            // If logged in, also save to Pod automatically
+            // Save with sync prevention (handles local DB + Pod save)
             if (isLoggedIn) {
-                isLocalChangeRef.current = true;
-                await saveToPod(savedPackingList);
-                // Reset the flag after a short delay to allow sync to complete
-                setTimeout(() => {
-                    isLocalChangeRef.current = false;
-                }, 2000);
+                const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
+                if (savedPackingList) {
+                    setPackingList(savedPackingList);
+                }
+            } else {
+                // Not logged in, just save locally
+                const dataWithTimestamp = {
+                    ...updatedPackingList,
+                    lastModified: new Date().toISOString()
+                };
+                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const savedPackingList = {
+                    ...dataWithTimestamp,
+                    _rev: dbResult.rev
+                };
+                setPackingList(savedPackingList);
             }
 
             setAutoSaveStatus('saved')
@@ -323,19 +266,8 @@ export function ViewPackingList() {
             const updatedItems = [...packingList.items, newItem]
             const updatedPackingList: PackingList = {
                 ...packingList,
-                items: updatedItems,
-                lastModified: new Date().toISOString() // Add timestamp for conflict resolution
+                items: updatedItems
             }
-
-            // Save to database
-            const dbResult = await packingAppDb.savePackingList(updatedPackingList)
-
-            // Update local state with new _rev
-            const savedPackingList = {
-                ...updatedPackingList,
-                _rev: dbResult.rev
-            }
-            setPackingList(savedPackingList)
 
             // Add to form values
             setValue(`items.${newItem.id}`, false)
@@ -343,14 +275,24 @@ export function ViewPackingList() {
             // Clear the input
             setNewItemInputs({ ...newItemInputs, [personName]: '' })
 
-            // If logged in, also save to Pod automatically
+            // Save with sync prevention (handles local DB + Pod save)
             if (isLoggedIn) {
-                isLocalChangeRef.current = true;
-                await saveToPod(savedPackingList);
-                // Reset the flag after a short delay to allow sync to complete
-                setTimeout(() => {
-                    isLocalChangeRef.current = false;
-                }, 2000);
+                const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
+                if (savedPackingList) {
+                    setPackingList(savedPackingList);
+                }
+            } else {
+                // Not logged in, just save locally
+                const dataWithTimestamp = {
+                    ...updatedPackingList,
+                    lastModified: new Date().toISOString()
+                };
+                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const savedPackingList = {
+                    ...dataWithTimestamp,
+                    _rev: dbResult.rev
+                };
+                setPackingList(savedPackingList);
             }
 
             setAutoSaveStatus('saved')
