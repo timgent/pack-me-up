@@ -22,32 +22,32 @@ export const Navigation = () => {
 
     return (
         <>
-            <nav className="bg-gray-800 text-white shadow-lg">
+            <nav className="bg-gradient-fun text-white shadow-soft backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <Link to="/" className="text-xl font-bold hover:text-gray-300">
-                                    Pack Me Up
+                                <Link to="/" className="text-2xl font-bold hover:scale-105 transition-transform duration-200 drop-shadow-lg">
+                                    🎒 Pack Me Up
                                 </Link>
                             </div>
                             <div className="hidden md:block">
-                                <div className="ml-10 flex items-baseline space-x-4">
+                                <div className="ml-10 flex items-baseline space-x-2">
                                     <Link
                                         to="/manage-questions"
-                                        className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700 hover:text-white"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                                     >
                                         Edit Questions
                                     </Link>
                                     <Link
                                         to="/create-packing-list"
-                                        className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700 hover:text-white"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                                     >
                                         Create List
                                     </Link>
                                     <Link
                                         to="/view-lists"
-                                        className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700 hover:text-white"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 backdrop-blur-sm transition-all duration-200 hover:scale-105"
                                     >
                                         View Lists
                                     </Link>
@@ -57,13 +57,13 @@ export const Navigation = () => {
                         {/* Solid Login/Logout section */}
                         <div className="hidden md:flex items-center gap-2">
                             {isLoggedIn ? (
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm text-gray-300 truncate max-w-xs" title={webId}>
+                                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl">
+                                    <span className="text-sm font-medium truncate max-w-xs" title={webId}>
                                         {webId}
                                     </span>
                                     <button
                                         onClick={handleLogout}
-                                        className="px-3 py-2 rounded-md text-sm font-medium bg-gray-700 hover:bg-gray-600 transition-colors"
+                                        className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-white/20 hover:bg-white/30 transition-all duration-200 hover:scale-105"
                                     >
                                         Logout
                                     </button>
@@ -72,12 +72,12 @@ export const Navigation = () => {
                                 <div className="flex flex-col items-end">
                                     <button
                                         onClick={handleSolidLogin}
-                                        className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 transition-colors"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-white/90 text-primary-700 hover:bg-white hover:scale-105 transition-all duration-200 shadow-soft"
                                         title="Store your packing lists in your own personal Pod - you own your data"
                                     >
                                         Login with Solid Pod
                                     </button>
-                                    <span className="text-xs text-gray-400 mt-1">Own your data</span>
+                                    <span className="text-xs text-white/80 mt-1 font-medium">Own your data</span>
                                 </div>
                             )}
                         </div>
@@ -85,7 +85,7 @@ export const Navigation = () => {
                         <div className="md:hidden">
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
-                                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none"
+                                className="inline-flex items-center justify-center p-2 rounded-lg text-white hover:bg-white/20 focus:outline-none transition-all duration-200"
                                 aria-expanded="false"
                             >
                                 <span className="sr-only">Open main menu</span>
@@ -115,34 +115,34 @@ export const Navigation = () => {
                 </div>
 
                 {/* Mobile menu */}
-                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden`}>
+                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-white/10 backdrop-blur-md`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             to="/manage-questions"
-                            className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 hover:text-white"
+                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             Edit Questions
                         </Link>
                         <Link
                             to="/create-packing-list"
-                            className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 hover:text-white"
+                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             Create List
                         </Link>
                         <Link
                             to="/view-lists"
-                            className="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 hover:text-white"
+                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             View Lists
                         </Link>
                         {/* Mobile Solid Login/Logout */}
-                        <div className="border-t border-gray-700 pt-2 mt-2">
+                        <div className="border-t border-white/20 pt-2 mt-2">
                             {isLoggedIn ? (
                                 <>
-                                    <div className="px-3 py-2 text-sm text-gray-300 truncate" title={webId}>
+                                    <div className="px-3 py-2 text-sm font-medium truncate" title={webId}>
                                         {webId}
                                     </div>
                                     <button
@@ -150,7 +150,7 @@ export const Navigation = () => {
                                             handleLogout()
                                             setIsOpen(false)
                                         }}
-                                        className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-gray-700 hover:bg-gray-600"
+                                        className="w-full text-left px-3 py-2 rounded-xl text-base font-semibold bg-white/20 hover:bg-white/30 transition-all duration-200"
                                     >
                                         Logout
                                     </button>
@@ -162,12 +162,12 @@ export const Navigation = () => {
                                             handleSolidLogin()
                                             setIsOpen(false)
                                         }}
-                                        className="w-full text-left px-3 py-2 rounded-md text-base font-medium bg-blue-600 hover:bg-blue-700"
+                                        className="w-full text-left px-3 py-2 rounded-xl text-base font-semibold bg-white/90 text-primary-700 hover:bg-white transition-all duration-200"
                                         title="Store your packing lists in your own personal Pod - you own your data"
                                     >
                                         Login with Solid Pod
                                     </button>
-                                    <p className="px-3 py-1 text-xs text-gray-400">Own your data</p>
+                                    <p className="px-3 py-1 text-xs text-white/80 font-medium">Own your data</p>
                                 </div>
                             )}
                         </div>

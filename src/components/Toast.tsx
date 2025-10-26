@@ -19,14 +19,16 @@ export function Toast({ message, type, onClose, duration = 3000 }: ToastProps) {
         return () => clearTimeout(timer);
     }, [duration, onClose]);
 
-    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const styles = type === 'success'
+        ? 'bg-gradient-to-r from-success-500 to-success-600 shadow-glow-primary'
+        : 'bg-gradient-to-r from-danger-500 to-danger-600 shadow-lg';
 
     return (
-        <div className={`fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 min-w-[200px]`}>
-            <span className="flex-1">{message}</span>
+        <div className={`fixed top-4 right-4 ${styles} text-white px-6 py-4 rounded-2xl flex items-center gap-3 min-w-[250px] animate-slide-down backdrop-blur-sm`}>
+            <span className="flex-1 font-semibold">{message}</span>
             <button
                 onClick={onClose}
-                className="hover:opacity-80 transition-opacity"
+                className="hover:scale-110 transition-transform duration-200"
             >
                 <XMarkIcon className="h-5 w-5" />
             </button>
