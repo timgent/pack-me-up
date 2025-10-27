@@ -16,6 +16,8 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { JsonEditor } from '../edit-questions/json-editor'
+import { validateQuestionSet } from '../edit-questions/validation'
 
 export function EditQuestionsForm() {
 
@@ -25,6 +27,10 @@ export function EditQuestionsForm() {
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
+  const [jsonValue, setJsonValue] = useState<string>('')
+  const [originalJsonValue, setOriginalJsonValue] = useState<string>('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
   const { fields: peopleFields, append: appendPeople, remove: removePeople } = useFieldArray({
     control,
     name: "people"
@@ -38,6 +44,21 @@ export function EditQuestionsForm() {
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
+
+  // Scroll to top on initial mount
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  // Scroll to top when switching to visual mode (after render completes)
+  useEffect(() => {
+    if (editorMode === 'visual') {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 0);
+    }
+  }, [editorMode]);
 
   // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
   const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
@@ -151,19 +172,25 @@ export function EditQuestionsForm() {
     }
   }, 800); // 800ms debounce to batch rapid changes
 
-  // Trigger auto-save when form values change
+  // Trigger auto-save when form values change (but not in JSON mode)
   useEffect(() => {
     console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
       hasCurrentQuestionSet: !!currentQuestionSet,
-      watchedFormValues: watchedFormValues
+      watchedFormValues: watchedFormValues,
+      editorMode: editorMode
     });
+    // Skip auto-save in JSON mode - user will manually save
+    if (editorMode === 'json') {
+      console.log('Skipping handleAutoSave - in JSON editor mode');
+      return;
+    }
     if (currentQuestionSet) {
       console.log('Calling handleAutoSave...');
       handleAutoSave();
     } else {
       console.log('Skipping handleAutoSave - currentQuestionSet is null');
     }
-  }, [watchedFormValues, handleAutoSave]);
+  }, [watchedFormValues, handleAutoSave, editorMode]);
 
   const removePerson = (removedIndex: number) => {
     // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -310,6 +337,118 @@ export function EditQuestionsForm() {
     }
   };
 
+  // JSON Editor sync functions
+  const syncVisualToJson = useCallback(() => {
+    const formData = getValues();
+    // Remove internal database fields that users shouldn't edit
+    const { _id, _rev, lastModified, ...cleanData } = formData as any;
+    const formatted = JSON.stringify(cleanData, null, 2);
+    setJsonValue(formatted);
+    setOriginalJsonValue(formatted); // Track original for diff
+    setJsonError(null);
+  }, [getValues]);
+
+  const syncJsonToVisual = useCallback((): boolean => {
+    try {
+      const parsed = JSON.parse(jsonValue);
+
+      // Validate structure
+      const validation = validateQuestionSet(parsed);
+      if (!validation.valid) {
+        setJsonError(validation.error || 'Invalid question set structure');
+        return false;
+      }
+
+      // Restore internal fields from current state before updating
+      const dataWithRev = { ...parsed, _rev: rev };
+      reset(dataWithRev);
+      setCurrentQuestionSet(dataWithRev);
+      setJsonError(null);
+      return true;
+    } catch (e: any) {
+      setJsonError(`Invalid JSON: ${e.message}`);
+      return false;
+    }
+  }, [jsonValue, reset, rev]);
+
+  // Manual save handler for JSON mode
+  const handleSaveJson = useCallback(async () => {
+    try {
+      const parsed = JSON.parse(jsonValue);
+
+      // Validate structure
+      const validation = validateQuestionSet(parsed);
+      if (!validation.valid) {
+        setJsonError(validation.error || 'Invalid question set structure');
+        showToast('Cannot save: JSON validation failed', 'error');
+        return;
+      }
+
+      setAutoSaveStatus('saving');
+
+      // Prepare data with ID and internal fields
+      const dataToSave = {
+        _id: "1",
+        ...parsed,
+        _rev: rev,
+      };
+
+      // Save logic similar to visual mode
+      if (isLoggedIn) {
+        const savedData = await saveWithSyncPrevention(dataToSave, saveToPod);
+        if (savedData) {
+          setRev(savedData._rev);
+          setCurrentQuestionSet(savedData);
+          // Update original to mark as saved
+          const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+          setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
+        }
+      } else {
+        const dataWithTimestamp = {
+          ...dataToSave,
+          lastModified: new Date().toISOString()
+        };
+        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const savedData = {
+          ...dataWithTimestamp,
+          _rev: result.rev
+        };
+        setRev(result.rev);
+        setCurrentQuestionSet(savedData);
+        // Update original to mark as saved
+        const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+        setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
+      }
+
+      setJsonError(null);
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      showToast('JSON saved successfully!', 'success');
+    } catch (e: any) {
+      setJsonError(`Invalid JSON: ${e.message}`);
+      setAutoSaveStatus('error');
+      showToast('Failed to save JSON', 'error');
+    }
+  }, [jsonValue, rev, isLoggedIn, saveWithSyncPrevention, saveToPod, showToast]);
+
+  const handleModeChange = useCallback((newMode: 'visual' | 'json') => {
+    if (newMode === 'json') {
+      // Switching TO JSON: sync current form state
+      syncVisualToJson();
+      setEditorMode('json');
+    } else {
+      // Switching FROM JSON: validate and apply changes
+      const success = syncJsonToVisual();
+      if (!success) {
+        // Show error, don't switch mode
+        showToast('Please fix JSON errors before switching to visual editor', 'error');
+        return;
+      }
+      setEditorMode('visual');
+      // Scroll handled by useEffect to ensure DOM has updated
+    }
+  }, [syncVisualToJson, syncJsonToVisual, showToast]);
+
   const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
   // Format last sync time for display
@@ -330,20 +469,49 @@ export function EditQuestionsForm() {
       <div className="mb-8 w-full max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
         <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
-      </div>
-      {isFormEmpty && (
-        <div className="w-full max-w-5xl mb-8">
-          <Callout
-            title="Get Started with Example Questions"
-            description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
-            action={{
-              label: "Load Example",
-              onClick: () => setIsExampleModalOpen(true)
-            }}
-          />
+
+        {/* Editor Mode Toggle */}
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleModeChange('visual')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              editorMode === 'visual'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            Visual Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('json')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              editorMode === 'json'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            JSON Editor
+          </button>
+          <span className="text-sm text-gray-500 ml-2">(Advanced)</span>
         </div>
-      )}
-      <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+      </div>
+      {editorMode === 'visual' ? (
+        <>
+          {isFormEmpty && (
+            <div className="w-full max-w-5xl mb-8">
+              <Callout
+                title="Get Started with Example Questions"
+                description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
+                action={{
+                  label: "Load Example",
+                  onClick: () => setIsExampleModalOpen(true)
+                }}
+              />
+            </div>
+          )}
+          <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
         {/* Main form content */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8" id="edit-questions-form">
           <PeopleSection
@@ -578,6 +746,19 @@ export function EditQuestionsForm() {
           </div>
         </div>
       </div>
+        </>
+      ) : (
+        <div className="w-full max-w-5xl">
+          <JsonEditor
+            value={jsonValue}
+            onChange={setJsonValue}
+            error={jsonError}
+            originalValue={originalJsonValue}
+            onSave={handleSaveJson}
+            hasUnsavedChanges={jsonValue !== originalJsonValue}
+          />
+        </div>
+      )}
 
       <Modal
         isOpen={isExampleModalOpen}

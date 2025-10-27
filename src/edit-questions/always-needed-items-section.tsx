@@ -27,13 +27,18 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const shouldFocusRef = useRef(false);
 
     useEffect(() => {
-        if (selectRefs.current[itemFields.length - 1]) {
-            const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
-            if (input) {
-                input.focus();
+        // Only focus if the user clicked "Add Item" button
+        if (shouldFocusRef.current) {
+            if (selectRefs.current[itemFields.length - 1]) {
+                const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
+                if (input) {
+                    input.focus();
+                }
             }
+            shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
 
@@ -97,6 +102,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                 <Button
                     type="button"
                     onClick={() => {
+                        shouldFocusRef.current = true;
                         appendItem({ text: "", personSelections: [] });
                     }}
                     variant="ghost"

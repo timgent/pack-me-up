@@ -90,3 +90,507 @@
   --box-shadow-glow-secondary: 0 0 20px rgba(249, 115, 22, 0.4);
   --box-shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
 }
+
+/* JSON Editor Styles */
+.json-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.json-editor-header {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1rem;
+}
+
+.json-editor-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.json-editor-help {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.json-editor-wrapper {
+  display: flex;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: #f9fafb;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.json-editor-wrapper:focus-within {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.json-editor-line-numbers {
+  padding: 1rem 0.75rem;
+  background-color: #f3f4f6;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: hidden;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.json-editor-line-number {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #9ca3af;
+  text-align: right;
+  padding-right: 0.5rem;
+}
+
+.json-editor-textarea {
+  flex: 1;
+  min-height: 600px;
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border: none;
+  background-color: transparent;
+  color: #111827;
+  resize: vertical;
+  outline: none;
+}
+
+.json-editor-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.json-editor-error {
+  padding: 1rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.json-editor-error strong {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* LLM Prompt Generator Styles */
+.llm-prompt-section {
+  background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%);
+  border: 2px solid #0d9488;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.llm-prompt-header h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f766e;
+  margin: 0 0 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.llm-prompt-help {
+  font-size: 0.875rem;
+  color: #0f766e;
+  margin: 0 0 1rem 0;
+  opacity: 0.9;
+}
+
+.llm-prompt-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .llm-prompt-input-group {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.llm-prompt-textarea {
+  flex: 1;
+  padding: 0.75rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border: 2px solid #5eead4;
+  border-radius: 0.5rem;
+  background-color: white;
+  color: #111827;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 80px;
+}
+
+.llm-prompt-textarea:focus {
+  outline: none;
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.llm-prompt-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.llm-prompt-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background-color: #0d9488;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  white-space: nowrap;
+  min-height: 80px;
+}
+
+.llm-prompt-button:hover:not(:disabled) {
+  background-color: #0f766e;
+}
+
+.llm-prompt-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.llm-prompt-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.llm-prompt-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (max-width: 767px) {
+  .llm-prompt-button {
+    min-height: auto;
+    width: 100%;
+  }
+}
+
+/* JSON Editor Save Button Styles */
+.json-editor-save-section {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.json-editor-save-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  width: 100%;
+  background-color: #6b7280;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.json-editor-save-button.has-changes {
+  background-color: #0d9488;
+  box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.3);
+}
+
+.json-editor-save-button.has-changes:hover:not(:disabled) {
+  background-color: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 8px -1px rgba(13, 148, 136, 0.4);
+}
+
+.json-editor-save-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.json-editor-save-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.json-editor-save-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.json-editor-save-hint {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: #ea580c;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Scroll to Top Button Styles */
+.json-editor-scroll-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background-color: #0d9488;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(13, 148, 136, 0.5);
+  transition: all 0.2s;
+}
+
+.json-editor-scroll-top:hover {
+  background-color: #0f766e;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.5);
+}
+
+.json-editor-scroll-top:active {
+  transform: translateY(0);
+}
+
+.json-editor-scroll-top svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Diff View Styles */
+.diff-toggle-section {
+  margin: 1rem 0;
+}
+
+.diff-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background-color: #f3f4f6;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 2px solid #d1d5db;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-toggle-button:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.diff-toggle-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.diff-view-container {
+  margin: 1rem 0;
+  border: 2px solid #d1d5db;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background-color: white;
+}
+
+/* Tabs */
+.diff-tabs {
+  display: flex;
+  background-color: #f9fafb;
+  border-bottom: 2px solid #d1d5db;
+}
+
+.diff-tab {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  background: none;
+  border: none;
+  border-right: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-tab:last-child {
+  border-right: none;
+}
+
+.diff-tab:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.diff-tab.active {
+  background-color: white;
+  color: #0d9488;
+  border-bottom: 2px solid #0d9488;
+  margin-bottom: -2px;
+}
+
+/* Tab Content */
+.diff-tab-content {
+  padding: 1.5rem;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.diff-no-changes {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 2rem;
+}
+
+/* Summary View */
+.diff-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.diff-summary-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.diff-summary-item {
+  padding: 0.5rem 1rem;
+  margin: 0.25rem 0;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.diff-summary-item.added {
+  background-color: #d1fae5;
+  color: #065f46;
+  font-weight: 500;
+}
+
+.diff-summary-item.removed {
+  background-color: #fee2e2;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+.diff-summary-item.modified {
+  background-color: #fef3c7;
+  color: #92400e;
+  font-weight: 500;
+}
+
+/* Questions & Items Views */
+.diff-section {
+  margin-bottom: 2rem;
+}
+
+.diff-section:last-child {
+  margin-bottom: 0;
+}
+
+.diff-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+}
+
+.diff-section-title.added {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.diff-section-title.removed {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.diff-section-title.modified {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.diff-item {
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  border-radius: 0.375rem;
+  border-left: 4px solid;
+}
+
+.diff-item.added {
+  background-color: #f0fdfa;
+  border-color: #14b8a6;
+}
+
+.diff-item.removed {
+  background-color: #fef2f2;
+  border-color: #ef4444;
+}
+
+.diff-item.modified {
+  background-color: #fffbeb;
+  border-color: #f59e0b;
+}
+
+.diff-item strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #111827;
+}
+
+.diff-item-meta {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+.diff-item-locations {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+.diff-item-change {
+  font-size: 0.875rem;
+  color: #374151;
+  margin-top: 0.25rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
