@@ -5,7 +5,8 @@ import { packingAppDb } from '../services/database'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
-import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, AuthenticationError } from '../services/solidPod'
+import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
@@ -15,6 +16,7 @@ export function PackingLists() {
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
+    const handlePodError = usePodErrorHandler()
 
     const deletePackingList = async (id: string, event: React.MouseEvent) => {
         event.stopPropagation() // Prevent navigation when clicking delete
@@ -46,12 +48,7 @@ export function PackingLists() {
                 showToast(`Saved ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
             }
         } catch (error) {
-            console.error('Error saving to pod:', error)
-            if (error instanceof AuthenticationError) {
-                showToast(error.message, 'error')
-            } else {
-                showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
-            }
+            handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         } finally {
             setIsSaving(false)
         }
@@ -102,12 +99,7 @@ export function PackingLists() {
                 showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
             }
         } catch (error) {
-            console.error('Error loading from pod:', error)
-            if (error instanceof AuthenticationError) {
-                showToast(error.message, 'error')
-            } else {
-                showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
-            }
+            handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
         } finally {
             setIsLoadingFromPod(false)
         }
