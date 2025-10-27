@@ -1,4 +1,5 @@
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
+import { validateQuestionSet, ValidationError } from './validation'
 
 interface JsonEditorProps {
   value: string
@@ -7,6 +8,7 @@ interface JsonEditorProps {
   originalValue: string
   onSave: () => void
   hasUnsavedChanges: boolean
+  onValidationChange?: (errors: ValidationError[] | null) => void
 }
 
 /**
@@ -14,7 +16,7 @@ interface JsonEditorProps {
  * Provides a textarea with monospace font, line numbers, error display, LLM prompt generation,
  * save button, and scroll to top functionality.
  */
-export function JsonEditor({ value, onChange, error, originalValue, onSave, hasUnsavedChanges }: JsonEditorProps) {
+export function JsonEditor({ value, onChange, error, originalValue, onSave, hasUnsavedChanges, onValidationChange }: JsonEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const [userPrompt, setUserPrompt] = useState('')
@@ -22,9 +24,57 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [showDiff, setShowDiff] = useState(false)
   const [diffTab, setDiffTab] = useState<'summary' | 'questions' | 'items'>('summary')
+  const [validationErrors, setValidationErrors] = useState<ValidationError[] | null>(null)
+  const [isValidating, setIsValidating] = useState(false)
 
   // Count lines in the value
   const lineCount = value.split('\n').length
+
+  // Debounced validation - runs 800ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsValidating(true)
+      try {
+        const parsed = JSON.parse(value)
+        const validation = validateQuestionSet(parsed)
+
+        if (validation.valid) {
+          setValidationErrors(null)
+          onValidationChange?.(null)
+        } else {
+          setValidationErrors(validation.errors || null)
+          onValidationChange?.(validation.errors || null)
+        }
+      } catch (e) {
+        // JSON syntax error - don't show validation errors yet
+        setValidationErrors(null)
+        onValidationChange?.(null)
+      }
+      setIsValidating(false)
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [value, onValidationChange])
+
+  // Manual re-validation function
+  const handleRevalidate = useCallback(() => {
+    setIsValidating(true)
+    try {
+      const parsed = JSON.parse(value)
+      const validation = validateQuestionSet(parsed)
+
+      if (validation.valid) {
+        setValidationErrors(null)
+        onValidationChange?.(null)
+      } else {
+        setValidationErrors(validation.errors || null)
+        onValidationChange?.(validation.errors || null)
+      }
+    } catch (e) {
+      // Keep existing validation errors if JSON is invalid
+    }
+    setIsValidating(false)
+  }, [value, onValidationChange])
 
   // Sync scroll between line numbers and textarea
   const handleScroll = useCallback(() => {
@@ -535,9 +585,57 @@ ${userPrompt}`
         />
       </div>
 
+      {/* Error Display - Shows either parse error or all validation errors */}
       {error && (
         <div className="json-editor-error">
-          <strong>Validation Error:</strong> {error}
+          <div className="json-editor-error-header">
+            <strong>
+              {error.includes('Invalid JSON') ? 'JSON Syntax Error' : 'Validation Errors'}
+            </strong>
+            {!error.includes('Invalid JSON') && validationErrors && validationErrors.length > 0 && (
+              <span className="json-editor-error-count">
+                ({validationErrors.length} issue{validationErrors.length > 1 ? 's' : ''})
+              </span>
+            )}
+          </div>
+
+          {/* Show all validation errors if available */}
+          {validationErrors && validationErrors.length > 0 ? (
+            <ul className="json-editor-error-list">
+              {validationErrors.map((err, idx) => (
+                <li key={idx} className="json-editor-error-item">
+                  <code className="json-editor-error-path">{err.path}</code>
+                  <span className="json-editor-error-message">: {err.message}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="json-editor-error-message">{error}</p>
+          )}
+
+          <div className="json-editor-error-actions">
+            <button
+              type="button"
+              onClick={handleRevalidate}
+              className="json-editor-revalidate-button"
+              disabled={isValidating}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isValidating ? 'Validating...' : 'Re-validate'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Validation status indicator when no errors */}
+      {!error && validationErrors === null && hasUnsavedChanges && (
+        <div className="json-editor-success">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>JSON is valid and ready to save</span>
         </div>
       )}
 

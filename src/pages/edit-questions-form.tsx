@@ -756,6 +756,12 @@ export function EditQuestionsForm() {
             originalValue={originalJsonValue}
             onSave={handleSaveJson}
             hasUnsavedChanges={jsonValue !== originalJsonValue}
+            onValidationChange={(errors) => {
+              // Clear parent error when real-time validation passes
+              if (errors === null && jsonError) {
+                setJsonError(null)
+              }
+            }}
           />
         </div>
       )}
