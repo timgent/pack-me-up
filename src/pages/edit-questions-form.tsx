@@ -42,6 +42,7 @@ export function EditQuestionsForm() {
   const watchedFormValues = useWatch({ control });
 
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
+  const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -283,7 +284,7 @@ export function EditQuestionsForm() {
     loadQuestionSet()
   }, [])
 
-  const { fields: questionFields, append: appendQuestion, remove: removeQuestion } = useFieldArray({
+  const { fields: questionFields, append: appendQuestion, remove: removeQuestion, move: moveQuestion } = useFieldArray({
     control,
     name: "questions"
   });
@@ -528,6 +529,17 @@ export function EditQuestionsForm() {
             setValue={setValue}
             people={people}
           />
+          {questionFields.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => setAllQuestionsCollapsed(!allQuestionsCollapsed)}
+                variant="secondary"
+              >
+                {allQuestionsCollapsed ? 'Expand All' : 'Collapse All'}
+              </Button>
+            </div>
+          )}
           {questionFields.map((question, questionIndex) => (
             <QuestionSection
               key={question.id}
@@ -538,6 +550,9 @@ export function EditQuestionsForm() {
               setValue={setValue}
               removeQuestion={() => removeQuestion(questionIndex)}
               people={people}
+              moveUp={questionIndex > 0 ? () => moveQuestion(questionIndex, questionIndex - 1) : undefined}
+              moveDown={questionIndex < questionFields.length - 1 ? () => moveQuestion(questionIndex, questionIndex + 1) : undefined}
+              forceCollapsed={allQuestionsCollapsed}
             />
           ))}
           {/* Add Question button at bottom of form - only visible on large screens */}

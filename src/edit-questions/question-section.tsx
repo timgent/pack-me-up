@@ -4,7 +4,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { OptionSection } from './option-section'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface QuestionSectionProps {
     questionIndex: number;
@@ -14,10 +14,20 @@ interface QuestionSectionProps {
     setValue: any;
     removeQuestion: () => void;
     people: Person[];
+    moveUp?: () => void;
+    moveDown?: () => void;
+    forceCollapsed?: boolean | null;
 }
 
-export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people }: QuestionSectionProps) {
+export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed }: QuestionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
+
+    // Sync with forceCollapsed when it changes
+    useEffect(() => {
+        if (forceCollapsed !== null && forceCollapsed !== undefined) {
+            setIsExpanded(!forceCollapsed);
+        }
+    }, [forceCollapsed]);
     const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options` as const
@@ -31,6 +41,7 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                         type="button"
                         onClick={() => setIsExpanded(!isExpanded)}
                         className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
                     >
                         <svg
                             className={`w-5 h-5 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
@@ -41,6 +52,40 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                     </button>
+                    <div className="flex flex-col gap-1">
+                        <button
+                            type="button"
+                            onClick={moveUp}
+                            disabled={!moveUp}
+                            className={`text-gray-400 transition-colors duration-200 ${moveUp ? 'hover:text-gray-600 cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
+                            title="Move up"
+                        >
+                            <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={moveDown}
+                            disabled={!moveDown}
+                            className={`text-gray-400 transition-colors duration-200 ${moveDown ? 'hover:text-gray-600 cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
+                            title="Move down"
+                        >
+                            <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                    </div>
                     <div className="flex-1">
                         <Input
                             label={`Question ${questionIndex + 1}`}
