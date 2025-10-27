@@ -30,13 +30,35 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
   // Count lines in the value
   const lineCount = value.split('\n').length
 
+  // Jump to a specific line in the textarea
+  const jumpToLine = useCallback((lineNumber: number) => {
+    if (!textareaRef.current) return
+
+    const lines = value.split('\n')
+    let charPosition = 0
+
+    // Calculate character position for the target line
+    for (let i = 0; i < Math.min(lineNumber - 1, lines.length); i++) {
+      charPosition += lines[i].length + 1 // +1 for newline
+    }
+
+    // Set cursor position and focus
+    textareaRef.current.focus()
+    textareaRef.current.setSelectionRange(charPosition, charPosition + (lines[lineNumber - 1]?.length || 0))
+
+    // Scroll to the line
+    const lineHeight = 24 // Approximate line height in pixels
+    const targetScrollPosition = (lineNumber - 1) * lineHeight - 100 // Offset to show some context
+    textareaRef.current.scrollTop = Math.max(0, targetScrollPosition)
+  }, [value])
+
   // Debounced validation - runs 800ms after user stops typing
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsValidating(true)
       try {
         const parsed = JSON.parse(value)
-        const validation = validateQuestionSet(parsed)
+        const validation = validateQuestionSet(parsed, value) // Pass JSON text for line numbers
 
         if (validation.valid) {
           setValidationErrors(null)
@@ -61,7 +83,7 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
     setIsValidating(true)
     try {
       const parsed = JSON.parse(value)
-      const validation = validateQuestionSet(parsed)
+      const validation = validateQuestionSet(parsed, value) // Pass JSON text for line numbers
 
       if (validation.valid) {
         setValidationErrors(null)
@@ -308,6 +330,80 @@ ${userPrompt}`
           Edit the question set JSON directly. Changes will be applied when you switch back to Visual Editor mode.
         </p>
       </div>
+
+      {/* Error Display - STICKY AT TOP - Shows either parse error or all validation errors */}
+      {error && (
+        <div className="json-editor-error json-editor-error-sticky">
+          <div className="json-editor-error-header">
+            <strong>
+              {error.includes('Invalid JSON') ? 'JSON Syntax Error' : 'Validation Errors'}
+            </strong>
+            {!error.includes('Invalid JSON') && validationErrors && validationErrors.length > 0 && (
+              <span className="json-editor-error-count">
+                {validationErrors.length} issue{validationErrors.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Show all validation errors if available */}
+          {validationErrors && validationErrors.length > 0 ? (
+            <ul className="json-editor-error-list">
+              {validationErrors.map((err, idx) => (
+                <li key={idx} className="json-editor-error-item">
+                  <div className="json-editor-error-item-header">
+                    {err.lineNumber && (
+                      <span className="json-editor-error-line">Line {err.lineNumber}</span>
+                    )}
+                    <code className="json-editor-error-path">{err.path}</code>
+                  </div>
+                  <div className="json-editor-error-message">{err.message}</div>
+                  {err.context && (
+                    <div className="json-editor-error-context">{err.context}</div>
+                  )}
+                  {err.lineNumber && (
+                    <button
+                      type="button"
+                      onClick={() => jumpToLine(err.lineNumber!)}
+                      className="json-editor-jump-button"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                      Jump to error
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="json-editor-error-simple">{error}</p>
+          )}
+
+          <div className="json-editor-error-actions">
+            <button
+              type="button"
+              onClick={handleRevalidate}
+              className="json-editor-revalidate-button"
+              disabled={isValidating}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isValidating ? 'Validating...' : 'Re-validate'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Validation status indicator when no errors */}
+      {!error && validationErrors === null && hasUnsavedChanges && (
+        <div className="json-editor-success json-editor-success-sticky">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>JSON is valid and ready to save</span>
+        </div>
+      )}
 
       {/* LLM Prompt Generator */}
       <div className="llm-prompt-section">
@@ -584,60 +680,6 @@ ${userPrompt}`
           placeholder="Enter question set JSON..."
         />
       </div>
-
-      {/* Error Display - Shows either parse error or all validation errors */}
-      {error && (
-        <div className="json-editor-error">
-          <div className="json-editor-error-header">
-            <strong>
-              {error.includes('Invalid JSON') ? 'JSON Syntax Error' : 'Validation Errors'}
-            </strong>
-            {!error.includes('Invalid JSON') && validationErrors && validationErrors.length > 0 && (
-              <span className="json-editor-error-count">
-                ({validationErrors.length} issue{validationErrors.length > 1 ? 's' : ''})
-              </span>
-            )}
-          </div>
-
-          {/* Show all validation errors if available */}
-          {validationErrors && validationErrors.length > 0 ? (
-            <ul className="json-editor-error-list">
-              {validationErrors.map((err, idx) => (
-                <li key={idx} className="json-editor-error-item">
-                  <code className="json-editor-error-path">{err.path}</code>
-                  <span className="json-editor-error-message">: {err.message}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="json-editor-error-message">{error}</p>
-          )}
-
-          <div className="json-editor-error-actions">
-            <button
-              type="button"
-              onClick={handleRevalidate}
-              className="json-editor-revalidate-button"
-              disabled={isValidating}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {isValidating ? 'Validating...' : 'Re-validate'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Validation status indicator when no errors */}
-      {!error && validationErrors === null && hasUnsavedChanges && (
-        <div className="json-editor-success">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>JSON is valid and ready to save</span>
-        </div>
-      )}
 
       {/* Scroll to Top Button */}
       {showScrollTop && (
