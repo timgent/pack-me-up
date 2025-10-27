@@ -293,15 +293,11 @@
 
 /* JSON Editor Save Button Styles */
 .json-editor-save-section {
-  position: sticky;
-  bottom: 0;
-  z-index: 40;
-  margin-top: 1.5rem;
+  margin: 1.5rem 0;
   padding: 1.25rem;
   background: #f9fafb;
   border: 2px solid #e5e7eb;
   border-radius: 0.75rem;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .json-editor-save-button {
