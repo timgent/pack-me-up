@@ -5,7 +5,7 @@ import { packingAppDb } from '../services/database'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
-import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, AuthenticationError } from '../services/solidPod'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
@@ -47,7 +47,11 @@ export function PackingLists() {
             }
         } catch (error) {
             console.error('Error saving to pod:', error)
-            showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
+            if (error instanceof AuthenticationError) {
+                showToast(error.message, 'error')
+            } else {
+                showToast(POD_ERROR_MESSAGES.SAVE_FAILED, 'error')
+            }
         } finally {
             setIsSaving(false)
         }
@@ -99,7 +103,11 @@ export function PackingLists() {
             }
         } catch (error) {
             console.error('Error loading from pod:', error)
-            showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
+            if (error instanceof AuthenticationError) {
+                showToast(error.message, 'error')
+            } else {
+                showToast(POD_ERROR_MESSAGES.LOAD_FAILED, 'error')
+            }
         } finally {
             setIsLoadingFromPod(false)
         }
