@@ -353,8 +353,8 @@ export function EditQuestionsForm() {
     try {
       const parsed = JSON.parse(jsonValue);
 
-      // Validate structure
-      const validation = validateQuestionSet(parsed);
+      // Validate structure with JSON text for line numbers
+      const validation = validateQuestionSet(parsed, jsonValue);
       if (!validation.valid) {
         setJsonError(validation.error || 'Invalid question set structure');
         return false;
@@ -377,8 +377,8 @@ export function EditQuestionsForm() {
     try {
       const parsed = JSON.parse(jsonValue);
 
-      // Validate structure
-      const validation = validateQuestionSet(parsed);
+      // Validate structure with JSON text for line numbers
+      const validation = validateQuestionSet(parsed, jsonValue);
       if (!validation.valid) {
         setJsonError(validation.error || 'Invalid question set structure');
         showToast('Cannot save: JSON validation failed', 'error');
@@ -771,6 +771,12 @@ export function EditQuestionsForm() {
             originalValue={originalJsonValue}
             onSave={handleSaveJson}
             hasUnsavedChanges={jsonValue !== originalJsonValue}
+            onValidationChange={(errors) => {
+              // Clear parent error when real-time validation passes
+              if (errors === null && jsonError) {
+                setJsonError(null)
+              }
+            }}
           />
         </div>
       )}
