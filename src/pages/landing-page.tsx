@@ -69,13 +69,22 @@ export const LandingPage = () => {
                     </div>
                 </div>
 
-                <div className="text-center">
+                <div className="text-center space-y-4">
                     <Link
-                        to="/create-packing-list"
+                        to="/wizard"
                         className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
                     >
-                        🚀 Create Your First Packing List
+                        ✨ Get Started with the Wizard
                     </Link>
+                    <div className="text-gray-600">
+                        or{' '}
+                        <Link
+                            to="/create-packing-list"
+                            className="text-primary-700 font-semibold hover:underline"
+                        >
+                            create a packing list directly
+                        </Link>
+                    </div>
                 </div>
             </div>
         </>
