@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
+import { Modal } from '../components/Modal'
 import { packingAppDb } from '../services/database'
 import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 
 export const Wizard = () => {
+    const navigate = useNavigate()
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
     const [hasExistingData, setHasExistingData] = useState(false)
-    const { isLoading, saveAndNavigate } = useWizardGeneration()
+    const { isLoading, isSuccess, generateAndSave } = useWizardGeneration()
 
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
         resolver: zodResolver(wizardSchema),
@@ -45,14 +48,14 @@ export const Wizard = () => {
         if (hasExistingData) {
             setShowConfirmDialog(true)
         } else {
-            await saveAndNavigate(data)
+            await generateAndSave(data)
         }
     }
 
     const handleConfirmOverride = async () => {
         setShowConfirmDialog(false)
         const data = watch()
-        await saveAndNavigate(data)
+        await generateAndSave(data)
     }
 
     const handleAddPerson = () => {
@@ -222,6 +225,39 @@ Are you sure you want to continue?"
                 cancelText="Cancel"
                 confirmVariant="danger"
             />
+
+            {/* Success Modal */}
+            <Modal
+                isOpen={isSuccess}
+                onClose={() => {}}
+                title="🎉 Questions Generated Successfully!"
+            >
+                <div className="space-y-6">
+                    <p className="text-gray-700 text-center">
+                        Your packing list questions are ready! What would you like to do next?
+                    </p>
+
+                    <div className="space-y-4">
+                        <button
+                            onClick={() => navigate('/create-packing-list')}
+                            className="w-full bg-gradient-primary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                        >
+                            🚀 Create My First Packing List
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/manage-questions')}
+                            className="w-full bg-gradient-secondary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-secondary"
+                        >
+                            ✏️ Refine My Packing List Questions
+                        </button>
+                    </div>
+
+                    <p className="text-sm text-gray-500 text-center mt-4">
+                        You can always access these options from the navigation menu above
+                    </p>
+                </div>
+            </Modal>
         </div>
     )
 }
