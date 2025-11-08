@@ -1,10 +1,10 @@
 import { PackingListQuestionSet } from './types';
 import { generateUUID } from '../utils/uuid';
 
-function createExampleData(numPeople: number): PackingListQuestionSet {
+export function createExampleData(numPeople: number, names?: string[]): PackingListQuestionSet {
     const people = Array.from({ length: numPeople }, (_, i) => ({
         id: generateUUID(),
-        name: i === 0 ? "Me" : `Person ${i + 1}`
+        name: names?.[i] || (i === 0 ? "Me" : `Person ${i + 1}`)
     }));
 
     return {
