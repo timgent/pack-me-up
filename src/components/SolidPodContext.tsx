@@ -7,6 +7,7 @@ import {
   logout as solidLogout
 } from "@inrupt/solid-client-authn-browser";
 import { useToast } from "./ToastContext";
+import { isAuthenticationError } from "../services/solidPod";
 
 interface SolidPodContextValue {
   session: Session | null;
@@ -109,6 +110,46 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
     initializeSession();
   }, [showToast]);
+
+  // Validate session when user returns to the tab
+  useEffect(() => {
+    if (!session?.info.isLoggedIn || !session?.info.webId) {
+      return;
+    }
+
+    const validateSession = async () => {
+      try {
+        // Make a lightweight HEAD request to verify the session is still valid
+        await session.fetch(session.info.webId!, { method: 'HEAD' });
+      } catch (error: any) {
+        // If authentication error, the session has expired
+        if (isAuthenticationError(error)) {
+          console.log("Session validation failed - session has expired");
+          await solidLogout();
+          const updatedSession = getDefaultSession();
+          setSession(updatedSession);
+          setSessionVersion(v => v + 1);
+          showToast(
+            "Your session expired while you were away. Please log in again.",
+            "error"
+          );
+        } else {
+          // Network errors or other issues - log but don't logout
+          console.error("Session validation failed with non-auth error:", error);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("Tab became visible - validating session");
+        validateSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [session?.info.isLoggedIn, session?.info.webId, showToast]);
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
