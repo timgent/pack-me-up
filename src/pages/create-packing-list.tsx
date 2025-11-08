@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
+import { Link } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList, PackingListFormData, PackingListItem } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
-import { exampleData } from '../edit-questions/example-data'
-import { Callout } from '../components/Callout'
+import { useSolidPod } from '../components/SolidPodContext'
 
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
-    const [isExampleLoaded, setIsExampleLoaded] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+    const [noQuestionsFound, setNoQuestionsFound] = useState(false)
     const { showToast } = useToast()
+    const { isLoggedIn } = useSolidPod()
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
         defaultValues: {
@@ -23,23 +25,25 @@ export function CreatePackingList() {
 
     useEffect(() => {
         const fetchQuestionSet = async () => {
+            setIsLoading(true)
             try {
                 const doc = await packingAppDb.getQuestionSet()
                 setQuestionSet(doc)
+                setNoQuestionsFound(false)
             } catch (err: any) {
                 if (err.name === 'not_found') {
-                    console.log('No question set found, using example data')
-                    const exampleDoc = exampleData["Basic packing list for 1"]
-                    setQuestionSet(exampleDoc)
-                    setIsExampleLoaded(true)
+                    console.log('No question set found')
+                    setNoQuestionsFound(true)
                 } else {
                     console.error('Error fetching question set:', err)
                     showToast('Failed to load questions', 'error')
                 }
+            } finally {
+                setIsLoading(false)
             }
         }
         fetchQuestionSet()
-    }, [])
+    }, [showToast])
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return
@@ -106,8 +110,79 @@ export function CreatePackingList() {
         }
     }
 
+    if (isLoading) {
+        return (
+            <div className="max-w-4xl mx-auto py-8 px-4">
+                <div className="flex items-center justify-center min-h-96">
+                    <div className="text-center">
+                        <div className="text-lg text-gray-600">Loading questions...</div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (noQuestionsFound) {
+        return (
+            <div className="max-w-4xl mx-auto py-8 px-4">
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
+                    <p className="mt-2 text-gray-600">Let's set up your packing list questions first!</p>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-soft border-2 border-primary-200 p-8">
+                    <div className="text-center mb-6">
+                        <div className="text-6xl mb-4">📋</div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Questions Found</h2>
+                        <p className="text-gray-600">
+                            Before you can create a packing list, you need to set up your packing list questions.
+                        </p>
+                    </div>
+
+                    <div className="space-y-4 max-w-2xl mx-auto">
+                        <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-xl border-2 border-primary-200">
+                            <h3 className="text-lg font-bold text-primary-900 mb-2">✨ Quick Start with Wizard</h3>
+                            <p className="text-gray-700 mb-4">
+                                Answer a few simple questions and we'll generate a personalized question set for you.
+                            </p>
+                            <Link to="/wizard">
+                                <Button variant="primary" className="w-full">
+                                    Use the Wizard
+                                </Button>
+                            </Link>
+                        </div>
+
+                        {!isLoggedIn && (
+                            <div className="bg-gradient-to-br from-accent-50 to-accent-100 p-6 rounded-xl border-2 border-accent-200">
+                                <h3 className="text-lg font-bold text-accent-900 mb-2">🔒 Login to Sync Questions</h3>
+                                <p className="text-gray-700 mb-4">
+                                    If you've already created questions and saved them to your Solid Pod, login to sync them.
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                    Click "Login with Solid Pod" in the navigation bar above to continue.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="bg-gradient-to-br from-secondary-50 to-secondary-100 p-6 rounded-xl border-2 border-secondary-200">
+                            <h3 className="text-lg font-bold text-secondary-900 mb-2">✏️ Create Manually</h3>
+                            <p className="text-gray-700 mb-4">
+                                Prefer full control? Create your packing list questions from scratch.
+                            </p>
+                            <Link to="/manage-questions">
+                                <Button variant="secondary" className="w-full">
+                                    Edit Questions
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     if (!questionSet) {
-        return <div>Loading questions...</div>
+        return null
     }
 
     return (
@@ -116,15 +191,6 @@ export function CreatePackingList() {
                 <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
                 <p className="mt-2 text-gray-600">Answer the questions below to create your packing list.</p>
             </div>
-
-            {isExampleLoaded && (
-                <div className="mb-8">
-                    <Callout
-                        title="Example Questions Loaded"
-                        description="We've loaded some example questions to help you get started. You can customize these questions later in the Edit Questions section."
-                    />
-                </div>
-            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <Input
