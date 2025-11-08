@@ -1,42 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../components/Button'
-import { Modal } from '../components/Modal'
-import { useToast } from '../components/ToastContext'
+import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { packingAppDb } from '../services/database'
-import { createExampleData } from '../edit-questions/example-data'
-
-interface WizardFormData {
-    numPeople: number
-    people: { name: string; age: string }[]
-    activities: {
-        swimming: boolean
-        outdoorSwimming: boolean
-        outdoorWatersports: boolean
-        cycling: boolean
-        climbing: boolean
-    }
-}
+import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
+import { useWizardGeneration } from './useWizardGeneration'
 
 export const Wizard = () => {
-    const navigate = useNavigate()
-    const { showToast } = useToast()
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
     const [hasExistingData, setHasExistingData] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
+    const { isLoading, saveAndNavigate } = useWizardGeneration()
 
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
+        resolver: zodResolver(wizardSchema),
         defaultValues: {
             numPeople: 1,
             people: [{ name: 'Me', age: '' }],
-            activities: {
-                swimming: false,
-                outdoorSwimming: false,
-                outdoorWatersports: false,
-                cycling: false,
-                climbing: false
-            }
+            activities: []
         }
     })
 
@@ -81,42 +62,14 @@ export const Wizard = () => {
         if (hasExistingData) {
             setShowConfirmDialog(true)
         } else {
-            await generateAndSaveQuestionSet(data)
+            await saveAndNavigate(data)
         }
     }
 
     const handleConfirmOverride = async () => {
         setShowConfirmDialog(false)
         const data = watch()
-        await generateAndSaveQuestionSet(data)
-    }
-
-    const generateAndSaveQuestionSet = async (data: WizardFormData) => {
-        setIsLoading(true)
-        try {
-            // Generate example data for the specified number of people
-            const exampleQuestionSet = createExampleData(data.numPeople)
-
-            // Update person names and ages if provided
-            exampleQuestionSet.people = exampleQuestionSet.people.map((person, index) => ({
-                ...person,
-                name: data.people[index]?.name || person.name
-            }))
-
-            // Save to database
-            await packingAppDb.saveQuestionSet({
-                _id: '1',
-                ...exampleQuestionSet
-            })
-
-            showToast('Packing list questions generated successfully!', 'success')
-            navigate('/manage-questions')
-        } catch (err) {
-            console.error('Error generating question set:', err)
-            showToast('Failed to generate question set', 'error')
-        } finally {
-            setIsLoading(false)
-        }
+        await saveAndNavigate(data)
     }
 
     return (
@@ -144,15 +97,12 @@ export const Wizard = () => {
                             min="1"
                             max="10"
                             {...register('numPeople', {
-                                required: true,
-                                min: 1,
-                                max: 10,
                                 valueAsNumber: true
                             })}
                             className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                         />
                         {errors.numPeople && (
-                            <p className="text-danger-500 text-sm mt-1">Please enter a number between 1 and 10</p>
+                            <p className="text-danger-500 text-sm mt-1">{errors.numPeople.message}</p>
                         )}
                     </div>
 
@@ -167,19 +117,26 @@ export const Wizard = () => {
                                         </label>
                                         <input
                                             type="text"
-                                            {...register(`people.${index}.name`, { required: true })}
+                                            {...register(`people.${index}.name`)}
                                             className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                         />
+                                        {errors.people?.[index]?.name && (
+                                            <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.name?.message}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Age (optional)
+                                            Age{' '}
+                                            <span className="text-xs text-gray-500 font-normal">
+                                                (Coming in future version)
+                                            </span>
                                         </label>
                                         <input
                                             type="text"
                                             placeholder="e.g., 5, 12, Adult"
                                             {...register(`people.${index}.age`)}
-                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all opacity-60"
+                                            disabled
                                         />
                                     </div>
                                 </div>
@@ -191,55 +148,33 @@ export const Wizard = () => {
                 {/* Activities Section */}
                 <div className="bg-white p-6 rounded-2xl shadow-soft border-2 border-secondary-200">
                     <h2 className="text-2xl font-bold mb-4 text-secondary-900">🏖️ What Activities Are You Planning?</h2>
+                    <div className="mb-4 p-3 bg-accent-50 border border-accent-200 rounded-xl">
+                        <p className="text-sm text-accent-900 font-medium">
+                            💡 Coming Soon: Activity-based customization will be available in a future update!
+                        </p>
+                    </div>
                     <p className="text-sm text-gray-600 mb-4">
-                        Select all that apply (this will help us customize your packing list in future iterations)
+                        Select all that apply (this information will be used to customize your packing list in future iterations)
                     </p>
 
-                    <div className="space-y-3">
-                        <label className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register('activities.swimming')}
-                                className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                            />
-                            <span className="text-gray-800 font-medium">Swimming (pool)</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register('activities.outdoorSwimming')}
-                                className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                            />
-                            <span className="text-gray-800 font-medium">Outdoor swimming (beach, lake, river)</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register('activities.outdoorWatersports')}
-                                className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                            />
-                            <span className="text-gray-800 font-medium">Outdoor watersports (surfing, kayaking, etc.)</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register('activities.cycling')}
-                                className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                            />
-                            <span className="text-gray-800 font-medium">Cycling</span>
-                        </label>
-
-                        <label className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer">
-                            <input
-                                type="checkbox"
-                                {...register('activities.climbing')}
-                                className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                            />
-                            <span className="text-gray-800 font-medium">Climbing</span>
-                        </label>
+                    <div className="space-y-3 opacity-60">
+                        {ACTIVITIES.map((activity) => (
+                            <label
+                                key={activity.id}
+                                className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-not-allowed"
+                            >
+                                <input
+                                    type="checkbox"
+                                    value={activity.id}
+                                    {...register('activities')}
+                                    className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
+                                    disabled
+                                />
+                                <span className="text-gray-800 font-medium">
+                                    {activity.icon} {activity.label}
+                                </span>
+                            </label>
+                        ))}
                     </div>
                 </div>
 
@@ -257,34 +192,18 @@ export const Wizard = () => {
             </form>
 
             {/* Confirmation Dialog */}
-            <Modal
+            <ConfirmationDialog
                 isOpen={showConfirmDialog}
                 onClose={() => setShowConfirmDialog(false)}
+                onConfirm={handleConfirmOverride}
                 title="⚠️ Existing Data Found"
-            >
-                <div className="space-y-4">
-                    <p className="text-gray-700">
-                        You already have packing list questions set up. Generating a new set will override your current questions.
-                    </p>
-                    <p className="text-gray-700 font-semibold">
-                        Are you sure you want to continue?
-                    </p>
-                    <div className="flex gap-3 justify-end mt-6">
-                        <Button
-                            variant="ghost"
-                            onClick={() => setShowConfirmDialog(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="danger"
-                            onClick={handleConfirmOverride}
-                        >
-                            Yes, Override
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+                message="You already have packing list questions set up. Generating a new set will override your current questions.
+
+Are you sure you want to continue?"
+                confirmText="Yes, Override"
+                cancelText="Cancel"
+                confirmVariant="danger"
+            />
         </div>
     )
 }
