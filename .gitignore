@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# PouchDB database files
+packing-app-data/
+packing-list-question-set/
+packing-lists/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
