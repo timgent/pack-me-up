@@ -11,11 +11,10 @@ export const ACTIVITIES = [
 export type ActivityId = typeof ACTIVITIES[number]['id']
 
 export const wizardSchema = z.object({
-    numPeople: z.number().min(1, 'At least 1 person required').max(10, 'Maximum 10 people allowed'),
     people: z.array(z.object({
         name: z.string().min(1, 'Name is required'),
         age: z.string().optional()
-    })),
+    })).min(1, 'At least 1 person required').max(10, 'Maximum 10 people allowed'),
     activities: z.array(z.string())
 })
 

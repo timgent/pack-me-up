@@ -13,7 +13,7 @@ export function useWizardGeneration() {
 
     const generateQuestionSet = (data: WizardFormData) => {
         const names = data.people.map(p => p.name)
-        return createExampleData(data.numPeople, names)
+        return createExampleData(data.people.length, names)
     }
 
     const saveAndNavigate = async (data: WizardFormData) => {

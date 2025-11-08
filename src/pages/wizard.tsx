@@ -15,7 +15,6 @@ export const Wizard = () => {
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
         resolver: zodResolver(wizardSchema),
         defaultValues: {
-            numPeople: 1,
             people: [{ name: 'Me', age: '' }],
             activities: []
         }
@@ -25,8 +24,6 @@ export const Wizard = () => {
         control,
         name: 'people'
     })
-
-    const numPeople = watch('numPeople')
 
     // Check for existing data on mount
     useEffect(() => {
@@ -44,20 +41,6 @@ export const Wizard = () => {
         checkExistingData()
     }, [])
 
-    // Adjust people array when numPeople changes
-    useEffect(() => {
-        const currentLength = fields.length
-        if (numPeople > currentLength) {
-            for (let i = currentLength; i < numPeople; i++) {
-                append({ name: i === 0 ? 'Me' : `Person ${i + 1}`, age: '' })
-            }
-        } else if (numPeople < currentLength) {
-            for (let i = currentLength - 1; i >= numPeople; i--) {
-                remove(i)
-            }
-        }
-    }, [numPeople, fields.length, append, remove])
-
     const onSubmit = async (data: WizardFormData) => {
         if (hasExistingData) {
             setShowConfirmDialog(true)
@@ -72,6 +55,16 @@ export const Wizard = () => {
         await saveAndNavigate(data)
     }
 
+    const handleAddPerson = () => {
+        append({ name: `Person ${fields.length + 1}`, age: '' })
+    }
+
+    const handleRemovePerson = (index: number) => {
+        if (fields.length > 1) {
+            remove(index)
+        }
+    }
+
     return (
         <div className="max-w-3xl mx-auto">
             <div className="mb-8 text-center animate-slide-up">
@@ -84,65 +77,90 @@ export const Wizard = () => {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                {/* Number of People Section */}
+                {/* People Section */}
                 <div className="bg-white p-6 rounded-2xl shadow-soft border-2 border-primary-200">
-                    <h2 className="text-2xl font-bold mb-4 text-primary-900">👥 Who's Packing?</h2>
-
-                    <div className="mb-6">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            How many people are you packing for?
-                        </label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="10"
-                            {...register('numPeople', {
-                                valueAsNumber: true
-                            })}
-                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                        />
-                        {errors.numPeople && (
-                            <p className="text-danger-500 text-sm mt-1">{errors.numPeople.message}</p>
-                        )}
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-2xl font-bold text-primary-900">👥 Who's Packing?</h2>
+                        <span className="text-sm text-gray-600 font-medium">
+                            {fields.length} {fields.length === 1 ? 'person' : 'people'}
+                        </span>
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-800">Tell us about each person:</h3>
                         {fields.map((field, index) => (
                             <div key={field.id} className="bg-primary-50 p-4 rounded-xl border border-primary-200">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Name
-                                        </label>
-                                        <input
-                                            type="text"
-                                            {...register(`people.${index}.name`)}
-                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                                        />
-                                        {errors.people?.[index]?.name && (
-                                            <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.name?.message}</p>
-                                        )}
+                                <div className="flex items-start gap-4">
+                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                {...register(`people.${index}.name`)}
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                            />
+                                            {errors.people?.[index]?.name && (
+                                                <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.name?.message}</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Age{' '}
+                                                <span className="text-xs text-gray-500 font-normal">
+                                                    (Coming in future version)
+                                                </span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g., 5, 12, Adult"
+                                                {...register(`people.${index}.age`)}
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all opacity-60"
+                                                disabled
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Age{' '}
-                                            <span className="text-xs text-gray-500 font-normal">
-                                                (Coming in future version)
-                                            </span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g., 5, 12, Adult"
-                                            {...register(`people.${index}.age`)}
-                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all opacity-60"
-                                            disabled
-                                        />
-                                    </div>
+                                    {fields.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemovePerson(index)}
+                                            className="mt-8 p-2 text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
+                                            title="Remove person"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
                     </div>
+
+                    {fields.length < 10 && (
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                onClick={handleAddPerson}
+                                className="w-full py-3 px-4 border-2 border-dashed border-primary-300 rounded-xl text-primary-700 font-semibold hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                </svg>
+                                Add Another Person
+                            </button>
+                        </div>
+                    )}
+
+                    {fields.length >= 10 && (
+                        <p className="mt-4 text-sm text-gray-600 text-center">
+                            Maximum of 10 people reached
+                        </p>
+                    )}
+
+                    {errors.people && typeof errors.people.message === 'string' && (
+                        <p className="text-danger-500 text-sm mt-2">{errors.people.message}</p>
+                    )}
                 </div>
 
                 {/* Activities Section */}
