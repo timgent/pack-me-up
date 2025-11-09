@@ -191,7 +191,7 @@ export function EditQuestionsForm() {
     } else {
       console.log('Skipping handleAutoSave - currentQuestionSet is null');
     }
-  }, [watchedFormValues, handleAutoSave, editorMode]);
+  }, [watchedFormValues, handleAutoSave, editorMode, currentQuestionSet]);
 
   const removePerson = (removedIndex: number) => {
     // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -235,13 +235,14 @@ export function EditQuestionsForm() {
         setRev(doc._rev)
         setCurrentQuestionSet(doc)
         reset(doc)
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const error = err as { name?: string; message?: string };
         console.log("Initial get error:", {
-          name: err.name,
-          message: err.message,
+          name: error.name,
+          message: error.message,
           timestamp: new Date().toISOString()
         })
-        if (err.name === 'not_found') {
+        if (error.name === 'not_found') {
           console.log('No data yet, creating new doc')
           const newDoc = {
             _id: "1",
@@ -266,10 +267,11 @@ export function EditQuestionsForm() {
             setRev(result.rev)
             setCurrentQuestionSet(savedNewDoc)
             reset(newDoc)
-          } catch (putErr: any) {
+          } catch (putErr: unknown) {
+            const putError = putErr as { name?: string; message?: string };
             console.error('Error creating new doc:', {
-              name: putErr.name,
-              message: putErr.message,
+              name: putError.name,
+              message: putError.message,
               timestamp: new Date().toISOString()
             })
             showToast('Failed to initialize database', 'error')
@@ -282,7 +284,7 @@ export function EditQuestionsForm() {
     }
 
     loadQuestionSet()
-  }, [])
+  }, [reset, showToast])
 
   const { fields: questionFields, append: appendQuestion, remove: removeQuestion, move: moveQuestion } = useFieldArray({
     control,
@@ -341,8 +343,12 @@ export function EditQuestionsForm() {
   // JSON Editor sync functions
   const syncVisualToJson = useCallback(() => {
     const formData = getValues();
-    // Remove internal database fields that users shouldn't edit
-    const { _id, _rev, lastModified, ...cleanData } = formData as any;
+    // Remove internal database fields that users shouldn't edit - create clean copy
+    const cleanData: PackingListQuestionSet = {
+      people: formData.people,
+      questions: formData.questions,
+      alwaysNeededItems: formData.alwaysNeededItems,
+    };
     const formatted = JSON.stringify(cleanData, null, 2);
     setJsonValue(formatted);
     setOriginalJsonValue(formatted); // Track original for diff
@@ -366,8 +372,9 @@ export function EditQuestionsForm() {
       setCurrentQuestionSet(dataWithRev);
       setJsonError(null);
       return true;
-    } catch (e: any) {
-      setJsonError(`Invalid JSON: ${e.message}`);
+    } catch (e: unknown) {
+      const error = e as { message?: string };
+      setJsonError(`Invalid JSON: ${error.message || 'Unknown error'}`);
       return false;
     }
   }, [jsonValue, reset, rev]);
@@ -400,8 +407,12 @@ export function EditQuestionsForm() {
         if (savedData) {
           setRev(savedData._rev);
           setCurrentQuestionSet(savedData);
-          // Update original to mark as saved
-          const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+          // Update original to mark as saved - create clean copy without DB fields
+          const cleanData: PackingListQuestionSet = {
+            people: savedData.people,
+            questions: savedData.questions,
+            alwaysNeededItems: savedData.alwaysNeededItems,
+          };
           setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
         }
       } else {
@@ -416,8 +427,12 @@ export function EditQuestionsForm() {
         };
         setRev(result.rev);
         setCurrentQuestionSet(savedData);
-        // Update original to mark as saved
-        const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+        // Update original to mark as saved - create clean copy without DB fields
+        const cleanData: PackingListQuestionSet = {
+          people: savedData.people,
+          questions: savedData.questions,
+          alwaysNeededItems: savedData.alwaysNeededItems,
+        };
         setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
       }
 
@@ -425,8 +440,9 @@ export function EditQuestionsForm() {
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
       showToast('JSON saved successfully!', 'success');
-    } catch (e: any) {
-      setJsonError(`Invalid JSON: ${e.message}`);
+    } catch (e: unknown) {
+      const error = e as { message?: string };
+      setJsonError(`Invalid JSON: ${error.message || 'Unknown error'}`);
       setAutoSaveStatus('error');
       showToast('Failed to save JSON', 'error');
     }

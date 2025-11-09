@@ -149,7 +149,7 @@ describe('PackingAppDatabase', () => {
         people: [...mockQuestionSet.people, { id: 'person-3', name: 'Charlie' }]
       })
 
-      const retrieved2 = await db.getQuestionSet()
+      await db.getQuestionSet()
 
       // Get the underlying document to check timestamps
       const info = await db.getInfo()
@@ -377,8 +377,7 @@ describe('PackingAppDatabase', () => {
     it('should handle document type validation for question set', async () => {
       // Directly insert a document with wrong type
       const dbInstance = PackingAppDatabase.getInstance()
-      // @ts-expect-error - Accessing private property for testing
-      const rawDb = dbInstance.db
+      const rawDb = (dbInstance as { db: PouchDB.Database }).db
 
       await rawDb.put({
         _id: 'question-set:1',
@@ -394,8 +393,7 @@ describe('PackingAppDatabase', () => {
     it('should handle document type validation for packing list', async () => {
       // Directly insert a document with wrong type
       const dbInstance = PackingAppDatabase.getInstance()
-      // @ts-expect-error - Accessing private property for testing
-      const rawDb = dbInstance.db
+      const rawDb = (dbInstance as { db: PouchDB.Database }).db
 
       await rawDb.put({
         _id: 'packing-list:test',

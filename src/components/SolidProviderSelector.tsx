@@ -7,6 +7,7 @@ export interface SolidProvider {
   issuer: string;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const COMMON_PROVIDERS: SolidProvider[] = [
   {
     name: 'Inrupt',

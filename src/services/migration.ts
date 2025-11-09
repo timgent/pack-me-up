@@ -37,8 +37,9 @@ export class DatabaseMigration {
         try {
             const questionSet = await legacyQuestionDb.get<PackingListQuestionSet>('1')
             backup.questionSets.push(questionSet)
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name !== 'not_found') {
                 console.warn('Could not backup question set:', err)
             }
         }
@@ -50,7 +51,7 @@ export class DatabaseMigration {
                     backup.packingLists.push(row.doc)
                 }
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.warn('Could not backup packing lists:', err)
         }
 
@@ -117,8 +118,9 @@ export class DatabaseMigration {
         try {
             await legacyQuestionDb.get('1')
             hasLegacyData = true
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name !== 'not_found') {
                 console.warn('Error checking legacy question set:', err)
             }
         }
@@ -135,8 +137,9 @@ export class DatabaseMigration {
         try {
             await packingAppDb.getQuestionSet()
             hasNewData = true
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name !== 'not_found') {
                 console.warn('Error checking new question set:', err)
             }
         }
@@ -185,8 +188,9 @@ export class DatabaseMigration {
             result.success = true
             console.log('Migration completed successfully:', result)
 
-        } catch (err: any) {
-            result.errors.push(`Migration failed: ${err.message}`)
+        } catch (err: unknown) {
+            const error = err as { message?: string };
+            result.errors.push(`Migration failed: ${error.message || 'Unknown error'}`)
             console.error('Migration failed:', err)
         }
 
@@ -231,8 +235,9 @@ export class DatabaseMigration {
                 }
             }
 
-        } catch (err: any) {
-            errors.push(`Verification error: ${err.message}`)
+        } catch (err: unknown) {
+            const error = err as { message?: string };
+            errors.push(`Verification error: ${error.message || 'Unknown error'}`)
         }
 
         return { success: errors.length === 0, errors }

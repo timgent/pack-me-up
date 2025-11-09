@@ -194,7 +194,7 @@ export function ViewPackingList() {
         } else {
             console.log('Skipping handleItemChange - packingList is null')
         }
-    }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
+    }, [watchedItems, handleItemChange, packingList]) // Only trigger on form value changes, not packingList updates
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return

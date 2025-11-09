@@ -1,6 +1,44 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { validateQuestionSet, ValidationError } from './validation'
 
+// Type definitions for parsed JSON structures
+interface PersonSelection {
+  personId: string
+  selected: boolean
+}
+
+interface Item {
+  text: string
+  personSelections: PersonSelection[]
+}
+
+interface Option {
+  id: string
+  text: string
+  order: number
+  items?: Item[]
+}
+
+interface Question {
+  id: string
+  type: 'draft' | 'saved'
+  text: string
+  order: number
+  questionType?: 'single-choice' | 'multiple-choice'
+  options?: Option[]
+}
+
+interface Person {
+  id: string
+  name: string
+}
+
+interface QuestionSet {
+  people?: Person[]
+  alwaysNeededItems?: Item[]
+  questions?: Question[]
+}
+
 interface JsonEditorProps {
   value: string
   onChange: (value: string) => void
@@ -67,7 +105,7 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
           setValidationErrors(validation.errors || null)
           onValidationChange?.(validation.errors || null)
         }
-      } catch (e) {
+      } catch {
         // JSON syntax error - don't show validation errors yet
         setValidationErrors(null)
         onValidationChange?.(null)
@@ -92,7 +130,7 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
         setValidationErrors(validation.errors || null)
         onValidationChange?.(validation.errors || null)
       }
-    } catch (e) {
+    } catch {
       // Keep existing validation errors if JSON is invalid
     }
     setIsValidating(false)
@@ -179,8 +217,8 @@ ${userPrompt}`
   // Compute summary statistics
   const computeSummary = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}')
-      const current = JSON.parse(value || '{}')
+      const original = JSON.parse(originalValue || '{}') as QuestionSet
+      const current = JSON.parse(value || '{}') as QuestionSet
 
       const originalQuestions = original.questions || []
       const currentQuestions = current.questions || []
@@ -191,31 +229,31 @@ ${userPrompt}`
       const originalItems = new Set<string>()
       const currentItems = new Set<string>()
 
-      originalQuestions.forEach((q: any) => {
-        q.options?.forEach((opt: any) => {
-          opt.items?.forEach((item: any) => originalItems.add(item.text))
+      originalQuestions.forEach((q: Question) => {
+        q.options?.forEach((opt: Option) => {
+          opt.items?.forEach((item: Item) => originalItems.add(item.text))
         })
       })
-      original.alwaysNeededItems?.forEach((item: any) => originalItems.add(item.text))
+      original.alwaysNeededItems?.forEach((item: Item) => originalItems.add(item.text))
 
-      currentQuestions.forEach((q: any) => {
-        q.options?.forEach((opt: any) => {
-          opt.items?.forEach((item: any) => currentItems.add(item.text))
+      currentQuestions.forEach((q: Question) => {
+        q.options?.forEach((opt: Option) => {
+          opt.items?.forEach((item: Item) => currentItems.add(item.text))
         })
       })
-      current.alwaysNeededItems?.forEach((item: any) => currentItems.add(item.text))
+      current.alwaysNeededItems?.forEach((item: Item) => currentItems.add(item.text))
 
       return {
-        questionsAdded: currentQuestions.filter((q: any) => !originalQuestions.find((oq: any) => oq.text === q.text)).length,
-        questionsRemoved: originalQuestions.filter((q: any) => !currentQuestions.find((cq: any) => cq.text === q.text)).length,
-        questionsModified: currentQuestions.filter((q: any) => {
-          const orig = originalQuestions.find((oq: any) => oq.text === q.text)
+        questionsAdded: currentQuestions.filter((q: Question) => !originalQuestions.find((oq: Question) => oq.text === q.text)).length,
+        questionsRemoved: originalQuestions.filter((q: Question) => !currentQuestions.find((cq: Question) => cq.text === q.text)).length,
+        questionsModified: currentQuestions.filter((q: Question) => {
+          const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
           return orig && orig.questionType !== q.questionType
         }).length,
         itemsAdded: Array.from(currentItems).filter(item => !originalItems.has(item)).length,
         itemsRemoved: Array.from(originalItems).filter(item => !currentItems.has(item)).length,
-        peopleAdded: currentPeople.filter((p: any) => !originalPeople.find((op: any) => op.name === p.name)).length,
-        peopleRemoved: originalPeople.filter((p: any) => !currentPeople.find((cp: any) => cp.name === p.name)).length
+        peopleAdded: currentPeople.filter((p: Person) => !originalPeople.find((op: Person) => op.name === p.name)).length,
+        peopleRemoved: originalPeople.filter((p: Person) => !currentPeople.find((cp: Person) => cp.name === p.name)).length
       }
     } catch {
       return { questionsAdded: 0, questionsRemoved: 0, questionsModified: 0, itemsAdded: 0, itemsRemoved: 0, peopleAdded: 0, peopleRemoved: 0 }
@@ -225,20 +263,20 @@ ${userPrompt}`
   // Compute questions diff
   const computeQuestionsDiff = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}')
-      const current = JSON.parse(value || '{}')
+      const original = JSON.parse(originalValue || '{}') as QuestionSet
+      const current = JSON.parse(value || '{}') as QuestionSet
 
       const originalQuestions = original.questions || []
       const currentQuestions = current.questions || []
 
-      const added = currentQuestions.filter((q: any) => !originalQuestions.find((oq: any) => oq.text === q.text))
-      const removed = originalQuestions.filter((q: any) => !currentQuestions.find((cq: any) => cq.text === q.text))
-      const modified = currentQuestions.filter((q: any) => {
-        const orig = originalQuestions.find((oq: any) => oq.text === q.text)
+      const added = currentQuestions.filter((q: Question) => !originalQuestions.find((oq: Question) => oq.text === q.text))
+      const removed = originalQuestions.filter((q: Question) => !currentQuestions.find((cq: Question) => cq.text === q.text))
+      const modified = currentQuestions.filter((q: Question) => {
+        const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
         return orig && orig.questionType !== q.questionType
-      }).map((q: any) => {
-        const orig = originalQuestions.find((oq: any) => oq.text === q.text)
-        return { text: q.text, oldType: orig.questionType || 'single-choice', newType: q.questionType || 'single-choice' }
+      }).map((q: Question) => {
+        const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
+        return { text: q.text, oldType: orig?.questionType || 'single-choice', newType: q.questionType || 'single-choice' }
       })
 
       return { added, removed, modified }
@@ -250,8 +288,8 @@ ${userPrompt}`
   // Compute items diff (deduplicated)
   const computeItemsDiff = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}')
-      const current = JSON.parse(value || '{}')
+      const original = JSON.parse(originalValue || '{}') as QuestionSet
+      const current = JSON.parse(value || '{}') as QuestionSet
 
       const originalQuestions = original.questions || []
       const currentQuestions = current.questions || []
@@ -261,9 +299,9 @@ ${userPrompt}`
       const currentItemLocations = new Map<string, string[]>()
 
       // Collect original item locations
-      originalQuestions.forEach((q: any) => {
-        q.options?.forEach((opt: any) => {
-          opt.items?.forEach((item: any) => {
+      originalQuestions.forEach((q: Question) => {
+        q.options?.forEach((opt: Option) => {
+          opt.items?.forEach((item: Item) => {
             const location = `${q.text} > ${opt.text}`
             const locs = originalItemLocations.get(item.text) || []
             locs.push(location)
@@ -271,16 +309,16 @@ ${userPrompt}`
           })
         })
       })
-      original.alwaysNeededItems?.forEach((item: any) => {
+      original.alwaysNeededItems?.forEach((item: Item) => {
         const locs = originalItemLocations.get(item.text) || []
         locs.push('Always Needed')
         originalItemLocations.set(item.text, locs)
       })
 
       // Collect current item locations
-      currentQuestions.forEach((q: any) => {
-        q.options?.forEach((opt: any) => {
-          opt.items?.forEach((item: any) => {
+      currentQuestions.forEach((q: Question) => {
+        q.options?.forEach((opt: Option) => {
+          opt.items?.forEach((item: Item) => {
             const location = `${q.text} > ${opt.text}`
             const locs = currentItemLocations.get(item.text) || []
             locs.push(location)
@@ -288,7 +326,7 @@ ${userPrompt}`
           })
         })
       })
-      current.alwaysNeededItems?.forEach((item: any) => {
+      current.alwaysNeededItems?.forEach((item: Item) => {
         const locs = currentItemLocations.get(item.text) || []
         locs.push('Always Needed')
         currentItemLocations.set(item.text, locs)
@@ -565,7 +603,7 @@ ${userPrompt}`
                       {qDiff.added.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title added">Added Questions</h4>
-                          {qDiff.added.map((q: any, idx: number) => (
+                          {qDiff.added.map((q: Question, idx: number) => (
                             <div key={idx} className="diff-item added">
                               <strong>{q.text}</strong>
                               <span className="diff-item-meta">({q.questionType || 'single-choice'})</span>
@@ -576,7 +614,7 @@ ${userPrompt}`
                       {qDiff.removed.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title removed">Removed Questions</h4>
-                          {qDiff.removed.map((q: any, idx: number) => (
+                          {qDiff.removed.map((q: Question, idx: number) => (
                             <div key={idx} className="diff-item removed">
                               <strong>{q.text}</strong>
                               <span className="diff-item-meta">({q.questionType || 'single-choice'})</span>
@@ -587,7 +625,7 @@ ${userPrompt}`
                       {qDiff.modified.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title modified">Modified Questions</h4>
-                          {qDiff.modified.map((q: any, idx: number) => (
+                          {qDiff.modified.map((q: { text: string; oldType: string; newType: string }, idx: number) => (
                             <div key={idx} className="diff-item modified">
                               <strong>{q.text}</strong>
                               <div className="diff-item-change">Type: {q.oldType} → {q.newType}</div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import CreatableSelect from 'react-select/creatable';
-import { ActionMeta, OnChangeValue } from 'react-select';
+import { OnChangeValue } from 'react-select';
 
 interface Option {
     label: string;
@@ -24,8 +24,7 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
     }));
 
     const handleChange = (
-        newValue: OnChangeValue<Option, false>,
-        _actionMeta: ActionMeta<Option>
+        newValue: OnChangeValue<Option, false>
     ) => {
         onChange(newValue?.value || '');
     };

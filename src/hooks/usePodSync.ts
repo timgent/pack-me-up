@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSolidPod } from '../components/SolidPodContext';
 import { getPrimaryPodUrl, loadFileFromPod, saveFileToPod, AuthenticationError } from '../services/solidPod';
 
@@ -113,14 +113,6 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   // Use ref to prevent concurrent syncs
   const isSyncingRef = useRef(false);
 
-  // Create a stable key for pathConfig to use in useEffect dependencies
-  // This prevents the interval from restarting when pathConfig object reference changes
-  const pathConfigKey = useMemo(() => {
-    const { container, filename, resourceId } = pathConfig;
-    const filenameKey = typeof filename === 'function' ? 'function' : filename;
-    return `${container}:${filenameKey}:${resourceId || ''}`;
-  }, [pathConfig.container, pathConfig.filename, pathConfig.resourceId]);
-
   /**
    * Resolve the full file URL from the path configuration
    */
@@ -182,13 +174,14 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       if (onSyncSuccess) {
         onSyncSuccess(data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 404 errors are expected when file doesn't exist yet - not a real error
-      if (err.statusCode !== 404) {
+      const error = err as { statusCode?: number; message?: string };
+      if (error.statusCode !== 404) {
         // Authentication errors use their own message
         const errorMessage = err instanceof AuthenticationError
           ? err.message
-          : (err.message || 'Failed to sync from Pod');
+          : (error.message || 'Failed to sync from Pod');
         setError(errorMessage);
 
         if (onSyncError) {
@@ -244,11 +237,12 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       }
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Authentication errors use their own message
+      const error = err as { message?: string };
       const errorMessage = err instanceof AuthenticationError
         ? err.message
-        : (err.message || 'Failed to save to Pod');
+        : (error.message || 'Failed to save to Pod');
       setError(errorMessage);
 
       if (onSaveError) {
@@ -285,11 +279,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     return () => {
       clearInterval(interval);
     };
-    // Note: syncFromPod is intentionally omitted from deps to prevent interval churn
-    // pathConfigKey is a stable string representation of pathConfig to avoid object reference issues
-    // The interval only needs to restart when the actual config values change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, isLoggedIn, pollInterval, pathConfigKey]);
+  }, [enabled, isLoggedIn, pollInterval, pathConfig, syncFromPod]);
 
   return {
     lastSync,

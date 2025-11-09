@@ -55,8 +55,9 @@ export class PackingAppDatabase {
                 _rev: doc._rev,
                 ...doc.data
             }
-        } catch (err: any) {
-            if (err.name === 'not_found') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name === 'not_found') {
                 throw { name: 'not_found', message: 'Question set not found' }
             }
             throw err
@@ -74,8 +75,9 @@ export class PackingAppDatabase {
                 if (doc.docType === 'question-set') {
                     existingDoc = doc
                 }
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name !== 'not_found') {
                     throw err
                 }
             }
@@ -112,8 +114,9 @@ export class PackingAppDatabase {
                 _rev: doc._rev,
                 ...doc.data
             }
-        } catch (err: any) {
-            if (err.name === 'not_found') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name === 'not_found') {
                 throw { name: 'not_found', message: 'Packing list not found' }
             }
             throw err
@@ -131,8 +134,9 @@ export class PackingAppDatabase {
                 if (doc.docType === 'packing-list') {
                     existingDoc = doc
                 }
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name !== 'not_found') {
                     throw err
                 }
             }
@@ -212,8 +216,9 @@ export class PackingAppDatabase {
                 await this.saveQuestionSet(questionSet)
                 questionSets = 1
                 console.log('Migrated question set successfully')
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name !== 'not_found') {
                     console.warn('Could not migrate question set:', err)
                 }
             }
@@ -227,8 +232,9 @@ export class PackingAppDatabase {
                     }
                 }
                 console.log(`Migrated ${packingLists} packing lists successfully`)
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name !== 'not_found') {
                     console.warn('Could not migrate packing lists:', err)
                 }
             }

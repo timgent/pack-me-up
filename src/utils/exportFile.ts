@@ -14,7 +14,14 @@ export async function exportFile({
     if (supportsFileSystemAccess) {
         try {
             // Always prompt the user to pick a file location
-            const fileHandle = await (window as any).showSaveFilePicker({
+            interface FileSystemFileHandle {
+                createWritable(): Promise<FileSystemWritableFileStream>;
+            }
+            interface FileSystemWritableFileStream {
+                write(data: Blob): Promise<void>;
+                close(): Promise<void>;
+            }
+            const fileHandle = await (window as Window & { showSaveFilePicker(options?: unknown): Promise<FileSystemFileHandle | null> }).showSaveFilePicker({
                 suggestedName: filename,
                 types: [
                     {
@@ -30,8 +37,9 @@ export async function exportFile({
             await writable.write(blob);
             await writable.close();
             return;
-        } catch (err: any) {
-            if (err.name === 'AbortError') {
+        } catch (err: unknown) {
+            const error = err as { name?: string };
+            if (error.name === 'AbortError') {
                 // User cancelled, do nothing
                 return;
             }

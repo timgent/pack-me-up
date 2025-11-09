@@ -34,8 +34,9 @@ export const Wizard = () => {
             try {
                 await packingAppDb.getQuestionSet()
                 setHasExistingData(true)
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name !== 'not_found') {
                     console.error('Error checking for existing data:', err)
                 }
                 setHasExistingData(false)

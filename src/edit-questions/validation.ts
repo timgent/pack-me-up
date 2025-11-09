@@ -17,13 +17,13 @@ export interface ValidationResult {
 /**
  * Converts a Zod error into a more human-readable error message with context
  */
-function enhanceErrorMessage(issue: ZodIssue, data: any): { message: string; context?: string } {
+function enhanceErrorMessage(issue: ZodIssue, data: unknown): { message: string; context?: string } {
   const path = issue.path.join('.')
 
   // Get the actual value at this path
-  let actualValue: any
+  let actualValue: unknown
   try {
-    actualValue = issue.path.reduce((obj, key) => obj?.[key], data)
+    actualValue = issue.path.reduce((obj, key) => obj?.[key], data as Record<string, unknown>)
   } catch {
     actualValue = undefined
   }
@@ -49,7 +49,7 @@ function enhanceErrorMessage(issue: ZodIssue, data: any): { message: string; con
   } else if (issue.code === 'too_small') {
     enhancedMessage = `Value is too small (minimum: ${issue.minimum})`
   } else if (issue.code === 'unrecognized_keys' && 'keys' in issue) {
-    enhancedMessage = `Unexpected field(s): ${(issue as any).keys.join(', ')}`
+    enhancedMessage = `Unexpected field(s): ${(issue as { keys: string[] }).keys.join(', ')}`
   }
 
   // Add context showing the actual value if it's a simple type
@@ -74,17 +74,11 @@ export function findLineNumberForPath(jsonText: string, path: string): number | 
   const lines = jsonText.split('\n')
 
   try {
-    let currentDepth = 0
-    let searchPath = [...pathParts]
+    const searchPath = [...pathParts]
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       const trimmed = line.trim()
-
-      // Track depth by counting braces
-      const openBraces = (line.match(/[{[]/g) || []).length
-      const closeBraces = (line.match(/[}\]]/g) || []).length
-      currentDepth += openBraces - closeBraces
 
       // Look for the current path part
       if (searchPath.length > 0) {
@@ -108,7 +102,7 @@ export function findLineNumberForPath(jsonText: string, path: string): number | 
         }
       }
     }
-  } catch (e) {
+  } catch {
     // If we can't find it, return undefined
   }
 
@@ -120,7 +114,7 @@ export function findLineNumberForPath(jsonText: string, path: string): number | 
  * Ensures all required fields and proper data types before applying to the form.
  * Returns all validation errors, not just the first one.
  */
-export function validateQuestionSet(data: any, jsonText?: string): ValidationResult {
+export function validateQuestionSet(data: unknown, jsonText?: string): ValidationResult {
   const result = PackingListQuestionSetSchema.safeParse(data)
 
   if (result.success) {

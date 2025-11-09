@@ -30,8 +30,9 @@ export function CreatePackingList() {
                 const doc = await packingAppDb.getQuestionSet()
                 setQuestionSet(doc)
                 setNoQuestionsFound(false)
-            } catch (err: any) {
-                if (err.name === 'not_found') {
+            } catch (err: unknown) {
+                const error = err as { name?: string };
+                if (error.name === 'not_found') {
                     console.log('No question set found')
                     setNoQuestionsFound(true)
                 } else {
@@ -56,7 +57,8 @@ export function CreatePackingList() {
 
             // For each selected option, get all items
             return selectedOptionIds.flatMap((selectedOptionId) => {
-                const selectedOption = question?.options.find((option) => (option.id === selectedOptionId))!
+                const selectedOption = question.options.find((option) => (option.id === selectedOptionId));
+                if (!selectedOption) return [];
                 const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
                     const selectedPeople = item.personSelections.filter((person) => (person.selected))
                     return selectedPeople.flatMap((person) => {
