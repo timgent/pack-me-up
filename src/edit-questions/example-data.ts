@@ -12,23 +12,15 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
         people,
         alwaysNeededItems: [
             {
-                text: "Toothbrush",
+                text: "Day bag / Backpack",
                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
             },
             {
-                text: "Toothpaste",
+                text: "Snacks",
                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
             },
             {
-                text: "Deodorant",
-                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-            },
-            {
-                text: "Phone Charger",
-                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-            },
-            {
-                text: "Passport/ID",
+                text: "Water bottle",
                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
             }
         ],
@@ -45,6 +37,26 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                         text: "Yes",
                         order: 0,
                         items: [
+                            {
+                                text: "Toothbrush",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Toothpaste",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Deodorant",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Phone Charger",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Passport/ID",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
                             {
                                 text: "Pajamas",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
