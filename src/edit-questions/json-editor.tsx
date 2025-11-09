@@ -1,44 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { validateQuestionSet, ValidationError } from './validation'
 
-// Type definitions for parsed JSON structures
-interface PersonSelection {
-  personId: string
-  selected: boolean
-}
-
-interface Item {
-  text: string
-  personSelections: PersonSelection[]
-}
-
-interface Option {
-  id: string
-  text: string
-  order: number
-  items?: Item[]
-}
-
-interface Question {
-  id: string
-  type: 'draft' | 'saved'
-  text: string
-  order: number
-  questionType?: 'single-choice' | 'multiple-choice'
-  options?: Option[]
-}
-
-interface Person {
-  id: string
-  name: string
-}
-
-interface QuestionSet {
-  people?: Person[]
-  alwaysNeededItems?: Item[]
-  questions?: Question[]
-}
-
 interface JsonEditorProps {
   value: string
   onChange: (value: string) => void
@@ -214,46 +176,90 @@ ${userPrompt}`
     }
   }, [generatePrompt])
 
+  // Helper to safely access array property
+  const safeArray = (obj: unknown, prop: string): unknown[] => {
+    if (obj && typeof obj === 'object' && prop in obj) {
+      const value = (obj as Record<string, unknown>)[prop]
+      return Array.isArray(value) ? value : []
+    }
+    return []
+  }
+
+  // Helper to safely get string property
+  const safeString = (obj: unknown, prop: string): string => {
+    if (obj && typeof obj === 'object' && prop in obj) {
+      const value = (obj as Record<string, unknown>)[prop]
+      return typeof value === 'string' ? value : ''
+    }
+    return ''
+  }
+
   // Compute summary statistics
   const computeSummary = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}') as QuestionSet
-      const current = JSON.parse(value || '{}') as QuestionSet
+      const original = JSON.parse(originalValue || '{}')
+      const current = JSON.parse(value || '{}')
 
-      const originalQuestions = original.questions || []
-      const currentQuestions = current.questions || []
-      const originalPeople = original.people || []
-      const currentPeople = current.people || []
+      const originalQuestions = safeArray(original, 'questions')
+      const currentQuestions = safeArray(current, 'questions')
+      const originalPeople = safeArray(original, 'people')
+      const currentPeople = safeArray(current, 'people')
 
       // Collect all items
       const originalItems = new Set<string>()
       const currentItems = new Set<string>()
 
-      originalQuestions.forEach((q: Question) => {
-        q.options?.forEach((opt: Option) => {
-          opt.items?.forEach((item: Item) => originalItems.add(item.text))
+      originalQuestions.forEach(q => {
+        safeArray(q, 'options').forEach(opt => {
+          safeArray(opt, 'items').forEach(item => {
+            const text = safeString(item, 'text')
+            if (text) originalItems.add(text)
+          })
         })
       })
-      original.alwaysNeededItems?.forEach((item: Item) => originalItems.add(item.text))
+      safeArray(original, 'alwaysNeededItems').forEach(item => {
+        const text = safeString(item, 'text')
+        if (text) originalItems.add(text)
+      })
 
-      currentQuestions.forEach((q: Question) => {
-        q.options?.forEach((opt: Option) => {
-          opt.items?.forEach((item: Item) => currentItems.add(item.text))
+      currentQuestions.forEach(q => {
+        safeArray(q, 'options').forEach(opt => {
+          safeArray(opt, 'items').forEach(item => {
+            const text = safeString(item, 'text')
+            if (text) currentItems.add(text)
+          })
         })
       })
-      current.alwaysNeededItems?.forEach((item: Item) => currentItems.add(item.text))
+      safeArray(current, 'alwaysNeededItems').forEach(item => {
+        const text = safeString(item, 'text')
+        if (text) currentItems.add(text)
+      })
 
       return {
-        questionsAdded: currentQuestions.filter((q: Question) => !originalQuestions.find((oq: Question) => oq.text === q.text)).length,
-        questionsRemoved: originalQuestions.filter((q: Question) => !currentQuestions.find((cq: Question) => cq.text === q.text)).length,
-        questionsModified: currentQuestions.filter((q: Question) => {
-          const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
-          return orig && orig.questionType !== q.questionType
+        questionsAdded: currentQuestions.filter(q => {
+          const qText = safeString(q, 'text')
+          return !originalQuestions.some(oq => safeString(oq, 'text') === qText)
+        }).length,
+        questionsRemoved: originalQuestions.filter(q => {
+          const qText = safeString(q, 'text')
+          return !currentQuestions.some(cq => safeString(cq, 'text') === qText)
+        }).length,
+        questionsModified: currentQuestions.filter(q => {
+          const qText = safeString(q, 'text')
+          const orig = originalQuestions.find(oq => safeString(oq, 'text') === qText)
+          if (!orig) return false
+          return safeString(orig, 'questionType') !== safeString(q, 'questionType')
         }).length,
         itemsAdded: Array.from(currentItems).filter(item => !originalItems.has(item)).length,
         itemsRemoved: Array.from(originalItems).filter(item => !currentItems.has(item)).length,
-        peopleAdded: currentPeople.filter((p: Person) => !originalPeople.find((op: Person) => op.name === p.name)).length,
-        peopleRemoved: originalPeople.filter((p: Person) => !currentPeople.find((cp: Person) => cp.name === p.name)).length
+        peopleAdded: currentPeople.filter(p => {
+          const pName = safeString(p, 'name')
+          return !originalPeople.some(op => safeString(op, 'name') === pName)
+        }).length,
+        peopleRemoved: originalPeople.filter(p => {
+          const pName = safeString(p, 'name')
+          return !currentPeople.some(cp => safeString(cp, 'name') === pName)
+        }).length
       }
     } catch {
       return { questionsAdded: 0, questionsRemoved: 0, questionsModified: 0, itemsAdded: 0, itemsRemoved: 0, peopleAdded: 0, peopleRemoved: 0 }
@@ -263,21 +269,36 @@ ${userPrompt}`
   // Compute questions diff
   const computeQuestionsDiff = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}') as QuestionSet
-      const current = JSON.parse(value || '{}') as QuestionSet
+      const original = JSON.parse(originalValue || '{}')
+      const current = JSON.parse(value || '{}')
 
-      const originalQuestions = original.questions || []
-      const currentQuestions = current.questions || []
+      const originalQuestions = safeArray(original, 'questions')
+      const currentQuestions = safeArray(current, 'questions')
 
-      const added = currentQuestions.filter((q: Question) => !originalQuestions.find((oq: Question) => oq.text === q.text))
-      const removed = originalQuestions.filter((q: Question) => !currentQuestions.find((cq: Question) => cq.text === q.text))
-      const modified = currentQuestions.filter((q: Question) => {
-        const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
-        return orig && orig.questionType !== q.questionType
-      }).map((q: Question) => {
-        const orig = originalQuestions.find((oq: Question) => oq.text === q.text)
-        return { text: q.text, oldType: orig?.questionType || 'single-choice', newType: q.questionType || 'single-choice' }
+      const added = currentQuestions.filter(q => {
+        const qText = safeString(q, 'text')
+        return !originalQuestions.some(oq => safeString(oq, 'text') === qText)
       })
+
+      const removed = originalQuestions.filter(q => {
+        const qText = safeString(q, 'text')
+        return !currentQuestions.some(cq => safeString(cq, 'text') === qText)
+      })
+
+      const modified = currentQuestions
+        .filter(q => {
+          const qText = safeString(q, 'text')
+          const orig = originalQuestions.find(oq => safeString(oq, 'text') === qText)
+          if (!orig) return false
+          return safeString(orig, 'questionType') !== safeString(q, 'questionType')
+        })
+        .map(q => {
+          const qText = safeString(q, 'text')
+          const orig = originalQuestions.find(oq => safeString(oq, 'text') === qText)
+          const oldType = safeString(orig, 'questionType') || 'single-choice'
+          const newType = safeString(q, 'questionType') || 'single-choice'
+          return { text: qText, oldType, newType }
+        })
 
       return { added, removed, modified }
     } catch {
@@ -288,48 +309,64 @@ ${userPrompt}`
   // Compute items diff (deduplicated)
   const computeItemsDiff = useCallback(() => {
     try {
-      const original = JSON.parse(originalValue || '{}') as QuestionSet
-      const current = JSON.parse(value || '{}') as QuestionSet
+      const original = JSON.parse(originalValue || '{}')
+      const current = JSON.parse(value || '{}')
 
-      const originalQuestions = original.questions || []
-      const currentQuestions = current.questions || []
+      const originalQuestions = safeArray(original, 'questions')
+      const currentQuestions = safeArray(current, 'questions')
 
       // Map of item text -> locations
       const originalItemLocations = new Map<string, string[]>()
       const currentItemLocations = new Map<string, string[]>()
 
       // Collect original item locations
-      originalQuestions.forEach((q: Question) => {
-        q.options?.forEach((opt: Option) => {
-          opt.items?.forEach((item: Item) => {
-            const location = `${q.text} > ${opt.text}`
-            const locs = originalItemLocations.get(item.text) || []
-            locs.push(location)
-            originalItemLocations.set(item.text, locs)
+      originalQuestions.forEach(q => {
+        const qText = safeString(q, 'text')
+        safeArray(q, 'options').forEach(opt => {
+          const optText = safeString(opt, 'text')
+          safeArray(opt, 'items').forEach(item => {
+            const itemText = safeString(item, 'text')
+            if (itemText) {
+              const location = `${qText} > ${optText}`
+              const locs = originalItemLocations.get(itemText) || []
+              locs.push(location)
+              originalItemLocations.set(itemText, locs)
+            }
           })
         })
       })
-      original.alwaysNeededItems?.forEach((item: Item) => {
-        const locs = originalItemLocations.get(item.text) || []
-        locs.push('Always Needed')
-        originalItemLocations.set(item.text, locs)
+      safeArray(original, 'alwaysNeededItems').forEach(item => {
+        const itemText = safeString(item, 'text')
+        if (itemText) {
+          const locs = originalItemLocations.get(itemText) || []
+          locs.push('Always Needed')
+          originalItemLocations.set(itemText, locs)
+        }
       })
 
       // Collect current item locations
-      currentQuestions.forEach((q: Question) => {
-        q.options?.forEach((opt: Option) => {
-          opt.items?.forEach((item: Item) => {
-            const location = `${q.text} > ${opt.text}`
-            const locs = currentItemLocations.get(item.text) || []
-            locs.push(location)
-            currentItemLocations.set(item.text, locs)
+      currentQuestions.forEach(q => {
+        const qText = safeString(q, 'text')
+        safeArray(q, 'options').forEach(opt => {
+          const optText = safeString(opt, 'text')
+          safeArray(opt, 'items').forEach(item => {
+            const itemText = safeString(item, 'text')
+            if (itemText) {
+              const location = `${qText} > ${optText}`
+              const locs = currentItemLocations.get(itemText) || []
+              locs.push(location)
+              currentItemLocations.set(itemText, locs)
+            }
           })
         })
       })
-      current.alwaysNeededItems?.forEach((item: Item) => {
-        const locs = currentItemLocations.get(item.text) || []
-        locs.push('Always Needed')
-        currentItemLocations.set(item.text, locs)
+      safeArray(current, 'alwaysNeededItems').forEach(item => {
+        const itemText = safeString(item, 'text')
+        if (itemText) {
+          const locs = currentItemLocations.get(itemText) || []
+          locs.push('Always Needed')
+          currentItemLocations.set(itemText, locs)
+        }
       })
 
       // Categorize items
@@ -603,10 +640,10 @@ ${userPrompt}`
                       {qDiff.added.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title added">Added Questions</h4>
-                          {qDiff.added.map((q: Question, idx: number) => (
+                          {qDiff.added.map((q, idx: number) => (
                             <div key={idx} className="diff-item added">
-                              <strong>{q.text}</strong>
-                              <span className="diff-item-meta">({q.questionType || 'single-choice'})</span>
+                              <strong>{safeString(q, 'text')}</strong>
+                              <span className="diff-item-meta">({safeString(q, 'questionType') || 'single-choice'})</span>
                             </div>
                           ))}
                         </div>
@@ -614,10 +651,10 @@ ${userPrompt}`
                       {qDiff.removed.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title removed">Removed Questions</h4>
-                          {qDiff.removed.map((q: Question, idx: number) => (
+                          {qDiff.removed.map((q, idx: number) => (
                             <div key={idx} className="diff-item removed">
-                              <strong>{q.text}</strong>
-                              <span className="diff-item-meta">({q.questionType || 'single-choice'})</span>
+                              <strong>{safeString(q, 'text')}</strong>
+                              <span className="diff-item-meta">({safeString(q, 'questionType') || 'single-choice'})</span>
                             </div>
                           ))}
                         </div>
@@ -625,10 +662,10 @@ ${userPrompt}`
                       {qDiff.modified.length > 0 && (
                         <div className="diff-section">
                           <h4 className="diff-section-title modified">Modified Questions</h4>
-                          {qDiff.modified.map((q: { text: string; oldType: string; newType: string }, idx: number) => (
+                          {qDiff.modified.map((q, idx: number) => (
                             <div key={idx} className="diff-item modified">
-                              <strong>{q.text}</strong>
-                              <div className="diff-item-change">Type: {q.oldType} → {q.newType}</div>
+                              <strong>{safeString(q, 'text')}</strong>
+                              <div className="diff-item-change">Type: {safeString(q, 'oldType')} → {safeString(q, 'newType')}</div>
                             </div>
                           ))}
                         </div>

@@ -15,18 +15,32 @@ export interface ValidationResult {
 }
 
 /**
+ * Safely get a nested value from an object using a path
+ */
+function getNestedValue(obj: unknown, path: (string | number)[]): unknown {
+  let current = obj
+  for (const key of path) {
+    if (current === null || current === undefined) {
+      return undefined
+    }
+    if (typeof current !== 'object') {
+      return undefined
+    }
+    // We've checked it's an object, safe to index
+    const indexable: Record<string | number, unknown> = current as Record<string | number, unknown>
+    current = indexable[key]
+  }
+  return current
+}
+
+/**
  * Converts a Zod error into a more human-readable error message with context
  */
 function enhanceErrorMessage(issue: ZodIssue, data: unknown): { message: string; context?: string } {
   const path = issue.path.join('.')
 
   // Get the actual value at this path
-  let actualValue: unknown
-  try {
-    actualValue = issue.path.reduce((obj, key) => obj?.[key], data as Record<string, unknown>)
-  } catch {
-    actualValue = undefined
-  }
+  const actualValue = getNestedValue(data, issue.path)
 
   // Create context-aware error messages
   let enhancedMessage = issue.message
@@ -49,7 +63,11 @@ function enhanceErrorMessage(issue: ZodIssue, data: unknown): { message: string;
   } else if (issue.code === 'too_small') {
     enhancedMessage = `Value is too small (minimum: ${issue.minimum})`
   } else if (issue.code === 'unrecognized_keys' && 'keys' in issue) {
-    enhancedMessage = `Unexpected field(s): ${(issue as { keys: string[] }).keys.join(', ')}`
+    // Type guard for unrecognized_keys issue
+    const keysIssue = issue as ZodIssue & { keys?: unknown }
+    if (Array.isArray(keysIssue.keys) && keysIssue.keys.every(k => typeof k === 'string')) {
+      enhancedMessage = `Unexpected field(s): ${keysIssue.keys.join(', ')}`
+    }
   }
 
   // Add context showing the actual value if it's a simple type
