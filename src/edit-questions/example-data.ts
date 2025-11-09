@@ -36,125 +36,45 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
             {
                 id: generateUUID(),
                 type: "saved",
-                text: "What type of trip is this?",
+                text: "Will you be staying overnight?",
                 order: 0,
                 questionType: "single-choice",
                 options: [
                     {
                         id: generateUUID(),
-                        text: "Beach Vacation",
+                        text: "Yes",
                         order: 0,
                         items: [
                             {
-                                text: "Swimsuit",
+                                text: "Pajamas",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Beach Towel",
+                                text: "Toiletries bag",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Beach Bag",
+                                text: "Change of clothes",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Pillow (optional)",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
                     },
                     {
                         id: generateUUID(),
-                        text: "City Break",
+                        text: "No",
                         order: 1,
-                        items: [
-                            {
-                                text: "Comfortable Walking Shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "City Map/Guide",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Mountain/Hiking Trip",
-                        order: 2,
-                        items: [
-                            {
-                                text: "Hiking Boots",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Hiking Poles",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Business Trip",
-                        order: 3,
-                        items: [
-                            {
-                                text: "Business Suit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Business Cards",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Camping Trip",
-                        order: 4,
-                        items: [
-                            {
-                                text: "Tent",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Sleeping Bag",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Cruise",
-                        order: 5,
-                        items: [
-                            {
-                                text: "Formal Evening Wear",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Cruise Card Holder",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Road Trip",
-                        order: 6,
-                        items: [
-                            {
-                                text: "Car Phone Charger",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Road Atlas",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
+                        items: []
                     }
                 ]
             },
             {
                 id: generateUUID(),
                 type: "saved",
-                text: "Will it be hot?",
+                text: "Are you self-catering?",
                 order: 1,
                 questionType: "single-choice",
                 options: [
@@ -164,11 +84,27 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                         order: 0,
                         items: [
                             {
-                                text: "Lightweight, breathable clothing",
+                                text: "Cooking utensils",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Sun hat",
+                                text: "Plates and cutlery",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Food storage containers",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Dish soap and sponge",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Tea towels",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Shopping bags",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
@@ -184,260 +120,179 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
             {
                 id: generateUUID(),
                 type: "saved",
-                text: "Will it be cold?",
+                text: "What activities will you be doing?",
                 order: 2,
-                questionType: "single-choice",
+                questionType: "multiple-choice",
                 options: [
                     {
                         id: generateUUID(),
-                        text: "Yes",
+                        text: "Swimming",
                         order: 0,
                         items: [
                             {
-                                text: "Warm jacket",
+                                text: "Swimsuit",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Thermal underwear",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "No",
-                        order: 1,
-                        items: []
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "Will it rain?",
-                order: 3,
-                questionType: "single-choice",
-                options: [
-                    {
-                        id: generateUUID(),
-                        text: "Yes",
-                        order: 0,
-                        items: [
-                            {
-                                text: "Waterproof jacket",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Umbrella",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "No",
-                        order: 1,
-                        items: []
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "What type of accommodation?",
-                order: 4,
-                questionType: "single-choice",
-                options: [
-                    {
-                        id: generateUUID(),
-                        text: "Hotel",
-                        order: 0,
-                        items: []
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Hostel",
-                        order: 1,
-                        items: [
-                            {
-                                text: "Padlock for lockers",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Earplugs",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Airbnb/Apartment",
-                        order: 2,
-                        items: [
-                            {
-                                text: "Basic cooking utensils",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Groceries list",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Camping",
-                        order: 3,
-                        items: [
-                            {
-                                text: "Sleeping bag",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Camping stove",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "Will you swim?",
-                order: 5,
-                questionType: "single-choice",
-                options: [
-                    {
-                        id: generateUUID(),
-                        text: "Yes",
-                        order: 0,
-                        items: [
-                            {
-                                text: "Swimwear",
+                                text: "Swim towel",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
                                 text: "Goggles",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Swim cap",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
                     },
                     {
                         id: generateUUID(),
-                        text: "No",
+                        text: "Watersports",
                         order: 1,
-                        items: []
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "Will you visit religious sites?",
-                order: 6,
-                questionType: "single-choice",
-                options: [
-                    {
-                        id: generateUUID(),
-                        text: "Yes",
-                        order: 0,
                         items: [
                             {
-                                text: "Modest clothing",
+                                text: "Wetsuit",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Head covering",
+                                text: "Water shoes",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Waterproof bag",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Rash guard",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
                     },
                     {
                         id: generateUUID(),
-                        text: "No",
-                        order: 1,
-                        items: []
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "Will you go to fancy restaurants?",
-                order: 7,
-                questionType: "single-choice",
-                options: [
+                        text: "Cycling",
+                        order: 2,
+                        items: [
+                            {
+                                text: "Cycling shorts",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Helmet",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Water bottle",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Bike repair kit",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Cycling gloves",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            }
+                        ]
+                    },
                     {
                         id: generateUUID(),
-                        text: "Yes",
-                        order: 0,
+                        text: "Running",
+                        order: 3,
                         items: [
+                            {
+                                text: "Running shoes",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Running clothes",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Sports watch",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Running socks",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            }
+                        ]
+                    },
+                    {
+                        id: generateUUID(),
+                        text: "Climbing",
+                        order: 4,
+                        items: [
+                            {
+                                text: "Climbing shoes",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Chalk bag",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Harness",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Climbing gloves",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Belay device",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            }
+                        ]
+                    },
+                    {
+                        id: generateUUID(),
+                        text: "Hiking",
+                        order: 5,
+                        items: [
+                            {
+                                text: "Hiking boots",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Daypack/Backpack",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Walking poles",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Trail map",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "First aid kit",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            }
+                        ]
+                    },
+                    {
+                        id: generateUUID(),
+                        text: "Formal occasions",
+                        order: 6,
+                        items: [
+                            {
+                                text: "Formal outfit",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
                             {
                                 text: "Dress shoes",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Formal attire",
+                                text: "Accessories (watch, jewelry, etc.)",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "No",
-                        order: 1,
-                        items: []
-                    }
-                ]
-            },
-            {
-                id: generateUUID(),
-                type: "saved",
-                text: "What's your trip duration?",
-                order: 8,
-                questionType: "single-choice",
-                options: [
-                    {
-                        id: generateUUID(),
-                        text: "Weekend (1-3 days)",
-                        order: 0,
-                        items: [
+                            },
                             {
-                                text: "Small backpack",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Short Trip (4-7 days)",
-                        order: 1,
-                        items: [
-                            {
-                                text: "Medium suitcase",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Medium Trip (8-14 days)",
-                        order: 2,
-                        items: [
-                            {
-                                text: "Large suitcase",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Long Trip (15+ days)",
-                        order: 3,
-                        items: [
-                            {
-                                text: "Laundry supplies",
+                                text: "Evening bag/Clutch",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
@@ -447,68 +302,110 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
             {
                 id: generateUUID(),
                 type: "saved",
-                text: "What's your travel style?",
-                order: 9,
-                questionType: "single-choice",
+                text: "What weather do you expect?",
+                order: 3,
+                questionType: "multiple-choice",
                 options: [
                     {
                         id: generateUUID(),
-                        text: "Backpacking/Budget",
+                        text: "Hot",
                         order: 0,
                         items: [
                             {
-                                text: "Money belt",
+                                text: "Sunscreen",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Quick-dry towel",
+                                text: "Sun hat",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Sunglasses",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Light, breathable clothing",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Sandals",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
                     },
                     {
                         id: generateUUID(),
-                        text: "Standard",
+                        text: "Rain",
                         order: 1,
-                        items: []
+                        items: [
+                            {
+                                text: "Raincoat",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Umbrella",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Waterproof shoes/boots",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Waterproof bag cover",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            }
+                        ]
                     },
                     {
                         id: generateUUID(),
-                        text: "Luxury",
+                        text: "Warm",
                         order: 2,
                         items: [
                             {
-                                text: "Travel steamer",
+                                text: "Light jacket",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "Luxury toiletries",
+                                text: "Comfortable layers",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Long-sleeved shirts",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Comfortable walking shoes",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
                     },
                     {
                         id: generateUUID(),
-                        text: "Minimalist",
+                        text: "Cold",
                         order: 3,
                         items: [
                             {
-                                text: "Compression packing cubes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
-                        ]
-                    },
-                    {
-                        id: generateUUID(),
-                        text: "Family-Friendly",
-                        order: 4,
-                        items: [
-                            {
-                                text: "Travel games",
+                                text: "Winter coat",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
                             {
-                                text: "First aid kit",
+                                text: "Gloves",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Scarf",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Warm hat/Beanie",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Thermal underwear",
+                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
+                            },
+                            {
+                                text: "Warm boots",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             }
                         ]
