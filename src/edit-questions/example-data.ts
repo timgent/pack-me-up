@@ -104,10 +104,6 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                         order: 0,
                         items: [
                             {
-                                text: "Food storage containers",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
                                 text: "Dish soap and sponge",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
                             },
