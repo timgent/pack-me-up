@@ -3,13 +3,19 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
+import { SolidPodPrompt } from '../components/SolidPodPrompt'
+import { useSolidPod } from '../components/SolidPodContext'
 import { packingAppDb } from '../services/database'
 import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 
+const WIZARD_POD_PROMPT_KEY = 'wizard-pod-prompt-dismissed'
+
 export const Wizard = () => {
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+    const [showPodPrompt, setShowPodPrompt] = useState(false)
     const [hasExistingData, setHasExistingData] = useState(false)
+    const { isLoggedIn } = useSolidPod()
     const { isLoading, saveAndNavigate } = useWizardGeneration()
 
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
@@ -62,14 +68,26 @@ export const Wizard = () => {
         if (hasExistingData) {
             setShowConfirmDialog(true)
         } else {
-            await saveAndNavigate(data)
+            await saveWizardData(data)
         }
     }
 
     const handleConfirmOverride = async () => {
         setShowConfirmDialog(false)
         const data = watch()
+        await saveWizardData(data)
+    }
+
+    const saveWizardData = async (data: WizardFormData) => {
         await saveAndNavigate(data)
+
+        // Show Solid Pod prompt if:
+        // 1. User is not already logged in
+        // 2. User hasn't dismissed this prompt before
+        const hasPromptBeenDismissed = localStorage.getItem(WIZARD_POD_PROMPT_KEY) === 'true'
+        if (!isLoggedIn && !hasPromptBeenDismissed) {
+            setShowPodPrompt(true)
+        }
     }
 
     return (
@@ -203,6 +221,15 @@ Are you sure you want to continue?"
                 confirmText="Yes, Override"
                 cancelText="Cancel"
                 confirmVariant="danger"
+            />
+
+            {/* Solid Pod Onboarding Prompt */}
+            <SolidPodPrompt
+                isOpen={showPodPrompt}
+                onClose={() => setShowPodPrompt(false)}
+                title="🎉 Great! Your Questions Are Ready"
+                message="Want to keep your personalized packing questions safe and accessible from any device? Set up a Solid Pod to store your data securely in personal storage that you control."
+                dismissalKey={WIZARD_POD_PROMPT_KEY}
             />
         </div>
     )
