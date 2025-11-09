@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { useSolidPod } from './SolidPodContext'
+import { useSolidPod } from '../hooks/useSolidPod'
 import { SolidProviderSelector } from './SolidProviderSelector'
 
 export const Navigation = () => {

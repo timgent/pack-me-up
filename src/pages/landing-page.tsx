@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useSolidPod } from '../components/SolidPodContext'
+import { useSolidPod } from '../hooks/useSolidPod'
 
 export const LandingPage = () => {
     const { isLoggedIn, webId } = useSolidPod()

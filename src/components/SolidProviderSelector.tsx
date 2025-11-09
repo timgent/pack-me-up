@@ -1,27 +1,7 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-
-export interface SolidProvider {
-  name: string;
-  issuer: string;
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const COMMON_PROVIDERS: SolidProvider[] = [
-  {
-    name: 'Inrupt',
-    issuer: 'https://login.inrupt.com'
-  },
-  {
-    name: 'solidcommunity.net',
-    issuer: 'https://solidcommunity.net'
-  },
-  {
-    name: 'solidweb.org',
-    issuer: 'https://solidweb.org'
-  }
-];
+import { COMMON_PROVIDERS } from '../constants/solidProviders';
 
 interface SolidProviderSelectorProps {
   isOpen: boolean;

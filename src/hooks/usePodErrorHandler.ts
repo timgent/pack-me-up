@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useToast } from '../components/ToastContext';
+import { useToast } from './useToast';
 import { AuthenticationError } from '../services/solidPod';
 
 /**

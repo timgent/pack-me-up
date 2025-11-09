@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import {
   Session,
   handleIncomingRedirect,
@@ -6,19 +6,9 @@ import {
   login as solidLogin,
   logout as solidLogout
 } from "@inrupt/solid-client-authn-browser";
-import { useToast } from "./ToastContext";
+import { useToast } from "../hooks/useToast";
 import { isAuthenticationError } from "../services/solidPod";
-
-interface SolidPodContextValue {
-  session: Session | null;
-  isLoggedIn: boolean;
-  webId: string | undefined;
-  isLoading: boolean;
-  login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
+import { SolidPodContext } from "../contexts/SolidPodContext";
 
 /**
  * Sets up event listeners for session lifecycle events
@@ -184,15 +174,4 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
       {children}
     </SolidPodContext.Provider>
   );
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useSolidPod() {
-  const context = useContext(SolidPodContext);
-
-  if (context === undefined) {
-    throw new Error('useSolidPod must be used within a SolidPodProvider');
-  }
-
-  return context;
 }

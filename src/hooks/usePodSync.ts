@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSolidPod } from '../components/SolidPodContext';
+import { useSolidPod } from './useSolidPod';
 import { getPrimaryPodUrl, loadFileFromPod, saveFileToPod, AuthenticationError } from '../services/solidPod';
 
 /**
