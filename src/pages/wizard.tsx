@@ -5,14 +5,20 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
+import { SolidPodPrompt } from '../components/SolidPodPrompt'
+import { useSolidPod } from '../components/SolidPodContext'
 import { packingAppDb } from '../services/database'
 import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 
+const WIZARD_POD_PROMPT_KEY = 'wizard-pod-prompt-dismissed'
+
 export const Wizard = () => {
     const navigate = useNavigate()
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+    const [showPodPrompt, setShowPodPrompt] = useState(false)
     const [hasExistingData, setHasExistingData] = useState(false)
+    const { isLoggedIn } = useSolidPod()
     const { isLoading, isSuccess, generateAndSave } = useWizardGeneration()
 
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
@@ -43,6 +49,16 @@ export const Wizard = () => {
         }
         checkExistingData()
     }, [])
+
+    // Show Solid Pod prompt after successful generation if not logged in
+    useEffect(() => {
+        if (isSuccess && !isLoggedIn) {
+            const hasPromptBeenDismissed = localStorage.getItem(WIZARD_POD_PROMPT_KEY) === 'true'
+            if (!hasPromptBeenDismissed) {
+                setShowPodPrompt(true)
+            }
+        }
+    }, [isSuccess, isLoggedIn])
 
     const onSubmit = async (data: WizardFormData) => {
         if (hasExistingData) {
@@ -258,6 +274,15 @@ Are you sure you want to continue?"
                     </p>
                 </div>
             </Modal>
+
+            {/* Solid Pod Onboarding Prompt */}
+            <SolidPodPrompt
+                isOpen={showPodPrompt}
+                onClose={() => setShowPodPrompt(false)}
+                title="🎉 Great! Your Questions Are Ready"
+                message="Want to keep your personalized packing questions safe and accessible from any device? Set up a Solid Pod to store your data securely in personal storage that you control."
+                dismissalKey={WIZARD_POD_PROMPT_KEY}
+            />
         </div>
     )
 }
