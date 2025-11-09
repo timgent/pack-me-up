@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/ToastContext'
 import { packingAppDb } from '../services/database'
 import { createExampleData } from '../edit-questions/example-data'
@@ -7,17 +6,18 @@ import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
 
 export function useWizardGeneration() {
-    const navigate = useNavigate()
     const { showToast } = useToast()
     const [isLoading, setIsLoading] = useState(false)
+    const [isSuccess, setIsSuccess] = useState(false)
 
     const generateQuestionSet = (data: WizardFormData) => {
         const names = data.people.map(p => p.name)
-        return createExampleData(data.numPeople, names)
+        return createExampleData(data.people.length, names)
     }
 
-    const saveAndNavigate = async (data: WizardFormData) => {
+    const generateAndSave = async (data: WizardFormData) => {
         setIsLoading(true)
+        setIsSuccess(false)
         try {
             const questionSet = generateQuestionSet(data)
 
@@ -27,7 +27,7 @@ export function useWizardGeneration() {
             })
 
             showToast('Packing list questions generated successfully!', 'success')
-            navigate('/manage-questions')
+            setIsSuccess(true)
         } catch (err) {
             console.error('Error generating question set:', err)
             showToast('Failed to generate question set', 'error')
@@ -38,6 +38,7 @@ export function useWizardGeneration() {
 
     return {
         isLoading,
-        saveAndNavigate
+        isSuccess,
+        generateAndSave
     }
 }
