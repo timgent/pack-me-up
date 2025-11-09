@@ -16,6 +16,8 @@ interface SolidPodContextValue {
   isLoading: boolean;
   login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
   logout: () => Promise<void>;
+  isFirstSyncAfterLogin: boolean;
+  markFirstSyncComplete: () => void;
 }
 
 const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
@@ -28,7 +30,8 @@ function setupSessionEventListeners(
   session: Session,
   showToast: (message: string, type: 'success' | 'error') => void,
   setSession: (session: Session) => void,
-  setSessionVersion: (updater: (v: number) => number) => void
+  setSessionVersion: (updater: (v: number) => number) => void,
+  setIsFirstSyncAfterLogin: (value: boolean) => void
 ) {
   // Listen for logout events (including session expiration)
   session.events.on("logout", () => {
@@ -36,6 +39,7 @@ function setupSessionEventListeners(
     // Update UI state
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
+    setIsFirstSyncAfterLogin(false);
 
     // Notify user that session has expired
     showToast(
@@ -50,6 +54,7 @@ function setupSessionEventListeners(
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsFirstSyncAfterLogin(true);
   });
 
   // Listen for session restore events
@@ -58,6 +63,7 @@ function setupSessionEventListeners(
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsFirstSyncAfterLogin(true);
   });
 }
 
@@ -65,6 +71,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
+  const [isFirstSyncAfterLogin, setIsFirstSyncAfterLogin] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -81,8 +88,13 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setSessionVersion(v => v + 1);
 
+        // If already logged in on initialization, mark as first sync needed
+        if (currentSession.info.isLoggedIn) {
+          setIsFirstSyncAfterLogin(true);
+        }
+
         // Set up session event listeners
-        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion);
+        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion, setIsFirstSyncAfterLogin);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -168,6 +180,11 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsFirstSyncAfterLogin(false);
+  };
+
+  const markFirstSyncComplete = () => {
+    setIsFirstSyncAfterLogin(false);
   };
 
   const value: SolidPodContextValue = {
@@ -177,6 +194,8 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     isLoading,
     login,
     logout,
+    isFirstSyncAfterLogin,
+    markFirstSyncComplete,
   };
 
   return (

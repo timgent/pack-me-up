@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
@@ -14,10 +14,11 @@ import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { useSolidPod } from '../components/SolidPodContext'
 import { usePodSync } from '../hooks/usePodSync'
-import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
+import { useSyncCoordinator, ConflictInfo } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
+import { ConflictResolutionModal, ConflictResolution, ConflictData } from '../components/ConflictResolutionModal'
 
 export function EditQuestionsForm() {
 
@@ -36,13 +37,21 @@ export function EditQuestionsForm() {
     name: "people"
   });
   const { showToast } = useToast();
-  const { isLoggedIn } = useSolidPod();
+  const { isLoggedIn, isFirstSyncAfterLogin, markFirstSyncComplete } = useSolidPod();
 
   // Watch all form values for auto-save
   const watchedFormValues = useWatch({ control });
 
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(null);
+
+  // Conflict resolution state
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const [conflictResolver, setConflictResolver] = useState<((resolution: ConflictResolution) => void) | null>(null);
+
+  // Ref to store saveToPod function (needed for conflict resolution)
+  const saveToPodRef = useRef<((data: PackingListQuestionSet) => Promise<boolean>) | null>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -60,6 +69,41 @@ export function EditQuestionsForm() {
       }, 0);
     }
   }, [editorMode]);
+
+  // Conflict detection callback
+  const handleConflictDetected = useCallback(
+    async (conflictInfo: ConflictInfo<PackingListQuestionSet>): Promise<'keep-local' | 'use-pod'> => {
+      return new Promise((resolve) => {
+        setConflictData({
+          localTimestamp: conflictInfo.localTimestamp,
+          podTimestamp: conflictInfo.podTimestamp,
+          docType: 'question-set',
+        });
+        setConflictModalOpen(true);
+        setConflictResolver(() => (resolution: ConflictResolution) => {
+          setConflictModalOpen(false);
+          markFirstSyncComplete();
+
+          if (resolution === 'keep-local') {
+            // User chose to keep local data - push it to pod
+            console.log('User chose to keep local data - will push to pod');
+            resolve('keep-local');
+
+            // Trigger save to pod with current local data
+            if (conflictInfo.localData && saveToPodRef.current) {
+              saveToPodRef.current(conflictInfo.localData);
+              showToast('Local data has been saved to your pod', 'success');
+            }
+          } else {
+            // User chose to use pod data
+            console.log('User chose to use pod data');
+            resolve('use-pod');
+          }
+        });
+      });
+    },
+    [markFirstSyncComplete, showToast]
+  );
 
   // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
   const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
@@ -83,6 +127,10 @@ export function EditQuestionsForm() {
         reset(updatedData);
       },
       conflictStrategy: 'fallback-to-pod', // Pod wins if local has no timestamp (handles fresh loads)
+      onConflictDetected: handleConflictDetected,
+      docType: 'question-set',
+      docId: 'question-set:1',
+      isFirstSync: isFirstSyncAfterLogin,
     });
 
   // Callback when save to Pod succeeds
@@ -109,6 +157,11 @@ export function EditQuestionsForm() {
     onSaveSuccess: handleSaveSuccess,
     onSaveError: handleSaveError,
   });
+
+  // Update saveToPodRef when saveToPod changes
+  useEffect(() => {
+    saveToPodRef.current = saveToPod;
+  }, [saveToPod]);
 
   // Auto-save handler with debouncing
   const handleAutoSave = useDebouncedCallback(async () => {
@@ -798,6 +851,14 @@ export function EditQuestionsForm() {
           ))}
         </div>
       </Modal>
+
+      {conflictData && conflictResolver && (
+        <ConflictResolutionModal
+          isOpen={conflictModalOpen}
+          onResolve={conflictResolver}
+          conflictData={conflictData}
+        />
+      )}
     </div>
   )
 } 

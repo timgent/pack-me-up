@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
@@ -8,8 +8,9 @@ import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
-import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
+import { useSyncCoordinator, ConflictInfo } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { ConflictResolutionModal, ConflictResolution, ConflictData } from '../components/ConflictResolutionModal'
 
 type FormData = {
     items: Record<string, boolean>
@@ -24,8 +25,16 @@ export function ViewPackingList() {
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
-    const { isLoggedIn } = useSolidPod()
+    const { isLoggedIn, isFirstSyncAfterLogin, markFirstSyncComplete } = useSolidPod()
     const { showToast } = useToast()
+
+    // Conflict resolution state
+    const [conflictModalOpen, setConflictModalOpen] = useState(false)
+    const [conflictData, setConflictData] = useState<ConflictData | null>(null)
+    const [conflictResolver, setConflictResolver] = useState<((resolution: ConflictResolution) => void) | null>(null)
+
+    // Ref to store saveToPod function (needed for conflict resolution)
+    const saveToPodRef = useRef<((data: PackingList) => Promise<boolean>) | null>(null)
 
     const { register, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
@@ -35,6 +44,42 @@ export function ViewPackingList() {
 
     // Use useWatch instead of watch() for proper re-renders on form changes
     const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
+
+    // Conflict detection callback
+    const handleConflictDetected = useCallback(
+        async (conflictInfo: ConflictInfo<PackingList>): Promise<'keep-local' | 'use-pod'> => {
+            return new Promise((resolve) => {
+                setConflictData({
+                    localTimestamp: conflictInfo.localTimestamp,
+                    podTimestamp: conflictInfo.podTimestamp,
+                    docType: 'packing-list',
+                    documentName: conflictInfo.localData?.name || conflictInfo.podData?.name,
+                })
+                setConflictModalOpen(true)
+                setConflictResolver(() => (resolution: ConflictResolution) => {
+                    setConflictModalOpen(false)
+                    markFirstSyncComplete()
+
+                    if (resolution === 'keep-local') {
+                        // User chose to keep local data - push it to pod
+                        console.log('User chose to keep local data - will push to pod')
+                        resolve('keep-local')
+
+                        // Trigger save to pod with current local data
+                        if (conflictInfo.localData && saveToPodRef.current) {
+                            saveToPodRef.current(conflictInfo.localData)
+                            showToast('Local data has been saved to your pod', 'success')
+                        }
+                    } else {
+                        // User chose to use pod data
+                        console.log('User chose to use pod data')
+                        resolve('use-pod')
+                    }
+                })
+            })
+        },
+        [markFirstSyncComplete, showToast]
+    )
 
     // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
     const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
@@ -56,6 +101,10 @@ export function ViewPackingList() {
                 setValue('items', formValues);
             },
             conflictStrategy: 'fallback-to-pod', // Use same strategy as edit questions for consistency
+            onConflictDetected: handleConflictDetected,
+            docType: 'packing-list',
+            docId: `packing-list:${id}`,
+            isFirstSync: isFirstSyncAfterLogin,
         });
 
     // Callback when save to Pod succeeds
@@ -83,6 +132,11 @@ export function ViewPackingList() {
         onSaveSuccess: handleSaveSuccess,
         onSaveError: handleSaveError,
     });
+
+    // Update saveToPodRef when saveToPod changes
+    useEffect(() => {
+        saveToPodRef.current = saveToPod
+    }, [saveToPod])
 
     useEffect(() => {
         const fetchPackingList = async () => {
@@ -462,6 +516,14 @@ export function ViewPackingList() {
                     </div>
                 </div>
             </div>
+
+            {conflictData && conflictResolver && (
+                <ConflictResolutionModal
+                    isOpen={conflictModalOpen}
+                    onResolve={conflictResolver}
+                    conflictData={conflictData}
+                />
+            )}
         </div>
     )
 }

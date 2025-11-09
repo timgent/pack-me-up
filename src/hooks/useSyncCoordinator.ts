@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { backupService } from '../services/backup';
 
 /**
  * Data with timestamp for conflict resolution
@@ -6,6 +7,16 @@ import { useState, useCallback, useRef } from 'react';
 export interface TimestampedData {
   lastModified?: string;
   _rev?: string;
+}
+
+/**
+ * Conflict information passed to conflict callback
+ */
+export interface ConflictInfo<T> {
+  localData: T | null;
+  podData: T;
+  localTimestamp?: string;
+  podTimestamp?: string;
 }
 
 /**
@@ -51,6 +62,27 @@ export interface SyncCoordinatorOptions<T extends TimestampedData> {
    * Duration to show sync indicator (milliseconds)
    */
   syncIndicatorDuration?: number;
+
+  /**
+   * Callback when a conflict is detected
+   * Should return a promise that resolves with the conflict resolution
+   */
+  onConflictDetected?: (conflictInfo: ConflictInfo<T>) => Promise<'keep-local' | 'use-pod'>;
+
+  /**
+   * Document type for backup purposes
+   */
+  docType?: 'question-set' | 'packing-list';
+
+  /**
+   * Document ID for backup purposes
+   */
+  docId?: string;
+
+  /**
+   * Whether this is the first sync after login (for conflict detection)
+   */
+  isFirstSync?: boolean;
 }
 
 /**
@@ -112,6 +144,10 @@ export function useSyncCoordinator<T extends TimestampedData>(
     conflictStrategy = 'fallback-to-pod',
     syncPreventionWindow = 2000,
     syncIndicatorDuration = 2000,
+    onConflictDetected,
+    docType,
+    docId,
+    isFirstSync = false,
   } = options;
 
   const [syncingFromPod, setSyncingFromPod] = useState(false);
@@ -121,6 +157,9 @@ export function useSyncCoordinator<T extends TimestampedData>(
 
   // Track the last synced data to detect actual changes
   const lastSyncedDataRef = useRef<string | null>(null);
+
+  // Track if we've already handled the first sync conflict
+  const hasHandledFirstSyncConflictRef = useRef(false);
 
   /**
    * Preserve focus and selection during updates
@@ -148,6 +187,31 @@ export function useSyncCoordinator<T extends TimestampedData>(
       }
     }, 0);
   }, []);
+
+  /**
+   * Detect if there's a conflict between local and pod data
+   */
+  const detectConflict = useCallback(
+    (podData: T): boolean => {
+      // No conflict if no local data exists
+      if (!currentData || !currentData.lastModified) {
+        return false;
+      }
+
+      // No conflict if pod data has no timestamp
+      if (!podData.lastModified) {
+        return false;
+      }
+
+      // Check if timestamps differ (indicating different versions)
+      const podTime = new Date(podData.lastModified).getTime();
+      const localTime = new Date(currentData.lastModified).getTime();
+
+      // Conflict exists if timestamps differ
+      return podTime !== localTime;
+    },
+    [currentData]
+  );
 
   /**
    * Determine if Pod data should be applied based on timestamps
@@ -181,6 +245,45 @@ export function useSyncCoordinator<T extends TimestampedData>(
         return;
       }
 
+      // Detect conflicts on first sync after login
+      if (isFirstSync && !hasHandledFirstSyncConflictRef.current && onConflictDetected) {
+        const hasConflict = detectConflict(data);
+
+        if (hasConflict) {
+          console.log('Conflict detected on first sync - prompting user', {
+            localTime: currentData?.lastModified,
+            podTime: data.lastModified,
+          });
+
+          hasHandledFirstSyncConflictRef.current = true;
+
+          try {
+            const conflictInfo: ConflictInfo<T> = {
+              localData: currentData,
+              podData: data,
+              localTimestamp: currentData?.lastModified,
+              podTimestamp: data.lastModified,
+            };
+
+            const resolution = await onConflictDetected(conflictInfo);
+
+            if (resolution === 'keep-local') {
+              console.log('User chose to keep local data');
+              // Don't apply pod data, local data wins
+              return;
+            } else {
+              console.log('User chose to use pod data');
+              // Continue with applying pod data below
+            }
+          } catch (err) {
+            console.error('Error handling conflict:', err);
+            return;
+          }
+        } else {
+          hasHandledFirstSyncConflictRef.current = true;
+        }
+      }
+
       // Check if we should apply the synced data based on timestamps
       if (!shouldApplyPodData(data)) {
         console.log('Synced data from Pod - local version is newer or same, keeping local', {
@@ -204,6 +307,17 @@ export function useSyncCoordinator<T extends TimestampedData>(
       setSyncingFromPod(true);
 
       try {
+        // Create backup before overwriting if we have backup info
+        if (currentData && docType && docId) {
+          console.log('Creating backup before overwriting with pod data');
+          await backupService.createBackup(
+            docId,
+            docType,
+            currentData,
+            'pod-sync-overwrite'
+          );
+        }
+
         // Remove _rev to avoid conflicts with local database version
         const dataWithoutRev = { ...data };
         delete dataWithoutRev._rev;
@@ -232,6 +346,11 @@ export function useSyncCoordinator<T extends TimestampedData>(
       shouldApplyPodData,
       preserveFocusAndSelection,
       syncIndicatorDuration,
+      isFirstSync,
+      onConflictDetected,
+      detectConflict,
+      docType,
+      docId,
     ]
   );
 
