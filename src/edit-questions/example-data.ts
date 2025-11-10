@@ -1,11 +1,15 @@
-import { PackingListQuestionSet } from './types';
+import { PackingListQuestionSet, Person } from './types';
 import { generateUUID } from '../utils/uuid';
+import {
+    generateAlwaysNeededAgeSpecificItems,
+    generateOvernightAgeSpecificItems,
+    generateSwimmingAgeSpecificItems,
+    generateHotWeatherAgeSpecificItems,
+    generateColdWeatherAgeSpecificItems,
+    generateHikingAgeSpecificItems
+} from './age-specific-items';
 
-export function createExampleData(numPeople: number, names?: string[]): PackingListQuestionSet {
-    const people = Array.from({ length: numPeople }, (_, i) => ({
-        id: generateUUID(),
-        name: names?.[i] || (i === 0 ? "Me" : `Person ${i + 1}`)
-    }));
+export function createExampleData(people: Person[]): PackingListQuestionSet {
 
     return {
         _id: "1",
@@ -22,7 +26,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
             {
                 text: "Water bottle",
                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-            }
+            },
+            ...generateAlwaysNeededAgeSpecificItems(people)
         ],
         questions: [
             {
@@ -80,7 +85,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                             {
                                 text: "Trousers/Shorts",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            },
+                            ...generateOvernightAgeSpecificItems(people)
                         ]
                     },
                     {
@@ -156,7 +162,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                             {
                                 text: "Swim cap",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            },
+                            ...generateSwimmingAgeSpecificItems(people)
                         ]
                     },
                     {
@@ -283,7 +290,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                             {
                                 text: "First aid kit",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            },
+                            ...generateHikingAgeSpecificItems(people)
                         ]
                     },
                     {
@@ -342,7 +350,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                             {
                                 text: "Sandals",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            },
+                            ...generateHotWeatherAgeSpecificItems(people)
                         ]
                     },
                     {
@@ -419,7 +428,8 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
                             {
                                 text: "Warm boots",
                                 personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            },
+                            ...generateColdWeatherAgeSpecificItems(people)
                         ]
                     }
                 ]
@@ -428,10 +438,19 @@ export function createExampleData(numPeople: number, names?: string[]): PackingL
     };
 }
 
+// Helper function to create people for examples
+function createExamplePeople(count: number): Person[] {
+    return Array.from({ length: count }, (_, i) => ({
+        id: generateUUID(),
+        name: i === 0 ? "Me" : `Person ${i + 1}`,
+        ageRange: undefined
+    }));
+}
+
 export const exampleData = {
-    "Basic packing list for 1": createExampleData(1),
-    "Basic packing list for 2": createExampleData(2),
-    "Basic packing list for 3": createExampleData(3),
-    "Basic packing list for 4": createExampleData(4),
-    "Basic packing list for 5": createExampleData(5),
+    "Basic packing list for 1": createExampleData(createExamplePeople(1)),
+    "Basic packing list for 2": createExampleData(createExamplePeople(2)),
+    "Basic packing list for 3": createExampleData(createExamplePeople(3)),
+    "Basic packing list for 4": createExampleData(createExamplePeople(4)),
+    "Basic packing list for 5": createExampleData(createExamplePeople(5)),
 }; 
