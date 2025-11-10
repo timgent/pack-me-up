@@ -1,4 +1,4 @@
-import { PackingListQuestionSet, Person } from './types';
+import { PackingListQuestionSet, Person, Item } from './types';
 import { generateUUID } from '../utils/uuid';
 import {
     generateAlwaysNeededAgeSpecificItems,
@@ -13,24 +13,32 @@ import {
     getToddlersAndOlder
 } from './age-specific-items';
 
+/**
+ * Helper function to create an item with age-appropriate person selections
+ * @param text - The item text/name
+ * @param people - All people in the group
+ * @param ageFilter - Optional function to filter people by age range (defaults to everyone)
+ */
+function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
+    const selectedPeople = ageFilter ? ageFilter(people) : people;
+    return {
+        text,
+        personSelections: people.map(p => ({
+            personId: p.id,
+            selected: selectedPeople.some(sp => sp.id === p.id)
+        }))
+    };
+}
+
 export function createExampleData(people: Person[]): PackingListQuestionSet {
 
     return {
         _id: "1",
         people,
         alwaysNeededItems: [
-            {
-                text: "Day bag / Backpack",
-                personSelections: people.map(p => ({ personId: p.id, selected: getChildrenAndOlder(people).some(person => person.id === p.id) }))
-            },
-            {
-                text: "Snacks",
-                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-            },
-            {
-                text: "Water bottle",
-                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-            },
+            item("Day bag / Backpack", people, getChildrenAndOlder),
+            item("Snacks", people),
+            item("Water bottle", people, getToddlersAndOlder),
             ...generateAlwaysNeededAgeSpecificItems(people)
         ],
         questions: [
@@ -46,50 +54,17 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Yes",
                         order: 0,
                         items: [
-                            {
-                                text: "Toothbrush",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Toothpaste",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Deodorant",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Phone Charger",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Passport/ID",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Pajamas",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Toiletries bag",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Underwear",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Socks",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "T-shirt/Top",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Trousers/Shorts",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
+                            item("Toothbrush", people, getToddlersAndOlder),
+                            item("Toothpaste", people, getAdults),
+                            item("Deodorant", people, getTeenagersAndAdults),
+                            item("Phone Charger", people, getTeenagersAndAdults),
+                            item("Passport/ID", people, getAdults),
+                            item("Pajamas", people),
+                            item("Toiletries bag", people, getTeenagersAndAdults),
+                            item("Underwear", people, getToddlersAndOlder),
+                            item("Socks", people),
+                            item("T-shirt/Top", people),
+                            item("Trousers/Shorts", people),
                             ...generateOvernightAgeSpecificItems(people)
                         ]
                     },
@@ -113,22 +88,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Yes",
                         order: 0,
                         items: [
-                            {
-                                text: "Dish soap and sponge",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Dishwasher tablets",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Tea towels",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Shopping bags",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Dish soap and sponge", people, getAdults),
+                            item("Dishwasher tablets", people, getAdults),
+                            item("Tea towels", people, getAdults),
+                            item("Shopping bags", people, getAdults)
                         ]
                     },
                     {
@@ -151,22 +114,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Swimming",
                         order: 0,
                         items: [
-                            {
-                                text: "Swimsuit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Swim towel",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Goggles",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getChildrenAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Swim cap",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getChildrenAndOlder(people).some(person => person.id === p.id) }))
-                            },
+                            item("Swimsuit", people, getToddlersAndOlder),
+                            item("Swim towel", people),
+                            item("Goggles", people, getChildrenAndOlder),
+                            item("Swim cap", people, getChildrenAndOlder),
                             ...generateSwimmingAgeSpecificItems(people)
                         ]
                     },
@@ -175,22 +126,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Watersports",
                         order: 1,
                         items: [
-                            {
-                                text: "Wetsuit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Water shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Waterproof bag",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Rash guard",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Wetsuit", people, getTeenagersAndAdults),
+                            item("Water shoes", people, getTeenagersAndAdults),
+                            item("Waterproof bag", people, getTeenagersAndAdults),
+                            item("Rash guard", people, getTeenagersAndAdults)
                         ]
                     },
                     {
@@ -198,26 +137,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Cycling",
                         order: 2,
                         items: [
-                            {
-                                text: "Cycling shorts",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Helmet",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Water bottle",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Bike repair kit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Cycling gloves",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Cycling shorts", people, getTeenagersAndAdults),
+                            item("Helmet", people, getTeenagersAndAdults),
+                            item("Water bottle", people, getTeenagersAndAdults),
+                            item("Bike repair kit", people, getTeenagersAndAdults),
+                            item("Cycling gloves", people, getTeenagersAndAdults)
                         ]
                     },
                     {
@@ -225,22 +149,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Running",
                         order: 3,
                         items: [
-                            {
-                                text: "Running shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Running clothes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Sports watch",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Running socks",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Running shoes", people, getTeenagersAndAdults),
+                            item("Running clothes", people, getTeenagersAndAdults),
+                            item("Sports watch", people, getTeenagersAndAdults),
+                            item("Running socks", people, getTeenagersAndAdults)
                         ]
                     },
                     {
@@ -248,26 +160,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Climbing",
                         order: 4,
                         items: [
-                            {
-                                text: "Climbing shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Chalk bag",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Harness",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Climbing gloves",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Belay device",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Climbing shoes", people, getTeenagersAndAdults),
+                            item("Chalk bag", people, getTeenagersAndAdults),
+                            item("Harness", people, getTeenagersAndAdults),
+                            item("Climbing gloves", people, getTeenagersAndAdults),
+                            item("Belay device", people, getTeenagersAndAdults)
                         ]
                     },
                     {
@@ -275,26 +172,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Hiking",
                         order: 5,
                         items: [
-                            {
-                                text: "Hiking boots",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getChildrenAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Daypack/Backpack",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Walking poles",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Trail map",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "First aid kit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getAdults(people).some(person => person.id === p.id) }))
-                            },
+                            item("Hiking boots", people, getChildrenAndOlder),
+                            item("Daypack/Backpack", people, getTeenagersAndAdults),
+                            item("Walking poles", people, getAdults),
+                            item("Trail map", people, getAdults),
+                            item("First aid kit", people, getAdults),
                             ...generateHikingAgeSpecificItems(people)
                         ]
                     },
@@ -303,22 +185,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Formal occasions",
                         order: 6,
                         items: [
-                            {
-                                text: "Formal outfit",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Dress shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Accessories (watch, jewelry, etc.)",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Evening bag/Clutch",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getTeenagersAndAdults(people).some(person => person.id === p.id) }))
-                            }
+                            item("Formal outfit", people),
+                            item("Dress shoes", people, getToddlersAndOlder),
+                            item("Accessories (watch, jewelry, etc.)", people, getTeenagersAndAdults),
+                            item("Evening bag/Clutch", people, getTeenagersAndAdults)
                         ]
                     }
                 ]
@@ -335,26 +205,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Hot",
                         order: 0,
                         items: [
-                            {
-                                text: "Sunscreen",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Sun hat",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Sunglasses",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getChildrenAndOlder(people).some(person => person.id === p.id) }))
-                            },
-                            {
-                                text: "Light, breathable clothing",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Sandals",
-                                personSelections: people.map(p => ({ personId: p.id, selected: getToddlersAndOlder(people).some(person => person.id === p.id) }))
-                            },
+                            item("Sunscreen", people),
+                            item("Sun hat", people),
+                            item("Sunglasses", people, getChildrenAndOlder),
+                            item("Light, breathable clothing", people),
+                            item("Sandals", people, getToddlersAndOlder),
                             ...generateHotWeatherAgeSpecificItems(people)
                         ]
                     },
@@ -363,22 +218,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Rain",
                         order: 1,
                         items: [
-                            {
-                                text: "Raincoat",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Umbrella",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Waterproof shoes/boots",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Waterproof bag cover",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            item("Raincoat", people),
+                            item("Umbrella", people),
+                            item("Waterproof shoes/boots", people),
+                            item("Waterproof bag cover", people)
                         ]
                     },
                     {
@@ -386,22 +229,10 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Warm",
                         order: 2,
                         items: [
-                            {
-                                text: "Light jacket",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Comfortable layers",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Long-sleeved shirts",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Comfortable walking shoes",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            }
+                            item("Light jacket", people),
+                            item("Comfortable layers", people),
+                            item("Long-sleeved shirts", people),
+                            item("Comfortable walking shoes", people)
                         ]
                     },
                     {
@@ -409,30 +240,12 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         text: "Cold",
                         order: 3,
                         items: [
-                            {
-                                text: "Winter coat",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Gloves",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Scarf",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Warm hat/Beanie",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Thermal underwear",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
-                            {
-                                text: "Warm boots",
-                                personSelections: people.map(p => ({ personId: p.id, selected: true }))
-                            },
+                            item("Winter coat", people),
+                            item("Gloves", people),
+                            item("Scarf", people),
+                            item("Warm hat/Beanie", people),
+                            item("Thermal underwear", people),
+                            item("Warm boots", people),
                             ...generateColdWeatherAgeSpecificItems(people)
                         ]
                     }
