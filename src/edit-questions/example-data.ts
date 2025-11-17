@@ -1,12 +1,10 @@
 import { PackingListQuestionSet, Person, Item } from './types';
 import { generateUUID } from '../utils/uuid';
 import {
-    generateAlwaysNeededAgeSpecificItems,
-    generateOvernightAgeSpecificItems,
-    generateSwimmingAgeSpecificItems,
-    generateHotWeatherAgeSpecificItems,
-    generateColdWeatherAgeSpecificItems,
-    generateHikingAgeSpecificItems,
+    getBabies,
+    getToddlers,
+    getChildren,
+    getTeenagers,
     getAdults,
     getTeenagersAndAdults,
     getChildrenAndOlder,
@@ -39,7 +37,31 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
             item("Day bag / Backpack", people, getChildrenAndOlder),
             item("Snacks", people),
             item("Water bottle", people, getToddlersAndOlder),
-            ...generateAlwaysNeededAgeSpecificItems(people)
+            // Baby items
+            item("Nappies (pack/supply)", people, getBabies),
+            item("Baby wipes", people, getBabies),
+            item("Nappy bags", people, getBabies),
+            item("Change mat", people, getBabies),
+            item("Bibs", people, getBabies),
+            item("Muslins/Burp cloths", people, getBabies),
+            item("Bottles (if bottle feeding)", people, getBabies),
+            item("Formula/Baby food", people, getBabies),
+            item("Dummy/Pacifier (if used)", people, getBabies),
+            item("Spare clothes (×3-4 sets)", people, getBabies),
+            // Toddler items
+            item("Pull-ups/Toddler nappies", people, getToddlers),
+            item("Potty (travel potty)", people, getToddlers),
+            item("Wipes", people, getToddlers),
+            item("Spare clothes (×2-3 sets)", people, getToddlers),
+            item("Sippy cup/Toddler cup", people, getToddlers),
+            item("Toddler snacks", people, getToddlers),
+            item("Comfort item (teddy/blanket)", people, getToddlers),
+            // Child items
+            item("Entertainment (books/small toys)", people, getChildren),
+            item("Playing cards/Travel games", people, getChildren),
+            // Teenager items
+            item("Headphones", people, getTeenagers),
+            item("Phone charger", people, getTeenagers)
         ],
         questions: [
             {
@@ -65,7 +87,20 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                             item("Socks", people),
                             item("T-shirt/Top", people),
                             item("Trousers/Shorts", people),
-                            ...generateOvernightAgeSpecificItems(people)
+                            // Baby items
+                            item("Baby monitor", people, getBabies),
+                            item("Nightlight", people, getBabies),
+                            item("Baby sleeping bag/Swaddle", people, getBabies),
+                            item("Extra bedding/sheets", people, getBabies),
+                            item("Bedtime bottle", people, getBabies),
+                            // Toddler items
+                            item("Bedtime books", people, getToddlers),
+                            item("Night nappy/Pull-up", people, getToddlers),
+                            // Child items
+                            item("Favorite toy/Stuffed animal", people, getChildren),
+                            item("Flashlight", people, getChildren),
+                            // Teenager items
+                            item("Personal care items (face wash, etc.)", people, getTeenagers)
                         ]
                     },
                     {
@@ -118,7 +153,17 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                             item("Swim towel", people),
                             item("Goggles", people, getChildrenAndOlder),
                             item("Swim cap", people, getChildrenAndOlder),
-                            ...generateSwimmingAgeSpecificItems(people)
+                            // Baby items
+                            item("Baby swim nappy", people, getBabies),
+                            item("Baby float/Swim seat", people, getBabies),
+                            item("Baby sun hat with neck protection", people, getBabies),
+                            item("Baby rash guard/Sun suit", people, getBabies),
+                            // Toddler items
+                            item("Swim nappy (if not potty trained)", people, getToddlers),
+                            item("Armbands/Floaties", people, getToddlers),
+                            item("Toddler sun hat", people, getToddlers),
+                            // Child items
+                            item("Swim aids (noodles, kickboard)", people, getChildren)
                         ]
                     },
                     {
@@ -177,7 +222,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                             item("Walking poles", people, getAdults),
                             item("Trail map", people, getAdults),
                             item("First aid kit", people, getAdults),
-                            ...generateHikingAgeSpecificItems(people)
+                            // Baby items
+                            item("Baby carrier/Sling", people, getBabies),
+                            // Toddler items
+                            item("Toddler reins/Backpack harness", people, getToddlers),
+                            item("Lightweight buggy/Stroller", people, getToddlers)
                         ]
                     },
                     {
@@ -210,7 +259,15 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                             item("Sunglasses", people, getChildrenAndOlder),
                             item("Light, breathable clothing", people),
                             item("Sandals", people, getToddlersAndOlder),
-                            ...generateHotWeatherAgeSpecificItems(people)
+                            // Baby items
+                            item("Baby sunscreen (SPF 50+)", people, getBabies),
+                            item("Sun protective baby clothing", people, getBabies),
+                            item("Shade cover/Parasol for pram", people, getBabies),
+                            // Toddler items
+                            item("Toddler sunscreen", people, getToddlers),
+                            item("Sun protective clothing", people, getToddlers),
+                            // Child items
+                            item("Kids sunscreen", people, getChildren)
                         ]
                     },
                     {
@@ -246,7 +303,15 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                             item("Warm hat/Beanie", people),
                             item("Thermal underwear", people),
                             item("Warm boots", people),
-                            ...generateColdWeatherAgeSpecificItems(people)
+                            // Baby items
+                            item("Baby snowsuit/Pramsuit", people, getBabies),
+                            item("Baby mittens", people, getBabies),
+                            item("Baby warm hat with ear coverage", people, getBabies),
+                            item("Blanket for carrier/pram", people, getBabies),
+                            // Toddler items
+                            item("Toddler snowsuit/Winter coat", people, getToddlers),
+                            item("Toddler mittens (not gloves - easier)", people, getToddlers),
+                            item("Toddler warm hat", people, getToddlers)
                         ]
                     }
                 ]
