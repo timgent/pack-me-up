@@ -4,6 +4,8 @@ import { packingAppDb } from '../services/database'
 import { createExampleData } from '../edit-questions/example-data'
 import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
+import { generateUUID } from '../utils/uuid'
+import { Person } from '../edit-questions/types'
 
 export function useWizardGeneration() {
     const { showToast } = useToast()
@@ -11,8 +13,12 @@ export function useWizardGeneration() {
     const [isSuccess, setIsSuccess] = useState(false)
 
     const generateQuestionSet = (data: WizardFormData) => {
-        const names = data.people.map(p => p.name)
-        return createExampleData(data.people.length, names)
+        const people: Person[] = data.people.map(p => ({
+            id: generateUUID(),
+            name: p.name,
+            ageRange: p.ageRange
+        }))
+        return createExampleData(people)
     }
 
     const generateAndSave = async (data: WizardFormData) => {

@@ -10,6 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { packingAppDb } from '../services/database'
 import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
+import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
 
 const WIZARD_POD_PROMPT_KEY = 'wizard-pod-prompt-dismissed'
 
@@ -24,7 +25,7 @@ export const Wizard = () => {
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
         resolver: zodResolver(wizardSchema),
         defaultValues: {
-            people: [{ name: 'Me', age: '' }],
+            people: [{ name: 'Me', ageRange: undefined }],
             activities: []
         }
     })
@@ -75,7 +76,7 @@ export const Wizard = () => {
     }
 
     const handleAddPerson = () => {
-        append({ name: `Person ${fields.length + 1}`, age: '' })
+        append({ name: `Person ${fields.length + 1}`, ageRange: undefined })
     }
 
     const handleRemovePerson = (index: number) => {
@@ -125,18 +126,25 @@ export const Wizard = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                Age{' '}
+                                                Age Range{' '}
                                                 <span className="text-xs text-gray-500 font-normal">
-                                                    (Coming in future version)
+                                                    (optional)
                                                 </span>
                                             </label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g., 5, 12, Adult"
-                                                {...register(`people.${index}.age`)}
-                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all opacity-60"
-                                                disabled
-                                            />
+                                            <select
+                                                {...register(`people.${index}.ageRange`)}
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                            >
+                                                <option value="">Select age range...</option>
+                                                {AGE_RANGE_OPTIONS.map(option => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.people?.[index]?.ageRange && (
+                                                <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.ageRange?.message}</p>
+                                            )}
                                         </div>
                                     </div>
                                     {fields.length > 1 && (

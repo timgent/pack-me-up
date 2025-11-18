@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AgeRangeSchema } from '../edit-questions/types'
 
 export const ACTIVITIES = [
     { id: 'swimming', label: 'Swimming (pool)', icon: '🏊' },
@@ -13,7 +14,7 @@ export type ActivityId = typeof ACTIVITIES[number]['id']
 export const wizardSchema = z.object({
     people: z.array(z.object({
         name: z.string().min(1, 'Name is required'),
-        age: z.string().optional()
+        ageRange: AgeRangeSchema.optional()
     })).min(1, 'At least 1 person required').max(10, 'Maximum 10 people allowed'),
     activities: z.array(z.string())
 })
