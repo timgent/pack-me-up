@@ -13,6 +13,7 @@ export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [noQuestionsFound, setNoQuestionsFound] = useState(false)
+    const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const { showToast } = useToast()
     const { isLoggedIn } = useSolidPod()
 
@@ -30,6 +31,8 @@ export function CreatePackingList() {
                 const doc = await packingAppDb.getQuestionSet()
                 setQuestionSet(doc)
                 setNoQuestionsFound(false)
+                // Initialize with all people selected by default
+                setSelectedPeopleIds(doc.people.map(p => p.id))
             } catch (err: any) {
                 if (err.name === 'not_found') {
                     console.log('No question set found')
@@ -58,7 +61,9 @@ export function CreatePackingList() {
             return selectedOptionIds.flatMap((selectedOptionId) => {
                 const selectedOption = question?.options.find((option) => (option.id === selectedOptionId))!
                 const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
-                    const selectedPeople = item.personSelections.filter((person) => (person.selected))
+                    const selectedPeople = item.personSelections.filter((person) => (
+                        person.selected && selectedPeopleIds.includes(person.personId)
+                    ))
                     return selectedPeople.flatMap((person) => {
                         const personName = questionSet.people.find((p) => p.id === person.personId)!.name
                         return {
@@ -78,7 +83,9 @@ export function CreatePackingList() {
 
         // Get always needed items
         const alwaysNeededItems = questionSet.alwaysNeededItems.flatMap((item) => {
-            const selectedPeople = item.personSelections.filter((person) => (person.selected))
+            const selectedPeople = item.personSelections.filter((person) => (
+                person.selected && selectedPeopleIds.includes(person.personId)
+            ))
             return selectedPeople.flatMap((person) => {
                 const personName = questionSet.people.find((p) => p.id === person.personId)!.name
                 return {
@@ -198,6 +205,39 @@ export function CreatePackingList() {
                     placeholder="Enter a name for your packing list"
                     {...register('name', { required: true })}
                 />
+
+                {/* Person Selection */}
+                {questionSet.people.length > 0 && (
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            Who is going on this trip?
+                        </h3>
+                        <div className="space-y-2">
+                            {questionSet.people.map((person) => (
+                                <label key={person.id} className="flex items-center space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPeopleIds.includes(person.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSelectedPeopleIds([...selectedPeopleIds, person.id])
+                                            } else {
+                                                setSelectedPeopleIds(selectedPeopleIds.filter(id => id !== person.id))
+                                            }
+                                        }}
+                                        className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <span className="text-gray-700">
+                                        {person.name}
+                                        {person.ageRange && (
+                                            <span className="ml-2 text-sm text-gray-500">({person.ageRange})</span>
+                                        )}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {questionSet.questions.map((question, index) => {
                     // Default to single-choice for backward compatibility
