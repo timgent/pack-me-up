@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
-import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
+import { PackingListQuestionSet, newDraftQuestion, Item } from '../edit-questions/types'
 import { packingAppDb } from '../services/database'
 import { DatabaseMigration } from '../services/migration'
 import { QuestionSection } from '../edit-questions/question-section'
@@ -18,6 +18,7 @@ import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
+import { SuggestionsPanel } from '../edit-questions/suggestions-panel'
 
 export function EditQuestionsForm() {
 
@@ -43,6 +44,7 @@ export function EditQuestionsForm() {
 
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(null);
+  const [showSuggestionsPanel, setShowSuggestionsPanel] = useState(false);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -452,6 +454,29 @@ export function EditQuestionsForm() {
 
   const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
+  // Handler to add a suggested item to always needed items
+  const handleAddSuggestedItem = useCallback((itemText: string) => {
+    const currentData = getValues();
+    const people = currentData.people || [];
+
+    const newItem: Item = {
+      text: itemText,
+      personSelections: people.map(person => ({
+        personId: person.id,
+        selected: true // Default to selected for all people
+      }))
+    };
+
+    const updatedItems = [...(currentData.alwaysNeededItems || []), newItem];
+    setValue('alwaysNeededItems', updatedItems);
+    showToast(`Added "${itemText}" to always needed items`, 'success');
+  }, [getValues, setValue, showToast]);
+
+  // Handler for adding multiple suggested items at once
+  const handleAddMultipleSuggestedItems = useCallback((itemTexts: string[]) => {
+    itemTexts.forEach(text => handleAddSuggestedItem(text));
+  }, [handleAddSuggestedItem]);
+
   // Format last sync time for display
   const formatLastSync = (date: Date | null) => {
     if (!date) return 'Never';
@@ -512,7 +537,7 @@ export function EditQuestionsForm() {
               />
             </div>
           )}
-          <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8">
+          <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-start lg:gap-8 relative">
         {/* Main form content */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 flex-1 pb-32 lg:pb-8" id="edit-questions-form">
           <PeopleSection
@@ -666,6 +691,17 @@ export function EditQuestionsForm() {
             </Button>
           </div>
         </div>
+
+        {/* Suggestions Panel */}
+        {currentQuestionSet && (
+          <SuggestionsPanel
+            questionSet={currentQuestionSet}
+            onAddItem={handleAddSuggestedItem}
+            onAddMultipleItems={handleAddMultipleSuggestedItems}
+            isOpen={showSuggestionsPanel}
+            onToggle={() => setShowSuggestionsPanel(!showSuggestionsPanel)}
+          />
+        )}
       </div>
       {/* Sticky bottom bar for small/medium screens */}
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
