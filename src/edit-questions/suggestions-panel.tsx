@@ -21,16 +21,16 @@ export function SuggestionsPanel({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
-  const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set())
+  const [numLists, setNumLists] = useState(3)
 
   useEffect(() => {
     loadSuggestions()
-  }, [questionSet])
+  }, [questionSet, numLists])
 
   async function loadSuggestions() {
     setIsLoading(true)
     try {
-      const items = await suggestionService.getManualItemSuggestions(questionSet)
+      const items = await suggestionService.getManualItemSuggestions(questionSet, numLists)
       setSuggestions(items)
     } catch (error) {
       console.error('Failed to load suggestions:', error)
@@ -39,7 +39,7 @@ export function SuggestionsPanel({
     }
   }
 
-  const visibleSuggestions = suggestions.filter(s => !dismissedItems.has(s))
+  const visibleSuggestions = suggestions
 
   const handleToggleSelection = (item: string) => {
     const newSelected = new Set(selectedItems)
@@ -53,26 +53,11 @@ export function SuggestionsPanel({
 
   const handleQuickAdd = (item: string) => {
     onAddItem(item)
-    setDismissedItems(prev => new Set(prev).add(item))
   }
 
   const handleAddSelected = () => {
     onAddMultipleItems(Array.from(selectedItems))
-    setDismissedItems(prev => {
-      const newSet = new Set(prev)
-      selectedItems.forEach(item => newSet.add(item))
-      return newSet
-    })
     setSelectedItems(new Set())
-  }
-
-  const handleDismiss = (item: string) => {
-    setDismissedItems(prev => new Set(prev).add(item))
-    setSelectedItems(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(item)
-      return newSet
-    })
   }
 
   if (!isOpen) {
@@ -107,9 +92,21 @@ export function SuggestionsPanel({
             </svg>
           </button>
         </div>
-        <p className="text-xs text-gray-600">
-          From your last 3 packing lists
-        </p>
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <span>From your last</span>
+          <select
+            value={numLists}
+            onChange={(e) => setNumLists(Number(e.target.value))}
+            className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+            <option value={3}>3</option>
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+          </select>
+          <span>packing {numLists === 1 ? 'list' : 'lists'}</span>
+        </div>
       </div>
 
       {/* Content */}
@@ -167,20 +164,12 @@ export function SuggestionsPanel({
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => handleQuickAdd(item)}
-                      className="flex-1 text-xs px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      + Add
-                    </button>
-                    <button
-                      onClick={() => handleDismiss(item)}
-                      className="text-xs px-3 py-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleQuickAdd(item)}
+                    className="w-full mt-2 text-xs px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    + Add to Always Needed
+                  </button>
                 </div>
               ))}
             </div>
