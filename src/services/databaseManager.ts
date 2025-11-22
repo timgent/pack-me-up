@@ -32,6 +32,7 @@ class DatabaseManager {
 
     /**
      * Switches to user-specific database when logging in
+     * If the user database is empty, migrates data from the default database
      */
     async switchToUserDatabase(webId: string): Promise<void> {
         if (this.currentWebId === webId && this.isUserDatabase) {
@@ -39,15 +40,51 @@ class DatabaseManager {
             return
         }
 
-        const dbName = createUserDatabaseName(webId)
-        await packingAppDb.switchDatabase(dbName)
+        const userDbName = createUserDatabaseName(webId)
+
+        // First, check if we need to migrate data from the default database
+        // We need to check this BEFORE switching, so we know if migration is needed
+        let needsMigration = false
+        let dataToMigrate = null
+
+        // Temporarily switch to user database to check if it's empty
+        const currentDbName = packingAppDb.getCurrentDatabaseName()
+        await packingAppDb.switchDatabase(userDbName)
+
+        const isEmpty = await packingAppDb.isEmpty()
+        if (isEmpty) {
+            console.log('User database is empty, will migrate data from default database')
+            needsMigration = true
+
+            // Switch to default database to export data
+            await packingAppDb.switchDatabase(DEFAULT_DB_NAME)
+            dataToMigrate = await packingAppDb.exportAllData()
+
+            console.log('Exported data from default database:', {
+                hasQuestionSet: !!dataToMigrate.questionSet,
+                packingListsCount: dataToMigrate.packingLists.length
+            })
+
+            // Switch back to user database
+            await packingAppDb.switchDatabase(userDbName)
+        } else if (currentDbName !== userDbName) {
+            // If not empty and we were on a different database, just make sure we're on the user database
+            await packingAppDb.switchDatabase(userDbName)
+        }
+
+        // Import data if migration is needed
+        if (needsMigration && dataToMigrate) {
+            const result = await packingAppDb.importData(dataToMigrate)
+            console.log('Migrated data to user database:', result)
+        }
 
         this.currentWebId = webId
         this.isUserDatabase = true
 
         console.log('Switched to user-specific database:', {
             webId,
-            dbName,
+            dbName: userDbName,
+            migrated: needsMigration,
             timestamp: new Date().toISOString()
         })
     }

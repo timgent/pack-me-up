@@ -274,6 +274,76 @@ export class PackingAppDatabase {
         }
     }
 
+    /**
+     * Checks if the current database is empty (no documents)
+     */
+    public async isEmpty(): Promise<boolean> {
+        try {
+            const result = await this.db.allDocs({ limit: 1 })
+            return result.rows.length === 0
+        } catch (err) {
+            console.error('Error checking if database is empty:', err)
+            throw err
+        }
+    }
+
+    /**
+     * Exports all data from the current database
+     */
+    public async exportAllData(): Promise<{ questionSet?: PackingListQuestionSet, packingLists: PackingList[] }> {
+        const data: { questionSet?: PackingListQuestionSet, packingLists: PackingList[] } = {
+            packingLists: []
+        }
+
+        try {
+            // Export question set
+            try {
+                data.questionSet = await this.getQuestionSet()
+            } catch (err: any) {
+                if (err.name !== 'not_found') {
+                    console.warn('Could not export question set:', err)
+                }
+            }
+
+            // Export all packing lists
+            data.packingLists = await this.getAllPackingLists()
+
+            return data
+        } catch (err) {
+            console.error('Error exporting data:', err)
+            throw err
+        }
+    }
+
+    /**
+     * Imports data into the current database
+     */
+    public async importData(data: { questionSet?: PackingListQuestionSet, packingLists: PackingList[] }): Promise<{ questionSets: number, packingLists: number }> {
+        let questionSets = 0
+        let packingLists = 0
+
+        try {
+            // Import question set if it exists
+            if (data.questionSet) {
+                await this.saveQuestionSet(data.questionSet)
+                questionSets = 1
+                console.log('Imported question set successfully')
+            }
+
+            // Import packing lists
+            for (const packingList of data.packingLists) {
+                await this.savePackingList(packingList)
+                packingLists++
+            }
+            console.log(`Imported ${packingLists} packing lists successfully`)
+
+            return { questionSets, packingLists }
+        } catch (err) {
+            console.error('Error importing data:', err)
+            throw err
+        }
+    }
+
     public getInfo() {
         return this.db.info()
     }
