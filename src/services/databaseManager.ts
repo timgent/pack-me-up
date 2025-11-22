@@ -1,4 +1,6 @@
 import { packingAppDb } from './database'
+import { syncAllFromPod } from './podSync'
+import { Session } from '@inrupt/solid-client-authn-browser'
 
 const DEFAULT_DB_NAME = 'packing-app-data'
 
@@ -33,8 +35,9 @@ class DatabaseManager {
     /**
      * Switches to user-specific database when logging in
      * If the user database is empty, migrates data from the default database
+     * Then syncs all data from pod using "last edited wins" strategy
      */
-    async switchToUserDatabase(webId: string): Promise<void> {
+    async switchToUserDatabase(webId: string, session?: Session | null): Promise<void> {
         if (this.currentWebId === webId && this.isUserDatabase) {
             console.log('Already using user-specific database for', webId)
             return
@@ -87,6 +90,18 @@ class DatabaseManager {
             migrated: needsMigration,
             timestamp: new Date().toISOString()
         })
+
+        // Sync all data from pod if session is available
+        if (session) {
+            console.log('Syncing all data from pod...')
+            try {
+                const syncResult = await syncAllFromPod(session)
+                console.log('Pod sync completed:', syncResult)
+            } catch (error) {
+                console.error('Error syncing from pod:', error)
+                // Don't throw - allow login to continue even if sync fails
+            }
+        }
     }
 
     /**

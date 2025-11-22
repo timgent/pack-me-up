@@ -62,10 +62,10 @@ function setupSessionEventListeners(
     console.log("Session login event fired");
     const updatedSession = getDefaultSession();
 
-    // Switch to user-specific database
+    // Switch to user-specific database and sync from pod
     if (updatedSession.info.webId) {
       console.log("Switching to user-specific database for", updatedSession.info.webId);
-      await databaseManager.switchToUserDatabase(updatedSession.info.webId);
+      await databaseManager.switchToUserDatabase(updatedSession.info.webId, updatedSession);
     }
 
     setSession(updatedSession);
@@ -77,10 +77,10 @@ function setupSessionEventListeners(
     console.log("Session restore event fired");
     const updatedSession = getDefaultSession();
 
-    // Switch to user-specific database if restoring a logged-in session
+    // Switch to user-specific database and sync from pod if restoring a logged-in session
     if (updatedSession.info.webId) {
       console.log("Session restored - switching to user-specific database for", updatedSession.info.webId);
-      await databaseManager.switchToUserDatabase(updatedSession.info.webId);
+      await databaseManager.switchToUserDatabase(updatedSession.info.webId, updatedSession);
     }
 
     setSession(updatedSession);
@@ -108,10 +108,10 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         });
 
         // If session is already logged in (restored from previous session),
-        // switch to user-specific database
+        // switch to user-specific database and sync from pod
         if (currentSession.info.isLoggedIn && currentSession.info.webId) {
           console.log("Restoring user session - switching to user-specific database");
-          await databaseManager.switchToUserDatabase(currentSession.info.webId);
+          await databaseManager.switchToUserDatabase(currentSession.info.webId, currentSession);
         }
 
         setSession(currentSession);

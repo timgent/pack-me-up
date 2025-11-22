@@ -275,6 +275,64 @@ export class PackingAppDatabase {
     }
 
     /**
+     * Gets the question set with metadata (including updatedAt timestamp)
+     */
+    public async getQuestionSetWithMetadata(): Promise<(PackingListQuestionSet & { updatedAt: string }) | null> {
+        try {
+            const doc = await this.db.get('question-set:1')
+            if (doc.docType !== 'question-set') {
+                throw new Error('Invalid document type for question set')
+            }
+            return {
+                _id: '1',
+                _rev: doc._rev,
+                ...doc.data,
+                updatedAt: doc.updatedAt
+            }
+        } catch (err: any) {
+            if (err.name === 'not_found') {
+                return null
+            }
+            throw err
+        }
+    }
+
+    /**
+     * Gets all packing lists with metadata (including updatedAt timestamps)
+     */
+    public async getAllPackingListsWithMetadata(): Promise<(PackingList & { updatedAt: string })[]> {
+        try {
+            const result = await this.db.allDocs({
+                include_docs: true,
+                startkey: 'packing-list:',
+                endkey: 'packing-list:\ufff0'
+            })
+
+            const packingLists: (PackingList & { updatedAt: string })[] = []
+
+            for (const row of result.rows) {
+                if (row.doc && row.doc.docType === 'packing-list') {
+                    const packingListId = row.id.replace('packing-list:', '')
+                    const packingList: PackingList & { updatedAt: string } = {
+                        id: packingListId,
+                        _rev: row.doc._rev,
+                        name: row.doc.data.name,
+                        createdAt: row.doc.data.createdAt,
+                        items: row.doc.data.items,
+                        updatedAt: row.doc.updatedAt
+                    }
+                    packingLists.push(packingList)
+                }
+            }
+
+            return packingLists.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        } catch (err) {
+            console.error('Error fetching all packing lists:', err)
+            throw err
+        }
+    }
+
+    /**
      * Checks if the current database is empty (no documents)
      */
     public async isEmpty(): Promise<boolean> {
@@ -290,23 +348,50 @@ export class PackingAppDatabase {
     /**
      * Exports all data from the current database
      */
-    public async exportAllData(): Promise<{ questionSet?: PackingListQuestionSet, packingLists: PackingList[] }> {
-        const data: { questionSet?: PackingListQuestionSet, packingLists: PackingList[] } = {
+    public async exportAllData(): Promise<{ questionSet?: PackingListQuestionSet & { updatedAt?: string }, packingLists: (PackingList & { updatedAt?: string })[] }> {
+        const data: { questionSet?: PackingListQuestionSet & { updatedAt?: string }, packingLists: (PackingList & { updatedAt?: string })[] } = {
             packingLists: []
         }
 
         try {
-            // Export question set
+            // Export question set with timestamp
             try {
-                data.questionSet = await this.getQuestionSet()
+                const doc = await this.db.get('question-set:1')
+                if (doc.docType === 'question-set') {
+                    data.questionSet = {
+                        _id: '1',
+                        _rev: doc._rev,
+                        ...doc.data,
+                        updatedAt: doc.updatedAt
+                    }
+                }
             } catch (err: any) {
                 if (err.name !== 'not_found') {
                     console.warn('Could not export question set:', err)
                 }
             }
 
-            // Export all packing lists
-            data.packingLists = await this.getAllPackingLists()
+            // Export all packing lists with timestamps
+            const result = await this.db.allDocs({
+                include_docs: true,
+                startkey: 'packing-list:',
+                endkey: 'packing-list:\ufff0'
+            })
+
+            for (const row of result.rows) {
+                if (row.doc && row.doc.docType === 'packing-list') {
+                    const packingListId = row.id.replace('packing-list:', '')
+                    const packingList: PackingList & { updatedAt?: string } = {
+                        id: packingListId,
+                        _rev: row.doc._rev,
+                        name: row.doc.data.name,
+                        createdAt: row.doc.data.createdAt,
+                        items: row.doc.data.items,
+                        updatedAt: row.doc.updatedAt
+                    }
+                    data.packingLists.push(packingList)
+                }
+            }
 
             return data
         } catch (err) {
