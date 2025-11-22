@@ -410,14 +410,18 @@ export class PackingAppDatabase {
         try {
             // Import question set if it exists
             if (data.questionSet) {
-                await this.saveQuestionSet(data.questionSet)
+                // Remove _rev to avoid conflicts when importing to a new database
+                const { _rev, ...questionSetWithoutRev } = data.questionSet
+                await this.saveQuestionSet(questionSetWithoutRev as PackingListQuestionSet)
                 questionSets = 1
                 console.log('Imported question set successfully')
             }
 
             // Import packing lists
             for (const packingList of data.packingLists) {
-                await this.savePackingList(packingList)
+                // Remove _rev to avoid conflicts when importing to a new database
+                const { _rev, ...packingListWithoutRev } = packingList
+                await this.savePackingList(packingListWithoutRev as PackingList)
                 packingLists++
             }
             console.log(`Imported ${packingLists} packing lists successfully`)
