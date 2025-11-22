@@ -27,9 +27,11 @@ export type AppDocument = QuestionSetDocument | PackingListDocument
 export class PackingAppDatabase {
     private db: PouchDB.Database<AppDocument>
     private static instance: PackingAppDatabase
+    private currentDbName: string
 
-    private constructor() {
-        this.db = new PouchDB<AppDocument>('packing-app-data')
+    private constructor(dbName: string = 'packing-app-data') {
+        this.currentDbName = dbName
+        this.db = new PouchDB<AppDocument>(dbName)
         console.log('Consolidated PouchDB instance created:', {
             name: this.db.name,
             timestamp: new Date().toISOString()
@@ -41,6 +43,38 @@ export class PackingAppDatabase {
             PackingAppDatabase.instance = new PackingAppDatabase()
         }
         return PackingAppDatabase.instance
+    }
+
+    /**
+     * Switches to a different database. This closes the current database
+     * and opens a new one with the specified name.
+     */
+    public async switchDatabase(dbName: string): Promise<void> {
+        if (this.currentDbName === dbName) {
+            console.log('Already using database:', dbName)
+            return
+        }
+
+        console.log('Switching database from', this.currentDbName, 'to', dbName)
+
+        // Close the current database
+        await this.db.close()
+
+        // Open the new database
+        this.currentDbName = dbName
+        this.db = new PouchDB<AppDocument>(dbName)
+
+        console.log('Switched to database:', {
+            name: this.db.name,
+            timestamp: new Date().toISOString()
+        })
+    }
+
+    /**
+     * Gets the current database name
+     */
+    public getCurrentDatabaseName(): string {
+        return this.currentDbName
     }
 
 

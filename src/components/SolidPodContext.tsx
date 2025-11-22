@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect, useRef } from "react";
 import {
   Session,
   handleIncomingRedirect,
@@ -8,6 +8,7 @@ import {
 } from "@inrupt/solid-client-authn-browser";
 import { useToast } from "./ToastContext";
 import { isAuthenticationError } from "../services/solidPod";
+import { databaseManager } from "../services/databaseManager";
 
 interface SolidPodContextValue {
   session: Session | null;
@@ -28,14 +29,26 @@ function setupSessionEventListeners(
   session: Session,
   showToast: (message: string, type: 'success' | 'error') => void,
   setSession: (session: Session) => void,
-  setSessionVersion: (updater: (v: number) => number) => void
+  setSessionVersion: (updater: (v: number) => number) => void,
+  isExplicitLogoutRef: React.MutableRefObject<boolean>
 ) {
   // Listen for logout events (including session expiration)
-  session.events.on("logout", () => {
+  session.events.on("logout", async () => {
     console.log("Session logout event fired");
+
     // Update UI state
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
+
+    // Only switch to default database if this was an explicit logout
+    // If session just timed out, keep using the user-specific database
+    if (isExplicitLogoutRef.current) {
+      console.log("Explicit logout - switching to default database");
+      await databaseManager.switchToDefaultDatabase();
+      isExplicitLogoutRef.current = false; // Reset the flag
+    } else {
+      console.log("Session timeout - keeping user-specific database");
+    }
 
     // Notify user that session has expired
     showToast(
@@ -45,17 +58,31 @@ function setupSessionEventListeners(
   });
 
   // Listen for login events
-  session.events.on("login", () => {
+  session.events.on("login", async () => {
     console.log("Session login event fired");
     const updatedSession = getDefaultSession();
+
+    // Switch to user-specific database
+    if (updatedSession.info.webId) {
+      console.log("Switching to user-specific database for", updatedSession.info.webId);
+      await databaseManager.switchToUserDatabase(updatedSession.info.webId);
+    }
+
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
   });
 
   // Listen for session restore events
-  session.events.on("sessionRestore", () => {
+  session.events.on("sessionRestore", async () => {
     console.log("Session restore event fired");
     const updatedSession = getDefaultSession();
+
+    // Switch to user-specific database if restoring a logged-in session
+    if (updatedSession.info.webId) {
+      console.log("Session restored - switching to user-specific database for", updatedSession.info.webId);
+      await databaseManager.switchToUserDatabase(updatedSession.info.webId);
+    }
+
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
   });
@@ -66,6 +93,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
   const { showToast } = useToast();
+  const isExplicitLogoutRef = useRef(false);
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -78,11 +106,19 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           webId: currentSession.info.webId,
           sessionId: currentSession.info.sessionId
         });
+
+        // If session is already logged in (restored from previous session),
+        // switch to user-specific database
+        if (currentSession.info.isLoggedIn && currentSession.info.webId) {
+          console.log("Restoring user session - switching to user-specific database");
+          await databaseManager.switchToUserDatabase(currentSession.info.webId);
+        }
+
         setSession(currentSession);
         setSessionVersion(v => v + 1);
 
         // Set up session event listeners
-        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion);
+        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion, isExplicitLogoutRef);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -164,6 +200,9 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Mark this as an explicit logout so the event listener knows to switch to default database
+    isExplicitLogoutRef.current = true;
+
     await solidLogout();
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
