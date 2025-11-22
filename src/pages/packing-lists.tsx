@@ -19,7 +19,7 @@ export function PackingLists() {
     const [showBanner, setShowBanner] = useState(false)
     const [showPodPrompt, setShowPodPrompt] = useState(false)
     const navigate = useNavigate()
-    const { isLoggedIn, session } = useSolidPod()
+    const { isLoggedIn, session, dataVersion } = useSolidPod()
     const { showToast } = useToast()
     const handlePodError = usePodErrorHandler()
 
@@ -142,7 +142,7 @@ export function PackingLists() {
         }
 
         fetchPackingLists()
-    }, [isLoggedIn])
+    }, [isLoggedIn, dataVersion])
 
     if (isLoading) {
         return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>

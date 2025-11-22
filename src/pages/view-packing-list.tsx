@@ -24,7 +24,7 @@ export function ViewPackingList() {
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
-    const { isLoggedIn } = useSolidPod()
+    const { isLoggedIn, dataVersion } = useSolidPod()
     const { showToast } = useToast()
 
     const { register, setValue, getValues, control } = useForm<FormData>({
@@ -103,7 +103,7 @@ export function ViewPackingList() {
         }
 
         fetchPackingList()
-    }, [id, setValue])
+    }, [id, setValue, dataVersion])
 
     const handleItemChange = useDebouncedCallback(async () => {
         if (!packingList) {
