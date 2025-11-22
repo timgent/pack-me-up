@@ -1,6 +1,6 @@
 import { Session } from '@inrupt/solid-client-authn-browser'
 import { packingAppDb } from './database'
-import { getPrimaryPodUrl, loadFileFromPod, loadMultipleFilesFromPod, POD_CONTAINERS } from './solidPod'
+import { getPrimaryPodUrl, loadFileFromPod, loadMultipleFilesFromPod, saveFileToPod, saveMultipleFilesToPod, POD_CONTAINERS } from './solidPod'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
 
@@ -115,10 +115,29 @@ async function syncQuestions(session: Session, podUrl: string, result: SyncAllRe
             }
         }
     } catch (error: any) {
-        // 404 means no questions in pod yet
+        // 404 means no questions in pod yet - upload local data if available
         if (error.statusCode === 404) {
-            result.questions.source = 'local'
-            console.log('No questions found in pod')
+            const localQuestions = await packingAppDb.getQuestionSetWithMetadata()
+            if (localQuestions) {
+                // Upload local questions to pod
+                try {
+                    await saveFileToPod({
+                        session,
+                        containerPath: `${podUrl}${POD_CONTAINERS.ROOT}`,
+                        filename: 'packing-list-questions.json',
+                        data: localQuestions
+                    })
+                    result.questions.synced = true
+                    result.questions.source = 'local'
+                    console.log('Uploaded local questions to pod (pod was empty)')
+                } catch (uploadError) {
+                    console.error('Error uploading questions to pod:', uploadError)
+                    result.questions.source = 'local'
+                }
+            } else {
+                result.questions.source = 'none'
+                console.log('No questions found in pod or locally')
+            }
         } else {
             console.error('Error syncing questions:', error)
             throw error
@@ -180,9 +199,23 @@ async function syncPackingLists(session: Session, podUrl: string, result: SyncAl
 
         console.log(`Synced ${result.packingLists.synced} packing lists, skipped ${result.packingLists.skipped}`)
     } catch (error: any) {
-        // 404 means no packing lists container yet
+        // 404 means no packing lists container yet - upload local data if available
         if (error.statusCode === 404) {
-            console.log('No packing lists container found in pod')
+            const localPackingLists = await packingAppDb.getAllPackingListsWithMetadata()
+            if (localPackingLists.length > 0) {
+                // Upload local packing lists to pod
+                try {
+                    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+                    const uploadResult = await saveMultipleFilesToPod(session, packingListsContainerUrl, localPackingLists)
+                    result.packingLists.synced = uploadResult.successCount
+                    result.packingLists.total = localPackingLists.length
+                    console.log(`Uploaded ${uploadResult.successCount} local packing lists to pod (pod was empty)`)
+                } catch (uploadError) {
+                    console.error('Error uploading packing lists to pod:', uploadError)
+                }
+            } else {
+                console.log('No packing lists found in pod or locally')
+            }
         } else {
             console.error('Error syncing packing lists:', error)
             throw error
