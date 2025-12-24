@@ -9,8 +9,6 @@ import { PeopleSection } from '../edit-questions/people-section'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { AlwaysNeededItemsSection } from '../edit-questions/always-needed-items-section'
-import { Modal } from '../components/Modal'
-import { exampleData } from '../edit-questions/example-data'
 import { Callout } from '../components/Callout'
 import { useSolidPod } from '../components/SolidPodContext'
 import { usePodSync } from '../hooks/usePodSync'
@@ -25,7 +23,6 @@ export function EditQuestionsForm() {
     defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] }
   });
   const [rev, setRev] = useState<string | undefined>(undefined)
-  const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
   const [jsonValue, setJsonValue] = useState<string>('')
@@ -327,17 +324,6 @@ export function EditQuestionsForm() {
     }
   };
 
-  const handleLoadExample = (exampleName: string) => {
-    const data = exampleData[exampleName as keyof typeof exampleData];
-    if (data) {
-      const dataWithRev = { ...data, _rev: rev };
-      reset(dataWithRev);
-      setCurrentQuestionSet(dataWithRev);
-      setIsExampleModalOpen(false);
-      showToast('Example loaded successfully!', 'success');
-    }
-  };
-
   // JSON Editor sync functions
   const syncVisualToJson = useCallback(() => {
     const formData = getValues();
@@ -503,11 +489,11 @@ export function EditQuestionsForm() {
           {isFormEmpty && (
             <div className="w-full max-w-5xl mb-8">
               <Callout
-                title="Get Started with Example Questions"
-                description="Your form is empty. Load an example to see how questions and options work, or start building your own from scratch."
+                title="Get Started with the Wizard"
+                description="Your form is empty. Use the packing list wizard to easily create your questions and options."
                 action={{
-                  label: "Load Example",
-                  onClick: () => setIsExampleModalOpen(true)
+                  label: "Go to Wizard",
+                  onClick: () => window.location.href = '/'
                 }}
               />
             </div>
@@ -657,13 +643,6 @@ export function EditQuestionsForm() {
               setCurrentQuestionSet(defaultData);
               showToast('Form has been reset to default state', 'success');
             }}>Reset form</Button>
-            <Button
-              type="button"
-              onClick={() => setIsExampleModalOpen(true)}
-              variant="secondary"
-            >
-              Load Example
-            </Button>
           </div>
         </div>
       </div>
@@ -750,13 +729,6 @@ export function EditQuestionsForm() {
               setCurrentQuestionSet(defaultData);
               showToast('Form has been reset to default state', 'success');
             }}>Reset form</Button>
-            <Button
-              type="button"
-              onClick={() => setIsExampleModalOpen(true)}
-              variant="secondary"
-            >
-              Load Example
-            </Button>
             </div>
           </div>
         </div>
@@ -780,24 +752,6 @@ export function EditQuestionsForm() {
           />
         </div>
       )}
-
-      <Modal
-        isOpen={isExampleModalOpen}
-        onClose={() => setIsExampleModalOpen(false)}
-        title="Load Example"
-      >
-        <div className="space-y-2">
-          {Object.keys(exampleData).map((exampleName) => (
-            <button
-              key={exampleName}
-              onClick={() => handleLoadExample(exampleName)}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-md transition-colors"
-            >
-              {exampleName}
-            </button>
-          ))}
-        </div>
-      </Modal>
     </div>
   )
 } 
