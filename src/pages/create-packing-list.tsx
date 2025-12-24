@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList, PackingListFormData, PackingListItem } from '../create-packing-list/types'
 import { packingAppDb } from '../services/database'
@@ -16,6 +16,7 @@ export function CreatePackingList() {
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const { showToast } = useToast()
     const { isLoggedIn } = useSolidPod()
+    const navigate = useNavigate()
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
         defaultValues: {
@@ -109,8 +110,8 @@ export function CreatePackingList() {
         try {
             await packingAppDb.savePackingList(packingList)
             showToast('Packing list created successfully!', 'success')
-            // Reset the form after successful creation
-            window.location.href = '/#/view-lists'
+            // Navigate to the newly created packing list
+            navigate(`/view-lists/${packingList.id}`)
         } catch (err) {
             console.error('Error saving packing list:', err)
             showToast('Failed to create packing list. Please try again.', 'error')
