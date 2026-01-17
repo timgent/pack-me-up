@@ -82,10 +82,7 @@ When users visit our app after their OAuth provider has invalidated the dynamica
 
 ### **Why This Is Problematic**
 
-- **Production blocking**: Users who return to the app after weeks/months are completely unable to access it
-- **No programmatic recovery**: We cannot detect or handle this scenario in our application code
-- **Poor user experience**: Users have no way to know why they can't access the app or how to fix it
-- **Silent failure**: The redirect happens before any Promise resolution, so standard error handling doesn't work
+Users who return after weeks/months are completely blocked from accessing the app. The redirect happens before our error handling can activate, so we have no way to detect or recover programmatically. Users must manually clear browser data, which they don't know how to do.
 
 ---
 
@@ -104,14 +101,9 @@ The user is now blocked from accessing the application entirely.
 
 ### **Our Understanding (Please Correct If Wrong)**
 
-From our investigation, it appears that:
+From our investigation, it appears that when `restorePreviousSession: true`, the library immediately initiates a silent auth redirect (`prompt=none`) before `handleIncomingRedirect()` returns its Promise. If the stored `client_id` has been invalidated, the redirect happens anyway with invalid credentials. Since the redirect is synchronous, our try/catch cannot intercept it.
 
-1. When `restorePreviousSession: true`, the library finds stored session data and immediately initiates a silent authentication flow (`prompt=none`)
-2. This redirect happens synchronously/immediately, before `handleIncomingRedirect()` returns its Promise
-3. If the stored `client_id` has been invalidated by the OAuth provider, the redirect happens anyway with the invalid credentials
-4. Since the redirect is synchronous, our application's error handling cannot catch it
-
-We may be misunderstanding how this is intended to work, so please correct us if we're missing something.
+We may be misunderstanding how this is intended to work.
 
 ---
 
@@ -148,13 +140,11 @@ However, this doesn't work because the redirect happens before the Promise is cr
 
 ### **Temporary Workaround We're Considering**
 
-We're considering changing our code to:
-
 ```typescript
 await handleIncomingRedirect({ restorePreviousSession: false });
 ```
 
-This would disable automatic session restoration, requiring users to explicitly log in after each page refresh. This prevents the invalid client_id issue but loses the seamless "stay logged in" experience.
+This would require users to explicitly log in after each page refresh, losing the seamless "stay logged in" experience, but prevents the blocking issue entirely.
 
 **Would this be the recommended approach**, or is there a better pattern we should follow?
 
@@ -171,100 +161,29 @@ We appreciate any guidance you can provide on the recommended way to handle this
 
 ---
 
-## Our Investigation
+## Internal Notes
 
-### Timeline of the Issue
+### What We Found
+- **File:** `src/components/SolidPodContext.tsx:74`
+- **Issue:** `restorePreviousSession: true` causes immediate redirect before error handling can activate
+- **Root cause:** Stored `client_id` from previous login becomes invalid over time (provider cleanup)
+- **User impact:** Complete app blockage, requires manual browser data clearing
 
-**Production Impact:**
-- Users visiting the app after extended periods were immediately redirected to Inrupt's OAuth provider
-- 401 error: "invalid_client_id"
-- Complete blockage from using the application
-- Required manual clearing of browser data to recover
+### Our Options
+1. **Short-term:** Set `restorePreviousSession: false` (lose "stay logged in" UX but fix the blocking issue)
+2. **Ideal:** Wait for Inrupt team guidance on the intended pattern
 
-### Technical Analysis
-
-**Current Implementation** (`src/components/SolidPodContext.tsx:74`):
-```typescript
-await handleIncomingRedirect({ restorePreviousSession: true });
-```
-
-**How It Fails:**
-1. User had previously logged in → `client_id` stored in browser (IndexedDB/localStorage)
-2. OAuth provider invalidated the dynamically registered client (normal maintenance)
-3. On next visit, library finds stored `client_id` and immediately redirects with `prompt=none`
-4. OAuth provider rejects invalid `client_id` before app can handle the error
-5. User stuck on 401 error page
-
-**Why Error Handling Doesn't Work:**
-The existing try/catch in lines 86-105 of SolidPodContext.tsx would handle errors, but the redirect happens **synchronously before any error is thrown** to catch.
-
----
-
-## Potential Solutions We're Evaluating
-
-### **Option 1: Disable Automatic Session Restoration**
-
-```typescript
-// Change from this:
-await handleIncomingRedirect({ restorePreviousSession: true });
-
-// To this:
-await handleIncomingRedirect({ restorePreviousSession: false });
-```
-
-**Pros:**
-- Eliminates the redirect loop problem
-- Users explicitly choose when to log in
-- No unexpected redirects
-- More predictable behavior
-
-**Cons:**
-- Users must click "Login" after every page refresh
-- Loses the seamless "stay logged in" experience
-- May not be using the library as intended
-
-### **Option 2: Wait for Upstream Guidance**
-
-Continue with current implementation but document the issue for users (tell them to clear site data if they get stuck). Wait for Inrupt team's guidance on the recommended pattern.
-
-**Pros:**
-- Keeps intended automatic session restoration
-- Follows library's designed usage pattern
-
-**Cons:**
-- Users can still get blocked
-- Not a real solution
-
-We're leaning toward **Option 1** as a short-term fix while we seek guidance, but we'd prefer to understand the intended way to handle this scenario.
-
----
-
-## References
-
-### Documentation
-- [Session Restore upon Browser Refresh](https://docs.inrupt.com/guides/authentication-in-solid/authentication-from-browser/session-restore-upon-browser-refresh)
-- [Session Restore Tutorial](https://docs.inrupt.com/developer-tools/javascript/client-libraries/tutorial/restore-session-browser-refresh/)
-- [Authentication from Browser](https://docs.inrupt.com/guides/authentication-in-solid/authentication-from-browser)
-
-### Related Issues
-- [Browser/App: Restore session without silent login and redirect (#3443)](https://github.com/inrupt/solid-client-authn-js/issues/3443)
-- [Wrong dynamic client ID used for code-to-token exchange (#1790)](https://github.com/inrupt/solid-client-authn-js/issues/1790)
-- [handleIncomingRedirect strips querystring (#1989)](https://github.com/inrupt/solid-client-authn-js/issues/1989)
-
-### Community Discussions
-- [Inrupt pod login complains about an invalid_client](https://forum.solidproject.org/t/inrupt-pod-login-complains-about-an-invalid-client/4726)
-- [handleIncomingRedirect creates endless loop](https://forum.solidproject.org/t/handleincomingredirect-w-redirect-creates-endless-loop/8623)
+### Research Links
+- **Docs:** [Session Restore](https://docs.inrupt.com/guides/authentication-in-solid/authentication-from-browser/session-restore-upon-browser-refresh) | [Tutorial](https://docs.inrupt.com/developer-tools/javascript/client-libraries/tutorial/restore-session-browser-refresh/)
+- **Issues:** [#3443](https://github.com/inrupt/solid-client-authn-js/issues/3443) (silent auth redirects) | [#1790](https://github.com/inrupt/solid-client-authn-js/issues/1790) (client ID) | [#1989](https://github.com/inrupt/solid-client-authn-js/issues/1989) (query string)
+- **Forum:** [Invalid client discussion](https://forum.solidproject.org/t/inrupt-pod-login-complains-about-an-invalid-client/4726)
 
 ---
 
 ## Next Steps
 
-1. **Submit Issue:** Create issue in `inrupt/solid-client-authn-js` repository to seek guidance from the Inrupt team
-2. **Evaluate Workaround:** Consider implementing `restorePreviousSession: false` as temporary measure
-3. **Monitor Response:** Review Inrupt team's recommendations and adjust implementation accordingly
-4. **Update Documentation:** Document the recommended approach for our team once we have clarity
+1. Submit issue to `inrupt/solid-client-authn-js` using the draft above
+2. Consider implementing `restorePreviousSession: false` workaround if needed urgently
+3. Update implementation based on Inrupt team's guidance
 
----
-
-**Document Maintained By:** Pack Me Up Development Team
 **Last Updated:** 2026-01-17
