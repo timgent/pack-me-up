@@ -71,7 +71,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     const initializeSession = async () => {
       try {
         console.log("Initializing Solid session...");
-        await handleIncomingRedirect({ restorePreviousSession: true });
+        await handleIncomingRedirect({ restorePreviousSession: false });
         const currentSession = getDefaultSession();
         console.log("Session initialized:", {
           isLoggedIn: currentSession.info.isLoggedIn,
