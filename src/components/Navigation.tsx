@@ -57,6 +57,12 @@ export const Navigation = () => {
                                     >
                                         View Lists
                                     </Link>
+                                    <Link
+                                        to="/backups"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
+                                    >
+                                        Backups
+                                    </Link>
                                 </div>
                             </div>
                         </div>
@@ -150,6 +156,13 @@ export const Navigation = () => {
                             onClick={() => setIsOpen(false)}
                         >
                             View Lists
+                        </Link>
+                        <Link
+                            to="/backups"
+                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Backups
                         </Link>
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">

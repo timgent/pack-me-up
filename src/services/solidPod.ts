@@ -8,6 +8,7 @@ export const POD_CONTAINERS = {
     ROOT: 'pack-me-up/',
     QUESTIONS: 'pack-me-up/packing-list-questions.json',
     PACKING_LISTS: 'pack-me-up/packing-lists/',
+    BACKUPS: 'pack-me-up/backups/',
 } as const
 
 /**

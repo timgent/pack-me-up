@@ -13,6 +13,7 @@ import { SolidPodProvider } from './components/SolidPodContext'
 import { DatabaseProvider } from './components/DatabaseContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 import { Wizard } from './pages/wizard'
+import { BackupsPage } from './pages/backups'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
                 <Route path="/view-lists" element={<PackingLists />} />
                 <Route path="/view-lists/:id" element={<ViewPackingList />} />
                 <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
+                <Route path="/backups" element={<BackupsPage />} />
               </Routes>
             </div>
           </div>
