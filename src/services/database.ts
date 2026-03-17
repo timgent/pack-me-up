@@ -268,4 +268,23 @@ export class PackingAppDatabase {
     public getInfo() {
         return this.db.info()
     }
+
+    public async isEmpty(): Promise<boolean> {
+        const info = await this.getInfo()
+        return info.doc_count === 0
+    }
+
+    public async copyAllDataFrom(source: PackingAppDatabase): Promise<void> {
+        try {
+            const questionSet = await source.getQuestionSet()
+            await this.saveQuestionSet({ ...questionSet, _rev: undefined })
+        } catch (err: any) {
+            if (err.name !== 'not_found') throw err
+        }
+
+        const lists = await source.getAllPackingLists()
+        for (const list of lists) {
+            await this.savePackingList({ ...list, _rev: undefined })
+        }
+    }
 }
