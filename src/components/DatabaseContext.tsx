@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useState, useEffect, Fragment } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl } from '../services/solidPod'
+import { getPrimaryPodUrl, hasPodData } from '../services/solidPod'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface DatabaseContextValue {
@@ -63,9 +63,12 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             const dismissedKey = `pod-migration-dismissed-${resolvedNamespace}`
             const dismissed = localStorage.getItem(dismissedKey) === 'true'
 
-            if (!dismissed) {
-                const [podEmpty, localEmpty] = await Promise.all([podDb.isEmpty(), local.isEmpty()])
-                if (podEmpty && !localEmpty) {
+            if (!dismissed && podUrl) {
+                const [podHasRemoteData, localEmpty] = await Promise.all([
+                    hasPodData(session, podUrl),
+                    local.isEmpty()
+                ])
+                if (!podHasRemoteData && !localEmpty) {
                     if (cancelled) return
                     setLocalDb(local)
                     setNamespace(resolvedNamespace)

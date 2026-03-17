@@ -111,6 +111,30 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
 }
 
 /**
+ * Checks whether the user's Solid Pod contains any data saved by this app.
+ * Checks the questions file first, then the packing lists container.
+ * Uses remote requests so it works correctly on any device, regardless of local cache state.
+ */
+export async function hasPodData(session: Session, podUrl: string): Promise<boolean> {
+    try {
+        await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS}`, { fetch: session.fetch })
+        return true
+    } catch (err: any) {
+        if (isAuthenticationError(err)) handlePodError(err)
+        if (err.statusCode !== 404) throw err
+    }
+
+    try {
+        const dataset = await getSolidDataset(`${podUrl}${POD_CONTAINERS.PACKING_LISTS}`, { fetch: session.fetch })
+        return getContainedResourceUrlAll(dataset).some(url => url.endsWith('.json'))
+    } catch (err: any) {
+        if (isAuthenticationError(err)) handlePodError(err)
+        if (err.statusCode === 404) return false
+        throw err
+    }
+}
+
+/**
  * Saves a file to a Pod container with automatic fallback to overwrite
  * Handles both saveFileInContainer (creates) and overwriteFile (updates) strategies
  */
