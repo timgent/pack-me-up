@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect } from "react";
+import { createContext, ReactNode, useContext, useState, useEffect, useRef } from "react";
 import {
   Session,
   handleIncomingRedirect,
@@ -28,20 +28,23 @@ function setupSessionEventListeners(
   session: Session,
   showToast: (message: string, type: 'success' | 'error') => void,
   setSession: (session: Session) => void,
-  setSessionVersion: (updater: (v: number) => number) => void
+  setSessionVersion: (updater: (v: number) => number) => void,
+  intentionalLogoutRef: React.MutableRefObject<boolean>
 ) {
-  // Listen for logout events (including session expiration)
+  // Listen for logout events — fires for both intentional logout and session expiry.
+  // Use intentionalLogoutRef to distinguish between the two.
   session.events.on("logout", () => {
     console.log("Session logout event fired");
-    // Update UI state
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
 
-    // Notify user that session has expired
-    showToast(
-      "Your Solid session has expired. Your data is saved locally - log in again to sync with your Pod.",
-      "error"
-    );
+    if (!intentionalLogoutRef.current) {
+      showToast(
+        "Your Solid session has expired. Your data is saved locally - log in again to sync with your Pod.",
+        "error"
+      );
+    }
+    intentionalLogoutRef.current = false;
   });
 
   // Listen for login events
@@ -66,6 +69,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
   const { showToast } = useToast();
+  const intentionalLogoutRef = useRef(false);
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -82,7 +86,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         setSessionVersion(v => v + 1);
 
         // Set up session event listeners
-        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion);
+        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion, intentionalLogoutRef);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -164,6 +168,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    intentionalLogoutRef.current = true;
     await solidLogout();
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
