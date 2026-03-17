@@ -429,6 +429,87 @@ describe('PackingAppDatabase', () => {
     })
   })
 
+  describe('isEmpty()', () => {
+    it('returns true when database has no documents', async () => {
+      expect(await db.isEmpty()).toBe(true)
+    })
+
+    it('returns false after a question set is saved', async () => {
+      await db.saveQuestionSet({
+        _id: '1',
+        people: [{ id: 'p1', name: 'Me' }],
+        alwaysNeededItems: [],
+        questions: []
+      })
+      expect(await db.isEmpty()).toBe(false)
+    })
+
+    it('returns false after a packing list is saved', async () => {
+      await db.savePackingList({
+        id: 'pl-1',
+        name: 'Trip',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        items: []
+      })
+      expect(await db.isEmpty()).toBe(false)
+    })
+  })
+
+  describe('copyAllDataFrom()', () => {
+    it('copies question set from source to target', async () => {
+      const source = PackingAppDatabase.getInstance('copy-qs-source')
+      const target = PackingAppDatabase.getInstance('copy-qs-target')
+      await source.saveQuestionSet({
+        _id: '1',
+        people: [{ id: 'p1', name: 'Alice' }],
+        alwaysNeededItems: [],
+        questions: []
+      })
+      await target.copyAllDataFrom(source)
+      const result = await target.getQuestionSet()
+      expect(result.people[0].name).toBe('Alice')
+    })
+
+    it('copies all packing lists from source to target', async () => {
+      const source = PackingAppDatabase.getInstance('copy-lists-source')
+      const target = PackingAppDatabase.getInstance('copy-lists-target')
+      await source.savePackingList({
+        id: 'list-1',
+        name: 'Beach Trip',
+        createdAt: '2025-06-01T00:00:00.000Z',
+        items: []
+      })
+      await source.savePackingList({
+        id: 'list-2',
+        name: 'Ski Trip',
+        createdAt: '2025-12-01T00:00:00.000Z',
+        items: []
+      })
+      await target.copyAllDataFrom(source)
+      const lists = await target.getAllPackingLists()
+      expect(lists).toHaveLength(2)
+      expect(lists.map(l => l.name)).toContain('Beach Trip')
+      expect(lists.map(l => l.name)).toContain('Ski Trip')
+    })
+
+    it('is a no-op when source is empty', async () => {
+      const source = PackingAppDatabase.getInstance('copy-empty-source')
+      const target = PackingAppDatabase.getInstance('copy-noop-target')
+      await target.copyAllDataFrom(source)
+      expect(await target.isEmpty()).toBe(true)
+    })
+
+    it('does not copy _rev so documents save cleanly in target', async () => {
+      const source = PackingAppDatabase.getInstance('copy-rev-source')
+      const target = PackingAppDatabase.getInstance('copy-rev-target')
+      await source.saveQuestionSet({ _id: '1', people: [], alwaysNeededItems: [], questions: [] })
+      await target.copyAllDataFrom(source)
+      // If _rev was copied incorrectly it would throw a conflict; reaching here means it worked
+      const qs = await target.getQuestionSet()
+      expect(qs._rev).toBeTruthy()
+    })
+  })
+
   describe('Revision Handling', () => {
     it('should handle concurrent updates with revision conflicts', async () => {
       const mockQuestionSet: PackingListQuestionSet = {
