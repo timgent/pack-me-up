@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect } from 'react'
+import { createContext, ReactNode, useContext, useState, useEffect, Fragment } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
 import { getPrimaryPodUrl } from '../services/solidPod'
@@ -23,6 +23,7 @@ const DatabaseContext = createContext<DatabaseContextValue | undefined>(undefine
 export function DatabaseProvider({ children }: { children: ReactNode }) {
     const { isLoggedIn, webId, session, isLoading } = useSolidPod()
     const [db, setDb] = useState<PackingAppDatabase | null>(null)
+    const [namespace, setNamespace] = useState<string | null>(null)
     const [isResolvingPod, setIsResolvingPod] = useState(false)
 
     useEffect(() => {
@@ -33,6 +34,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
 
         if (!isLoggedIn || !webId) {
             // Not logged in — use the local namespace immediately
+            setNamespace(LOCAL_NAMESPACE)
             setDb(PackingAppDatabase.getInstance(LOCAL_NAMESPACE))
             return
         }
@@ -44,11 +46,12 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         getPrimaryPodUrl(session).then(podUrl => {
             if (cancelled) return
 
-            const namespace = podUrl
+            const resolvedNamespace = podUrl
                 ? PackingAppDatabase.sanitizePodUrl(podUrl)
                 : PackingAppDatabase.sanitizePodUrl(webId)
 
-            setDb(PackingAppDatabase.getInstance(namespace))
+            setNamespace(resolvedNamespace)
+            setDb(PackingAppDatabase.getInstance(resolvedNamespace))
             setIsResolvingPod(false)
         })
 
@@ -57,13 +60,18 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         }
     }, [isLoggedIn, webId, session, isLoading])
 
-    if (isLoading || isResolvingPod || !db) {
+    if (isLoading || isResolvingPod || !db || !namespace) {
         return null
     }
 
+    // The Fragment key causes all children to remount whenever the active database
+    // namespace changes (e.g. login / logout). This ensures every page re-fetches
+    // its data from the correct database instead of showing stale state.
     return (
         <DatabaseContext.Provider value={{ db }}>
-            {children}
+            <Fragment key={namespace}>
+                {children}
+            </Fragment>
         </DatabaseContext.Provider>
     )
 }
