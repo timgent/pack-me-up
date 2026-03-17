@@ -63,7 +63,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             const dismissedKey = `pod-migration-dismissed-${resolvedNamespace}`
             const dismissed = localStorage.getItem(dismissedKey) === 'true'
 
-            if (!dismissed && podUrl) {
+            if (!dismissed && podUrl && session) {
                 const [podHasRemoteData, localEmpty] = await Promise.all([
                     hasPodData(session, podUrl),
                     local.isEmpty()
