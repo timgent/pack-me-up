@@ -3,7 +3,7 @@ import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList, PackingListFormData, PackingListItem } from '../create-packing-list/types'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
@@ -16,6 +16,7 @@ export function CreatePackingList() {
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const { showToast } = useToast()
     const { isLoggedIn } = useSolidPod()
+    const { db } = useDatabase()
     const navigate = useNavigate()
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
@@ -29,7 +30,7 @@ export function CreatePackingList() {
         const fetchQuestionSet = async () => {
             setIsLoading(true)
             try {
-                const doc = await packingAppDb.getQuestionSet()
+                const doc = await db.getQuestionSet()
                 setQuestionSet(doc)
                 setNoQuestionsFound(false)
                 // Initialize with all people selected by default
@@ -108,7 +109,7 @@ export function CreatePackingList() {
             items: [...questionBasedItems, ...alwaysNeededItems]
         }
         try {
-            await packingAppDb.savePackingList(packingList)
+            await db.savePackingList(packingList)
             showToast('Packing list created successfully!', 'success')
             // Navigate to the newly created packing list
             navigate(`/view-lists/${packingList.id}`)

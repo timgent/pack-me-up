@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useToast } from '../components/ToastContext'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { createExampleData } from '../edit-questions/example-data'
 import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
@@ -9,6 +9,7 @@ import { Person } from '../edit-questions/types'
 
 export function useWizardGeneration() {
     const { showToast } = useToast()
+    const { db } = useDatabase()
     const [isLoading, setIsLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
 
@@ -27,7 +28,7 @@ export function useWizardGeneration() {
         try {
             const questionSet = generateQuestionSet(data)
 
-            await packingAppDb.saveQuestionSet({
+            await db.saveQuestionSet({
                 _id: QUESTION_SET_ID,
                 ...questionSet
             })

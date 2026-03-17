@@ -24,23 +24,48 @@ export interface PackingListDocument extends BaseDocument {
 
 export type AppDocument = QuestionSetDocument | PackingListDocument
 
+/**
+ * Namespace used when the user is not logged into a pod.
+ * Data saved here is local to this browser only.
+ */
+export const LOCAL_NAMESPACE = 'local'
+
 export class PackingAppDatabase {
     private db: PouchDB.Database<AppDocument>
-    private static instance: PackingAppDatabase
+    private static instances: Map<string, PackingAppDatabase> = new Map()
 
-    private constructor() {
-        this.db = new PouchDB<AppDocument>('packing-app-data')
-        console.log('Consolidated PouchDB instance created:', {
+    private constructor(namespace: string) {
+        this.db = new PouchDB<AppDocument>(`packing-app-data--${namespace}`)
+        console.log('PouchDB instance created:', {
             name: this.db.name,
+            namespace,
             timestamp: new Date().toISOString()
         })
     }
 
-    public static getInstance(): PackingAppDatabase {
-        if (!PackingAppDatabase.instance) {
-            PackingAppDatabase.instance = new PackingAppDatabase()
+    /**
+     * Returns the database instance for the given namespace.
+     * Use LOCAL_NAMESPACE for anonymous (not logged in) users.
+     * Use sanitizePodUrl(podUrl) for logged-in users.
+     *
+     * The same instance is returned for the same namespace (cached).
+     */
+    public static getInstance(namespace: string): PackingAppDatabase {
+        if (!PackingAppDatabase.instances.has(namespace)) {
+            PackingAppDatabase.instances.set(namespace, new PackingAppDatabase(namespace))
         }
-        return PackingAppDatabase.instance
+        return PackingAppDatabase.instances.get(namespace)!
+    }
+
+    /**
+     * Converts a pod URL into a safe, human-readable database namespace.
+     * Example: 'https://timgent.solidcommunity.net/' -> 'timgent.solidcommunity.net'
+     */
+    public static sanitizePodUrl(podUrl: string): string {
+        return podUrl
+            .replace(/^https?:\/\//, '')  // strip protocol
+            .replace(/\/+$/, '')           // strip trailing slashes
+            .replace(/\//g, '_')           // replace remaining slashes with underscores
     }
 
 
@@ -244,5 +269,3 @@ export class PackingAppDatabase {
         return this.db.info()
     }
 }
-
-export const packingAppDb = PackingAppDatabase.getInstance()

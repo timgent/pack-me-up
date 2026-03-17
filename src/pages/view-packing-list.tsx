@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { Button } from '../components/Button'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
@@ -26,6 +26,7 @@ export function ViewPackingList() {
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
+    const { db } = useDatabase()
 
     const { register, setValue, getValues, control } = useForm<FormData>({
         defaultValues: {
@@ -41,7 +42,7 @@ export function ViewPackingList() {
         useSyncCoordinator<PackingList>({
             currentData: packingList,
             saveToLocalDb: async (data) => {
-                return await packingAppDb.savePackingList(data);
+                return await db.savePackingList(data);
             },
             updateFormAndState: (data, newRev) => {
                 setPackingList({
@@ -87,7 +88,7 @@ export function ViewPackingList() {
     useEffect(() => {
         const fetchPackingList = async () => {
             try {
-                const doc = await packingAppDb.getPackingList(id!)
+                const doc = await db.getPackingList(id!)
                 setPackingList(doc)
                 // Initialize form values with a clean slate
                 const initialValues: Record<string, boolean> = {}
@@ -163,7 +164,7 @@ export function ViewPackingList() {
                     ...updatedPackingList,
                     lastModified: new Date().toISOString()
                 };
-                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const dbResult = await db.savePackingList(dataWithTimestamp);
                 const savedPackingList = {
                     ...dataWithTimestamp,
                     _rev: dbResult.rev
@@ -226,7 +227,7 @@ export function ViewPackingList() {
                     ...updatedPackingList,
                     lastModified: new Date().toISOString()
                 };
-                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const dbResult = await db.savePackingList(dataWithTimestamp);
                 const savedPackingList = {
                     ...dataWithTimestamp,
                     _rev: dbResult.rev
@@ -287,7 +288,7 @@ export function ViewPackingList() {
                     ...updatedPackingList,
                     lastModified: new Date().toISOString()
                 };
-                const dbResult = await packingAppDb.savePackingList(dataWithTimestamp);
+                const dbResult = await db.savePackingList(dataWithTimestamp);
                 const savedPackingList = {
                     ...dataWithTimestamp,
                     _rev: dbResult.rev
