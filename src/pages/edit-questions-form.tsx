@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
 import { QuestionSection } from '../edit-questions/question-section'
 import { PeopleSection } from '../edit-questions/people-section'
@@ -37,6 +37,7 @@ export function EditQuestionsForm() {
   });
   const { showToast } = useToast();
   const { isLoggedIn } = useSolidPod();
+  const { db } = useDatabase();
 
   // Watch all form values for auto-save
   const watchedFormValues = useWatch({ control });
@@ -71,7 +72,7 @@ export function EditQuestionsForm() {
           ...data,
           _rev: rev,
         };
-        return await packingAppDb.saveQuestionSet(docToWrite);
+        return await db.saveQuestionSet(docToWrite);
       },
       updateFormAndState: (data, newRev) => {
         const updatedData = {
@@ -154,7 +155,7 @@ export function EditQuestionsForm() {
           ...dataToSave,
           lastModified: new Date().toISOString()
         };
-        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const result = await db.saveQuestionSet(dataWithTimestamp);
         const savedData = {
           ...dataWithTimestamp,
           _rev: result.rev
@@ -214,10 +215,10 @@ export function EditQuestionsForm() {
 
       try {
         // Check if migration is needed
-        const migrationCheck = await DatabaseMigration.checkMigrationNeeded()
+        const migrationCheck = await DatabaseMigration.checkMigrationNeeded(db)
         if (migrationCheck.needed) {
           console.log('Migration needed, performing automatic migration')
-          const migrationResult = await DatabaseMigration.performMigration()
+          const migrationResult = await DatabaseMigration.performMigration(db)
           if (!migrationResult.success) {
             console.error('Migration failed:', migrationResult.errors)
             showToast('Database migration failed', 'error')
@@ -226,7 +227,7 @@ export function EditQuestionsForm() {
           showToast('Database migrated successfully', 'success')
         }
 
-        const doc = await packingAppDb.getQuestionSet()
+        const doc = await db.getQuestionSet()
         console.log("Document retrieved successfully:", {
           _id: doc._id,
           _rev: doc._rev,
@@ -254,7 +255,7 @@ export function EditQuestionsForm() {
             timestamp: new Date().toISOString()
           })
           try {
-            const result = await packingAppDb.saveQuestionSet(newDoc)
+            const result = await db.saveQuestionSet(newDoc)
             console.log("Document created successfully:", {
               rev: result.rev,
               timestamp: new Date().toISOString()
@@ -311,7 +312,7 @@ export function EditQuestionsForm() {
           ...dataToSave,
           lastModified: new Date().toISOString()
         };
-        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const result = await db.saveQuestionSet(dataWithTimestamp);
         const savedData = {
           ...dataWithTimestamp,
           _rev: result.rev
@@ -409,7 +410,7 @@ export function EditQuestionsForm() {
           ...dataToSave,
           lastModified: new Date().toISOString()
         };
-        const result = await packingAppDb.saveQuestionSet(dataWithTimestamp);
+        const result = await db.saveQuestionSet(dataWithTimestamp);
         const savedData = {
           ...dataWithTimestamp,
           _rev: result.rev

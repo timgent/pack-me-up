@@ -1,7 +1,7 @@
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
-import { packingAppDb } from './database'
+import { PackingAppDatabase } from './database'
 
 export interface MigrationResult {
     success: boolean
@@ -107,7 +107,7 @@ export class DatabaseMigration {
         }
     }
 
-    public static async checkMigrationNeeded(): Promise<{ needed: boolean, hasLegacyData: boolean, hasNewData: boolean }> {
+    public static async checkMigrationNeeded(db: PackingAppDatabase): Promise<{ needed: boolean, hasLegacyData: boolean, hasNewData: boolean }> {
         const legacyQuestionDb = new PouchDB('packing-list-question-set')
         const legacyPackingListsDb = new PouchDB('packing-lists')
 
@@ -133,7 +133,7 @@ export class DatabaseMigration {
         }
 
         try {
-            await packingAppDb.getQuestionSet()
+            await db.getQuestionSet()
             hasNewData = true
         } catch (err: any) {
             if (err.name !== 'not_found') {
@@ -142,7 +142,7 @@ export class DatabaseMigration {
         }
 
         try {
-            const lists = await packingAppDb.getAllPackingLists()
+            const lists = await db.getAllPackingLists()
             if (lists.length > 0) {
                 hasNewData = true
             }
@@ -155,7 +155,7 @@ export class DatabaseMigration {
         return { needed, hasLegacyData, hasNewData }
     }
 
-    public static async performMigration(): Promise<MigrationResult> {
+    public static async performMigration(db: PackingAppDatabase): Promise<MigrationResult> {
         const result: MigrationResult = {
             success: false,
             questionSetsFound: 0,
@@ -172,11 +172,11 @@ export class DatabaseMigration {
             result.questionSetsFound = backup.questionSets.length
             result.packingListsFound = backup.packingLists.length
 
-            const migrationResult = await packingAppDb.migrateFromLegacyDatabases()
+            const migrationResult = await db.migrateFromLegacyDatabases()
             result.questionSetsMigrated = migrationResult.questionSets
             result.packingListsMigrated = migrationResult.packingLists
 
-            const verification = await DatabaseMigration.verifyMigration(backup)
+            const verification = await DatabaseMigration.verifyMigration(backup, db)
             if (!verification.success) {
                 result.errors.push(...verification.errors)
                 throw new Error('Migration verification failed')
@@ -193,12 +193,12 @@ export class DatabaseMigration {
         return result
     }
 
-    private static async verifyMigration(backup: BackupData): Promise<{ success: boolean, errors: string[] }> {
+    private static async verifyMigration(backup: BackupData, db: PackingAppDatabase): Promise<{ success: boolean, errors: string[] }> {
         const errors: string[] = []
 
         try {
             if (backup.questionSets.length > 0) {
-                const migratedQuestionSet = await packingAppDb.getQuestionSet()
+                const migratedQuestionSet = await db.getQuestionSet()
                 const originalQuestionSet = backup.questionSets[0]
 
                 if (migratedQuestionSet.people.length !== originalQuestionSet.people.length) {
@@ -212,7 +212,7 @@ export class DatabaseMigration {
                 }
             }
 
-            const migratedLists = await packingAppDb.getAllPackingLists()
+            const migratedLists = await db.getAllPackingLists()
             if (migratedLists.length !== backup.packingLists.length) {
                 errors.push(`Packing lists count mismatch: expected ${backup.packingLists.length}, got ${migratedLists.length}`)
             }

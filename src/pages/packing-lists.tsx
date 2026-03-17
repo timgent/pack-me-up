@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PackingList } from '../create-packing-list/types'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
@@ -21,6 +21,7 @@ export function PackingLists() {
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
+    const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
     const handleBannerDismiss = () => {
@@ -36,7 +37,7 @@ export function PackingLists() {
     const deletePackingList = async (id: string, event: React.MouseEvent) => {
         event.stopPropagation() // Prevent navigation when clicking delete
         try {
-            await packingAppDb.deletePackingList(id)
+            await db.deletePackingList(id)
             setPackingLists(packingLists.filter(list => list.id !== id))
         } catch (err) {
             console.error('Error deleting packing list:', err)
@@ -92,20 +93,20 @@ export function PackingLists() {
             }
 
             // First, delete all existing local packing lists
-            const existingLists = await packingAppDb.getAllPackingLists()
+            const existingLists = await db.getAllPackingLists()
             for (const existingList of existingLists) {
-                await packingAppDb.deletePackingList(existingList.id)
+                await db.deletePackingList(existingList.id)
             }
 
             // Then save each loaded list to local database
             for (const list of loadedLists) {
                 // Remove _rev to avoid conflicts with local database version
                 delete list._rev
-                await packingAppDb.savePackingList(list)
+                await db.savePackingList(list)
             }
 
             // Refresh the local list
-            const allLists = await packingAppDb.getAllPackingLists()
+            const allLists = await db.getAllPackingLists()
             setPackingLists(allLists)
 
             if (result.success) {
@@ -123,7 +124,7 @@ export function PackingLists() {
     useEffect(() => {
         const fetchPackingLists = async () => {
             try {
-                const lists = await packingAppDb.getAllPackingLists()
+                const lists = await db.getAllPackingLists()
                 setPackingLists(lists)
 
                 // Show banner if:

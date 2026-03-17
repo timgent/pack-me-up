@@ -7,7 +7,7 @@ import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { useSolidPod } from '../components/SolidPodContext'
-import { packingAppDb } from '../services/database'
+import { useDatabase } from '../components/DatabaseContext'
 import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
@@ -20,6 +20,7 @@ export const Wizard = () => {
     const [showPodPrompt, setShowPodPrompt] = useState(false)
     const [hasExistingData, setHasExistingData] = useState(false)
     const { isLoggedIn } = useSolidPod()
+    const { db } = useDatabase()
     const { isLoading, isSuccess, generateAndSave } = useWizardGeneration()
 
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
@@ -39,7 +40,7 @@ export const Wizard = () => {
     useEffect(() => {
         const checkExistingData = async () => {
             try {
-                await packingAppDb.getQuestionSet()
+                await db.getQuestionSet()
                 setHasExistingData(true)
             } catch (err: any) {
                 if (err.name !== 'not_found') {

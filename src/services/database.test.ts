@@ -8,6 +8,16 @@ import type { PackingList } from '../create-packing-list/types'
 // Setup PouchDB with memory adapter for testing
 PouchDB.plugin(PouchDBMemoryAdapter)
 
+async function clearAllInstances() {
+  // @ts-expect-error - Accessing private static property for testing
+  const instances = PackingAppDatabase.instances as Map<string, PackingAppDatabase>
+  for (const instance of instances.values()) {
+    // @ts-expect-error - Accessing private property for testing
+    await instance.db.destroy()
+  }
+  instances.clear()
+}
+
 describe('PackingAppDatabase', () => {
   let db: PackingAppDatabase
 
@@ -22,25 +32,62 @@ describe('PackingAppDatabase', () => {
     vi.restoreAllMocks()
   })
 
-  // Reset database instance before each test
+  // Reset all database instances before each test
   beforeEach(async () => {
-    // Force a new instance by clearing the singleton
-    // @ts-expect-error - Accessing private static property for testing
-    if (PackingAppDatabase.instance) {
-      // @ts-expect-error - Accessing private property for testing
-      const rawDb = PackingAppDatabase.instance.db
-      await rawDb.destroy()
-    }
-    // @ts-expect-error - Accessing private static property for testing
-    PackingAppDatabase.instance = undefined
-    db = PackingAppDatabase.getInstance()
+    await clearAllInstances()
+    db = PackingAppDatabase.getInstance('local')
   })
 
-  describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = PackingAppDatabase.getInstance()
-      const instance2 = PackingAppDatabase.getInstance()
-      expect(instance1).toBe(instance2)
+  describe('Namespacing', () => {
+    it('getInstance with same namespace returns same instance', () => {
+      const a = PackingAppDatabase.getInstance('local')
+      const b = PackingAppDatabase.getInstance('local')
+      expect(a).toBe(b)
+    })
+
+    it('getInstance with different namespaces returns different instances', () => {
+      const local = PackingAppDatabase.getInstance('local')
+      const pod = PackingAppDatabase.getInstance('pod.example.com')
+      expect(local).not.toBe(pod)
+    })
+
+    it('database name includes the namespace', async () => {
+      const info = await PackingAppDatabase.getInstance('mypod.example.com').getInfo()
+      expect(info.db_name).toContain('mypod.example.com')
+    })
+
+    it('data saved to one namespace is not visible in another', async () => {
+      const localDb = PackingAppDatabase.getInstance('local')
+      const podDb = PackingAppDatabase.getInstance('pod.example.com')
+
+      const list: PackingList = {
+        id: 'pl-local',
+        name: 'Local list',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        items: []
+      }
+      await localDb.savePackingList(list)
+
+      const podLists = await podDb.getAllPackingLists()
+      expect(podLists).toHaveLength(0)
+    })
+  })
+
+  describe('sanitizePodUrl', () => {
+    it('strips https protocol and trailing slash', () => {
+      expect(PackingAppDatabase.sanitizePodUrl('https://timgent.solidcommunity.net/')).toBe('timgent.solidcommunity.net')
+    })
+
+    it('strips http protocol and trailing slash', () => {
+      expect(PackingAppDatabase.sanitizePodUrl('http://example.com/')).toBe('example.com')
+    })
+
+    it('replaces path slashes with underscores', () => {
+      expect(PackingAppDatabase.sanitizePodUrl('https://pod.example.com/users/alice/')).toBe('pod.example.com_users_alice')
+    })
+
+    it('handles URL without trailing slash', () => {
+      expect(PackingAppDatabase.sanitizePodUrl('https://example.com')).toBe('example.com')
     })
   })
 
@@ -140,7 +187,6 @@ describe('PackingAppDatabase', () => {
 
       const retrieved1 = await db.getQuestionSet()
 
-      // Wait a bit to ensure timestamps would differ
       await new Promise(resolve => setTimeout(resolve, 10))
 
       await db.saveQuestionSet({
@@ -150,10 +196,9 @@ describe('PackingAppDatabase', () => {
       })
 
       const retrieved2 = await db.getQuestionSet()
-
-      // Get the underlying document to check timestamps
       const info = await db.getInfo()
       expect(info).toBeDefined()
+      expect(retrieved2).toBeDefined()
     })
   })
 
@@ -232,26 +277,9 @@ describe('PackingAppDatabase', () => {
     })
 
     it('should retrieve all packing lists', async () => {
-      const packingList1: PackingList = {
-        ...mockPackingList,
-        id: 'pl-1',
-        name: 'Beach Trip',
-        createdAt: '2025-01-01T00:00:00.000Z'
-      }
-
-      const packingList2: PackingList = {
-        ...mockPackingList,
-        id: 'pl-2',
-        name: 'Mountain Hiking',
-        createdAt: '2025-01-02T00:00:00.000Z'
-      }
-
-      const packingList3: PackingList = {
-        ...mockPackingList,
-        id: 'pl-3',
-        name: 'City Tour',
-        createdAt: '2025-01-03T00:00:00.000Z'
-      }
+      const packingList1: PackingList = { ...mockPackingList, id: 'pl-1', name: 'Beach Trip', createdAt: '2025-01-01T00:00:00.000Z' }
+      const packingList2: PackingList = { ...mockPackingList, id: 'pl-2', name: 'Mountain Hiking', createdAt: '2025-01-02T00:00:00.000Z' }
+      const packingList3: PackingList = { ...mockPackingList, id: 'pl-3', name: 'City Tour', createdAt: '2025-01-03T00:00:00.000Z' }
 
       await db.savePackingList(packingList1)
       await db.savePackingList(packingList2)
@@ -266,28 +294,10 @@ describe('PackingAppDatabase', () => {
     })
 
     it('should return packing lists sorted by createdAt (newest first)', async () => {
-      const packingList1: PackingList = {
-        ...mockPackingList,
-        id: 'pl-1',
-        name: 'Oldest',
-        createdAt: '2025-01-01T00:00:00.000Z'
-      }
+      const packingList1: PackingList = { ...mockPackingList, id: 'pl-1', name: 'Oldest', createdAt: '2025-01-01T00:00:00.000Z' }
+      const packingList2: PackingList = { ...mockPackingList, id: 'pl-2', name: 'Newest', createdAt: '2025-01-03T00:00:00.000Z' }
+      const packingList3: PackingList = { ...mockPackingList, id: 'pl-3', name: 'Middle', createdAt: '2025-01-02T00:00:00.000Z' }
 
-      const packingList2: PackingList = {
-        ...mockPackingList,
-        id: 'pl-2',
-        name: 'Newest',
-        createdAt: '2025-01-03T00:00:00.000Z'
-      }
-
-      const packingList3: PackingList = {
-        ...mockPackingList,
-        id: 'pl-3',
-        name: 'Middle',
-        createdAt: '2025-01-02T00:00:00.000Z'
-      }
-
-      // Save in random order
       await db.savePackingList(packingList1)
       await db.savePackingList(packingList3)
       await db.savePackingList(packingList2)
@@ -358,9 +368,6 @@ describe('PackingAppDatabase', () => {
       expect(result.questionSets).toBe(0)
       expect(result.packingLists).toBe(0)
     })
-
-    // Note: More comprehensive migration tests would require setting up
-    // legacy databases, which is complex in a test environment
   })
 
   describe('Database Info', () => {
@@ -375,14 +382,13 @@ describe('PackingAppDatabase', () => {
 
   describe('Error Handling', () => {
     it('should handle document type validation for question set', async () => {
-      // Directly insert a document with wrong type
-      const dbInstance = PackingAppDatabase.getInstance()
+      const dbInstance = PackingAppDatabase.getInstance('local')
       // @ts-expect-error - Accessing private property for testing
       const rawDb = dbInstance.db
 
       await rawDb.put({
         _id: 'question-set:1',
-        docType: 'packing-list', // Wrong type
+        docType: 'packing-list',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         data: {}
@@ -392,14 +398,13 @@ describe('PackingAppDatabase', () => {
     })
 
     it('should handle document type validation for packing list', async () => {
-      // Directly insert a document with wrong type
-      const dbInstance = PackingAppDatabase.getInstance()
+      const dbInstance = PackingAppDatabase.getInstance('local')
       // @ts-expect-error - Accessing private property for testing
       const rawDb = dbInstance.db
 
       await rawDb.put({
         _id: 'packing-list:test',
-        docType: 'question-set', // Wrong type
+        docType: 'question-set',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         data: {}
@@ -411,7 +416,6 @@ describe('PackingAppDatabase', () => {
     it('should log errors when saving fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error')
 
-      // Force an error by using an invalid rev
       const invalidQuestionSet: PackingListQuestionSet = {
         _id: '1',
         _rev: 'invalid-rev',
@@ -434,15 +438,12 @@ describe('PackingAppDatabase', () => {
         questions: []
       }
 
-      // Save initial version
       await db.saveQuestionSet(mockQuestionSet)
       const firstVersion = await db.getQuestionSet()
 
-      // Update with correct rev
       const update1 = { ...mockQuestionSet, _rev: firstVersion._rev, people: [{ id: 'p1', name: 'Alice Updated' }] }
       await db.saveQuestionSet(update1)
 
-      // Try to update with old rev (should fail)
       const update2 = { ...mockQuestionSet, _rev: firstVersion._rev, people: [{ id: 'p2', name: 'Bob' }] }
       await expect(db.saveQuestionSet(update2)).rejects.toThrow()
     })
@@ -455,7 +456,6 @@ describe('PackingAppDatabase', () => {
         items: []
       }
 
-      // No _rev provided
       const result = await db.savePackingList(mockPackingList)
       expect(result.rev).toBeTruthy()
 

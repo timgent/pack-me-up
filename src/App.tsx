@@ -10,6 +10,7 @@ import { CreatePackingList } from './pages/create-packing-list'
 import { PackingLists } from './pages/packing-lists'
 import { ViewPackingList } from './pages/view-packing-list'
 import { SolidPodProvider } from './components/SolidPodContext'
+import { DatabaseProvider } from './components/DatabaseContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 import { Wizard } from './pages/wizard'
 
@@ -17,6 +18,7 @@ function App() {
   return (
     <ToastProvider>
       <SolidPodProvider>
+        <DatabaseProvider>
         <HashRouter>
           <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
             <Navigation />
@@ -33,6 +35,7 @@ function App() {
             </div>
           </div>
         </HashRouter>
+        </DatabaseProvider>
       </SolidPodProvider>
     </ToastProvider>
   )
