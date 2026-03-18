@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
@@ -50,7 +50,7 @@ export const Wizard = () => {
             }
         }
         checkExistingData()
-    }, [])
+    }, [db])
 
     // Show Solid Pod prompt after successful generation if not logged in
     useEffect(() => {
@@ -96,6 +96,18 @@ export const Wizard = () => {
                     Answer a few quick questions to set up your personalized packing list
                 </p>
             </div>
+
+            {hasExistingData && (
+                <div className="mb-6 p-4 bg-warning-50 border-2 border-warning-300 rounded-2xl">
+                    <p className="text-warning-900 font-semibold">
+                        ⚠️ You already have packing list questions set up. Completing this wizard will replace them.
+                    </p>
+                    <p className="text-sm text-warning-800 mt-1">
+                        To keep your existing questions, go to{' '}
+                        <Link to="/manage-questions" className="underline font-semibold">Edit Questions</Link> instead.
+                    </p>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 {/* People Section */}
