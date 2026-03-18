@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
+import { useHasQuestions } from '../hooks/useHasQuestions'
 
 export const LandingPage = () => {
     const { isLoggedIn, webId } = useSolidPod()
+    const hasQuestions = useHasQuestions()
     return (
         <>
             {isLoggedIn && (
@@ -70,21 +72,49 @@ export const LandingPage = () => {
                 </div>
 
                 <div className="text-center space-y-4">
-                    <Link
-                        to="/wizard"
-                        className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
-                    >
-                        ✨ Get Started with the Wizard
-                    </Link>
-                    <div className="text-gray-600">
-                        or{' '}
-                        <Link
-                            to="/create-packing-list"
-                            className="text-primary-700 font-semibold hover:underline"
-                        >
-                            create a packing list directly
-                        </Link>
-                    </div>
+                    {hasQuestions ? (
+                        <>
+                            <Link
+                                to="/view-lists"
+                                className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                            >
+                                📋 View Packing Lists
+                            </Link>
+                            <div className="text-gray-600 space-x-3">
+                                <Link
+                                    to="/create-packing-list"
+                                    className="text-primary-700 font-semibold hover:underline"
+                                >
+                                    create a new packing list
+                                </Link>
+                                <span>·</span>
+                                <Link
+                                    to="/wizard"
+                                    className="text-primary-700 font-semibold hover:underline"
+                                >
+                                    reconfigure your questions
+                                </Link>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <Link
+                                to="/wizard"
+                                className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                            >
+                                ✨ Get Started with the Wizard
+                            </Link>
+                            <div className="text-gray-600">
+                                or{' '}
+                                <Link
+                                    to="/create-packing-list"
+                                    className="text-primary-700 font-semibold hover:underline"
+                                >
+                                    create a packing list directly
+                                </Link>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </>

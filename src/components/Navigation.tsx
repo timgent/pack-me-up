@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useSolidPod } from './SolidPodContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
+import { useHasQuestions } from '../hooks/useHasQuestions'
 
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { login, logout, isLoggedIn, webId } = useSolidPod()
+    const hasQuestions = useHasQuestions()
 
     const handleSolidLogin = () => {
         setIsProviderSelectorOpen(true)
@@ -37,7 +39,7 @@ export const Navigation = () => {
                                         to="/wizard"
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        Get Started
+                                        {hasQuestions ? 'Reconfigure Questions' : 'Get Started'}
                                     </Link>
                                     <Link
                                         to="/manage-questions"
@@ -134,7 +136,7 @@ export const Navigation = () => {
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            Get Started
+                            {hasQuestions ? 'Reconfigure Questions' : 'Get Started'}
                         </Link>
                         <Link
                             to="/manage-questions"
