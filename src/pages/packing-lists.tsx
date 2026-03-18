@@ -143,7 +143,7 @@ export function PackingLists() {
         }
 
         fetchPackingLists()
-    }, [isLoggedIn])
+    }, [db, isLoggedIn])
 
     if (isLoading) {
         return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>

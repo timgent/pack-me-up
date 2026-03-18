@@ -41,7 +41,7 @@ export interface SaveToPodOptions {
     session: Session
     containerPath: string
     filename: string
-    data: any
+    data: unknown
     onError?: (error: Error) => void
 }
 
@@ -68,7 +68,7 @@ export interface LoadMultipleFromPodOptions<T> {
  * Custom error class for authentication failures
  */
 export class AuthenticationError extends Error {
-    constructor(message: string, public originalError?: any) {
+    constructor(message: string, public originalError?: unknown) {
         super(message)
         this.name = 'AuthenticationError'
     }
@@ -78,19 +78,27 @@ export class AuthenticationError extends Error {
  * Checks if an error is an authentication error (401 or 403)
  * These errors typically indicate an expired or invalid session
  */
-export function isAuthenticationError(error: any): boolean {
-    return error?.statusCode === 401 || error?.statusCode === 403
+export function isAuthenticationError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false
+    const statusCode = (error as { statusCode?: unknown }).statusCode
+    return statusCode === 401 || statusCode === 403
 }
 
 /**
  * Wraps an error, converting authentication errors to AuthenticationError
  * This makes it easier to detect and handle session expiration in the UI
  */
-export function handlePodError(error: any): never {
+export function handlePodError(error: unknown): never {
     if (isAuthenticationError(error)) {
         throw new AuthenticationError(POD_ERROR_MESSAGES.SESSION_EXPIRED, error)
     }
     throw error
+}
+
+function getStatusCode(err: unknown): number | undefined {
+    if (typeof err !== 'object' || err === null) return undefined
+    const code = (err as { statusCode?: unknown }).statusCode
+    return typeof code === 'number' ? code : undefined
 }
 
 /**
@@ -120,17 +128,17 @@ export async function hasPodData(session: Session, podUrl: string): Promise<bool
     try {
         await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS}`, { fetch: session.fetch })
         return true
-    } catch (err: any) {
+    } catch (err: unknown) {
         if (isAuthenticationError(err)) handlePodError(err)
-        if (err.statusCode !== 404) throw err
+        if (getStatusCode(err) !== 404) throw err
     }
 
     try {
         const dataset = await getSolidDataset(`${podUrl}${POD_CONTAINERS.PACKING_LISTS}`, { fetch: session.fetch })
         return getContainedResourceUrlAll(dataset).some(url => url.endsWith('.json'))
-    } catch (err: any) {
+    } catch (err: unknown) {
         if (isAuthenticationError(err)) handlePodError(err)
-        if (err.statusCode === 404) return false
+        if (getStatusCode(err) === 404) return false
         throw err
     }
 }
@@ -156,7 +164,7 @@ export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
                 slug: filename
             }
         )
-    } catch (saveError: any) {
+    } catch (saveError: unknown) {
         // Check for authentication errors first
         if (isAuthenticationError(saveError)) {
             handlePodError(saveError)
@@ -164,14 +172,15 @@ export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
 
         // If container doesn't exist (404) or file already exists (409),
         // use overwriteFile instead
-        if (saveError.statusCode === 404 || saveError.statusCode === 409) {
+        const saveStatusCode = getStatusCode(saveError)
+        if (saveStatusCode === 404 || saveStatusCode === 409) {
             try {
                 const fileUrl = `${containerPath}${filename}`
                 await overwriteFile(fileUrl, blob, {
                     fetch: session.fetch,
                     contentType: 'application/json'
                 })
-            } catch (overwriteError: any) {
+            } catch (overwriteError: unknown) {
                 // Check for authentication errors in overwrite
                 if (isAuthenticationError(overwriteError)) {
                     handlePodError(overwriteError)
@@ -194,7 +203,7 @@ export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T
         const file = await getFile(fileUrl, { fetch: session.fetch })
         const text = await file.text()
         return JSON.parse(text) as T
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Check for authentication errors
         if (isAuthenticationError(error)) {
             handlePodError(error)
@@ -235,7 +244,7 @@ export async function saveMultipleFilesToPod<T extends { id: string }>(
                 try {
                     await deleteFile(fileUrl, { fetch: session.fetch })
                     deleteCount++
-                } catch (error: any) {
+                } catch (error: unknown) {
                     // Check for authentication errors
                     if (isAuthenticationError(error)) {
                         handlePodError(error)
@@ -245,13 +254,13 @@ export async function saveMultipleFilesToPod<T extends { id: string }>(
                 }
             }
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Check for authentication errors
         if (isAuthenticationError(error)) {
             handlePodError(error)
         }
         // If container doesn't exist (404), that's fine - no files to delete
-        if (error.statusCode !== 404) {
+        if (getStatusCode(error) !== 404) {
             console.error('Error checking for orphaned files:', error)
         }
     }
@@ -266,7 +275,7 @@ export async function saveMultipleFilesToPod<T extends { id: string }>(
                 data: item
             })
             successCount++
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Authentication errors should bubble up immediately
             if (error instanceof AuthenticationError) {
                 throw error
@@ -297,12 +306,12 @@ export async function loadMultipleFilesFromPod<T>(
     let dataset
     try {
         dataset = await getSolidDataset(containerPath, { fetch: session.fetch })
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Check for authentication errors
         if (isAuthenticationError(error)) {
             handlePodError(error)
         }
-        if (error.statusCode === 404) {
+        if (getStatusCode(error) === 404) {
             return {
                 data: [],
                 result: {
@@ -348,7 +357,7 @@ export async function loadMultipleFilesFromPod<T>(
             if (onFileLoaded) {
                 onFileLoaded(item)
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Check for authentication errors
             if (isAuthenticationError(error)) {
                 handlePodError(error)
@@ -357,7 +366,7 @@ export async function loadMultipleFilesFromPod<T>(
             failCount++
 
             if (onError) {
-                onError(fileUrl, error as Error)
+                onError(fileUrl, error instanceof Error ? error : new Error(String(error)))
             }
         }
     }

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import type { Session } from '@inrupt/solid-client-authn-browser'
+import type { SolidDataset, WithServerResourceInfo } from '@inrupt/solid-client'
 import { hasPodData } from './solidPod'
 import { AuthenticationError } from './solidPod'
 
@@ -21,7 +23,7 @@ const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
     fetch: vi.fn(),
-} as any
+} as unknown as Session
 
 const POD_URL = 'https://pod.example.com/'
 
@@ -35,7 +37,7 @@ describe('hasPodData', () => {
     })
 
     it('returns true when the questions file exists on the pod', async () => {
-        mockGetFile.mockResolvedValue(new Blob(['{}']) as any)
+        mockGetFile.mockResolvedValue(new Blob(['{}']) as unknown as Blob & WithServerResourceInfo)
 
         const result = await hasPodData(mockSession, POD_URL)
 
@@ -49,7 +51,7 @@ describe('hasPodData', () => {
     it('returns true when no questions file but packing lists exist', async () => {
         mockGetFile.mockRejectedValue({ statusCode: 404 })
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([
             `${POD_URL}pack-me-up/packing-lists/list-1.json`,
         ])
@@ -71,7 +73,7 @@ describe('hasPodData', () => {
     it('returns false when questions file is 404 and packing lists container is empty', async () => {
         mockGetFile.mockRejectedValue({ statusCode: 404 })
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([])
 
         const result = await hasPodData(mockSession, POD_URL)
@@ -82,7 +84,7 @@ describe('hasPodData', () => {
     it('returns false when questions file is 404 and packing lists container has no json files', async () => {
         mockGetFile.mockRejectedValue({ statusCode: 404 })
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([
             `${POD_URL}pack-me-up/packing-lists/`,
         ])

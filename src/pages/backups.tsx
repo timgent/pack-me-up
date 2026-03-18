@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
@@ -23,7 +23,7 @@ export function BackupsPage() {
     const [isLoadingBackups, setIsLoadingBackups] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
 
-    const fetchBackups = async () => {
+    const fetchBackups = useCallback(async () => {
         if (!session || !isLoggedIn) return
         const podUrl = await getPrimaryPodUrl(session)
         if (!podUrl) return
@@ -37,13 +37,13 @@ export function BackupsPage() {
         } finally {
             setIsLoadingBackups(false)
         }
-    }
+    }, [session, isLoggedIn, handlePodError])
 
     useEffect(() => {
         if (isLoggedIn) {
             fetchBackups()
         }
-    }, [isLoggedIn])
+    }, [isLoggedIn, fetchBackups])
 
     const handleCreateBackup = async () => {
         if (!session) return

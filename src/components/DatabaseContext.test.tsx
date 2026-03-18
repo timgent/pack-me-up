@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
+import type { Session } from '@inrupt/solid-client-authn-browser'
 import { DatabaseProvider, useDatabase } from './DatabaseContext'
 
 // --- Mocks ---
@@ -55,7 +56,7 @@ function defaultInstanceFactory(namespace: string) {
 
 function NamespaceDisplay() {
   const { db } = useDatabase()
-  return <div data-testid="db-name">{(db as any).getInfo ? 'has-db' : 'no-db'}</div>
+  return <div data-testid="db-name">{(db as unknown as { getInfo?: unknown }).getInfo ? 'has-db' : 'no-db'}</div>
 }
 
 function OutsideProvider() {
@@ -145,7 +146,7 @@ describe('DatabaseContext', () => {
   it('provides a pod-namespaced db when logged in with a pod URL', async () => {
     const mockSession = { info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
     mockUseSolidPod.mockReturnValue({
-      session: mockSession as any,
+      session: mockSession as unknown as Session,
       isLoggedIn: true,
       webId: 'https://example.com/profile#me',
       isLoading: false,
@@ -167,7 +168,7 @@ describe('DatabaseContext', () => {
   it('falls back to sanitized webId when getPrimaryPodUrl returns null', async () => {
     const mockSession = { info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
     mockUseSolidPod.mockReturnValue({
-      session: mockSession as any,
+      session: mockSession as unknown as Session,
       isLoggedIn: true,
       webId: 'https://example.com/profile#me',
       isLoading: false,
@@ -199,7 +200,7 @@ describe('DatabaseContext', () => {
     beforeEach(() => {
       const mockSession = { info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
       mockUseSolidPod.mockReturnValue({
-        session: mockSession as any,
+        session: mockSession as unknown as Session,
         isLoggedIn: true,
         webId: 'https://example.com/profile#me',
         isLoading: false,

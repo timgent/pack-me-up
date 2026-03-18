@@ -1,4 +1,4 @@
-import { useFieldArray, Control } from 'react-hook-form'
+import { useFieldArray, Control, UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
 import { PackingListQuestionSet, Person, newOption } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
@@ -9,9 +9,9 @@ import { useState, useEffect } from 'react'
 interface QuestionSectionProps {
     questionIndex: number;
     control: Control<PackingListQuestionSet>;
-    register: any;
-    watch: any;
-    setValue: any;
+    register: UseFormRegister<PackingListQuestionSet>;
+    watch: UseFormWatch<PackingListQuestionSet>;
+    setValue: UseFormSetValue<PackingListQuestionSet>;
     removeQuestion: () => void;
     people: Person[];
     moveUp?: () => void;

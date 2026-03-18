@@ -42,8 +42,9 @@ export const Wizard = () => {
             try {
                 await db.getQuestionSet()
                 setHasExistingData(true)
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                const hasName = typeof err === 'object' && err !== null && 'name' in err
+                if (!hasName || (err as { name: string }).name !== 'not_found') {
                     console.error('Error checking for existing data:', err)
                 }
                 setHasExistingData(false)

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { Wizard } from './wizard'
+import type { PackingAppDatabase } from '../services/database'
 
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
@@ -60,7 +61,7 @@ describe('Wizard', () => {
 
     it('shows warning banner when questions already exist', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [] }) })
-        mockUseDatabase.mockReturnValue({ db: db as any })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         render(
             <MemoryRouter>
@@ -75,7 +76,7 @@ describe('Wizard', () => {
 
     it('does not show warning banner when no questions exist', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
-        mockUseDatabase.mockReturnValue({ db: db as any })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         render(
             <MemoryRouter>
