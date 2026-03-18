@@ -35,16 +35,6 @@ export function CreatePackingList() {
                 setNoQuestionsFound(false)
                 // Initialize with all people selected by default
                 setSelectedPeopleIds(doc.people.map(p => p.id))
-                // Pre-populate answers from wizard activity selections
-                if (doc.preSelectedAnswers) {
-                    doc.preSelectedAnswers.forEach(psa => {
-                        const qIndex = doc.questions.findIndex(q => q.id === psa.questionId)
-                        if (qIndex !== -1) {
-                            setValue(`questionAnswers.${qIndex}.questionId`, psa.questionId)
-                            setValue(`questionAnswers.${qIndex}.selectedOptionIds`, psa.selectedOptionIds)
-                        }
-                    })
-                }
             } catch (err: any) {
                 if (err.name === 'not_found') {
                     console.log('No question set found')

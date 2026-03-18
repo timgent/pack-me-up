@@ -63,11 +63,7 @@ export const PackingListQuestionSetSchema = z.object({
   people: z.array(PersonSchema),
   alwaysNeededItems: z.array(ItemSchema),
   questions: z.array(QuestionSchema),
-  lastModified: z.string().optional(), // ISO timestamp for sync conflict resolution
-  preSelectedAnswers: z.array(z.object({
-    questionId: z.string(),
-    selectedOptionIds: z.array(z.string())
-  })).optional()
+  lastModified: z.string().optional() // ISO timestamp for sync conflict resolution
 })
 
 // TypeScript Types (inferred from schemas)
