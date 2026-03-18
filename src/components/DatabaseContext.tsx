@@ -130,6 +130,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
  * Returns the PouchDB instance for the current pod identity.
  * Must be used within a DatabaseProvider.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useDatabase(): DatabaseContextValue {
     const context = useContext(DatabaseContext)
     if (context === undefined) {

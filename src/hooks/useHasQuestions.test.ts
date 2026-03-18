@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
+import type { PackingAppDatabase } from '../services/database'
 import { useHasQuestions } from './useHasQuestions'
 
 vi.mock('../components/DatabaseContext', () => ({
@@ -27,7 +28,7 @@ describe('useHasQuestions', () => {
 
     it('returns false when no questions exist (not_found)', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
-        mockUseDatabase.mockReturnValue({ db: db as any })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         const { result } = renderHook(() => useHasQuestions())
 
@@ -36,7 +37,7 @@ describe('useHasQuestions', () => {
 
     it('returns true when questions exist', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [] }) })
-        mockUseDatabase.mockReturnValue({ db: db as any })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         const { result } = renderHook(() => useHasQuestions())
 
@@ -45,7 +46,7 @@ describe('useHasQuestions', () => {
 
     it('returns false and logs error for unexpected errors', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue(new Error('unexpected')) })
-        mockUseDatabase.mockReturnValue({ db: db as any })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         const { result } = renderHook(() => useHasQuestions())
 

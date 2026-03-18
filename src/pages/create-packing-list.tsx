@@ -35,8 +35,9 @@ export function CreatePackingList() {
                 setNoQuestionsFound(false)
                 // Initialize with all people selected by default
                 setSelectedPeopleIds(doc.people.map(p => p.id))
-            } catch (err: any) {
-                if (err.name === 'not_found') {
+            } catch (err: unknown) {
+                const hasName = typeof err === 'object' && err !== null && 'name' in err
+                if (hasName && (err as { name: string }).name === 'not_found') {
                     console.log('No question set found')
                     setNoQuestionsFound(true)
                 } else {
@@ -48,7 +49,7 @@ export function CreatePackingList() {
             }
         }
         fetchQuestionSet()
-    }, [showToast])
+    }, [db, showToast])
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return

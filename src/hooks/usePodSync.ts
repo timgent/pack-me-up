@@ -119,6 +119,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     const { container, filename, resourceId } = pathConfig;
     const filenameKey = typeof filename === 'function' ? 'function' : filename;
     return `${container}:${filenameKey}:${resourceId || ''}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathConfig.container, pathConfig.filename, pathConfig.resourceId]);
 
   /**
@@ -182,13 +183,14 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       if (onSyncSuccess) {
         onSyncSuccess(data);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // 404 errors are expected when file doesn't exist yet - not a real error
-      if (err.statusCode !== 404) {
+      const statusCode = typeof err === 'object' && err !== null ? (err as { statusCode?: number }).statusCode : undefined
+      if (statusCode !== 404) {
         // Authentication errors use their own message
         const errorMessage = err instanceof AuthenticationError
           ? err.message
-          : (err.message || 'Failed to sync from Pod');
+          : (err instanceof Error ? err.message : 'Failed to sync from Pod');
         setError(errorMessage);
 
         if (onSyncError) {
@@ -244,11 +246,11 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       }
 
       return true;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Authentication errors use their own message
       const errorMessage = err instanceof AuthenticationError
         ? err.message
-        : (err.message || 'Failed to save to Pod');
+        : (err instanceof Error ? err.message : 'Failed to save to Pod');
       setError(errorMessage);
 
       if (onSaveError) {

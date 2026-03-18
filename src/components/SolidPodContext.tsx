@@ -125,7 +125,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
       try {
         // Make a lightweight HEAD request to verify the session is still valid
         await session.fetch(session.info.webId!, { method: 'HEAD' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         // If authentication error, the session has expired
         if (isAuthenticationError(error)) {
           console.log("Session validation failed - session has expired");
@@ -153,7 +153,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [session?.info.isLoggedIn, session?.info.webId, showToast]);
+  }, [session, session?.info.isLoggedIn, session?.info.webId, showToast]);
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
@@ -191,6 +191,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSolidPod() {
   const context = useContext(SolidPodContext);
 

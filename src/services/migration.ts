@@ -20,6 +20,14 @@ export interface BackupData {
     version: string
 }
 
+function hasName(err: unknown): err is { name: string } {
+    return typeof err === 'object' && err !== null && 'name' in err
+}
+
+function hasMessage(err: unknown): err is { message: string } {
+    return typeof err === 'object' && err !== null && 'message' in err
+}
+
 export class DatabaseMigration {
     private static readonly BACKUP_KEY = 'packing-app-backup'
 
@@ -37,8 +45,8 @@ export class DatabaseMigration {
         try {
             const questionSet = await legacyQuestionDb.get<PackingListQuestionSet>('1')
             backup.questionSets.push(questionSet)
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            if (!hasName(err) || err.name !== 'not_found') {
                 console.warn('Could not backup question set:', err)
             }
         }
@@ -50,7 +58,7 @@ export class DatabaseMigration {
                     backup.packingLists.push(row.doc)
                 }
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.warn('Could not backup packing lists:', err)
         }
 
@@ -117,8 +125,8 @@ export class DatabaseMigration {
         try {
             await legacyQuestionDb.get('1')
             hasLegacyData = true
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            if (!hasName(err) || err.name !== 'not_found') {
                 console.warn('Error checking legacy question set:', err)
             }
         }
@@ -135,8 +143,8 @@ export class DatabaseMigration {
         try {
             await db.getQuestionSet()
             hasNewData = true
-        } catch (err: any) {
-            if (err.name !== 'not_found') {
+        } catch (err: unknown) {
+            if (!hasName(err) || err.name !== 'not_found') {
                 console.warn('Error checking new question set:', err)
             }
         }
@@ -185,8 +193,8 @@ export class DatabaseMigration {
             result.success = true
             console.log('Migration completed successfully:', result)
 
-        } catch (err: any) {
-            result.errors.push(`Migration failed: ${err.message}`)
+        } catch (err: unknown) {
+            result.errors.push(`Migration failed: ${hasMessage(err) ? err.message : String(err)}`)
             console.error('Migration failed:', err)
         }
 
@@ -231,8 +239,8 @@ export class DatabaseMigration {
                 }
             }
 
-        } catch (err: any) {
-            errors.push(`Verification error: ${err.message}`)
+        } catch (err: unknown) {
+            errors.push(`Verification error: ${hasMessage(err) ? err.message : String(err)}`)
         }
 
         return { success: errors.length === 0, errors }

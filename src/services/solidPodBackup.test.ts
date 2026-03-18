@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import PouchDB from 'pouchdb'
 import PouchDBMemoryAdapter from 'pouchdb-adapter-memory'
+import type { Session } from '@inrupt/solid-client-authn-browser'
+import type { SolidDataset, WithServerResourceInfo } from '@inrupt/solid-client'
 import { PackingAppDatabase } from './database'
 import { AuthenticationError } from './solidPod'
 import { createBackup, listBackups, deleteBackup, restoreBackup } from './solidPodBackup'
@@ -44,7 +46,7 @@ const mockSaveMultipleFilesToPod = vi.mocked(saveMultipleFilesToPod)
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
     fetch: vi.fn(),
-} as any
+} as unknown as Session
 
 const POD_URL = 'https://pod.example.com/'
 
@@ -172,7 +174,7 @@ describe('listBackups', () => {
         const backupUrl2 = `${POD_URL}pack-me-up/backups/backup-2000.json`
 
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([backupUrl1, backupUrl2])
 
         const backupFile1 = {
@@ -204,7 +206,7 @@ describe('listBackups', () => {
         const backupUrl = `${POD_URL}pack-me-up/backups/backup-1000.json`
 
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([backupUrl])
 
         const backupFile = {
@@ -255,7 +257,7 @@ describe('listBackups', () => {
         const otherUrl = `${POD_URL}pack-me-up/backups/`
 
         const mockDataset = {}
-        mockGetSolidDataset.mockResolvedValue(mockDataset as any)
+        mockGetSolidDataset.mockResolvedValue(mockDataset as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValue([backupUrl, otherUrl])
 
         const backupFile = {
@@ -287,7 +289,7 @@ describe('deleteBackup', () => {
 
     it('calls deleteFile with the correct URL', async () => {
         const backupUrl = `${POD_URL}pack-me-up/backups/backup-1000.json`
-        mockDeleteFile.mockResolvedValue(undefined as any)
+        mockDeleteFile.mockResolvedValue(undefined)
 
         await deleteBackup(mockSession, backupUrl)
 

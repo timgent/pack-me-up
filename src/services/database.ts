@@ -30,6 +30,10 @@ export type AppDocument = QuestionSetDocument | PackingListDocument
  */
 export const LOCAL_NAMESPACE = 'local'
 
+function hasName(err: unknown): err is { name: string } {
+    return typeof err === 'object' && err !== null && 'name' in err
+}
+
 export class PackingAppDatabase {
     private db: PouchDB.Database<AppDocument>
     private static instances: Map<string, PackingAppDatabase> = new Map()
@@ -80,8 +84,8 @@ export class PackingAppDatabase {
                 _rev: doc._rev,
                 ...doc.data
             }
-        } catch (err: any) {
-            if (err.name === 'not_found') {
+        } catch (err: unknown) {
+            if (hasName(err) && err.name === 'not_found') {
                 throw { name: 'not_found', message: 'Question set not found' }
             }
             throw err
@@ -99,8 +103,8 @@ export class PackingAppDatabase {
                 if (doc.docType === 'question-set') {
                     existingDoc = doc
                 }
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                if (!hasName(err) || err.name !== 'not_found') {
                     throw err
                 }
             }
@@ -137,8 +141,8 @@ export class PackingAppDatabase {
                 _rev: doc._rev,
                 ...doc.data
             }
-        } catch (err: any) {
-            if (err.name === 'not_found') {
+        } catch (err: unknown) {
+            if (hasName(err) && err.name === 'not_found') {
                 throw { name: 'not_found', message: 'Packing list not found' }
             }
             throw err
@@ -156,8 +160,8 @@ export class PackingAppDatabase {
                 if (doc.docType === 'packing-list') {
                     existingDoc = doc
                 }
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                if (!hasName(err) || err.name !== 'not_found') {
                     throw err
                 }
             }
@@ -237,8 +241,8 @@ export class PackingAppDatabase {
                 await this.saveQuestionSet(questionSet)
                 questionSets = 1
                 console.log('Migrated question set successfully')
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                if (!hasName(err) || err.name !== 'not_found') {
                     console.warn('Could not migrate question set:', err)
                 }
             }
@@ -252,8 +256,8 @@ export class PackingAppDatabase {
                     }
                 }
                 console.log(`Migrated ${packingLists} packing lists successfully`)
-            } catch (err: any) {
-                if (err.name !== 'not_found') {
+            } catch (err: unknown) {
+                if (!hasName(err) || err.name !== 'not_found') {
                     console.warn('Could not migrate packing lists:', err)
                 }
             }
@@ -278,8 +282,8 @@ export class PackingAppDatabase {
         try {
             const questionSet = await source.getQuestionSet()
             await this.saveQuestionSet({ ...questionSet, _rev: undefined })
-        } catch (err: any) {
-            if (err.name !== 'not_found') throw err
+        } catch (err: unknown) {
+            if (!hasName(err) || err.name !== 'not_found') throw err
         }
 
         const lists = await source.getAllPackingLists()

@@ -12,6 +12,16 @@ import {
     POD_CONTAINERS,
 } from './solidPod'
 
+function hasName(err: unknown): err is { name: string } {
+    return typeof err === 'object' && err !== null && 'name' in err
+}
+
+function getStatusCode(err: unknown): number | undefined {
+    if (typeof err !== 'object' || err === null) return undefined
+    const code = (err as { statusCode?: unknown }).statusCode
+    return typeof code === 'number' ? code : undefined
+}
+
 export interface BackupFile {
     createdAt: string
     version: 1
@@ -42,8 +52,8 @@ export async function createBackup(
     let questionSet: PackingListQuestionSet | null = null
     try {
         questionSet = await db.getQuestionSet()
-    } catch (err: any) {
-        if (err.name !== 'not_found') throw err
+    } catch (err: unknown) {
+        if (!hasName(err) || err.name !== 'not_found') throw err
     }
 
     const packingLists = await db.getAllPackingLists()
@@ -80,11 +90,11 @@ export async function listBackups(
     let dataset
     try {
         dataset = await getSolidDataset(containerUrl, { fetch: session.fetch })
-    } catch (err: any) {
+    } catch (err: unknown) {
         if (isAuthenticationError(err)) {
             handlePodError(err)
         }
-        if (err.statusCode === 404) {
+        if (getStatusCode(err) === 404) {
             return []
         }
         throw err
@@ -149,8 +159,8 @@ export async function restoreBackup(
         // Since PackingAppDatabase doesn't expose a deleteQuestionSet, we do this via the raw db.
         // We'll overwrite it below regardless, so just proceed.
         void qs // suppress unused warning
-    } catch (err: any) {
-        if (err.name !== 'not_found') throw err
+    } catch (err: unknown) {
+        if (!hasName(err) || err.name !== 'not_found') throw err
         // Question set doesn't exist - that's fine
     }
 

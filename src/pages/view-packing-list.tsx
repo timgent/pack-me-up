@@ -104,7 +104,7 @@ export function ViewPackingList() {
         }
 
         fetchPackingList()
-    }, [id, setValue])
+    }, [db, id, setValue])
 
     const handleItemChange = useDebouncedCallback(async () => {
         if (!packingList) {
@@ -195,7 +195,8 @@ export function ViewPackingList() {
         } else {
             console.log('Skipping handleItemChange - packingList is null')
         }
-    }, [watchedItems, handleItemChange]) // Only trigger on form value changes, not packingList updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- packingList intentionally excluded: only trigger on form value changes
+    }, [watchedItems, handleItemChange])
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return

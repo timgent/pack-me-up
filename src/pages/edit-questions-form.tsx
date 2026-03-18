@@ -192,6 +192,7 @@ export function EditQuestionsForm() {
     } else {
       console.log('Skipping handleAutoSave - currentQuestionSet is null');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentQuestionSet is used as a guard; adding it would trigger extra auto-saves on initial load
   }, [watchedFormValues, handleAutoSave, editorMode]);
 
   const removePerson = (removedIndex: number) => {
@@ -236,13 +237,15 @@ export function EditQuestionsForm() {
         setRev(doc._rev)
         setCurrentQuestionSet(doc)
         reset(doc)
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errName = typeof err === 'object' && err !== null && 'name' in err ? (err as { name: string }).name : ''
+        const errMessage = err instanceof Error ? err.message : String(err)
         console.log("Initial get error:", {
-          name: err.name,
-          message: err.message,
+          name: errName,
+          message: errMessage,
           timestamp: new Date().toISOString()
         })
-        if (err.name === 'not_found') {
+        if (errName === 'not_found') {
           console.log('No data yet, creating new doc')
           const newDoc = {
             _id: "1",
@@ -267,10 +270,10 @@ export function EditQuestionsForm() {
             setRev(result.rev)
             setCurrentQuestionSet(savedNewDoc)
             reset(newDoc)
-          } catch (putErr: any) {
+          } catch (putErr: unknown) {
             console.error('Error creating new doc:', {
-              name: putErr.name,
-              message: putErr.message,
+              name: typeof putErr === 'object' && putErr !== null && 'name' in putErr ? (putErr as { name: string }).name : '',
+              message: putErr instanceof Error ? putErr.message : String(putErr),
               timestamp: new Date().toISOString()
             })
             showToast('Failed to initialize database', 'error')
@@ -283,6 +286,7 @@ export function EditQuestionsForm() {
     }
 
     loadQuestionSet()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount
   }, [])
 
   const { fields: questionFields, append: appendQuestion, remove: removeQuestion, move: moveQuestion } = useFieldArray({
@@ -343,7 +347,7 @@ export function EditQuestionsForm() {
   const syncVisualToJson = useCallback(() => {
     const formData = getValues();
     // Remove internal database fields that users shouldn't edit
-    const { _id, _rev, lastModified, ...cleanData } = formData as any;
+    const { _id, _rev, lastModified, ...cleanData } = formData as PackingListQuestionSet;
     const formatted = JSON.stringify(cleanData, null, 2);
     setJsonValue(formatted);
     setOriginalJsonValue(formatted); // Track original for diff
@@ -367,8 +371,8 @@ export function EditQuestionsForm() {
       setCurrentQuestionSet(dataWithRev);
       setJsonError(null);
       return true;
-    } catch (e: any) {
-      setJsonError(`Invalid JSON: ${e.message}`);
+    } catch (e: unknown) {
+      setJsonError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
       return false;
     }
   }, [jsonValue, reset, rev]);
@@ -402,7 +406,7 @@ export function EditQuestionsForm() {
           setRev(savedData._rev);
           setCurrentQuestionSet(savedData);
           // Update original to mark as saved
-          const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+          const { _id, _rev: _, lastModified, ...cleanData } = savedData as PackingListQuestionSet;
           setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
         }
       } else {
@@ -418,7 +422,7 @@ export function EditQuestionsForm() {
         setRev(result.rev);
         setCurrentQuestionSet(savedData);
         // Update original to mark as saved
-        const { _id, _rev: _, lastModified, ...cleanData } = savedData as any;
+        const { _id, _rev: _, lastModified, ...cleanData } = savedData as PackingListQuestionSet;
         setOriginalJsonValue(JSON.stringify(cleanData, null, 2));
       }
 
@@ -426,12 +430,12 @@ export function EditQuestionsForm() {
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
       showToast('JSON saved successfully!', 'success');
-    } catch (e: any) {
-      setJsonError(`Invalid JSON: ${e.message}`);
+    } catch (e: unknown) {
+      setJsonError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
       setAutoSaveStatus('error');
       showToast('Failed to save JSON', 'error');
     }
-  }, [jsonValue, rev, isLoggedIn, saveWithSyncPrevention, saveToPod, showToast]);
+  }, [db, jsonValue, rev, isLoggedIn, saveWithSyncPrevention, saveToPod, showToast]);
 
   const handleModeChange = useCallback((newMode: 'visual' | 'json') => {
     if (newMode === 'json') {
