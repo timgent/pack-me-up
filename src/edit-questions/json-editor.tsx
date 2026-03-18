@@ -67,7 +67,7 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
           setValidationErrors(validation.errors || null)
           onValidationChange?.(validation.errors || null)
         }
-      } catch (e) {
+      } catch {
         // JSON syntax error - don't show validation errors yet
         setValidationErrors(null)
         onValidationChange?.(null)
@@ -92,7 +92,7 @@ export function JsonEditor({ value, onChange, error, originalValue, onSave, hasU
         setValidationErrors(validation.errors || null)
         onValidationChange?.(validation.errors || null)
       }
-    } catch (e) {
+    } catch {
       // Keep existing validation errors if JSON is invalid
     }
     setIsValidating(false)

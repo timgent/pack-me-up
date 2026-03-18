@@ -74,17 +74,11 @@ export function findLineNumberForPath(jsonText: string, path: string): number | 
   const lines = jsonText.split('\n')
 
   try {
-    let currentDepth = 0
-    let searchPath = [...pathParts]
+    const searchPath = [...pathParts]
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       const trimmed = line.trim()
-
-      // Track depth by counting braces
-      const openBraces = (line.match(/[{[]/g) || []).length
-      const closeBraces = (line.match(/[}\]]/g) || []).length
-      currentDepth += openBraces - closeBraces
 
       // Look for the current path part
       if (searchPath.length > 0) {
@@ -108,7 +102,7 @@ export function findLineNumberForPath(jsonText: string, path: string): number | 
         }
       }
     }
-  } catch (e) {
+  } catch {
     // If we can't find it, return undefined
   }
 

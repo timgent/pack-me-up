@@ -61,7 +61,7 @@ export function CreatePackingList() {
 
             // For each selected option, get all items
             return selectedOptionIds.flatMap((selectedOptionId) => {
-                const selectedOption = question?.options.find((option) => (option.id === selectedOptionId))!
+                const selectedOption = question.options.find((option) => (option.id === selectedOptionId))!
                 const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
                     const selectedPeople = item.personSelections.filter((person) => (
                         person.selected && selectedPeopleIds.includes(person.personId)
