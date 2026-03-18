@@ -194,27 +194,21 @@ export const Wizard = () => {
                 {/* Activities Section */}
                 <div className="bg-white p-6 rounded-2xl shadow-soft border-2 border-secondary-200">
                     <h2 className="text-2xl font-bold mb-4 text-secondary-900">🏖️ What Activities Are You Planning?</h2>
-                    <div className="mb-4 p-3 bg-accent-50 border border-accent-200 rounded-xl">
-                        <p className="text-sm text-accent-900 font-medium">
-                            💡 Coming Soon: Activity-based customization will be available in a future update!
-                        </p>
-                    </div>
                     <p className="text-sm text-gray-600 mb-4">
-                        Select all that apply (this information will be used to customize your packing list in future iterations)
+                        Select all activities you're planning — we'll pre-fill your packing list items
                     </p>
 
-                    <div className="space-y-3 opacity-60">
+                    <div className="space-y-3">
                         {ACTIVITIES.map((activity) => (
                             <label
                                 key={activity.id}
-                                className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-not-allowed"
+                                className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer"
                             >
                                 <input
                                     type="checkbox"
                                     value={activity.id}
                                     {...register('activities')}
                                     className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                                    disabled
                                 />
                                 <span className="text-gray-800 font-medium">
                                     {activity.icon} {activity.label}

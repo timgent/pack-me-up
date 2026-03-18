@@ -1,5 +1,15 @@
 import { PackingListQuestionSet, Person, Item } from './types';
 import { generateUUID } from '../utils/uuid';
+
+export const ACTIVITY_OPTION_IDS = {
+    swimming: 'activity-option-swimming',
+    watersports: 'activity-option-watersports',
+    cycling: 'activity-option-cycling',
+    running: 'activity-option-running',
+    climbing: 'activity-option-climbing',
+    hiking: 'activity-option-hiking',
+    formalOccasions: 'activity-option-formal-occasions',
+} as const
 import {
     getBabies,
     getToddlers,
@@ -28,7 +38,10 @@ function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Perso
     };
 }
 
-export function createExampleData(people: Person[]): PackingListQuestionSet {
+export function createExampleData(people: Person[], selectedActivityIds: string[] = []): PackingListQuestionSet {
+    const validActivityIds = Object.values(ACTIVITY_OPTION_IDS) as string[]
+    const validSelectedIds = selectedActivityIds.filter(id => validActivityIds.includes(id))
+    const activitiesQuestionId = generateUUID()
 
     return {
         _id: "1",
@@ -138,14 +151,14 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                 ]
             },
             {
-                id: generateUUID(),
+                id: activitiesQuestionId,
                 type: "saved",
                 text: "What activities will you be doing?",
                 order: 2,
                 questionType: "multiple-choice",
                 options: [
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.swimming,
                         text: "Swimming",
                         order: 0,
                         items: [
@@ -167,7 +180,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.watersports,
                         text: "Watersports",
                         order: 1,
                         items: [
@@ -178,7 +191,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.cycling,
                         text: "Cycling",
                         order: 2,
                         items: [
@@ -190,7 +203,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.running,
                         text: "Running",
                         order: 3,
                         items: [
@@ -201,7 +214,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.climbing,
                         text: "Climbing",
                         order: 4,
                         items: [
@@ -213,7 +226,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.hiking,
                         text: "Hiking",
                         order: 5,
                         items: [
@@ -230,7 +243,7 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                         ]
                     },
                     {
-                        id: generateUUID(),
+                        id: ACTIVITY_OPTION_IDS.formalOccasions,
                         text: "Formal occasions",
                         order: 6,
                         items: [
@@ -316,7 +329,11 @@ export function createExampleData(people: Person[]): PackingListQuestionSet {
                     }
                 ]
             }
-        ]
+        ],
+        preSelectedAnswers: validSelectedIds.length > 0 ? [{
+            questionId: activitiesQuestionId,
+            selectedOptionIds: validSelectedIds
+        }] : undefined
     };
 }
 
