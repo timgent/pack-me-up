@@ -23,7 +23,7 @@ function enhanceErrorMessage(issue: ZodIssue, data: unknown): { message: string;
   // Get the actual value at this path
   let actualValue: unknown
   try {
-    actualValue = issue.path.reduce((obj: unknown, key) => (obj as Record<string | number, unknown>)?.[key], data)
+    actualValue = issue.path.reduce((obj: unknown, key) => (obj as Record<string | number | symbol, unknown>)?.[key], data)
   } catch {
     actualValue = undefined
   }
