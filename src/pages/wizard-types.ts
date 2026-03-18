@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { AgeRangeSchema } from '../edit-questions/types'
+import { ACTIVITY_OPTION_IDS } from '../edit-questions/example-data'
 
 export const ACTIVITIES = [
-    { id: 'swimming', label: 'Swimming (pool)', icon: '🏊' },
-    { id: 'outdoor-swimming', label: 'Outdoor swimming (beach, lake, river)', icon: '🏖️' },
-    { id: 'outdoor-watersports', label: 'Outdoor watersports (surfing, kayaking, etc.)', icon: '🏄' },
-    { id: 'cycling', label: 'Cycling', icon: '🚴' },
-    { id: 'climbing', label: 'Climbing', icon: '🧗' },
+    { id: ACTIVITY_OPTION_IDS.swimming, label: 'Swimming (pool)', icon: '🏊' },
+    { id: ACTIVITY_OPTION_IDS.watersports, label: 'Watersports (surfing, kayaking, beach & lake swimming)', icon: '🏄' },
+    { id: ACTIVITY_OPTION_IDS.cycling, label: 'Cycling', icon: '🚴' },
+    { id: ACTIVITY_OPTION_IDS.climbing, label: 'Climbing', icon: '🧗' },
+    { id: ACTIVITY_OPTION_IDS.hiking, label: 'Hiking', icon: '🥾' },
 ] as const
 
 export type ActivityId = typeof ACTIVITIES[number]['id']
