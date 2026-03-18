@@ -43,11 +43,6 @@ export interface SyncCoordinatorOptions<T extends TimestampedData> {
   conflictStrategy?: ConflictStrategy;
 
   /**
-   * Duration to prevent sync after local changes (milliseconds)
-   */
-  syncPreventionWindow?: number;
-
-  /**
    * Duration to show sync indicator (milliseconds)
    */
   syncIndicatorDuration?: number;
@@ -110,17 +105,28 @@ export function useSyncCoordinator<T extends TimestampedData>(
     saveToLocalDb,
     updateFormAndState,
     conflictStrategy = 'fallback-to-pod',
-    syncPreventionWindow = 2000,
     syncIndicatorDuration = 2000,
   } = options;
+
+  // How long to suppress Pod updates after a local save completes
+  const SYNC_PREVENTION_WINDOW_MS = 2000;
 
   const [syncingFromPod, setSyncingFromPod] = useState(false);
 
   // Track if we're currently handling a local change to prevent sync loops
   const isLocalChangeRef = useRef(false);
 
+  // Track whether a save is currently in-progress (set before first await, cleared in finally)
+  const saveInProgressRef = useRef(false);
+
+  // Track the lastModified timestamp of the most recently saved data for echo detection
+  const lastSavedTimestampRef = useRef<string | null>(null);
+
   // Track the last synced data to detect actual changes
   const lastSyncedDataRef = useRef<string | null>(null);
+
+  // Track the highest timestamp ever seen (local or Pod) for monotonic timestamp generation
+  const maxSeenTimestampRef = useRef<number>(0);
 
   /**
    * Preserve focus and selection during updates
@@ -175,6 +181,24 @@ export function useSyncCoordinator<T extends TimestampedData>(
    */
   const handleSyncSuccess = useCallback(
     async (data: T) => {
+      // Advance maxSeenTimestamp so subsequent saves are always strictly newer
+      if (data.lastModified) {
+        const podMs = new Date(data.lastModified).getTime();
+        maxSeenTimestampRef.current = Math.max(maxSeenTimestampRef.current, podMs);
+      }
+
+      // Skip if a save operation is currently in-flight (set before first await)
+      if (saveInProgressRef.current) {
+        console.log('Synced data from Pod - skipping because save is in-progress');
+        return;
+      }
+
+      // Skip echoes: if the Pod is returning the exact data we just saved, ignore it
+      if (data.lastModified && data.lastModified === lastSavedTimestampRef.current) {
+        console.log('Synced data from Pod - skipping echo of our own last save');
+        return;
+      }
+
       // Only update if this isn't a local change we just made
       if (isLocalChangeRef.current) {
         console.log('Synced data from Pod - skipping because local change is in progress');
@@ -248,12 +272,23 @@ export function useSyncCoordinator<T extends TimestampedData>(
    */
   const saveWithSyncPrevention = useCallback(
     async (data: T, saveToPod: (data: T) => Promise<boolean>): Promise<T | null> => {
+      // Mark save as in-progress before any async work so handleSyncSuccess
+      // cannot slip through the unguarded window before isLocalChangeRef is set.
+      saveInProgressRef.current = true;
       try {
-        // Add timestamp for conflict resolution
+        // Add monotonically increasing timestamp for conflict resolution.
+        // Uses max(wallClock, maxSeen+1) so that saves are always strictly newer
+        // than any previously observed timestamp, protecting against clock skew.
+        const nowMs = Date.now();
+        const tsMs = Math.max(nowMs, maxSeenTimestampRef.current + 1);
+        maxSeenTimestampRef.current = tsMs;
         const dataWithTimestamp = {
           ...data,
-          lastModified: new Date().toISOString(),
+          lastModified: new Date(tsMs).toISOString(),
         } as T;
+
+        // Record the timestamp so we can detect echoes from the Pod later
+        lastSavedTimestampRef.current = dataWithTimestamp.lastModified!;
 
         // Save to local database first (guaranteed)
         const dbResult = await saveToLocalDb(dataWithTimestamp);
@@ -274,15 +309,17 @@ export function useSyncCoordinator<T extends TimestampedData>(
         // Reset the flag after the sync prevention window
         setTimeout(() => {
           isLocalChangeRef.current = false;
-        }, syncPreventionWindow);
+        }, SYNC_PREVENTION_WINDOW_MS);
 
         return savedData;
       } catch (err) {
         console.error('Error in saveWithSyncPrevention:', err);
         return null;
+      } finally {
+        saveInProgressRef.current = false;
       }
     },
-    [saveToLocalDb, syncPreventionWindow]
+    [saveToLocalDb]
   );
 
   return {
