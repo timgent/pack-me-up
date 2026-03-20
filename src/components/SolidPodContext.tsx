@@ -21,47 +21,58 @@ interface SolidPodContextValue {
 const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
 
 /**
- * Sets up event listeners for session lifecycle events
- * Monitors login, logout, and session restoration events
+ * Sets up event listeners for session lifecycle events.
+ * Monitors login, logout, and session restoration events.
+ * Returns a cleanup function that removes all registered listeners.
  */
 function setupSessionEventListeners(
   session: Session,
-  showToast: (message: string, type: 'success' | 'error') => void,
+  showToastRef: React.MutableRefObject<(message: string, type: 'success' | 'error') => void>,
   setSession: (session: Session) => void,
   setSessionVersion: (updater: (v: number) => number) => void,
   intentionalLogoutRef: React.MutableRefObject<boolean>
-) {
+): () => void {
   // Listen for logout events — fires for both intentional logout and session expiry.
   // Use intentionalLogoutRef to distinguish between the two.
-  session.events.on("logout", () => {
+  const onLogout = () => {
     console.log("Session logout event fired");
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
 
     if (!intentionalLogoutRef.current) {
-      showToast(
+      showToastRef.current(
         "Your Solid session has expired. Your data is saved locally - log in again to sync with your Pod.",
         "error"
       );
     }
     intentionalLogoutRef.current = false;
-  });
+  };
 
   // Listen for login events
-  session.events.on("login", () => {
+  const onLogin = () => {
     console.log("Session login event fired");
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
-  });
+  };
 
   // Listen for session restore events
-  session.events.on("sessionRestore", () => {
+  const onSessionRestore = () => {
     console.log("Session restore event fired");
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
-  });
+  };
+
+  session.events.on("logout", onLogout);
+  session.events.on("login", onLogin);
+  session.events.on("sessionRestore", onSessionRestore);
+
+  return () => {
+    session.events.off("logout", onLogout);
+    session.events.off("login", onLogin);
+    session.events.off("sessionRestore", onSessionRestore);
+  };
 }
 
 export function SolidPodProvider({ children }: { children: ReactNode }) {
@@ -69,9 +80,20 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
   const { showToast } = useToast();
+  const showToastRef = useRef(showToast);
+  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
   const intentionalLogoutRef = useRef(false);
 
   useEffect(() => {
+    // Register listeners synchronously on the singleton session so the cleanup
+    // function is available immediately (before the async init work completes).
+    // This prevents React StrictMode's synchronous cleanup–remount cycle from
+    // leaving duplicate listeners when the async callback hasn't resolved yet.
+    const initialSession = getDefaultSession();
+    const cleanupListeners = setupSessionEventListeners(
+      initialSession, showToastRef, setSession, setSessionVersion, intentionalLogoutRef
+    );
+
     const initializeSession = async () => {
       try {
         console.log("Initializing Solid session...");
@@ -84,9 +106,6 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         });
         setSession(currentSession);
         setSessionVersion(v => v + 1);
-
-        // Set up session event listeners
-        setupSessionEventListeners(currentSession, showToast, setSession, setSessionVersion, intentionalLogoutRef);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -113,7 +132,12 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     };
 
     initializeSession();
-  }, [showToast]);
+
+    return cleanupListeners;
+  // showToast is intentionally excluded: we access it via showToastRef to keep
+  // this effect stable and prevent duplicate listener registration on re-renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Validate session when user returns to the tab
   useEffect(() => {
