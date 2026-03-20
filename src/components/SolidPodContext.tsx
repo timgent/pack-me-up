@@ -6,7 +6,6 @@ import {
   login as solidLogin,
   logout as solidLogout
 } from "@inrupt/solid-client-authn-browser";
-import { useToast } from "./ToastContext";
 import { isAuthenticationError } from "../services/solidPod";
 
 interface SolidPodContextValue {
@@ -23,8 +22,9 @@ interface SolidPodContextValue {
 const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
 
 /**
- * Sets up event listeners for session lifecycle events
- * Monitors login, logout, and session restoration events
+ * Sets up event listeners for session lifecycle events.
+ * Monitors login, logout, and session restoration events.
+ * Returns a cleanup function that removes all registered listeners.
  */
 function setupSessionEventListeners(
   session: Session,
@@ -33,10 +33,10 @@ function setupSessionEventListeners(
   setIsLoggedIn: (v: boolean) => void,
   setSessionExpired: (v: boolean) => void,
   intentionalLogoutRef: React.MutableRefObject<boolean>
-) {
+): () => void {
   // Listen for logout events — fires for both intentional logout and session expiry.
   // Use intentionalLogoutRef to distinguish between the two.
-  session.events.on("logout", () => {
+  const onLogout = () => {
     console.log("Session logout event fired");
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
@@ -46,26 +46,36 @@ function setupSessionEventListeners(
       setSessionExpired(true);
     }
     intentionalLogoutRef.current = false;
-  });
+  };
 
   // Listen for login events
-  session.events.on("login", () => {
+  const onLogin = () => {
     console.log("Session login event fired");
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
     setIsLoggedIn(true);
     setSessionExpired(false);
-  });
+  };
 
   // Listen for session restore events
-  session.events.on("sessionRestore", () => {
+  const onSessionRestore = () => {
     console.log("Session restore event fired");
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
     setIsLoggedIn(true);
-  });
+  };
+
+  session.events.on("logout", onLogout);
+  session.events.on("login", onLogin);
+  session.events.on("sessionRestore", onSessionRestore);
+
+  return () => {
+    session.events.off("logout", onLogout);
+    session.events.off("login", onLogin);
+    session.events.off("sessionRestore", onSessionRestore);
+  };
 }
 
 export function SolidPodProvider({ children }: { children: ReactNode }) {
@@ -74,10 +84,18 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
-  const { showToast } = useToast();
   const intentionalLogoutRef = useRef(false);
 
   useEffect(() => {
+    // Register listeners synchronously on the singleton session so the cleanup
+    // function is available immediately (before the async init work completes).
+    // This prevents React StrictMode's synchronous cleanup–remount cycle from
+    // leaving duplicate listeners when the async callback hasn't resolved yet.
+    const initialSession = getDefaultSession();
+    const cleanupListeners = setupSessionEventListeners(
+      initialSession, setSession, setSessionVersion, setIsLoggedIn, setSessionExpired, intentionalLogoutRef
+    );
+
     const initializeSession = async () => {
       try {
         console.log("Initializing Solid session...");
@@ -91,9 +109,6 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setSessionVersion(v => v + 1);
         setIsLoggedIn(currentSession.info.isLoggedIn);
-
-        // Set up session event listeners
-        setupSessionEventListeners(currentSession, setSession, setSessionVersion, setIsLoggedIn, setSessionExpired, intentionalLogoutRef);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -120,7 +135,9 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     };
 
     initializeSession();
-  }, [showToast]);
+
+    return cleanupListeners;
+  }, []);
 
   // Validate session when user returns to the tab
   useEffect(() => {
