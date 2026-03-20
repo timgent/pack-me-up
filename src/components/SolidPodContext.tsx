@@ -6,12 +6,13 @@ import {
   login as solidLogin,
   logout as solidLogout
 } from "@inrupt/solid-client-authn-browser";
-import { useToast } from "./ToastContext";
 import { isAuthenticationError } from "../services/solidPod";
 
 interface SolidPodContextValue {
   session: Session | null;
   isLoggedIn: boolean;
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
   webId: string | undefined;
   isLoading: boolean;
   login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
@@ -27,9 +28,10 @@ const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefine
  */
 function setupSessionEventListeners(
   session: Session,
-  showToastRef: React.MutableRefObject<(message: string, type: 'success' | 'error') => void>,
   setSession: (session: Session) => void,
   setSessionVersion: (updater: (v: number) => number) => void,
+  setIsLoggedIn: (v: boolean) => void,
+  setSessionExpired: (v: boolean) => void,
   intentionalLogoutRef: React.MutableRefObject<boolean>
 ): () => void {
   // Listen for logout events — fires for both intentional logout and session expiry.
@@ -38,12 +40,10 @@ function setupSessionEventListeners(
     console.log("Session logout event fired");
     setSession(getDefaultSession());
     setSessionVersion(v => v + 1);
+    setIsLoggedIn(false);
 
     if (!intentionalLogoutRef.current) {
-      showToastRef.current(
-        "Your Solid session has expired. Your data is saved locally - log in again to sync with your Pod.",
-        "error"
-      );
+      setSessionExpired(true);
     }
     intentionalLogoutRef.current = false;
   };
@@ -54,6 +54,8 @@ function setupSessionEventListeners(
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsLoggedIn(true);
+    setSessionExpired(false);
   };
 
   // Listen for session restore events
@@ -62,6 +64,7 @@ function setupSessionEventListeners(
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsLoggedIn(true);
   };
 
   session.events.on("logout", onLogout);
@@ -77,11 +80,10 @@ function setupSessionEventListeners(
 
 export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [, setSessionVersion] = useState(0);
-  const { showToast } = useToast();
-  const showToastRef = useRef(showToast);
-  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
   const intentionalLogoutRef = useRef(false);
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     // leaving duplicate listeners when the async callback hasn't resolved yet.
     const initialSession = getDefaultSession();
     const cleanupListeners = setupSessionEventListeners(
-      initialSession, showToastRef, setSession, setSessionVersion, intentionalLogoutRef
+      initialSession, setSession, setSessionVersion, setIsLoggedIn, setSessionExpired, intentionalLogoutRef
     );
 
     const initializeSession = async () => {
@@ -106,6 +108,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         });
         setSession(currentSession);
         setSessionVersion(v => v + 1);
+        setIsLoggedIn(currentSession.info.isLoggedIn);
       } catch (error) {
         console.error("Error initializing session:", error);
         console.log("Session restoration failed, clearing any corrupted session data...");
@@ -134,9 +137,6 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     initializeSession();
 
     return cleanupListeners;
-  // showToast is intentionally excluded: we access it via showToastRef to keep
-  // this effect stable and prevent duplicate listener registration on re-renders.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Validate session when user returns to the tab
@@ -157,10 +157,8 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           const updatedSession = getDefaultSession();
           setSession(updatedSession);
           setSessionVersion(v => v + 1);
-          showToast(
-            "Your session expired while you were away. Please log in again.",
-            "error"
-          );
+          setIsLoggedIn(false);
+          setSessionExpired(true);
         } else {
           // Network errors or other issues - log but don't logout
           console.error("Session validation failed with non-auth error:", error);
@@ -177,7 +175,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [session, session?.info.isLoggedIn, session?.info.webId, showToast]);
+  }, [session, session?.info.isLoggedIn, session?.info.webId]);
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
@@ -197,11 +195,16 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     const updatedSession = getDefaultSession();
     setSession(updatedSession);
     setSessionVersion(v => v + 1);
+    setIsLoggedIn(false);
   };
+
+  const clearSessionExpired = () => setSessionExpired(false);
 
   const value: SolidPodContextValue = {
     session,
-    isLoggedIn: session?.info.isLoggedIn ?? false,
+    isLoggedIn,
+    sessionExpired,
+    clearSessionExpired,
     webId: session?.info.webId,
     isLoading,
     login,

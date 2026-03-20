@@ -1,132 +1,214 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { render, screen, act, waitFor } from '@testing-library/react'
+import { EventEmitter } from 'events'
 import React from 'react'
-
-// ---------------------------------------------------------------------------
-// Hoisted variables (must be declared before vi.mock factory runs)
-// ---------------------------------------------------------------------------
-
-const { fakeEvents, fakeSession, mockSolidLogout, mockShowToast } = vi.hoisted(() => {
-  const { EventEmitter } = require('events') as typeof import('events')
-
-  const fakeEvents = new EventEmitter()
-  fakeEvents.setMaxListeners(50)
-
-  const fakeSession = {
-    info: { isLoggedIn: false, webId: undefined as string | undefined, sessionId: 'test' },
-    events: fakeEvents,
-    fetch: () => Promise.resolve(new Response()),
-  }
-
-  return {
-    fakeEvents,
-    fakeSession,
-    mockSolidLogout: vi.fn(),
-    mockShowToast: vi.fn(),
-  }
-})
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-vi.mock('@inrupt/solid-client-authn-browser', () => ({
-  getDefaultSession: vi.fn(() => fakeSession),
-  handleIncomingRedirect: vi.fn().mockResolvedValue(undefined),
-  login: vi.fn(),
-  logout: mockSolidLogout,
-}))
-
-// Stable showToast reference — the real bug is React StrictMode double-invoking
-// effects with no cleanup, not an unstable showToast reference.
-vi.mock('./ToastContext', () => ({
-  useToast: () => ({ showToast: mockShowToast }),
-}))
-
 import { SolidPodProvider, useSolidPod } from './SolidPodContext'
+import { ToastProvider } from './ToastContext'
 
-// ---------------------------------------------------------------------------
-// Helper component
-// ---------------------------------------------------------------------------
-
-function LogoutButton() {
-  const { logout } = useSolidPod()
-  return <button onClick={() => { void logout() }}>Logout</button>
+function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+        <ToastProvider>
+            <SolidPodProvider>{children}</SolidPodProvider>
+        </ToastProvider>
+    )
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// Build a controllable mock session backed by an EventEmitter
+function makeMockSession(isLoggedIn = false, webId?: string) {
+    const events = new EventEmitter()
+    return {
+        info: { isLoggedIn, webId, sessionId: 'test-session' },
+        events,
+        fetch: vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+    }
+}
+
+let mockSession = makeMockSession()
+
+vi.mock('@inrupt/solid-client-authn-browser', () => ({
+    handleIncomingRedirect: vi.fn().mockResolvedValue(undefined),
+    getDefaultSession: vi.fn(() => mockSession),
+    login: vi.fn(),
+    logout: vi.fn().mockResolvedValue(undefined),
+}))
+
+import { getDefaultSession } from '@inrupt/solid-client-authn-browser'
+const mockGetDefaultSession = vi.mocked(getDefaultSession)
+
+/** Test consumer that renders context values as text */
+function Consumer() {
+    const { isLoggedIn, sessionExpired, webId } = useSolidPod()
+    return (
+        <div>
+            <span data-testid="isLoggedIn">{String(isLoggedIn)}</span>
+            <span data-testid="sessionExpired">{String(sessionExpired)}</span>
+            <span data-testid="webId">{webId ?? 'none'}</span>
+        </div>
+    )
+}
+
+/** Test consumer that also exposes clearSessionExpired */
+function ConsumerWithActions() {
+    const { isLoggedIn, sessionExpired, clearSessionExpired, logout } = useSolidPod()
+    return (
+        <div>
+            <span data-testid="isLoggedIn">{String(isLoggedIn)}</span>
+            <span data-testid="sessionExpired">{String(sessionExpired)}</span>
+            <button onClick={clearSessionExpired}>clear</button>
+            <button onClick={logout}>logout</button>
+        </div>
+    )
+}
 
 describe('SolidPodContext', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => {})
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    mockShowToast.mockClear()
-    mockSolidLogout.mockClear()
-
-    // solidLogout emits 'logout' on the shared fake session, mirroring the
-    // real Inrupt library behaviour
-    mockSolidLogout.mockImplementation(async () => {
-      fakeEvents.emit('logout')
+    beforeEach(() => {
+        vi.spyOn(console, 'log').mockImplementation(() => {})
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        mockSession = makeMockSession()
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
     })
 
-    // Remove any listeners left by the previous test's component
-    fakeEvents.removeAllListeners()
-    fakeSession.info = { isLoggedIn: false, webId: undefined, sessionId: 'test' }
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  // In React 18 StrictMode (used in development and the production app), effects
-  // are intentionally double-invoked to surface missing cleanups. Because
-  // setupSessionEventListeners has no cleanup, both invocations leave their
-  // listeners active. When the user logs out:
-  //   1st listener: sees intentionalLogoutRef=true → suppresses toast, resets flag to false
-  //   2nd listener: sees intentionalLogoutRef=false → shows "session expired" toast ← BUG
-  it('does not show session-expired toast when user intentionally logs out (StrictMode)', async () => {
-    render(
-      <React.StrictMode>
-        <SolidPodProvider>
-          <LogoutButton />
-        </SolidPodProvider>
-      </React.StrictMode>
-    )
-
-    await waitFor(() => screen.getByText('Logout'))
-
-    await act(async () => {
-      fireEvent.click(screen.getByText('Logout'))
+    afterEach(() => {
+        vi.restoreAllMocks()
     })
 
-    expect(mockShowToast).not.toHaveBeenCalledWith(
-      expect.stringContaining('session has expired'),
-      'error'
-    )
-  })
+    it('starts with isLoggedIn false and sessionExpired false', async () => {
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
 
-  it('shows session-expired toast when session expires unexpectedly', async () => {
-    render(
-      <SolidPodProvider>
-        <LogoutButton />
-      </SolidPodProvider>
-    )
-
-    await waitFor(() => screen.getByText('Logout'))
-
-    // Emit the logout event directly — no intentional flag set, so the toast
-    // should appear
-    act(() => {
-      fakeEvents.emit('logout')
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
     })
 
-    expect(mockShowToast).toHaveBeenCalledWith(
-      expect.stringContaining('session has expired'),
-      'error'
-    )
-  })
+    it('sets isLoggedIn true after session initialises with a logged-in session', async () => {
+        mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
+
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+        })
+    })
+
+    it('sets isLoggedIn false and sessionExpired true on non-intentional logout', async () => {
+        mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
+
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+        })
+
+        // Simulate session expiry: library fires logout event and resets session info
+        await act(async () => {
+            mockSession.info.isLoggedIn = false
+            const expiredSession = makeMockSession(false)
+            mockGetDefaultSession.mockReturnValue(expiredSession as never)
+            mockSession.events.emit('logout')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('true')
+        })
+    })
+
+    it('sets isLoggedIn false but keeps sessionExpired false on intentional logout', async () => {
+        mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
+
+        render(
+            <Wrapper>
+                <ConsumerWithActions />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+        })
+
+        await act(async () => {
+            screen.getByRole('button', { name: 'logout' }).click()
+        })
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
+    })
+
+    it('sets isLoggedIn true and sessionExpired false on login event', async () => {
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
+        })
+
+        await act(async () => {
+            mockSession.info.isLoggedIn = true
+            mockSession.info.webId = 'https://user.example.org/profile/card#me'
+            mockSession.events.emit('login')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
+    })
+
+    it('clearSessionExpired sets sessionExpired to false', async () => {
+        mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
+
+        render(
+            <Wrapper>
+                <ConsumerWithActions />
+            </Wrapper>
+        )
+
+        // Wait for initialization
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+        })
+
+        // Trigger session expiry
+        await act(async () => {
+            mockSession.info.isLoggedIn = false
+            const expiredSession = makeMockSession(false)
+            mockGetDefaultSession.mockReturnValue(expiredSession as never)
+            mockSession.events.emit('logout')
+        })
+
+        await waitFor(() => {
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('true')
+        })
+
+        // Dismiss
+        await act(async () => {
+            screen.getByRole('button', { name: 'clear' }).click()
+        })
+
+        await waitFor(() => {
+            expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
+    })
 })
