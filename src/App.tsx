@@ -3,6 +3,7 @@ import { Route } from 'react-router-dom'
 import { Routes } from 'react-router-dom'
 import './App.css'
 import { Navigation } from './components/Navigation'
+import { SessionExpiredBanner } from './components/SessionExpiredBanner'
 import { ToastProvider } from './components/ToastContext'
 import { LandingPage } from './pages/landing-page'
 import { EditQuestionsForm } from './pages/edit-questions-form'
@@ -23,6 +24,7 @@ function App() {
         <HashRouter>
           <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
             <Navigation />
+            <SessionExpiredBanner />
             <div className="container mx-auto px-4 py-8">
               <Routes>
                 <Route path="/" element={<LandingPage />} />

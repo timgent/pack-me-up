@@ -27,6 +27,8 @@ describe('Navigation', () => {
         mockUseSolidPod.mockReturnValue({
             session: null,
             isLoggedIn: false,
+            sessionExpired: false,
+            clearSessionExpired: vi.fn(),
             webId: undefined,
             isLoading: false,
             login: vi.fn(),
