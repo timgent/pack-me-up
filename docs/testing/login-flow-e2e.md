@@ -11,7 +11,7 @@
 
 Started using the `solid-dev` skill, which runs Community Solid Server and provisions a test account automatically. See `.claude/skills/solid-dev/`.
 
-> **Note:** The CSS v7 account registration API differs from what `start.sh` currently uses — the script needs updating to use account-specific URLs (see [issue](#known-issues)). Account was provisioned manually for this test run.
+> **Note:** The CSS v7 account registration flow required a manual workaround during this test run. `start.sh` has since been updated to use the correct v7 token-based API automatically.
 
 ---
 
@@ -91,16 +91,6 @@ Clicked "Logout". The session was cleared, the nav bar reverted to the "Login wi
 ---
 
 ## Known Issues
-
-### `start.sh` uses outdated CSS v7 account API
-
-CSS v7 changed the account registration flow. The current `start.sh` sends `POST /.account/` and `POST /.account/pod/` but those endpoints no longer work as expected. The correct v7 flow is:
-
-1. `POST /.account/account/` — create account, get `authorization` token
-2. `POST /.account/account/{id}/login/password/` — register email/password using that token
-3. `POST /.account/account/{id}/pod/` — create pod using that token
-
-The `start.sh` script should be updated to use this three-step flow.
 
 ### "Session expired" toast on intentional logout
 
