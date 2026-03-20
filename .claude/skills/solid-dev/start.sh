@@ -18,14 +18,25 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# 4a. Create account
-curl -s -c /tmp/css-cookies.txt -X POST http://localhost:$PORT/.account/ \
+# 4a. Create account, capture token and account-specific URLs
+ACCOUNT_RESP=$(curl -s -X POST http://localhost:$PORT/.account/account/ \
+  -H 'Content-Type: application/json' -d '{}')
+TOKEN=$(echo "$ACCOUNT_RESP" | grep -o '"authorization":"[^"]*"' | cut -d'"' -f4)
+# Discover account-specific URLs via authenticated GET
+CONTROLS=$(curl -s -H "Authorization: CSS-Account-Token $TOKEN" http://localhost:$PORT/.account/)
+POD_URL=$(echo "$CONTROLS" | grep -o '"pod":"http://[^"]*"' | cut -d'"' -f4)
+PASSWORD_URL=$(echo "$CONTROLS" | grep -o '"create":"http://[^"]*password[^"]*"' | cut -d'"' -f4)
+
+# 4b. Register email/password login
+curl -s -X POST "$PASSWORD_URL" \
   -H 'Content-Type: application/json' \
+  -H "Authorization: CSS-Account-Token $TOKEN" \
   -d '{"email":"test@example.com","password":"test1234"}' > /dev/null
 
-# 4b. Create pod
-curl -s -b /tmp/css-cookies.txt -X POST http://localhost:$PORT/.account/pod/ \
+# 4c. Create pod
+curl -s -X POST "$POD_URL" \
   -H 'Content-Type: application/json' \
+  -H "Authorization: CSS-Account-Token $TOKEN" \
   -d '{"name":"test"}' > /dev/null
 
 echo ""
