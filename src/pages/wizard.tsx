@@ -18,6 +18,8 @@ export const Wizard = () => {
     const navigate = useNavigate()
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
     const [showPodPrompt, setShowPodPrompt] = useState(false)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [pendingNavRoute, setPendingNavRoute] = useState<string | null>(null)
     const [hasExistingData, setHasExistingData] = useState(false)
     const { isLoggedIn } = useSolidPod()
     const { db } = useDatabase()
@@ -53,15 +55,31 @@ export const Wizard = () => {
         checkExistingData()
     }, [db])
 
-    // Show Solid Pod prompt after successful generation if not logged in
+    // Open success modal when generation completes
     useEffect(() => {
-        if (isSuccess && !isLoggedIn) {
-            const hasPromptBeenDismissed = localStorage.getItem(WIZARD_POD_PROMPT_KEY) === 'true'
-            if (!hasPromptBeenDismissed) {
+        if (isSuccess) setShowSuccessModal(true)
+    }, [isSuccess])
+
+    const handleSuccessAction = (route: string) => {
+        setShowSuccessModal(false)
+        if (!isLoggedIn) {
+            const dismissed = localStorage.getItem(WIZARD_POD_PROMPT_KEY) === 'true'
+            if (!dismissed) {
+                setPendingNavRoute(route)
                 setShowPodPrompt(true)
+                return
             }
         }
-    }, [isSuccess, isLoggedIn])
+        navigate(route)
+    }
+
+    const handlePodPromptClose = () => {
+        setShowPodPrompt(false)
+        if (pendingNavRoute) {
+            navigate(pendingNavRoute)
+            setPendingNavRoute(null)
+        }
+    }
 
     const onSubmit = async (data: WizardFormData) => {
         if (hasExistingData) {
@@ -260,7 +278,7 @@ Are you sure you want to continue?"
 
             {/* Success Modal */}
             <Modal
-                isOpen={isSuccess}
+                isOpen={showSuccessModal}
                 onClose={() => {}}
                 title="🎉 Questions Generated Successfully!"
             >
@@ -271,14 +289,14 @@ Are you sure you want to continue?"
 
                     <div className="space-y-4">
                         <button
-                            onClick={() => navigate('/create-packing-list')}
+                            onClick={() => handleSuccessAction('/create-packing-list')}
                             className="w-full bg-gradient-primary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
                         >
                             🚀 Create My First Packing List
                         </button>
 
                         <button
-                            onClick={() => navigate('/manage-questions')}
+                            onClick={() => handleSuccessAction('/manage-questions')}
                             className="w-full bg-gradient-secondary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-secondary"
                         >
                             ✏️ Refine My Packing List Questions
@@ -294,7 +312,7 @@ Are you sure you want to continue?"
             {/* Solid Pod Onboarding Prompt */}
             <SolidPodPrompt
                 isOpen={showPodPrompt}
-                onClose={() => setShowPodPrompt(false)}
+                onClose={handlePodPromptClose}
                 title="🎉 Great! Your Questions Are Ready"
                 message="Want to keep your personalized packing questions safe and accessible from any device? Set up a Solid Pod to store your data securely in personal storage that you control."
                 dismissalKey={WIZARD_POD_PROMPT_KEY}
