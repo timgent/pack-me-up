@@ -87,4 +87,54 @@ describe('Wizard', () => {
         await waitFor(() => screen.getByRole('button', { name: /generate/i }))
         expect(screen.queryByText(/you already have packing list questions set up/i)).toBeNull()
     })
+
+    it('shows success modal but not pod prompt immediately after generation succeeds', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseWizardGeneration.mockReturnValue({
+            isLoading: false,
+            isSuccess: true,
+            generateAndSave: vi.fn(),
+        })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        )
+        expect(screen.queryByText(/great! your questions are ready/i)).toBeNull()
+    })
+
+    it('shows pod prompt only after a success modal CTA is clicked', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseWizardGeneration.mockReturnValue({
+            isLoading: false,
+            isSuccess: true,
+            generateAndSave: vi.fn(),
+        })
+        localStorage.removeItem('wizard-pod-prompt-dismissed')
+
+        const { getByRole } = render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        )
+        expect(screen.queryByText(/great! your questions are ready/i)).toBeNull()
+
+        const createListBtn = getByRole('button', { name: /create my first packing list/i })
+        createListBtn.click()
+
+        await waitFor(() =>
+            expect(screen.getByText(/great! your questions are ready/i)).toBeTruthy()
+        )
+    })
 })
