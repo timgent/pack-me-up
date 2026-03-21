@@ -69,6 +69,78 @@ function renderComponent() {
     )
 }
 
+describe('ViewPackingList item deletion confirmation', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({
+            saveToPod: vi.fn(),
+        })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('does not immediately delete item when X is clicked', async () => {
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Delete item'))
+
+        expect(screen.getByText('Passport')).toBeTruthy()
+    })
+
+    it('shows confirmation dialog when X is clicked', async () => {
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Delete item'))
+
+        expect(screen.getByText('Are you sure you want to remove this item?')).toBeTruthy()
+    })
+
+    it('does not delete item when Cancel is clicked in confirmation dialog', async () => {
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Delete item'))
+        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+        expect(screen.getByText('Passport')).toBeTruthy()
+        expect(screen.queryByText('Are you sure you want to remove this item?')).toBeNull()
+    })
+
+    it('deletes item when Remove is clicked in confirmation dialog', async () => {
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Delete item'))
+        fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
+
+        await waitFor(() => {
+            expect(screen.queryByText('Passport')).toBeNull()
+        })
+    })
+})
+
 describe('ViewPackingList hidden items banner', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
