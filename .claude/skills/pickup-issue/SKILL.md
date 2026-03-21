@@ -36,7 +36,7 @@ List all open issues and find the first one without a `taken` label:
 
 ```bash
 gh issue list \
-  --repo timgent/spaced-repetition-exploration \
+  --repo timgent/react-packing-app \
   --state open \
   --json number,title,labels \
   --limit 100
@@ -56,7 +56,7 @@ Ensure the `taken` label exists (this is a no-op if it already does):
 
 ```bash
 gh label create taken \
-  --repo timgent/spaced-repetition-exploration \
+  --repo timgent/react-packing-app \
   --color "B60205" \
   --description "Issue is being worked on" \
   --force
@@ -66,7 +66,7 @@ Add the label to the issue:
 
 ```bash
 gh issue edit <number> \
-  --repo timgent/spaced-repetition-exploration \
+  --repo timgent/react-packing-app \
   --add-label taken
 ```
 
@@ -80,7 +80,7 @@ Fetch the issue body and all comments:
 
 ```bash
 gh issue view <number> \
-  --repo timgent/spaced-repetition-exploration \
+  --repo timgent/react-packing-app \
   --json title,body,comments
 ```
 
@@ -95,10 +95,10 @@ Read carefully:
 
 Use Glob, Grep, and Read to identify the code areas involved. At minimum:
 
-1. Search for keywords from the issue title/body across `src/` and `tests/`.
-2. Read the files most likely to need changes.
-3. Find the existing test file(s) that cover the affected area.
-4. Note the patterns and conventions in place (error handling style, model structure, CLI commands, etc.).
+1. Search for keywords from the issue title/body across `src/`.
+2. Read the files most likely to need changes (components, hooks, services, pages).
+3. Find the existing test file(s) that cover the affected area — look for `*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx` co-located with the source files.
+4. Note the patterns and conventions in place (component structure, hook patterns, PouchDB service usage, error handling style, etc.).
 
 ---
 
@@ -108,11 +108,11 @@ Call EnterPlanMode, then write a plan file with these sections:
 
 - **Issue summary** — one paragraph describing the problem or feature.
 - **Root cause / approach** — what needs to change and why.
-- **Files to modify** — list each file with the specific function or section to change.
+- **Files to modify** — list each file with the specific component, hook, or function to change.
 - **TDD steps**:
-  1. **Red** — write a failing test that captures the expected behaviour.
+  1. **Red** — write a failing test (`.test.tsx` / `.test.ts`) that captures the expected behaviour.
   2. **Green** — make the minimal change to pass the test.
   3. **Refactor** — clean up without breaking tests.
-- **Verification** — `pytest` command(s) to confirm everything passes.
+- **Verification** — `npm test` to confirm everything passes.
 
 Call ExitPlanMode to present the plan for user approval before writing any code.
