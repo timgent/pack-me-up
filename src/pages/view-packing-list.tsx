@@ -433,7 +433,7 @@ export function ViewPackingList() {
                                                             {...register(`items.${item.id}`)}
                                                             className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                         />
-                                                        <span className="text-gray-700">
+                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
                                                             {item.itemText}
                                                         </span>
                                                     </label>
