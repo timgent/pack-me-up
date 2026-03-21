@@ -9,6 +9,16 @@ import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 
+export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
+    const seen = new Set<string>()
+    return items.filter((item) => {
+        const key = `${item.personId}::${item.itemText.trim().toLowerCase()}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+    })
+}
+
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -107,7 +117,7 @@ export function CreatePackingList() {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
-            items: [...questionBasedItems, ...alwaysNeededItems]
+            items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {
             await db.savePackingList(packingList)
