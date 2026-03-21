@@ -4,6 +4,7 @@ import { useDebouncedCallback } from 'use-debounce'
 import { PackingList } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { Button } from '../components/Button'
+import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
@@ -24,6 +25,7 @@ export function ViewPackingList() {
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null)
     const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
@@ -325,6 +327,7 @@ export function ViewPackingList() {
         : 0
 
     return (
+        <>
         <div className="w-full flex flex-col items-center py-8 px-4">
             {/* Sticky top toolbar */}
             <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
@@ -436,7 +439,7 @@ export function ViewPackingList() {
                                                     </label>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleDeleteItem(item.id)}
+                                                        onClick={() => setItemToDelete(item.id)}
                                                         className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
                                                         title="Delete item"
                                                     >
@@ -480,5 +483,15 @@ export function ViewPackingList() {
                 </div>
             </div>
         </div>
+        <ConfirmationDialog
+            isOpen={itemToDelete !== null}
+            onClose={() => setItemToDelete(null)}
+            onConfirm={() => { handleDeleteItem(itemToDelete!); setItemToDelete(null) }}
+            title="Remove item"
+            message="Are you sure you want to remove this item?"
+            confirmText="Remove"
+            confirmVariant="danger"
+        />
+        </>
     )
 }
