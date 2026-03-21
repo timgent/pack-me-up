@@ -320,6 +320,10 @@ export function ViewPackingList() {
         return !watchedItems[item.id]
     })
 
+    const hiddenPackedCount = !showPacked
+        ? packingList.items.filter(item => watchedItems[item.id]).length
+        : 0
+
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             {/* Sticky top toolbar */}
@@ -362,7 +366,7 @@ export function ViewPackingList() {
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button
                                     type="button"
-                                    variant="secondary"
+                                    variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
                                     onClick={() => setShowPacked(!showPacked)}
                                 >
                                     {showPacked ? 'Hide Packed' : 'Show Packed'}
@@ -384,6 +388,17 @@ export function ViewPackingList() {
                     </div>
                 </div>
             </div>
+
+            {/* Hidden packed items banner */}
+            {hiddenPackedCount > 0 && (
+                <div className="w-full max-w-screen-2xl mb-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                        <p className="text-sm text-amber-800">
+                            {hiddenPackedCount} packed item{hiddenPackedCount !== 1 ? 's' : ''} hidden — tap <strong>Show Packed</strong> to see them.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Main content */}
             <div className="w-full">
