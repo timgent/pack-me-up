@@ -6,8 +6,8 @@ export type AgeRange = z.infer<typeof AgeRangeSchema>
 
 // Age range options for dropdowns with descriptions
 export const AGE_RANGE_OPTIONS = [
-  { value: 'Baby' as const, label: '👶 Baby (0-1) - nappies, wipes, change mat' },
-  { value: 'Toddler' as const, label: '🧒 Toddler (1-3) - potty, pull-ups, extra clothes' },
+  { value: 'Baby' as const, label: '👶 Baby (0-1) - nappies & wipes' },
+  { value: 'Toddler' as const, label: '🧒 Toddler (1-3) - potty & pull-ups' },
   { value: 'Child' as const, label: '👧 Child (3-12)' },
   { value: 'Teenager' as const, label: '👦 Teenager (12-17)' },
   { value: 'Adult' as const, label: '🧑 Adult (18+)' }
