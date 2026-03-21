@@ -5,6 +5,8 @@ description: |
   Run the app with a local Solid server, explore it as a realistic new user,
   write a narrative of the experience, then summarise bugs/UX issues. Checks
   open GitHub issues for duplicates and offers to file new ones.
+  Optional argument: a brief description of the persona to adopt (e.g. "a retired
+  school teacher planning a round-the-world trip"). If omitted, invent a suitable one.
 allowed-tools:
   - Bash
   - mcp__playwright__browser_navigate
@@ -22,18 +24,23 @@ allowed-tools:
 # ux-explorer: UX Exploration as a New User
 
 You are running the `/ux-explorer` workflow. You will start the app locally,
-then explore it as **Alex** — a realistic first-time user — writing a narrative
-journal of your experience. At the end you will compile a list of bugs and UX
-issues, cross-reference them against open GitHub issues, and offer to file new ones.
+explore it as a realistic first-time user, write a narrative journal of your
+experience, then compile a list of bugs and UX issues, cross-reference them
+against open GitHub issues, and offer to file new ones.
 
-**Persona — Alex:**
-- 32-year-old frequent traveller (business and leisure trips)
-- Reasonably tech-savvy but impatient with friction or unclear UI
-- Uses a phone more than a desktop; expects things to "just work"
-- Has never used this app before — treat every screen as unfamiliar
+## Step 0 — Establish the persona
+
+If the user supplied an argument (e.g. `/ux-explorer a retired teacher planning a gap year`),
+use that as the basis for your persona. Otherwise invent a persona that is plausible for
+the type of app you are about to explore.
+
+Give the persona a name and 3–4 bullet-point traits that will shape how they use the app
+(e.g. level of tech-savviness, patience, goals). Print the persona at the start so the
+user can see who you are playing.
+
+Stay in character throughout all narrative sections.
 
 **Hard rules:**
-- Stay in character as Alex throughout the narrative sections.
 - Never skip a screen — take a snapshot before every interaction.
 - Record every moment of confusion, surprise, or delight.
 - Never invent issues that didn't actually happen — only report what you observed.
@@ -42,23 +49,15 @@ issues, cross-reference them against open GitHub issues, and offer to file new o
 
 ## Step 1 — Start the local Solid server
 
-Run the existing solid-dev start script:
-
 ```bash
 bash .claude/skills/solid-dev/start.sh
 ```
 
-Note the output credentials:
-- **OIDC Issuer:** `http://localhost:4000`
-- **Email:** `test@example.com`
-- **Password:** `test1234`
-- **WebID:** `http://localhost:4000/test/profile/card#me`
-
-Save the CSS PID printed in the output for later cleanup.
+Note the credentials and save the CSS PID printed in the output for later cleanup.
 
 ---
 
-## Step 2 — Start the Vite dev server
+## Step 2 — Start the dev server
 
 ```bash
 npm run dev > /tmp/vite.log 2>&1 &
@@ -66,114 +65,57 @@ VITE_PID=$!
 echo "Vite PID: $VITE_PID"
 ```
 
-Wait until the dev server is ready:
+Poll until ready:
 
 ```bash
 for i in $(seq 1 30); do
-  curl -sf http://localhost:5173/ -o /dev/null && echo "Vite ready" && break
-  echo "Waiting for Vite... ($i/30)"
+  curl -sf http://localhost:5173/ -o /dev/null && echo "Dev server ready" && break
+  echo "Waiting... ($i/30)"
   sleep 1
 done
 ```
 
 ---
 
-## Step 3 — Explore the app as Alex
+## Step 3 — Explore the app
 
-Use Playwright to navigate the app. After **every meaningful interaction**, write a
-short paragraph (2–5 sentences) in Alex's first-person voice describing what you
-see, what you do, and how it feels. Build up a running narrative throughout this step.
+Navigate to `http://localhost:5173`. Use Playwright to discover and explore the app
+organically — follow what the UI presents rather than assuming a fixed structure.
 
-Work through these flows in order — adapt if the app presents a different structure:
+After **every meaningful interaction**, write a short paragraph (2–5 sentences) in
+the persona's first-person voice: what you see, what you do, and how it feels.
 
-### 3a. First impression
-- Navigate to `http://localhost:5173`
-- Take a screenshot and snapshot
-- Describe the landing page: is it immediately clear what the app does? Is there
-  a call to action? Does it feel polished?
+Aim to cover:
+- First impression of the landing / home screen
+- Authentication or sign-up (use the local Solid server at `http://localhost:4000`
+  with email `test@example.com` / password `test1234`)
+- Any onboarding or setup flow
+- The main feature(s) of the app — create, view, edit, delete content as the persona would
+- Navigation between sections
+- Any settings, profile, or secondary screens that are reachable
 
-### 3b. Login / sign up
-- Locate the login or sign-in button
-- Use the **Custom / Other provider** option and enter `http://localhost:4000` as
-  the OIDC issuer
-- Complete the Solid login flow using email `test@example.com` / password `test1234`
-- Note any friction: confusing labels, redirects, unclear error messages
-
-### 3c. Onboarding (if present)
-- If there is a setup wizard or onboarding flow, go through it fully
-- Answer questions as Alex would (e.g. travelling for work, typical trip length 3–5 days)
-- Note any questions that feel odd, redundant, or are hard to answer
-
-### 3d. Create a packing list
-- Find where to create a new packing list
-- Create a list for a 4-day work trip to Berlin
-- Note whether the creation flow is fast or tedious
-
-### 3e. Add and remove items
-- Add at least 5 items to the list
-- Remove one item
-- Note whether adding/removing is intuitive and whether the UI updates smoothly
-
-### 3f. Navigate around
-- Explore all reachable sections of the app (navbar, sidebar, settings, etc.)
-- Take a screenshot of each distinct screen
-- Note any navigation that is confusing or missing
-
-### 3g. Settings / profile (if present)
-- Find and visit any settings or profile page
-- Note what options exist and whether they're useful
+Adapt freely as the app evolves — explore whatever is actually there.
 
 ---
 
 ## Step 4 — Write out the narrative
 
-Print the full narrative journal you built up in Step 3, formatted as:
-
-```
-## Alex's Journey
-
-### First Impression
-<paragraph>
-
-### Logging In
-<paragraph>
-
-### Onboarding
-<paragraph>
-
-### Creating a Packing List
-<paragraph>
-
-### Adding Items
-<paragraph>
-
-### Exploring the App
-<paragraph>
-
-### Settings & Profile
-<paragraph>
-```
+Print the full narrative journal built up in Step 3. Use section headings that match
+what actually happened (don't force headings for screens that didn't exist).
 
 ---
 
 ## Step 5 — Compile bugs and UX issues
 
-Review your observations and produce a structured list. For each issue:
+Review your observations and produce a structured list:
 
 | # | Type | Title | Description | Severity |
 |---|------|-------|-------------|----------|
 | 1 | Bug / UX Issue / Missing Feature | Short title | What happened vs what was expected | Low / Medium / High |
 
-Types:
-- **Bug** — something broken or behaving incorrectly
-- **UX Issue** — something that works but is confusing, slow, or frustrating
-- **Missing Feature** — something Alex expected to exist but didn't
-
 ---
 
 ## Step 6 — Cross-reference open GitHub issues
-
-Fetch all open issues:
 
 ```bash
 gh issue list \
@@ -183,10 +125,9 @@ gh issue list \
   --limit 100
 ```
 
-For each issue in your list from Step 5, search the fetched issues for keyword
-overlap (title + body). Annotate each issue:
-- **Covered by #NNN** — if an open issue clearly describes the same problem
-- **Not yet filed** — if no matching open issue exists
+For each issue in Step 5, check for keyword overlap with open issues. Annotate each:
+- **Covered by #NNN** — a matching open issue exists
+- **Not yet filed** — no matching open issue found
 
 Print the annotated table.
 
@@ -194,32 +135,24 @@ Print the annotated table.
 
 ## Step 7 — Offer to file new issues
 
-Count the issues marked "Not yet filed". Then ask the user:
+Ask the user:
 
-```
-mcp__conductor__AskUserQuestion: "I found N issues not yet filed on GitHub. Would you like me to create GitHub issues for them?"
-```
+> "I found N issues not yet filed on GitHub. Would you like me to create GitHub issues for them?"
 
-If the user says yes, for each unfiled issue create a GitHub issue:
+If yes, create each one:
 
 ```bash
 gh issue create \
   --repo timgent/react-packing-app \
   --title "<short title>" \
-  --body "$(cat <<'EOF'
-## Description
+  --body "## Description
 <what happened vs what was expected>
-
-## Steps to reproduce
-<if applicable>
 
 ## Severity
 <Low / Medium / High>
 
 ## Discovered during
-UX exploration session via /ux-explorer skill
-EOF
-)"
+UX exploration session (/ux-explorer)"
 ```
 
 Print the URL of each created issue.
@@ -230,11 +163,6 @@ Print the URL of each created issue.
 
 ```bash
 kill $VITE_PID 2>/dev/null || true
-```
-
-For the Solid CSS server, use the PID printed in Step 1:
-
-```bash
 kill <CSS_PID> 2>/dev/null || true
 ```
 
