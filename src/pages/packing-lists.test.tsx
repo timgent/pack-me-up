@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { PackingLists } from './packing-lists'
+import type { PackingAppDatabase } from '../services/database'
 
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
@@ -71,12 +72,12 @@ describe('PackingLists delete confirmation', () => {
             isLoading: false,
             login: vi.fn(),
             logout: vi.fn(),
-        } as any)
+        })
     })
 
     it('does not delete immediately when Delete is clicked', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as any)
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         renderComponent()
 
@@ -89,7 +90,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('shows a confirmation dialog with the list name when Delete is clicked', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as any)
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         renderComponent()
 
@@ -105,7 +106,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('cancels deletion when Cancel is clicked in the dialog', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as any)
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         renderComponent()
 
@@ -125,7 +126,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('deletes the list when confirmed in the dialog', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as any)
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         renderComponent()
 
