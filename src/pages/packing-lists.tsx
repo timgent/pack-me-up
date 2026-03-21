@@ -5,34 +5,19 @@ import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
-import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
-
-const PACKING_LISTS_BANNER_KEY = 'packing-lists-pod-banner-dismissed'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
-    const [showBanner, setShowBanner] = useState(false)
-    const [showPodPrompt, setShowPodPrompt] = useState(false)
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
-
-    const handleBannerDismiss = () => {
-        localStorage.setItem(PACKING_LISTS_BANNER_KEY, 'true')
-        setShowBanner(false)
-    }
-
-    const handleBannerSetup = () => {
-        setShowBanner(false)
-        setShowPodPrompt(true)
-    }
 
     const deletePackingList = async (id: string, event: React.MouseEvent) => {
         event.stopPropagation() // Prevent navigation when clicking delete
@@ -126,15 +111,6 @@ export function PackingLists() {
             try {
                 const lists = await db.getAllPackingLists()
                 setPackingLists(lists)
-
-                // Show banner if:
-                // 1. User is not logged in
-                // 2. User has packing lists
-                // 3. Banner hasn't been dismissed
-                const hasBannerBeenDismissed = localStorage.getItem(PACKING_LISTS_BANNER_KEY) === 'true'
-                if (!isLoggedIn && lists.length > 0 && !hasBannerBeenDismissed) {
-                    setShowBanner(true)
-                }
             } catch (err) {
                 console.error('Error fetching packing lists:', err)
             } finally {
@@ -183,52 +159,6 @@ export function PackingLists() {
                     )}
                 </div>
             </div>
-
-            {/* Solid Pod Banner for non-logged-in users */}
-            {showBanner && (
-                <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl shadow-soft p-5 animate-fade-in">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                            <h3 className="text-lg font-bold text-amber-900 mb-2 flex items-center gap-2">
-                                <span className="text-2xl">⚠️</span>
-                                Protect Your Packing Lists
-                            </h3>
-                            <p className="text-amber-800 mb-3 leading-relaxed">
-                                You have <strong>{packingLists.length} packing list{packingLists.length !== 1 ? 's' : ''}</strong> stored locally.
-                                They could be lost if you clear your browser data or switch devices.
-                                Secure them with a Solid Pod for multi-device access and peace of mind!
-                            </p>
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    onClick={handleBannerSetup}
-                                    variant="primary"
-                                    className="text-sm"
-                                >
-                                    🔒 Secure My Data Now
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={handleBannerDismiss}
-                                    variant="ghost"
-                                    className="text-sm"
-                                >
-                                    Dismiss
-                                </Button>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleBannerDismiss}
-                            className="text-amber-600 hover:text-amber-800 transition-colors"
-                            aria-label="Close banner"
-                        >
-                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {packingLists.length === 0 ? (
                 <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
@@ -289,14 +219,6 @@ export function PackingLists() {
                 </div>
             )}
 
-            {/* Solid Pod Setup Prompt */}
-            <SolidPodPrompt
-                isOpen={showPodPrompt}
-                onClose={() => setShowPodPrompt(false)}
-                title="🔒 Secure Your Packing Lists"
-                message="Protect your valuable packing lists from being lost! Set up a Solid Pod to store your data securely in personal storage that you control, accessible from any device."
-                dismissalKey={PACKING_LISTS_BANNER_KEY}
-            />
         </div>
     )
 } 
