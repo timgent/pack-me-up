@@ -215,6 +215,41 @@ describe('ViewPackingList hidden items banner', () => {
     })
 })
 
+describe('ViewPackingList Solid Pod inline box', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({
+            saveToPod: vi.fn(),
+        })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('does not show Login with Solid Pod inline box', async () => {
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        expect(screen.queryByText(/Login with Solid Pod to save your packing list/i)).toBeNull()
+    })
+})
+
 describe('ViewPackingList checked item styling', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({

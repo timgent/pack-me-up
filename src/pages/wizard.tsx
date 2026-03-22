@@ -12,7 +12,7 @@ import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
 
-const WIZARD_POD_PROMPT_KEY = 'wizard-pod-prompt-dismissed'
+const SOLID_POD_UPSELL_SHOWN_KEY = 'solid-pod-upsell-shown'
 
 export const Wizard = () => {
     const navigate = useNavigate()
@@ -63,7 +63,7 @@ export const Wizard = () => {
     const handleSuccessAction = (route: string) => {
         setShowSuccessModal(false)
         if (!isLoggedIn) {
-            const dismissed = localStorage.getItem(WIZARD_POD_PROMPT_KEY) === 'true'
+            const dismissed = localStorage.getItem(SOLID_POD_UPSELL_SHOWN_KEY) === 'true'
             if (!dismissed) {
                 setPendingNavRoute(route)
                 setShowPodPrompt(true)
@@ -315,7 +315,7 @@ Are you sure you want to continue?"
                 onClose={handlePodPromptClose}
                 title="🎉 Great! Your Questions Are Ready"
                 message="Want to keep your personalized packing questions safe and accessible from any device? Set up a Solid Pod to store your data securely in personal storage that you control."
-                dismissalKey={WIZARD_POD_PROMPT_KEY}
+                dismissalKey={SOLID_POD_UPSELL_SHOWN_KEY}
             />
         </div>
     )

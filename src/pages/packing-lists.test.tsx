@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -41,6 +41,13 @@ import { useSolidPod } from '../components/SolidPodContext'
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 
+const testPackingList = {
+    id: 'list-1',
+    name: 'Beach Trip',
+    createdAt: '2026-01-01T00:00:00Z',
+    items: [{ id: 'i1', itemText: 'Sunscreen', personName: 'Me', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false }],
+}
+
 const testList = {
     id: 'list-1',
     name: 'Summer Holiday',
@@ -62,6 +69,42 @@ function renderComponent() {
         </MemoryRouter>
     )
 }
+
+describe('PackingLists', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue([testPackingList]),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+            } as unknown as PackingAppDatabase,
+        })
+        localStorage.clear()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('does not show Protect Your Packing Lists banner for non-logged-in users with lists', async () => {
+        render(
+            <MemoryRouter>
+                <PackingLists />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.getByText(/Beach Trip/)).toBeTruthy())
+        expect(screen.queryByText(/Protect Your Packing Lists/i)).toBeNull()
+    })
+})
 
 describe('PackingLists delete confirmation', () => {
     beforeEach(() => {

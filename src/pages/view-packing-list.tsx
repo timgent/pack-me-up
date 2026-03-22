@@ -383,11 +383,6 @@ export function ViewPackingList() {
                                 </Button>
                             </div>
                         </div>
-                        {!isLoggedIn && (
-                            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2">
-                                <p className="text-xs text-gray-700">💡 Login with Solid Pod to save your packing list privately in storage you control.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
