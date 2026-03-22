@@ -141,6 +141,119 @@ describe('ViewPackingList item deletion confirmation', () => {
     })
 })
 
+const multiCategoryPackingList = {
+    id: 'test-list-2',
+    name: 'Multi Category Trip',
+    createdAt: '2026-01-01T00:00:00Z',
+    items: [
+        { id: 'item-a1', itemText: 'Toothbrush', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials' },
+        { id: 'item-a2', itemText: 'Tent', personName: 'Alice', personId: 'p1', questionId: 'q2', optionId: 'o2', packed: false, category: 'Hiking' },
+        { id: 'item-a3', itemText: 'Legacy item', personName: 'Alice', personId: 'p1', questionId: 'q3', optionId: 'o3', packed: false },
+        { id: 'item-b1', itemText: 'Nappies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials' },
+    ],
+}
+
+function makeDbMultiCategory() {
+    return {
+        getPackingList: vi.fn().mockResolvedValue(multiCategoryPackingList),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+    }
+}
+
+function renderComponentMultiCategory() {
+    return render(
+        <MemoryRouter initialEntries={['/view-list/test-list-2']}>
+            <Routes>
+                <Route path="/view-list/:id" element={<ViewPackingList />} />
+            </Routes>
+        </MemoryRouter>
+    )
+}
+
+describe('ViewPackingList category grouping', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...multiCategoryPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDbMultiCategory() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('renders category headings within a person card', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        expect(screen.getAllByRole('button', { name: /Collapse Essentials/i }).length).toBeGreaterThan(0)
+        expect(screen.getByRole('button', { name: /Collapse Hiking/i })).toBeTruthy()
+    })
+
+    it('shows items without category under "Other"', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Legacy item')).toBeTruthy())
+        expect(screen.getByRole('button', { name: /Collapse Other/i })).toBeTruthy()
+    })
+
+    it('items are visible by default', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+    })
+
+    it('collapses a category when its toggle is clicked', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /Collapse Hiking/i }))
+        expect(screen.queryByText('Tent')).toBeNull()
+    })
+
+    it('re-expands a category when its toggle is clicked again', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /Collapse Hiking/i }))
+        fireEvent.click(screen.getByRole('button', { name: /Expand Hiking/i }))
+        expect(screen.getByText('Tent')).toBeTruthy()
+    })
+
+    it('shows a "Check all" button per category section', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        // 3 expanded categories (Essentials for Alice, Hiking, Other) plus Essentials for Bob = 4
+        const checkAllButtons = screen.getAllByRole('button', { name: /check all/i })
+        expect(checkAllButtons.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('checking all items in a category makes the hidden-items banner appear', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        // Click "Check all" for the first Hiking-section "Check all" button
+        const checkAllButtons = screen.getAllByRole('button', { name: /check all/i })
+        fireEvent.click(checkAllButtons[0])
+        await waitFor(() => {
+            expect(screen.getByText(/item.* hidden/i)).toBeTruthy()
+        })
+    })
+
+    it('renders Essentials category independently for each person', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        const essentialsToggles = screen.getAllByRole('button', { name: /Collapse Essentials/i })
+        expect(essentialsToggles.length).toBe(2)
+    })
+})
+
 describe('ViewPackingList hidden items banner', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({

@@ -15,6 +15,7 @@ export interface PackingListItem {
     questionId: string
     optionId: string
     packed: boolean
+    category?: string
 }
 
 export interface PackingListFormData {
