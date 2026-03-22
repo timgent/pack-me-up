@@ -5,6 +5,7 @@ import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
+import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 
@@ -13,19 +14,27 @@ export function PackingLists() {
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
+    const [listToDelete, setListToDelete] = useState<{ id: string; name: string } | null>(null)
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
-    const deletePackingList = async (id: string, event: React.MouseEvent) => {
-        event.stopPropagation() // Prevent navigation when clicking delete
+    const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
+        event.stopPropagation()
+        setListToDelete({ id, name })
+    }
+
+    const confirmDeletePackingList = async () => {
+        if (!listToDelete) return
         try {
-            await db.deletePackingList(id)
-            setPackingLists(packingLists.filter(list => list.id !== id))
+            await db.deletePackingList(listToDelete.id)
+            setPackingLists(packingLists.filter(list => list.id !== listToDelete.id))
         } catch (err) {
             console.error('Error deleting packing list:', err)
+        } finally {
+            setListToDelete(null)
         }
     }
 
@@ -195,7 +204,7 @@ export function PackingLists() {
                                             📅 {new Date(list.createdAt).toLocaleDateString()}
                                         </span>
                                         <button
-                                            onClick={(e) => deletePackingList(list.id, e)}
+                                            onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
                                             className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
                                         >
                                             🗑️ Delete
@@ -219,6 +228,16 @@ export function PackingLists() {
                 </div>
             )}
 
+            <ConfirmationDialog
+                isOpen={listToDelete !== null}
+                onClose={() => setListToDelete(null)}
+                onConfirm={confirmDeletePackingList}
+                title="Delete List"
+                message={`Are you sure you want to delete "${listToDelete?.name}"? This cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                confirmVariant="danger"
+            />
         </div>
     )
-} 
+}
