@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
-import { PackingList } from '../create-packing-list/types'
+import { PackingList, PackingListItem } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
@@ -16,6 +16,27 @@ type FormData = {
     items: Record<string, boolean>
 }
 
+function groupByCategory(items: PackingListItem[]) {
+    const map = new Map<string, PackingListItem[]>()
+    for (const item of items) {
+        const cat = item.category ?? 'Other'
+        if (!map.has(cat)) map.set(cat, [])
+        map.get(cat)!.push(item)
+    }
+    return [...map.entries()]
+        .sort(([a], [b]) => {
+            if (a === 'Essentials') return -1
+            if (b === 'Essentials') return 1
+            if (a === 'Other') return 1
+            if (b === 'Other') return -1
+            return a.localeCompare(b)
+        })
+        .map(([category, catItems]) => ({
+            category,
+            items: catItems.sort((a, b) => a.itemText.localeCompare(b.itemText)),
+        }))
+}
+
 
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
@@ -26,6 +47,17 @@ export function ViewPackingList() {
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+
+    const toggleCategory = (key: string) =>
+        setCollapsedCategories(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) { next.delete(key) } else { next.add(key) }
+            return next
+        })
+
+    const handleCheckAll = (items: PackingListItem[]) =>
+        items.forEach(item => setValue(`items.${item.id}`, true))
     const { isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
@@ -432,38 +464,70 @@ export function ViewPackingList() {
                                     {personName}'s Items
                                     <span className="ml-2 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
                                 </h2>
-                                <div className="space-y-2">
-                                    {items
-                                        .sort((a, b) => a.itemText.localeCompare(b.itemText))
-                                        .map((item) => (
-                                            <div
-                                                key={`${item.id}-${personName}`}
-                                                className="bg-gray-50 rounded-lg p-3"
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1">
-                                                        <input
-                                                            type="checkbox"
-                                                            {...register(`items.${item.id}`)}
-                                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                        />
-                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                                                            {item.itemText}
-                                                        </span>
-                                                    </label>
+                                <div>
+                                    {groupByCategory(items).map(({ category, items: catItems }) => {
+                                        const sectionKey = `${personName}::${category}`
+                                        const isCollapsed = collapsedCategories.has(sectionKey)
+                                        return (
+                                            <div key={sectionKey} className="mb-3">
+                                                <div className="flex items-center justify-between py-1 mb-1">
                                                     <button
                                                         type="button"
-                                                        onClick={() => setItemToDelete(item.id)}
-                                                        className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
-                                                        title="Delete item"
+                                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${category}`}
+                                                        onClick={() => toggleCategory(sectionKey)}
+                                                        className="flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-gray-900"
                                                     >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                        </svg>
+                                                        <span>{isCollapsed ? '▶' : '▼'}</span>
+                                                        <span>{category}</span>
+                                                        <span className="text-xs font-normal text-gray-400 ml-1">({catItems.length})</span>
                                                     </button>
+                                                    {!isCollapsed && (
+                                                        <button
+                                                            type="button"
+                                                            aria-label="Check all"
+                                                            onClick={() => handleCheckAll(catItems)}
+                                                            className="text-xs text-blue-600 hover:text-blue-800"
+                                                        >
+                                                            Check all
+                                                        </button>
+                                                    )}
                                                 </div>
+                                                {!isCollapsed && (
+                                                    <div className="space-y-2">
+                                                        {catItems.map((item) => (
+                                                            <div
+                                                                key={`${item.id}-${personName}`}
+                                                                className="bg-gray-50 rounded-lg p-3"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            {...register(`items.${item.id}`)}
+                                                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                                        />
+                                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                                                                            {item.itemText}
+                                                                        </span>
+                                                                    </label>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setItemToDelete(item.id)}
+                                                                        className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
+                                                                        title="Delete item"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                        ))}
+                                        )
+                                    })}
 
                                     {/* Add new item input */}
                                     <div className="mt-4 pt-4 border-t border-gray-200">
