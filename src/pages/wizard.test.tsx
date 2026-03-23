@@ -117,7 +117,7 @@ describe('Wizard', () => {
             isSuccess: true,
             generateAndSave: vi.fn(),
         })
-        localStorage.removeItem('wizard-pod-prompt-dismissed')
+        localStorage.removeItem('solid-pod-upsell-shown')
 
         const { getByRole } = render(
             <MemoryRouter>
@@ -136,5 +136,63 @@ describe('Wizard', () => {
         await waitFor(() =>
             expect(screen.getByText(/great! your questions are ready/i)).toBeTruthy()
         )
+    })
+
+    it('sets solid-pod-upsell-shown global key when pod prompt is dismissed', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseWizardGeneration.mockReturnValue({
+            isLoading: false,
+            isSuccess: true,
+            generateAndSave: vi.fn(),
+        })
+        localStorage.removeItem('solid-pod-upsell-shown')
+
+        const { getByRole } = render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        )
+
+        getByRole('button', { name: /create my first packing list/i }).click()
+
+        await waitFor(() =>
+            expect(screen.getByText(/great! your questions are ready/i)).toBeTruthy()
+        )
+
+        getByRole('button', { name: /maybe later/i }).click()
+
+        expect(localStorage.getItem('solid-pod-upsell-shown')).toBe('true')
+    })
+
+    it('does not show pod prompt when solid-pod-upsell-shown is already set', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseWizardGeneration.mockReturnValue({
+            isLoading: false,
+            isSuccess: true,
+            generateAndSave: vi.fn(),
+        })
+        localStorage.setItem('solid-pod-upsell-shown', 'true')
+
+        const { getByRole } = render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        )
+
+        getByRole('button', { name: /create my first packing list/i }).click()
+
+        // Give React a chance to update - pod prompt should NOT appear
+        await new Promise(r => setTimeout(r, 50))
+        expect(screen.queryByText(/great! your questions are ready/i)).toBeNull()
     })
 })

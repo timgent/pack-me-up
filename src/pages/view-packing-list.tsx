@@ -415,11 +415,6 @@ export function ViewPackingList() {
                                 </Button>
                             </div>
                         </div>
-                        {!isLoggedIn && (
-                            <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2">
-                                <p className="text-xs text-gray-700">💡 Login with Solid Pod to save your packing list privately in storage you control.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
@@ -492,7 +487,7 @@ export function ViewPackingList() {
                                                                             {...register(`items.${item.id}`)}
                                                                             className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                                         />
-                                                                        <span className="text-gray-700">
+                                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
                                                                             {item.itemText}
                                                                         </span>
                                                                     </label>

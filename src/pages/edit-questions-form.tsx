@@ -613,7 +613,7 @@ export function EditQuestionsForm() {
               </div>
             </div>
 
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <>
                 {/* Pod Sync Status */}
                 <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
@@ -642,12 +642,6 @@ export function EditQuestionsForm() {
                   )}
                 </div>
               </>
-            ) : (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-xs text-gray-700 font-semibold mb-1">💡 Store in Your Pod</p>
-                <p className="text-xs text-gray-600 mb-2">Login with Solid Pod to save your questions privately in storage you control.</p>
-                <p className="text-xs text-blue-600">→ Click "Login with Solid Pod" above</p>
-              </div>
             )}
             <Button
               type="button"
@@ -732,12 +726,6 @@ export function EditQuestionsForm() {
                     </p>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {!isLoggedIn && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-2 mx-2">
-                <p className="text-xs text-gray-700 font-semibold">💡 Login with Solid Pod to save privately</p>
               </div>
             )}
 
