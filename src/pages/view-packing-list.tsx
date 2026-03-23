@@ -358,6 +358,17 @@ export function ViewPackingList() {
         ? packingList.items.filter(item => watchedItems[item.id]).length
         : 0
 
+    const totalCount = packingList.items.length
+    const packedCount = packingList.items.filter(item => watchedItems[item.id]).length
+    const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
+
+    const personStats = packingList.items.reduce((acc, item) => {
+        if (!acc[item.personName]) acc[item.personName] = { packed: 0, total: 0 }
+        acc[item.personName].total++
+        if (watchedItems[item.id]) acc[item.personName].packed++
+        return acc
+    }, {} as Record<string, { packed: number; total: number }>)
+
     return (
         <>
         <div className="w-full flex flex-col items-center py-8 px-4">
@@ -376,6 +387,9 @@ export function ViewPackingList() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
+                                <span className="text-sm text-gray-600 font-medium">
+                                    {packedCount} / {totalCount} packed ({percentComplete}%)
+                                </span>
                                 {/* Always reserve space for auto-save status to prevent layout jump */}
                                 <div className={`flex items-center space-x-2 min-w-[120px] transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
                                     {autoSaveStatus === 'saving' && (
@@ -442,9 +456,14 @@ export function ViewPackingList() {
                                 acc[item.personName].push(item);
                                 return acc;
                             }, {} as Record<string, typeof filteredItems>)
-                        ).sort(([nameA], [nameB]) => nameA.localeCompare(nameB)).map(([personName, items]) => (
+                        ).sort(([nameA], [nameB]) => nameA.localeCompare(nameB)).map(([personName, items]) => {
+                            const stats = personStats[personName] ?? { packed: 0, total: 0 }
+                            return (
                             <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                                <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">{personName}'s Items</h2>
+                                <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
+                                    {personName}'s Items
+                                    <span className="ml-2 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
+                                </h2>
                                 <div>
                                     {groupByCategory(items).map(({ category, items: catItems }) => {
                                         const sectionKey = `${personName}::${category}`
@@ -537,7 +556,7 @@ export function ViewPackingList() {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                 </div>
             </div>

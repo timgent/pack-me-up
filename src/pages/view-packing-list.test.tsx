@@ -363,6 +363,76 @@ describe('ViewPackingList Solid Pod inline box', () => {
     })
 })
 
+const testPackingListWithProgress = {
+    id: 'test-list-progress',
+    name: 'Progress Trip',
+    createdAt: '2026-01-01T00:00:00Z',
+    items: [
+        { id: 'item-1', itemText: 'Passport', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: true },
+        { id: 'item-2', itemText: 'Sunscreen', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o2', packed: false },
+        { id: 'item-3', itemText: 'Hat', personName: 'Bob', personId: 'p2', questionId: 'q2', optionId: 'o1', packed: true },
+        { id: 'item-4', itemText: 'Shoes', personName: 'Bob', personId: 'p2', questionId: 'q2', optionId: 'o2', packed: false },
+    ],
+}
+// Alice: 1/2 packed; Bob: 1/2 packed; Overall: 2/4 packed (50%)
+
+function makeDbWithProgress() {
+    return {
+        getPackingList: vi.fn().mockResolvedValue(testPackingListWithProgress),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+    }
+}
+
+describe('progress indicators', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingListWithProgress, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDbWithProgress() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderProgressComponent() {
+        return render(
+            <MemoryRouter initialEntries={['/view-list/test-list-progress']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+    }
+
+    it('shows overall packed count and percentage in toolbar', async () => {
+        renderProgressComponent()
+        await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
+
+        expect(screen.getByText(/2 \/ 4 packed \(50%\)/)).toBeTruthy()
+    })
+
+    it('shows per-person packed count in each column header', async () => {
+        renderProgressComponent()
+        await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
+
+        const badges = screen.getAllByText(/1 \/ 2/)
+        expect(badges.length).toBe(2)
+    })
+})
+
 describe('ViewPackingList checked item styling', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
