@@ -86,7 +86,8 @@ export function CreatePackingList() {
                             personName,
                             questionId: question.id,
                             optionId: selectedOption.id,
-                            packed: false
+                            packed: false,
+                            category: question.questionType === 'multiple-choice' ? selectedOption.text : question.text,
                         }
                     })
                 })
@@ -108,7 +109,8 @@ export function CreatePackingList() {
                     personName,
                     questionId: 'always-needed',
                     optionId: 'always-needed',
-                    packed: false
+                    packed: false,
+                    category: 'Essentials',
                 }
             })
         })
