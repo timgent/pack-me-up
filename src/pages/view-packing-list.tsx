@@ -48,6 +48,8 @@ export function ViewPackingList() {
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+    const [editingItemId, setEditingItemId] = useState<string | null>(null)
+    const [editingItemText, setEditingItemText] = useState<string>('')
 
     const toggleCategory = (key: string) =>
         setCollapsedCategories(prev => {
@@ -278,6 +280,33 @@ export function ViewPackingList() {
         }
     }
 
+    const handleRenameItem = async (itemId: string, newText: string) => {
+        if (!packingList) return
+        const trimmed = newText.trim()
+        if (!trimmed) return
+        try {
+            setAutoSaveStatus('saving')
+            const updatedItems = packingList.items.map(item =>
+                item.id === itemId ? { ...item, itemText: trimmed } : item
+            )
+            const updatedPackingList: PackingList = { ...packingList, items: updatedItems }
+            if (isLoggedIn) {
+                const saved = await saveWithSyncPrevention(updatedPackingList, saveToPod)
+                if (saved) setPackingList(saved)
+            } else {
+                const data = { ...updatedPackingList, lastModified: new Date().toISOString() }
+                const dbResult = await db.savePackingList(data)
+                setPackingList({ ...data, _rev: dbResult.rev })
+            }
+            setEditingItemId(null)
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
+        } catch (err) {
+            console.error('Error renaming item:', err)
+            setAutoSaveStatus('error')
+        }
+    }
+
     const handleAddItem = async (personName: string) => {
         if (!packingList) return
 
@@ -500,26 +529,78 @@ export function ViewPackingList() {
                                                                 className="bg-gray-50 rounded-lg p-3"
                                                             >
                                                                 <div className="flex items-center justify-between">
-                                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            {...register(`items.${item.id}`)}
-                                                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                                        />
-                                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                                                                            {item.itemText}
-                                                                        </span>
-                                                                    </label>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setItemToDelete(item.id)}
-                                                                        className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
-                                                                        title="Delete item"
-                                                                    >
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                                        </svg>
-                                                                    </button>
+                                                                    {editingItemId === item.id ? (
+                                                                        <>
+                                                                            <input
+                                                                                type="text"
+                                                                                aria-label="Edit item text"
+                                                                                value={editingItemText}
+                                                                                onChange={(e) => setEditingItemText(e.target.value)}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') handleRenameItem(item.id, editingItemText)
+                                                                                    if (e.key === 'Escape') setEditingItemId(null)
+                                                                                }}
+                                                                                className="flex-1 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                                                autoFocus
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRenameItem(item.id, editingItemText)}
+                                                                                className="ml-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-md p-1 transition-colors"
+                                                                                title="Confirm edit"
+                                                                            >
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                                </svg>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setEditingItemId(null)}
+                                                                                className="ml-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md p-1 transition-colors"
+                                                                                title="Cancel edit"
+                                                                            >
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <label className="flex items-center space-x-3 cursor-pointer flex-1">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    {...register(`items.${item.id}`)}
+                                                                                    className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                                                                />
+                                                                                <span
+                                                                                    className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}
+                                                                                    onDoubleClick={() => { setEditingItemId(item.id); setEditingItemText(item.itemText) }}
+                                                                                >
+                                                                                    {item.itemText}
+                                                                                </span>
+                                                                            </label>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => { setEditingItemId(item.id); setEditingItemText(item.itemText) }}
+                                                                                className="ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md p-1 transition-colors"
+                                                                                title="Edit item"
+                                                                            >
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                                                </svg>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setItemToDelete(item.id)}
+                                                                                className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
+                                                                                title="Delete item"
+                                                                            >
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         ))}

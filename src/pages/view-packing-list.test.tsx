@@ -481,3 +481,91 @@ describe('ViewPackingList checked item styling', () => {
         expect(span.className).not.toContain('line-through')
     })
 })
+
+describe('ViewPackingList item inline editing', () => {
+    let mockDb: ReturnType<typeof makeDb>
+
+    beforeEach(() => {
+        mockDb = makeDb()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: mockDb as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('renders a pencil edit button for each item', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        expect(screen.getByTitle('Edit item')).toBeTruthy()
+    })
+
+    it('clicking pencil enters edit mode with current text pre-filled', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item text/i })
+        expect((input as HTMLInputElement).value).toBe('Passport')
+    })
+
+    it('confirming saves the new item name', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item text/i })
+        fireEvent.change(input, { target: { value: 'Passport 2.0' } })
+        fireEvent.click(screen.getByTitle('Confirm edit'))
+        await waitFor(() => {
+            expect(mockDb.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    items: expect.arrayContaining([
+                        expect.objectContaining({ id: 'item-1', itemText: 'Passport 2.0' }),
+                    ]),
+                })
+            )
+        })
+    })
+
+    it('cancelling edit does not save and restores original text', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item text/i })
+        fireEvent.change(input, { target: { value: 'Something Else' } })
+        fireEvent.click(screen.getByTitle('Cancel edit'))
+        expect(screen.getByText('Passport')).toBeTruthy()
+        expect(mockDb.savePackingList).not.toHaveBeenCalled()
+    })
+
+    it('confirming with empty text does not save', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item text/i })
+        fireEvent.change(input, { target: { value: '   ' } })
+        fireEvent.click(screen.getByTitle('Confirm edit'))
+        expect(mockDb.savePackingList).not.toHaveBeenCalled()
+    })
+
+    it('double-clicking item text enters edit mode', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.dblClick(screen.getByText('Passport'))
+        expect(screen.getByRole('textbox', { name: /edit item text/i })).toBeTruthy()
+    })
+})
