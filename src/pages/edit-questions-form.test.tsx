@@ -104,4 +104,28 @@ describe('EditQuestionsForm', () => {
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
         expect(screen.queryByText(/Store in Your Pod/i)).toBeNull()
     })
+
+    it('shows user-friendly page heading "Customise My Lists"', async () => {
+        render(
+            <MemoryRouter>
+                <EditQuestionsForm />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
+        expect(screen.getByRole('heading', { name: 'Customise My Lists' })).toBeDefined()
+        expect(screen.queryByText('Packing List Questions')).toBeNull()
+    })
+
+    it('does not show the JSON Editor button', async () => {
+        render(
+            <MemoryRouter>
+                <EditQuestionsForm />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
+        expect(screen.queryByRole('button', { name: /JSON Editor/i })).toBeNull()
+        expect(screen.queryByText('(Advanced)')).toBeNull()
+    })
 })

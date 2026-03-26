@@ -473,35 +473,8 @@ export function EditQuestionsForm() {
   return (
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
-        <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
-
-        {/* Editor Mode Toggle */}
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleModeChange('visual')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              editorMode === 'visual'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Visual Editor
-          </button>
-          <button
-            type="button"
-            onClick={() => handleModeChange('json')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              editorMode === 'json'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            JSON Editor
-          </button>
-          <span className="text-sm text-gray-500 ml-2">(Advanced)</span>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Customise My Lists</h1>
+        <p className="mt-2 text-gray-600">Add, remove, and personalise the items on your packing lists.</p>
       </div>
       {editorMode === 'visual' ? (
         <>
