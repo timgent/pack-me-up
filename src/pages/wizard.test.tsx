@@ -169,6 +169,33 @@ describe('Wizard', () => {
         expect(localStorage.getItem('solid-pod-upsell-shown')).toBe('true')
     })
 
+    describe("Who's Packing? - remove person", () => {
+        function renderWizard() {
+            const db = makeDb()
+            mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+            return render(
+                <MemoryRouter>
+                    <Wizard />
+                </MemoryRouter>
+            )
+        }
+
+        it('shows a remove button for the first person even when only one person exists', async () => {
+            renderWizard()
+            const removeBtn = await screen.findByTitle('Remove person')
+            expect(removeBtn).toBeTruthy()
+        })
+
+        it('clicking remove on the only person clears their name field', async () => {
+            renderWizard()
+            const removeBtn = await screen.findByTitle('Remove person')
+            removeBtn.click()
+            await waitFor(() => expect(screen.getByDisplayValue('')).toBeTruthy())
+            // Ensure there is still exactly one person entry
+            expect(screen.getAllByTitle('Remove person')).toHaveLength(1)
+        })
+    })
+
     it('does not show pod prompt when solid-pod-upsell-shown is already set', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
