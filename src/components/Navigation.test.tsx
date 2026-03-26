@@ -74,6 +74,19 @@ describe('Navigation', () => {
         expect(screen.queryByText('Backups')).toBeNull()
     })
 
+    it('shows "Customise My Lists" nav link instead of "Edit Questions"', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        expect(screen.getAllByText('Customise My Lists').length).toBeGreaterThan(0)
+        expect(screen.queryByText('Edit Questions')).toBeNull()
+    })
+
     it('shows Backups link when logged in', () => {
         mockUseSolidPod.mockReturnValue({
             session: null,

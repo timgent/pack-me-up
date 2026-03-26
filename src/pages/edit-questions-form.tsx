@@ -27,7 +27,7 @@ export function EditQuestionsForm() {
   const [rev, setRev] = useState<string | undefined>(undefined)
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [editorMode, setEditorMode] = useState<'visual' | 'json'>('visual')
+  const [editorMode] = useState<'visual' | 'json'>('visual')
   const [jsonValue, setJsonValue] = useState<string>('')
   const [originalJsonValue, setOriginalJsonValue] = useState<string>('')
   const [jsonError, setJsonError] = useState<string | null>(null)
@@ -343,39 +343,6 @@ export function EditQuestionsForm() {
     }
   };
 
-  // JSON Editor sync functions
-  const syncVisualToJson = useCallback(() => {
-    const formData = getValues();
-    // Remove internal database fields that users shouldn't edit
-    const { _id, _rev, lastModified, ...cleanData } = formData as PackingListQuestionSet;
-    const formatted = JSON.stringify(cleanData, null, 2);
-    setJsonValue(formatted);
-    setOriginalJsonValue(formatted); // Track original for diff
-    setJsonError(null);
-  }, [getValues]);
-
-  const syncJsonToVisual = useCallback((): boolean => {
-    try {
-      const parsed = JSON.parse(jsonValue);
-
-      // Validate structure with JSON text for line numbers
-      const validation = validateQuestionSet(parsed, jsonValue);
-      if (!validation.valid) {
-        setJsonError(validation.error || 'Invalid question set structure');
-        return false;
-      }
-
-      // Restore internal fields from current state before updating
-      const dataWithRev = { ...parsed, _rev: rev };
-      reset(dataWithRev);
-      setCurrentQuestionSet(dataWithRev);
-      setJsonError(null);
-      return true;
-    } catch (e: unknown) {
-      setJsonError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
-      return false;
-    }
-  }, [jsonValue, reset, rev]);
 
   // Manual save handler for JSON mode
   const handleSaveJson = useCallback(async () => {
@@ -437,23 +404,6 @@ export function EditQuestionsForm() {
     }
   }, [db, jsonValue, rev, isLoggedIn, saveWithSyncPrevention, saveToPod, showToast]);
 
-  const handleModeChange = useCallback((newMode: 'visual' | 'json') => {
-    if (newMode === 'json') {
-      // Switching TO JSON: sync current form state
-      syncVisualToJson();
-      setEditorMode('json');
-    } else {
-      // Switching FROM JSON: validate and apply changes
-      const success = syncJsonToVisual();
-      if (!success) {
-        // Show error, don't switch mode
-        showToast('Please fix JSON errors before switching to visual editor', 'error');
-        return;
-      }
-      setEditorMode('visual');
-      // Scroll handled by useEffect to ensure DOM has updated
-    }
-  }, [syncVisualToJson, syncJsonToVisual, showToast]);
 
   const isFormEmpty = questionFields.length === 0 && people.length === 1 && getValues("alwaysNeededItems").length === 0;
 
@@ -473,35 +423,8 @@ export function EditQuestionsForm() {
   return (
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">Packing List Questions</h1>
-        <p className="mt-2 text-gray-600">Create and manage your packing list questions and options.</p>
-
-        {/* Editor Mode Toggle */}
-        <div className="mt-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleModeChange('visual')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              editorMode === 'visual'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Visual Editor
-          </button>
-          <button
-            type="button"
-            onClick={() => handleModeChange('json')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              editorMode === 'json'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            JSON Editor
-          </button>
-          <span className="text-sm text-gray-500 ml-2">(Advanced)</span>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Customise My Lists</h1>
+        <p className="mt-2 text-gray-600">Add, remove, and personalise the items on your packing lists.</p>
       </div>
       {editorMode === 'visual' ? (
         <>
