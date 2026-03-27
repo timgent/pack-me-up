@@ -84,7 +84,7 @@ describe('Wizard', () => {
             </MemoryRouter>
         )
 
-        await waitFor(() => screen.getByRole('button', { name: /save my family profile/i }))
+        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
         expect(screen.queryByText(/you already have packing list questions set up/i)).toBeNull()
     })
 
@@ -169,7 +169,7 @@ describe('Wizard', () => {
         expect(localStorage.getItem('solid-pod-upsell-shown')).toBe('true')
     })
 
-    it('shows the family profile heading', async () => {
+    it('shows the travel profile heading', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -180,7 +180,7 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByText(/set up your family profile/i)).toBeTruthy()
+            expect(screen.getByText(/set up your travel profile/i)).toBeTruthy()
         )
     })
 
@@ -209,11 +209,11 @@ describe('Wizard', () => {
             </MemoryRouter>
         )
 
-        await waitFor(() => screen.getByRole('button', { name: /save my family profile/i }))
+        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
         expect(screen.queryByText(/what activities are you planning/i)).toBeNull()
     })
 
-    it('submit button says "Save My Family Profile"', async () => {
+    it('submit button says "Save My Travel Profile"', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -224,7 +224,7 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByRole('button', { name: /save my family profile/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /save my travel profile/i })).toBeTruthy()
         )
     })
 

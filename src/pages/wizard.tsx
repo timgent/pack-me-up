@@ -110,13 +110,13 @@ export const Wizard = () => {
         <div className="max-w-3xl mx-auto">
             <div className="mb-8 text-center animate-slide-up">
                 <h1 className="text-4xl font-bold mb-4 text-primary-900">
-                    Set Up Your Family Profile
+                    Set Up Your Travel Profile
                 </h1>
                 <p className="text-lg text-gray-700">
                     Tell us who you travel with — we'll use this to personalise your packing lists every time
                 </p>
                 <p className="text-sm text-gray-500 mt-2 italic">
-                    You only need to do this once. You can always update your family profile later.
+                    You only need to do this once. You can always update your travel profile later.
                 </p>
             </div>
 
@@ -232,7 +232,7 @@ export const Wizard = () => {
                         disabled={isLoading}
                         className="px-8 py-4 text-lg"
                     >
-                        {isLoading ? '🔄 Saving...' : '✅ Save My Family Profile'}
+                        {isLoading ? '🔄 Saving...' : '✅ Save My Travel Profile'}
                     </Button>
                 </div>
             </form>

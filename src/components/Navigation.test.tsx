@@ -36,7 +36,7 @@ describe('Navigation', () => {
         })
     })
 
-    it('shows "Family Setup" nav link when no questions exist', () => {
+    it('shows "Travel Profile" nav link when no questions exist', () => {
         mockUseHasQuestions.mockReturnValue(false)
 
         render(
@@ -45,7 +45,7 @@ describe('Navigation', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getAllByText('Family Setup').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Travel Profile').length).toBeGreaterThan(0)
         expect(screen.queryByText('Reconfigure Questions')).toBeNull()
     })
 
@@ -59,7 +59,7 @@ describe('Navigation', () => {
         )
 
         expect(screen.getAllByText('Reconfigure Questions').length).toBeGreaterThan(0)
-        expect(screen.queryByText('Family Setup')).toBeNull()
+        expect(screen.queryByText('Travel Profile')).toBeNull()
     })
 
     it('hides Backups link when not logged in', () => {
