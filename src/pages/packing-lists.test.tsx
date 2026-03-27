@@ -106,6 +106,78 @@ describe('PackingLists', () => {
     })
 })
 
+describe('PackingLists progress bar minimum width', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('shows at least 4% width when a small number of items are packed', async () => {
+        const items = Array.from({ length: 130 }, (_, i) => ({
+            id: `item-${i}`,
+            itemText: `Item ${i}`,
+            personName: 'Me',
+            personId: 'p1',
+            questionId: 'q1',
+            optionId: 'o1',
+            packed: i === 0, // only 1 of 130 packed → 1%
+        }))
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue([{
+                    id: 'list-1', name: 'Big List', createdAt: '2026-01-01T00:00:00Z', items,
+                }]),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+            } as unknown as PackingAppDatabase,
+        })
+
+        render(<MemoryRouter><PackingLists /></MemoryRouter>)
+
+        await screen.findByText(/Big List/)
+
+        const fill = document.querySelector('[data-testid="progress-fill"]') as HTMLElement
+        expect(fill).not.toBeNull()
+        const width = parseFloat(fill.style.width)
+        expect(width).toBeGreaterThanOrEqual(4)
+    })
+
+    it('shows 0% width when no items are packed', async () => {
+        const items = Array.from({ length: 10 }, (_, i) => ({
+            id: `item-${i}`,
+            itemText: `Item ${i}`,
+            personName: 'Me',
+            personId: 'p1',
+            questionId: 'q1',
+            optionId: 'o1',
+            packed: false,
+        }))
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue([{
+                    id: 'list-2', name: 'Empty Progress', createdAt: '2026-01-01T00:00:00Z', items,
+                }]),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+            } as unknown as PackingAppDatabase,
+        })
+
+        render(<MemoryRouter><PackingLists /></MemoryRouter>)
+
+        await screen.findByText(/Empty Progress/)
+
+        const fill = document.querySelector('[data-testid="progress-fill"]') as HTMLElement
+        expect(fill).not.toBeNull()
+        expect(fill.style.width).toBe('0%')
+    })
+})
+
 describe('PackingLists delete confirmation', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
