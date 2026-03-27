@@ -17,11 +17,8 @@ export const LandingPage = () => {
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12 animate-slide-up">
                     <h1 className="text-5xl font-bold mb-4 text-primary-900">
-                        Smart Packing Made Simple
+                        Smart Packing Lists, Made Simple
                     </h1>
-                    <p className="text-xl text-gray-700 font-medium">
-                        Never forget an essential item again. Create personalized packing lists based on your specific needs.
-                    </p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-12">
@@ -57,18 +54,6 @@ export const LandingPage = () => {
                         </p>
                     </div>
 
-                    <div className="md:col-span-2 bg-primary-950 p-6 rounded-2xl shadow-glow-primary border-2 border-primary-800 text-white">
-                        <div className="text-4xl mb-2">🔒</div>
-                        <h2 className="text-2xl font-bold mb-3">Own Your Data</h2>
-                        <p className="mb-4 text-white">
-                            Login with your Solid Pod to store your questions and lists in personal storage that you control. Your data stays private and portable.
-                        </p>
-                        {!isLoggedIn && (
-                            <p className="text-sm font-bold bg-white/20 backdrop-blur-sm px-4 py-2 rounded-xl inline-block">
-                                → Click "Login with Solid Pod" above to get started
-                            </p>
-                        )}
-                    </div>
                 </div>
 
                 <div className="text-center space-y-4">
@@ -114,6 +99,14 @@ export const LandingPage = () => {
                                 </Link>
                             </div>
                         </>
+                    )}
+                </div>
+
+                <div className="mt-10 p-4 rounded-xl border border-gray-200 bg-gray-50 text-center text-sm text-gray-500">
+                    <h2 className="font-semibold text-gray-600 inline">Own Your Data</h2>
+                    {' '}— Login with your Solid Pod to store your lists in personal storage you control.
+                    {!isLoggedIn && (
+                        <span className="block mt-1">Click "Login with Solid Pod" above to get started.</span>
                     )}
                 </div>
             </div>

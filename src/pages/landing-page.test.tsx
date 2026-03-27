@@ -67,4 +67,33 @@ describe('LandingPage', () => {
 
         expect(screen.getByRole('link', { name: /reconfigure your questions/i })).toBeTruthy()
     })
+
+    it('displays the correct h1 heading', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.getByRole('heading', { level: 1, name: /smart packing lists, made simple/i })).toBeTruthy()
+    })
+
+    it('does not show a separate tagline below the h1', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.queryByText(/smart packing lists for every trip/i)).toBeNull()
+    })
+
+    it('renders the Solid Pod section after the CTA in the DOM', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const cta = screen.getByRole('link', { name: /get started with the wizard/i })
+        const solidPodHeading = screen.getByRole('heading', { name: /own your data/i })
+        expect(
+            cta.compareDocumentPosition(solidPodHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+    })
+
+    it('does not render the Solid Pod section as a dark full-width card', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const solidPodHeading = screen.getByRole('heading', { name: /own your data/i })
+        expect(solidPodHeading.closest('[class*="bg-primary-950"]')).toBeNull()
+    })
 })
