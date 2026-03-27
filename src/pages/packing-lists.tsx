@@ -181,6 +181,7 @@ export function PackingLists() {
                         const packedCount = list.items.filter(item => item.packed).length
                         const totalCount = list.items.length
                         const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
+                        const displayWidth = packedCount === 0 ? 0 : Math.max(percentComplete, 4)
 
                         // Rotate through gradient colors
                         const gradients = [
@@ -214,8 +215,9 @@ export function PackingLists() {
                                 <div className="flex items-center gap-4">
                                     <div className="flex-1 bg-white/40 rounded-full h-3 overflow-hidden">
                                         <div
+                                            data-testid="progress-fill"
                                             className="bg-gradient-primary h-full transition-all duration-500 rounded-full"
-                                            style={{ width: `${percentComplete}%` }}
+                                            style={{ width: `${displayWidth}%` }}
                                         ></div>
                                     </div>
                                     <span className="text-sm font-bold text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
