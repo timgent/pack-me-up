@@ -68,10 +68,16 @@ describe('LandingPage', () => {
         expect(screen.getByRole('link', { name: /reconfigure your questions/i })).toBeTruthy()
     })
 
-    it('displays the app tagline', () => {
+    it('displays the correct h1 heading', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        expect(screen.getByText(/smart packing lists for every trip/i)).toBeTruthy()
+        expect(screen.getByRole('heading', { level: 1, name: /smart packing lists, made simple/i })).toBeTruthy()
+    })
+
+    it('does not show a separate tagline below the h1', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.queryByText(/smart packing lists for every trip/i)).toBeNull()
     })
 
     it('renders the Solid Pod section after the CTA in the DOM', () => {

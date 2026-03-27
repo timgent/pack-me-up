@@ -17,11 +17,8 @@ export const LandingPage = () => {
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12 animate-slide-up">
                     <h1 className="text-5xl font-bold mb-4 text-primary-900">
-                        Smart Packing Made Simple
+                        Smart Packing Lists, Made Simple
                     </h1>
-                    <p className="text-2xl font-semibold text-primary-700 mb-2">
-                        Smart packing lists for every trip
-                    </p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-12">
