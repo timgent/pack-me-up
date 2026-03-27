@@ -39,7 +39,7 @@ export const Navigation = () => {
                                         to="/wizard"
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        {hasQuestions ? 'Reconfigure Questions' : 'Get Started'}
+                                        {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
                                     </Link>
                                     <Link
                                         to="/manage-questions"
@@ -138,7 +138,7 @@ export const Navigation = () => {
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            {hasQuestions ? 'Reconfigure Questions' : 'Get Started'}
+                            {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
                         </Link>
                         <Link
                             to="/manage-questions"

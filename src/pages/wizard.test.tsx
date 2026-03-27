@@ -84,7 +84,7 @@ describe('Wizard', () => {
             </MemoryRouter>
         )
 
-        await waitFor(() => screen.getByRole('button', { name: /generate/i }))
+        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
         expect(screen.queryByText(/you already have packing list questions set up/i)).toBeNull()
     })
 
@@ -167,6 +167,65 @@ describe('Wizard', () => {
         getByRole('button', { name: /maybe later/i }).click()
 
         expect(localStorage.getItem('solid-pod-upsell-shown')).toBe('true')
+    })
+
+    it('shows the travel profile heading', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/set up your travel profile/i)).toBeTruthy()
+        )
+    })
+
+    it('shows the one-time setup note', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/you only need to do this once/i)).toBeTruthy()
+        )
+    })
+
+    it('does not render the activities section', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
+        expect(screen.queryByText(/what activities are you planning/i)).toBeNull()
+    })
+
+    it('submit button says "Save My Travel Profile"', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByRole('button', { name: /save my travel profile/i })).toBeTruthy()
+        )
     })
 
     describe("Who's Packing? - remove person", () => {
