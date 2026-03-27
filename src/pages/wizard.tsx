@@ -8,7 +8,7 @@ import { Modal } from '../components/Modal'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
-import { ACTIVITIES, wizardSchema, WizardFormData } from './wizard-types'
+import { wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
 
@@ -29,7 +29,6 @@ export const Wizard = () => {
         resolver: zodResolver(wizardSchema),
         defaultValues: {
             people: [{ name: 'Me', ageRange: undefined }],
-            activities: []
         }
     })
 
@@ -111,10 +110,13 @@ export const Wizard = () => {
         <div className="max-w-3xl mx-auto">
             <div className="mb-8 text-center animate-slide-up">
                 <h1 className="text-4xl font-bold mb-4 text-primary-900">
-                    Welcome! Let's Get Started
+                    Set Up Your Family Profile
                 </h1>
                 <p className="text-lg text-gray-700">
-                    Answer a few quick questions to set up your personalized packing list
+                    Tell us who you travel with — we'll use this to personalise your packing lists every time
+                </p>
+                <p className="text-sm text-gray-500 mt-2 italic">
+                    You only need to do this once. You can always update your family profile later.
                 </p>
             </div>
 
@@ -222,33 +224,6 @@ export const Wizard = () => {
                     )}
                 </div>
 
-                {/* Activities Section */}
-                <div className="bg-white p-6 rounded-2xl shadow-soft border-2 border-secondary-200">
-                    <h2 className="text-2xl font-bold mb-4 text-secondary-900">🏖️ What Activities Are You Planning?</h2>
-                    <p className="text-sm text-gray-600 mb-4">
-                        Select all activities you're planning — we'll pre-fill your packing list items
-                    </p>
-
-                    <div className="space-y-3">
-                        {ACTIVITIES.map((activity) => (
-                            <label
-                                key={activity.id}
-                                className="flex items-center space-x-3 p-3 rounded-xl hover:bg-secondary-50 transition-colors cursor-pointer"
-                            >
-                                <input
-                                    type="checkbox"
-                                    value={activity.id}
-                                    {...register('activities')}
-                                    className="w-5 h-5 text-secondary-600 rounded focus:ring-2 focus:ring-secondary-500"
-                                />
-                                <span className="text-gray-800 font-medium">
-                                    {activity.icon} {activity.label}
-                                </span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-
                 {/* Submit Button */}
                 <div className="flex justify-center">
                     <Button
@@ -257,7 +232,7 @@ export const Wizard = () => {
                         disabled={isLoading}
                         className="px-8 py-4 text-lg"
                     >
-                        {isLoading ? '🔄 Generating...' : '✨ Generate My Packing List Questions'}
+                        {isLoading ? '🔄 Saving...' : '✅ Save My Family Profile'}
                     </Button>
                 </div>
             </form>

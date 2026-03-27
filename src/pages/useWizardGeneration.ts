@@ -19,7 +19,7 @@ export function useWizardGeneration() {
             name: p.name,
             ageRange: p.ageRange
         }))
-        return createExampleData(people, data.activities)
+        return createExampleData(people, [])
     }
 
     const generateAndSave = async (data: WizardFormData) => {
