@@ -22,9 +22,6 @@ export const LandingPage = () => {
                     <p className="text-2xl font-semibold text-primary-700 mb-2">
                         Smart packing lists for every trip
                     </p>
-                    <p className="text-xl text-gray-700 font-medium">
-                        Never forget an essential item again. Create personalized packing lists based on your specific needs.
-                    </p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-12">
