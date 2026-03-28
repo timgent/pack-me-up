@@ -481,3 +481,98 @@ describe('ViewPackingList checked item styling', () => {
         expect(span.className).not.toContain('line-through')
     })
 })
+
+describe('ViewPackingList inline item editing', () => {
+    let db: ReturnType<typeof makeDb>
+
+    beforeEach(() => {
+        db = makeDb()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({
+            saveToPod: vi.fn(),
+        })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('double-clicking item text enters edit mode with current value', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.dblClick(screen.getByText('Passport'))
+
+        const input = screen.getByRole('textbox', { name: /edit item name/i })
+        expect(input).toBeTruthy()
+        expect((input as HTMLInputElement).value).toBe('Passport')
+    })
+
+    it('clicking pencil icon enters edit mode', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Edit item'))
+
+        expect(screen.getByRole('textbox', { name: /edit item name/i })).toBeTruthy()
+    })
+
+    it('pressing Enter saves renamed item and exits edit mode', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item name/i })
+        fireEvent.change(input, { target: { value: 'Sunscreen SPF50' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+
+        await waitFor(() => expect(screen.getByText('Sunscreen SPF50')).toBeTruthy())
+        expect(db.savePackingList).toHaveBeenCalledWith(
+            expect.objectContaining({
+                items: expect.arrayContaining([
+                    expect.objectContaining({ id: 'item-1', itemText: 'Sunscreen SPF50' }),
+                ]),
+            })
+        )
+    })
+
+    it('pressing Escape cancels edit and restores original name', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item name/i })
+        fireEvent.change(input, { target: { value: 'Bogus' } })
+        fireEvent.keyDown(input, { key: 'Escape' })
+
+        expect(screen.getByText('Passport')).toBeTruthy()
+        expect(db.savePackingList).not.toHaveBeenCalled()
+    })
+
+    it('clearing all text and pressing Enter does not save and restores original name', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Edit item'))
+        const input = screen.getByRole('textbox', { name: /edit item name/i })
+        fireEvent.change(input, { target: { value: '' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        expect(db.savePackingList).not.toHaveBeenCalled()
+    })
+})

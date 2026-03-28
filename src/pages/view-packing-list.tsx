@@ -47,6 +47,8 @@ export function ViewPackingList() {
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+    const [editingItemId, setEditingItemId] = useState<string | null>(null)
+    const [editingItemText, setEditingItemText] = useState<string>('')
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
 
     const toggleCategory = (key: string) =>
@@ -232,49 +234,77 @@ export function ViewPackingList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- packingList intentionally excluded: only trigger on form value changes
     }, [watchedItems, handleItemChange])
 
+    const persistPackingList = async (updatedPackingList: PackingList) => {
+        if (isLoggedIn) {
+            const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod)
+            if (savedPackingList) {
+                setPackingList(savedPackingList)
+            }
+        } else {
+            const dataWithTimestamp = { ...updatedPackingList, lastModified: new Date().toISOString() }
+            const dbResult = await db.savePackingList(dataWithTimestamp)
+            setPackingList({ ...dataWithTimestamp, _rev: dbResult.rev })
+        }
+    }
+
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return
 
         try {
             setAutoSaveStatus('saving')
 
-            // Remove the item from the packing list
             const updatedItems = packingList.items.filter(item => item.id !== itemId)
-            const updatedPackingList: PackingList = {
-                ...packingList,
-                items: updatedItems
-            }
+            const updatedPackingList: PackingList = { ...packingList, items: updatedItems }
 
             // Remove from form values
             const currentFormValues = getValues('items')
             delete currentFormValues[itemId]
             setValue('items', currentFormValues)
 
-            // Save with sync prevention (handles local DB + Pod save)
-            if (isLoggedIn) {
-                const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
-                if (savedPackingList) {
-                    setPackingList(savedPackingList);
-                }
-            } else {
-                // Not logged in, just save locally
-                const dataWithTimestamp = {
-                    ...updatedPackingList,
-                    lastModified: new Date().toISOString()
-                };
-                const dbResult = await db.savePackingList(dataWithTimestamp);
-                const savedPackingList = {
-                    ...dataWithTimestamp,
-                    _rev: dbResult.rev
-                };
-                setPackingList(savedPackingList);
-            }
+            await persistPackingList(updatedPackingList)
 
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
             console.error('Error deleting item:', err)
             setAutoSaveStatus('error')
+        }
+    }
+
+    const handleStartEdit = (item: PackingListItem) => {
+        setEditingItemId(item.id)
+        setEditingItemText(item.itemText)
+    }
+
+    const handleCancelEdit = () => {
+        setEditingItemId(null)
+        setEditingItemText('')
+    }
+
+    const handleSaveEdit = async (itemId: string) => {
+        const trimmed = editingItemText.trim()
+        if (!trimmed) {
+            handleCancelEdit()
+            return
+        }
+        if (!packingList) return
+
+        try {
+            setAutoSaveStatus('saving')
+
+            const updatedItems = packingList.items.map(item =>
+                item.id === itemId ? { ...item, itemText: trimmed } : item
+            )
+            await persistPackingList({ ...packingList, items: updatedItems })
+
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
+        } catch (err) {
+            console.error('Error saving item name:', err)
+            setAutoSaveStatus('error')
+        } finally {
+            setEditingItemId(null)
+            setEditingItemText('')
         }
     }
 
@@ -287,49 +317,21 @@ export function ViewPackingList() {
         try {
             setAutoSaveStatus('saving')
 
-            // Create new item
             const newItem = {
                 id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 itemText: newItemText,
                 personName: personName,
-                personId: '', // Manual items don't have a person ID from the question flow
-                questionId: '', // Manual items don't have a question ID
-                optionId: '', // Manual items don't have an option ID
+                personId: '',
+                questionId: '',
+                optionId: '',
                 packed: false
             }
 
-            // Add the item to the packing list
-            const updatedItems = [...packingList.items, newItem]
-            const updatedPackingList: PackingList = {
-                ...packingList,
-                items: updatedItems
-            }
-
-            // Add to form values
+            // Add to form values and clear the input before saving
             setValue(`items.${newItem.id}`, false)
-
-            // Clear the input
             setNewItemInputs({ ...newItemInputs, [personName]: '' })
 
-            // Save with sync prevention (handles local DB + Pod save)
-            if (isLoggedIn) {
-                const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
-                if (savedPackingList) {
-                    setPackingList(savedPackingList);
-                }
-            } else {
-                // Not logged in, just save locally
-                const dataWithTimestamp = {
-                    ...updatedPackingList,
-                    lastModified: new Date().toISOString()
-                };
-                const dbResult = await db.savePackingList(dataWithTimestamp);
-                const savedPackingList = {
-                    ...dataWithTimestamp,
-                    _rev: dbResult.rev
-                };
-                setPackingList(savedPackingList);
-            }
+            await persistPackingList({ ...packingList, items: [...packingList.items, newItem] })
 
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
@@ -506,10 +508,41 @@ export function ViewPackingList() {
                                                                             {...register(`items.${item.id}`)}
                                                                             className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                                         />
-                                                                        <span className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                                                                            {item.itemText}
-                                                                        </span>
+                                                                        {editingItemId === item.id ? (
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingItemText}
+                                                                                onChange={(e) => setEditingItemText(e.target.value)}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
+                                                                                    if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
+                                                                                }}
+                                                                                onBlur={() => handleSaveEdit(item.id)}
+                                                                                autoFocus
+                                                                                aria-label="Edit item name"
+                                                                                className="flex-1 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
+                                                                            />
+                                                                        ) : (
+                                                                            <span
+                                                                                className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}
+                                                                                onDoubleClick={() => handleStartEdit(item)}
+                                                                            >
+                                                                                {item.itemText}
+                                                                            </span>
+                                                                        )}
                                                                     </label>
+                                                                    {editingItemId !== item.id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleStartEdit(item)}
+                                                                            className="ml-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1 transition-colors"
+                                                                            title="Edit item"
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setItemToDelete(item.id)}
