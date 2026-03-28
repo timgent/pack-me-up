@@ -6,8 +6,10 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
+import { Modal } from '../components/Modal'
 import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
+import { generateUUID } from '../utils/uuid'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
@@ -15,6 +17,8 @@ export function PackingLists() {
     const [isSaving, setIsSaving] = useState(false)
     const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
     const [listToDelete, setListToDelete] = useState<{ id: string; name: string } | null>(null)
+    const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
+    const [renameValue, setRenameValue] = useState('')
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
@@ -24,6 +28,42 @@ export function PackingLists() {
     const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
         event.stopPropagation()
         setListToDelete({ id, name })
+    }
+
+    const requestRenamePackingList = (id: string, name: string, event: React.MouseEvent) => {
+        event.stopPropagation()
+        setListToRename({ id, name })
+        setRenameValue(name)
+    }
+
+    const confirmRenamePackingList = async () => {
+        if (!listToRename) return
+        try {
+            const list = packingLists.find(l => l.id === listToRename.id)
+            if (!list) return
+            await db.savePackingList({ ...list, name: renameValue })
+            setPackingLists(packingLists.map(l => l.id === listToRename.id ? { ...l, name: renameValue } : l))
+        } catch (err) {
+            console.error('Error renaming packing list:', err)
+        } finally {
+            setListToRename(null)
+        }
+    }
+
+    const handleDuplicatePackingList = async (list: PackingList, event: React.MouseEvent) => {
+        event.stopPropagation()
+        try {
+            const newList: PackingList = {
+                id: generateUUID(),
+                name: `Copy of ${list.name}`,
+                createdAt: new Date().toISOString(),
+                items: list.items.map(item => ({ ...item, id: generateUUID(), packed: false })),
+            }
+            await db.savePackingList(newList)
+            setPackingLists([newList, ...packingLists])
+        } catch (err) {
+            console.error('Error duplicating packing list:', err)
+        }
     }
 
     const confirmDeletePackingList = async () => {
@@ -205,6 +245,18 @@ export function PackingLists() {
                                             📅 {new Date(list.createdAt).toLocaleDateString()}
                                         </span>
                                         <button
+                                            onClick={(e) => requestRenamePackingList(list.id, list.name, e)}
+                                            className="text-primary-600 hover:text-primary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                                        >
+                                            ✏️ Rename
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDuplicatePackingList(list, e)}
+                                            className="text-secondary-600 hover:text-secondary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                                        >
+                                            📋 Duplicate
+                                        </button>
+                                        <button
                                             onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
                                             className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
                                         >
@@ -240,6 +292,21 @@ export function PackingLists() {
                 cancelText="Cancel"
                 confirmVariant="danger"
             />
+
+            <Modal isOpen={listToRename !== null} onClose={() => setListToRename(null)} title="Rename List">
+                <div className="space-y-4">
+                    <input
+                        type="text"
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    />
+                    <div className="flex gap-3 justify-end mt-4">
+                        <Button variant="ghost" onClick={() => setListToRename(null)}>Cancel</Button>
+                        <Button variant="primary" onClick={confirmRenamePackingList}>Save</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     )
 }
