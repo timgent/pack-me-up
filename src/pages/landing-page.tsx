@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useHasQuestions } from '../hooks/useHasQuestions'
+import { SolidProviderSelector } from '../components/SolidProviderSelector'
 
 export const LandingPage = () => {
-    const { isLoggedIn, webId } = useSolidPod()
+    const { isLoggedIn, webId, login } = useSolidPod()
+    const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const hasQuestions = useHasQuestions()
     return (
         <>
@@ -106,10 +109,23 @@ export const LandingPage = () => {
                     <h2 className="font-semibold text-gray-600 inline">Own Your Data</h2>
                     {' '}— Login with your Solid Pod to store your lists in personal storage you control.
                     {!isLoggedIn && (
-                        <span className="block mt-1">Click "Login with Solid Pod" above to get started.</span>
+                        <span className="block mt-1">
+                            <button
+                                className="font-semibold text-primary-700 underline hover:text-primary-900"
+                                onClick={() => setIsProviderSelectorOpen(true)}
+                            >
+                                Login with Solid Pod
+                            </button>
+                            {' '}to get started.
+                        </span>
                     )}
                 </div>
             </div>
+            <SolidProviderSelector
+                isOpen={isProviderSelectorOpen}
+                onClose={() => setIsProviderSelectorOpen(false)}
+                onSelect={(issuer) => login(issuer)}
+            />
         </>
     )
-} 
+}

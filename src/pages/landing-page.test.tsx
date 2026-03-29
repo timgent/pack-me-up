@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { LandingPage } from './landing-page'
@@ -95,5 +95,19 @@ describe('LandingPage', () => {
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
         const solidPodHeading = screen.getByRole('heading', { name: /own your data/i })
         expect(solidPodHeading.closest('[class*="bg-primary-950"]')).toBeNull()
+    })
+
+    it('shows a "Login with Solid Pod" button on the page when not logged in', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.getByRole('button', { name: /login with solid pod/i })).toBeTruthy()
+    })
+
+    it('opens the provider selector modal when the login button is clicked', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const loginButton = screen.getByRole('button', { name: /login with solid pod/i })
+        fireEvent.click(loginButton)
+        expect(screen.getByRole('dialog')).toBeTruthy()
     })
 })

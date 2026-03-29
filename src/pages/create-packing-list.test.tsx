@@ -1,6 +1,36 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import React from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { deduplicateItems } from './create-packing-list'
 import { PackingListItem } from '../create-packing-list/types'
+
+vi.mock('../components/SolidPodContext', () => ({
+    useSolidPod: vi.fn(),
+}))
+
+vi.mock('../components/DatabaseContext', () => ({
+    useDatabase: vi.fn(),
+}))
+
+vi.mock('../components/ToastContext', () => ({
+    useToast: vi.fn(),
+}))
+
+vi.mock('../hooks/useHasQuestions', () => ({
+    useHasQuestions: vi.fn(),
+}))
+
+import { useSolidPod } from '../components/SolidPodContext'
+import { useDatabase } from '../components/DatabaseContext'
+import { useToast } from '../components/ToastContext'
+import { ToastType } from '../components/Toast'
+import { PackingAppDatabase } from '../services/database'
+import { CreatePackingList } from './create-packing-list'
+
+const mockUseSolidPod = vi.mocked(useSolidPod)
+const mockUseDatabase = vi.mocked(useDatabase)
+const mockUseToast = vi.mocked(useToast)
 
 const makeItem = (overrides: Partial<PackingListItem> & { itemText: string; personId: string }): PackingListItem => ({
     id: 'test-id',
@@ -70,5 +100,40 @@ describe('deduplicateItems', () => {
         // total: 4
         const result = deduplicateItems(items)
         expect(result).toHaveLength(4)
+    })
+})
+
+describe('CreatePackingList - login button', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({ db: null as unknown as PackingAppDatabase })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() as (message: string, type: ToastType) => void })
+    })
+
+    it('shows a "Login with Solid Pod" button in the page when not logged in and no questions found', () => {
+        render(
+            <MemoryRouter>
+                <CreatePackingList />
+            </MemoryRouter>
+        )
+        expect(screen.getByRole('button', { name: /login with solid pod/i })).toBeTruthy()
+    })
+
+    it('opens the provider selector modal when the login button is clicked', () => {
+        render(
+            <MemoryRouter>
+                <CreatePackingList />
+            </MemoryRouter>
+        )
+        const loginButton = screen.getByRole('button', { name: /login with solid pod/i })
+        fireEvent.click(loginButton)
+        expect(screen.getByRole('dialog')).toBeTruthy()
     })
 })
