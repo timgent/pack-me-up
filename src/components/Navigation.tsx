@@ -39,13 +39,13 @@ export const Navigation = () => {
                                         to="/wizard"
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
+                                        {hasQuestions ? 'Redo Setup Wizard' : 'Setup Wizard'}
                                     </Link>
                                     <Link
                                         to="/manage-questions"
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        Customise My Lists
+                                        My Questions & Items
                                     </Link>
                                     <Link
                                         to="/create-packing-list"
@@ -138,14 +138,14 @@ export const Navigation = () => {
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
+                            {hasQuestions ? 'Redo Setup Wizard' : 'Setup Wizard'}
                         </Link>
                         <Link
                             to="/manage-questions"
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            Customise My Lists
+                            My Questions & Items
                         </Link>
                         <Link
                             to="/create-packing-list"

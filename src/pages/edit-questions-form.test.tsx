@@ -105,7 +105,7 @@ describe('EditQuestionsForm', () => {
         expect(screen.queryByText(/Store in Your Pod/i)).toBeNull()
     })
 
-    it('shows user-friendly page heading "Customise My Lists"', async () => {
+    it('shows user-friendly page heading "My Questions & Items"', async () => {
         render(
             <MemoryRouter>
                 <EditQuestionsForm />
@@ -113,7 +113,7 @@ describe('EditQuestionsForm', () => {
         )
 
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
-        expect(screen.getByRole('heading', { name: 'Customise My Lists' })).toBeDefined()
+        expect(screen.getByRole('heading', { name: 'My Questions & Items' })).toBeDefined()
         expect(screen.queryByText('Packing List Questions')).toBeNull()
     })
 

@@ -36,7 +36,7 @@ describe('Navigation', () => {
         })
     })
 
-    it('shows "Travel Profile" nav link when no questions exist', () => {
+    it('shows "Setup Wizard" nav link when no questions exist', () => {
         mockUseHasQuestions.mockReturnValue(false)
 
         render(
@@ -45,11 +45,11 @@ describe('Navigation', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getAllByText('Travel Profile').length).toBeGreaterThan(0)
-        expect(screen.queryByText('Reconfigure Questions')).toBeNull()
+        expect(screen.getAllByText('Setup Wizard').length).toBeGreaterThan(0)
+        expect(screen.queryByText('Redo Setup Wizard')).toBeNull()
     })
 
-    it('shows "Reconfigure Questions" nav link when questions exist', () => {
+    it('shows "Redo Setup Wizard" nav link when questions exist', () => {
         mockUseHasQuestions.mockReturnValue(true)
 
         render(
@@ -58,8 +58,8 @@ describe('Navigation', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getAllByText('Reconfigure Questions').length).toBeGreaterThan(0)
-        expect(screen.queryByText('Travel Profile')).toBeNull()
+        expect(screen.getAllByText('Redo Setup Wizard').length).toBeGreaterThan(0)
+        expect(screen.queryByText('Setup Wizard')).toBeNull()
     })
 
     it('hides Backups link when not logged in', () => {
@@ -74,7 +74,7 @@ describe('Navigation', () => {
         expect(screen.queryByText('Backups')).toBeNull()
     })
 
-    it('shows "Customise My Lists" nav link instead of "Edit Questions"', () => {
+    it('shows "My Questions & Items" nav link instead of "Edit Questions"', () => {
         mockUseHasQuestions.mockReturnValue(false)
 
         render(
@@ -83,7 +83,7 @@ describe('Navigation', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getAllByText('Customise My Lists').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('My Questions & Items').length).toBeGreaterThan(0)
         expect(screen.queryByText('Edit Questions')).toBeNull()
     })
 
