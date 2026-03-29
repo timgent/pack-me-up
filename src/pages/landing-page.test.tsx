@@ -68,6 +68,12 @@ describe('LandingPage', () => {
         expect(screen.getByRole('link', { name: /reconfigure your questions/i })).toBeTruthy()
     })
 
+    it('does not show "create a packing list directly" link when no questions exist', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.queryByRole('link', { name: /create a packing list directly/i })).toBeNull()
+    })
+
     it('displays the correct h1 heading', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)

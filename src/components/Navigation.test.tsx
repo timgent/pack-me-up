@@ -49,17 +49,10 @@ describe('Navigation', () => {
         expect(screen.queryByText('Reconfigure Questions')).toBeNull()
     })
 
-    it('shows "Reconfigure Questions" nav link when questions exist', () => {
+    it('hides the wizard link from nav when questions already exist', () => {
         mockUseHasQuestions.mockReturnValue(true)
-
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
-
-        expect(screen.getAllByText('Reconfigure Questions').length).toBeGreaterThan(0)
-        expect(screen.queryByText('Travel Profile')).toBeNull()
+        render(<MemoryRouter><Navigation /></MemoryRouter>)
+        expect(screen.queryByRole('link', { name: /reconfigure questions/i })).toBeNull()
     })
 
     it('hides Backups link when not logged in', () => {
