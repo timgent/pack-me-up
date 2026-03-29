@@ -210,8 +210,8 @@ export function CreatePackingList() {
                 { text: item.itemText, personSelections },
             ],
         }
-        await db.saveQuestionSet(updatedQs)
-        setQuestionSet(updatedQs)
+        const { rev } = await db.saveQuestionSet(updatedQs)
+        setQuestionSet({ ...updatedQs, _rev: rev })
 
         // Mark reviewed on the packing list
         await markReviewed(listId, item)

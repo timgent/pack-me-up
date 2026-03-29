@@ -418,6 +418,35 @@ describe('CreatePackingList – suggestion card', () => {
         expect(secondCallArg._rev).toBe('rev-2')
     })
 
+    it('"Always include" uses updated _rev from first save when processing second item', async () => {
+        const secondItem: PackingListItem = {
+            ...customItem,
+            id: 'custom-2',
+            itemText: 'Flip Flops',
+        }
+        const listWithTwo: PackingList = { ...pastList, items: [customItem, secondItem] }
+        let qsSaveCount = 0
+        const saveQuestionSet = vi.fn().mockImplementation(() => {
+            qsSaveCount++
+            return Promise.resolve({ rev: `qs-rev-${qsSaveCount + 1}` })
+        })
+        const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]), saveQuestionSet })
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        fireEvent.click(screen.getAllByRole('button', { name: /always include/i })[0])
+        await waitFor(() => expect(saveQuestionSet).toHaveBeenCalledTimes(1))
+        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        await waitFor(() => expect(saveQuestionSet).toHaveBeenCalledTimes(2))
+
+        // Second save must use the _rev returned by the first save
+        const secondCallArg = saveQuestionSet.mock.calls[1][0] as PackingListQuestionSet
+        expect(secondCallArg._rev).toBe('qs-rev-2')
+    })
+
     it('card disappears when all items are acted on', async () => {
         const secondItem: PackingListItem = {
             ...customItem,
