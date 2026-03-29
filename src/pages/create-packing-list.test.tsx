@@ -24,6 +24,8 @@ vi.mock('../hooks/useHasQuestions', () => ({
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
+import { ToastType } from '../components/Toast'
+import { PackingAppDatabase } from '../services/database'
 import { CreatePackingList } from './create-packing-list'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
@@ -111,8 +113,8 @@ describe('CreatePackingList - login button', () => {
             login: vi.fn(),
             logout: vi.fn(),
         })
-        mockUseDatabase.mockReturnValue({ db: null } as any)
-        mockUseToast.mockReturnValue({ showToast: vi.fn() } as any)
+        mockUseDatabase.mockReturnValue({ db: null as unknown as PackingAppDatabase })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() as (message: string, type: ToastType) => void })
     })
 
     it('shows a "Login with Solid Pod" button in the page when not logged in and no questions found', () => {
