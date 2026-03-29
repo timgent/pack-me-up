@@ -221,8 +221,8 @@ export function CreatePackingList() {
             ...list,
             items: list.items.map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
-        await db.savePackingList(updatedList)
-        setAllPackingLists(prev => prev.map(l => l.id === listId ? updatedList : l))
+        const { rev } = await db.savePackingList(updatedList)
+        setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
     }
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
