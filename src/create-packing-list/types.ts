@@ -16,6 +16,7 @@ export interface PackingListItem {
     optionId: string
     packed: boolean
     category?: string
+    reviewed?: boolean
 }
 
 export interface PackingListFormData {

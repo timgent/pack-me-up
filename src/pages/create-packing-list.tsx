@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
@@ -20,11 +20,129 @@ export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     })
 }
 
+export function getUnreviewedCustomItems(
+    packingLists: PackingList[],
+    questionSet: PackingListQuestionSet
+): Array<{ listId: string; listName: string; item: PackingListItem }> {
+    // Build a normalised set of existing question-set item texts
+    const existingTexts = new Set<string>()
+    for (const item of questionSet.alwaysNeededItems) {
+        existingTexts.add(item.text.trim().toLowerCase())
+    }
+    for (const question of questionSet.questions) {
+        for (const option of question.options) {
+            for (const item of option.items) {
+                existingTexts.add(item.text.trim().toLowerCase())
+            }
+        }
+    }
+
+    const results: Array<{ listId: string; listName: string; item: PackingListItem }> = []
+    for (const list of packingLists) {
+        for (const item of list.items) {
+            if (item.questionId !== '') continue
+            if (item.reviewed === true) continue
+            if (existingTexts.has(item.itemText.trim().toLowerCase())) continue
+            results.push({ listId: list.id, listName: list.name, item })
+        }
+    }
+    return results
+}
+
+interface SuggestionCardProps {
+    suggestions: Array<{ listId: string; listName: string; item: PackingListItem }>
+    onAlwaysInclude: (listId: string, item: PackingListItem) => void
+    onSkip: (listId: string, item: PackingListItem) => void
+    onDismiss: () => void
+}
+
+function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: SuggestionCardProps) {
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    // Group by list
+    const grouped = useMemo(() => {
+        const map = new Map<string, { listName: string; items: Array<{ listId: string; item: PackingListItem }> }>()
+        for (const s of suggestions) {
+            if (!map.has(s.listId)) {
+                map.set(s.listId, { listName: s.listName, items: [] })
+            }
+            map.get(s.listId)!.items.push({ listId: s.listId, item: s.item })
+        }
+        return Array.from(map.values())
+    }, [suggestions])
+
+    return (
+        <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
+            <div className="flex items-start justify-between gap-4">
+                <p className="text-amber-900 font-medium">
+                    On past trips you added items that aren't in your question set yet. Want to save any for next time?
+                </p>
+                <button
+                    type="button"
+                    aria-label="Dismiss suggestions"
+                    onClick={onDismiss}
+                    className="text-amber-600 hover:text-amber-900 text-xl leading-none flex-shrink-0"
+                >
+                    ×
+                </button>
+            </div>
+            {!isExpanded ? (
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(true)}
+                    className="mt-2 text-sm text-amber-700 underline"
+                    aria-label="Review suggestions"
+                >
+                    Review suggestions
+                </button>
+            ) : (
+                <div className="mt-4 space-y-4">
+                    {grouped.map(({ listName, items }) => (
+                        <div key={listName}>
+                            <p className="text-sm text-amber-700 font-semibold mb-2">From: {listName}</p>
+                            <div className="space-y-2">
+                                {items.map(({ listId, item }) => (
+                                    <div key={item.id} className="flex items-center justify-between gap-2 bg-white rounded border border-amber-200 px-3 py-2">
+                                        <div>
+                                            <span className="font-medium text-gray-900">{item.itemText}</span>
+                                            {item.personName && (
+                                                <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                onClick={() => onAlwaysInclude(listId, item)}
+                                            >
+                                                Always include
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                onClick={() => onSkip(listId, item)}
+                                            >
+                                                Skip
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
+    const [allPackingLists, setAllPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [noQuestionsFound, setNoQuestionsFound] = useState(false)
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
+    const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
     const { isLoggedIn, login } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
@@ -47,10 +165,13 @@ export function CreatePackingList() {
             }
             setIsLoading(true)
             try {
-                const doc = await db.getQuestionSet()
+                const [doc, lists] = await Promise.all([
+                    db.getQuestionSet(),
+                    db.getAllPackingLists(),
+                ])
                 setQuestionSet(doc)
+                setAllPackingLists(lists)
                 setNoQuestionsFound(false)
-                // Initialize with all people selected by default
                 setSelectedPeopleIds(doc.people.map(p => p.id))
             } catch (err: unknown) {
                 const hasName = typeof err === 'object' && err !== null && 'name' in err
@@ -67,6 +188,49 @@ export function CreatePackingList() {
         }
         fetchQuestionSet()
     }, [db, showToast])
+
+    const suggestions = useMemo(
+        () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],
+        [allPackingLists, questionSet]
+    )
+
+    const handleAlwaysInclude = async (listId: string, item: PackingListItem) => {
+        if (!questionSet) return
+
+        // Build personSelections for every person in the question set
+        const personSelections = questionSet.people.map(p => ({
+            personId: p.id,
+            selected: p.name.toLowerCase() === item.personName.toLowerCase(),
+        }))
+
+        const updatedQs: PackingListQuestionSet = {
+            ...questionSet,
+            alwaysNeededItems: [
+                ...questionSet.alwaysNeededItems,
+                { text: item.itemText, personSelections },
+            ],
+        }
+        const { rev } = await db.saveQuestionSet(updatedQs)
+        setQuestionSet({ ...updatedQs, _rev: rev })
+
+        // Mark reviewed on the packing list
+        await markReviewed(listId, item)
+    }
+
+    const handleSkip = async (listId: string, item: PackingListItem) => {
+        await markReviewed(listId, item)
+    }
+
+    const markReviewed = async (listId: string, item: PackingListItem) => {
+        const list = allPackingLists.find(l => l.id === listId)
+        if (!list) return
+        const updatedList: PackingList = {
+            ...list,
+            items: list.items.map(i => i.id === item.id ? { ...i, reviewed: true } : i),
+        }
+        const { rev } = await db.savePackingList(updatedList)
+        setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+    }
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return
@@ -230,6 +394,17 @@ export function CreatePackingList() {
                 <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
                 <p className="mt-2 text-gray-600">Answer the questions below to create your packing list.</p>
             </div>
+
+            {suggestions.length > 0 && !isSuggestionDismissed && (
+                <div className="mb-6">
+                    <SuggestionCard
+                        suggestions={suggestions}
+                        onAlwaysInclude={handleAlwaysInclude}
+                        onSkip={handleSkip}
+                        onDismiss={() => setIsSuggestionDismissed(true)}
+                    />
+                </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <Input
