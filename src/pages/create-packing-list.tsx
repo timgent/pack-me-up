@@ -8,6 +8,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
+import { SolidProviderSelector } from '../components/SolidProviderSelector'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -143,7 +144,8 @@ export function CreatePackingList() {
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
-    const { isLoggedIn } = useSolidPod()
+    const { isLoggedIn, login } = useSolidPod()
+    const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { db } = useDatabase()
     const navigate = useNavigate()
 
@@ -155,7 +157,12 @@ export function CreatePackingList() {
     })
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchQuestionSet = async () => {
+            if (!db) {
+                setNoQuestionsFound(true)
+                setIsLoading(false)
+                return
+            }
             setIsLoading(true)
             try {
                 const [doc, lists] = await Promise.all([
@@ -179,7 +186,7 @@ export function CreatePackingList() {
                 setIsLoading(false)
             }
         }
-        fetchData()
+        fetchQuestionSet()
     }, [db, showToast])
 
     const suggestions = useMemo(
@@ -310,60 +317,70 @@ export function CreatePackingList() {
 
     if (noQuestionsFound) {
         return (
-            <div className="max-w-4xl mx-auto py-8 px-4">
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
-                    <p className="mt-2 text-gray-600">Let's set up your packing list questions first!</p>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-soft border-2 border-primary-200 p-8">
-                    <div className="text-center mb-6">
-                        <div className="text-6xl mb-4">📋</div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Questions Found</h2>
-                        <p className="text-gray-600">
-                            Before you can create a packing list, you need to set up your packing list questions.
-                        </p>
+            <>
+                <div className="max-w-4xl mx-auto py-8 px-4">
+                    <div className="mb-8">
+                        <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
+                        <p className="mt-2 text-gray-600">Let's set up your packing list questions first!</p>
                     </div>
 
-                    <div className="space-y-4 max-w-2xl mx-auto">
-                        <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-xl border-2 border-primary-200">
-                            <h3 className="text-lg font-bold text-primary-900 mb-2">✨ Quick Start with Wizard</h3>
-                            <p className="text-gray-700 mb-4">
-                                Answer a few simple questions and we'll generate a personalized question set for you.
+                    <div className="bg-white rounded-2xl shadow-soft border-2 border-primary-200 p-8">
+                        <div className="text-center mb-6">
+                            <div className="text-6xl mb-4">📋</div>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">No Questions Found</h2>
+                            <p className="text-gray-600">
+                                Before you can create a packing list, you need to set up your packing list questions.
                             </p>
-                            <Link to="/wizard">
-                                <Button variant="primary" className="w-full">
-                                    Use the Wizard
-                                </Button>
-                            </Link>
                         </div>
 
-                        {!isLoggedIn && (
-                            <div className="bg-gradient-to-br from-accent-50 to-accent-100 p-6 rounded-xl border-2 border-accent-200">
-                                <h3 className="text-lg font-bold text-accent-900 mb-2">🔒 Login to Sync Questions</h3>
+                        <div className="space-y-4 max-w-2xl mx-auto">
+                            <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-xl border-2 border-primary-200">
+                                <h3 className="text-lg font-bold text-primary-900 mb-2">✨ Quick Start with Wizard</h3>
                                 <p className="text-gray-700 mb-4">
-                                    If you've already created questions and saved them to your Solid Pod, login to sync them.
+                                    Answer a few simple questions and we'll generate a personalized question set for you.
                                 </p>
-                                <p className="text-sm text-gray-600">
-                                    Click "Login with Solid Pod" in the navigation bar above to continue.
-                                </p>
+                                <Link to="/wizard">
+                                    <Button variant="primary" className="w-full">
+                                        Use the Wizard
+                                    </Button>
+                                </Link>
                             </div>
-                        )}
 
-                        <div className="bg-gradient-to-br from-secondary-50 to-secondary-100 p-6 rounded-xl border-2 border-secondary-200">
-                            <h3 className="text-lg font-bold text-secondary-900 mb-2">✏️ Create Manually</h3>
-                            <p className="text-gray-700 mb-4">
-                                Prefer full control? Create your packing list questions from scratch.
-                            </p>
-                            <Link to="/manage-questions">
-                                <Button variant="secondary" className="w-full">
-                                    Edit Questions
-                                </Button>
-                            </Link>
+                            {!isLoggedIn && (
+                                <div className="bg-gradient-to-br from-accent-50 to-accent-100 p-6 rounded-xl border-2 border-accent-200">
+                                    <h3 className="text-lg font-bold text-accent-900 mb-2">🔒 Login to Sync Questions</h3>
+                                    <p className="text-gray-700 mb-4">
+                                        If you've already created questions and saved them to your Solid Pod, login to sync them.
+                                    </p>
+                                    <button
+                                        className="text-sm font-semibold text-accent-700 underline hover:text-accent-900"
+                                        onClick={() => setIsProviderSelectorOpen(true)}
+                                    >
+                                        Login with Solid Pod
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="bg-gradient-to-br from-secondary-50 to-secondary-100 p-6 rounded-xl border-2 border-secondary-200">
+                                <h3 className="text-lg font-bold text-secondary-900 mb-2">✏️ Create Manually</h3>
+                                <p className="text-gray-700 mb-4">
+                                    Prefer full control? Create your packing list questions from scratch.
+                                </p>
+                                <Link to="/manage-questions">
+                                    <Button variant="secondary" className="w-full">
+                                        Edit Questions
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+                <SolidProviderSelector
+                    isOpen={isProviderSelectorOpen}
+                    onClose={() => setIsProviderSelectorOpen(false)}
+                    onSelect={(issuer) => login(issuer)}
+                />
+            </>
         )
     }
 

@@ -5,6 +5,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { PackingLists } from './packing-lists'
 import type { PackingAppDatabase } from '../services/database'
 
+vi.mock('../utils/uuid', () => ({
+    generateUUID: vi.fn(() => 'new-uuid'),
+}))
+
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
 }))
@@ -255,6 +259,126 @@ describe('PackingLists delete confirmation', () => {
 
         await waitFor(() => {
             expect(db.deletePackingList).toHaveBeenCalledWith('list-1')
+        })
+    })
+})
+
+describe('PackingLists rename', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('shows a Rename button on each list card', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        expect(screen.getByRole('button', { name: /rename/i })).toBeTruthy()
+    })
+
+    it('opens a rename modal pre-filled with the current list name when Rename is clicked', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+
+        await waitFor(() => {
+            const input = screen.getByRole('textbox')
+            expect((input as HTMLInputElement).value).toBe('Summer Holiday')
+        })
+    })
+
+    it('calls savePackingList with the new name when Save is clicked', async () => {
+        const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '2' }) }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+
+        await waitFor(() => screen.getByRole('textbox'))
+
+        fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Winter Holiday' } })
+        fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+        await waitFor(() => {
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'list-1', name: 'Winter Holiday' })
+            )
+        })
+    })
+
+    it('does not call savePackingList when Cancel is clicked in the rename modal', async () => {
+        const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '2' }) }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+
+        await waitFor(() => screen.getByRole('textbox'))
+
+        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+
+        expect(db.savePackingList).not.toHaveBeenCalled()
+    })
+})
+
+describe('PackingLists duplicate', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('shows a Duplicate button on each list card', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        expect(screen.getByRole('button', { name: /duplicate/i })).toBeTruthy()
+    })
+
+    it('calls savePackingList with a new list named "Copy of {name}" when Duplicate is clicked', async () => {
+        const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '1' }) }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
+
+        await waitFor(() => {
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'Copy of Summer Holiday', id: 'new-uuid' })
+            )
         })
     })
 })
