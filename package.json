@@ -16,7 +16,7 @@
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.2",
     "@inrupt/solid-client": "^2.1.2",
-    "@inrupt/solid-client-authn-browser": "^3.1.0",
+    "@inrupt/solid-client-authn-browser": "^4.0.0",
     "@inrupt/vocab-common-rdf": "^1.0.5",
     "@inrupt/vocab-solid": "^1.0.4",
     "@tailwindcss/vite": "^4.1.4",
