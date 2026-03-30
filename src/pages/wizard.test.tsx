@@ -84,7 +84,7 @@ describe('Wizard', () => {
             </MemoryRouter>
         )
 
-        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
+        await waitFor(() => screen.getByRole('button', { name: /generate my packing questions/i }))
         expect(screen.queryByText(/you already have packing list questions set up/i)).toBeNull()
     })
 
@@ -169,7 +169,7 @@ describe('Wizard', () => {
         expect(localStorage.getItem('solid-pod-upsell-shown')).toBe('true')
     })
 
-    it('shows the travel profile heading', async () => {
+    it('shows the create packing questions heading', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -180,7 +180,7 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByText(/set up your travel profile/i)).toBeTruthy()
+            expect(screen.getByText(/create your packing questions/i)).toBeTruthy()
         )
     })
 
@@ -195,7 +195,7 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByText(/you only need to do this once/i)).toBeTruthy()
+            expect(screen.getByText(/do this once to get started/i)).toBeTruthy()
         )
     })
 
@@ -209,11 +209,11 @@ describe('Wizard', () => {
             </MemoryRouter>
         )
 
-        await waitFor(() => screen.getByRole('button', { name: /save my travel profile/i }))
+        await waitFor(() => screen.getByRole('button', { name: /generate my packing questions/i }))
         expect(screen.queryByText(/what activities are you planning/i)).toBeNull()
     })
 
-    it('submit button says "Save My Travel Profile"', async () => {
+    it('submit button says "Generate My Packing Questions"', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -224,7 +224,7 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByRole('button', { name: /save my travel profile/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /generate my packing questions/i })).toBeTruthy()
         )
     })
 

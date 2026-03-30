@@ -110,13 +110,13 @@ export const Wizard = () => {
         <div className="max-w-3xl mx-auto">
             <div className="mb-8 text-center animate-slide-up">
                 <h1 className="text-4xl font-bold mb-4 text-primary-900">
-                    Set Up Your Travel Profile
+                    Create Your Packing Questions
                 </h1>
                 <p className="text-lg text-gray-700">
-                    Tell us who you travel with — we'll use this to personalise your packing lists every time
+                    Tell us who you travel with — we'll generate a starter set of packing questions tailored to your group.
                 </p>
                 <p className="text-sm text-gray-500 mt-2 italic">
-                    You only need to do this once. You can always update your travel profile later.
+                    Do this once to get started. Afterwards, fine-tune your questions and packing items from 'My Questions &amp; Items' to match exactly what you need.
                 </p>
             </div>
 
@@ -232,7 +232,7 @@ export const Wizard = () => {
                         disabled={isLoading}
                         className="px-8 py-4 text-lg"
                     >
-                        {isLoading ? '🔄 Saving...' : '✅ Save My Travel Profile'}
+                        {isLoading ? '🔄 Generating...' : '✅ Generate My Packing Questions'}
                     </Button>
                 </div>
             </form>
@@ -259,7 +259,7 @@ Are you sure you want to continue?"
             >
                 <div className="space-y-6">
                     <p className="text-gray-700 text-center">
-                        Your packing list questions are ready! What would you like to do next?
+                        Your starter questions are ready! Head to 'My Questions &amp; Items' to add, remove, or tweak them to match how you travel — then create your first list.
                     </p>
 
                     <div className="space-y-4">

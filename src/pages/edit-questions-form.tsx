@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
@@ -423,8 +424,9 @@ export function EditQuestionsForm() {
   return (
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">Customise My Lists</h1>
-        <p className="mt-2 text-gray-600">Add, remove, and personalise the items on your packing lists.</p>
+        <h1 className="text-2xl font-bold text-gray-900">My Questions & Items</h1>
+        <p className="mt-2 text-gray-600">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
+        <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
       </div>
       {editorMode === 'visual' ? (
         <>

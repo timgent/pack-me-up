@@ -35,17 +35,19 @@ export const Navigation = () => {
                             </div>
                             <div className="hidden md:block">
                                 <div className="ml-10 flex items-baseline space-x-2">
-                                    <Link
-                                        to="/wizard"
-                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                                    >
-                                        {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
-                                    </Link>
+                                    {!hasQuestions && (
+                                        <Link
+                                            to="/wizard"
+                                            className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
+                                        >
+                                            Setup Wizard
+                                        </Link>
+                                    )}
                                     <Link
                                         to="/manage-questions"
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        Customise My Lists
+                                        My Questions & Items
                                     </Link>
                                     <Link
                                         to="/create-packing-list"
@@ -133,19 +135,21 @@ export const Navigation = () => {
                 {/* Mobile menu */}
                 <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-950`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <Link
-                            to="/wizard"
-                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            {hasQuestions ? 'Reconfigure Questions' : 'Travel Profile'}
-                        </Link>
+                        {!hasQuestions && (
+                            <Link
+                                to="/wizard"
+                                className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                                onClick={() => setIsOpen(false)}
+                            >
+                                Setup Wizard
+                            </Link>
+                        )}
                         <Link
                             to="/manage-questions"
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            Customise My Lists
+                            My Questions & Items
                         </Link>
                         <Link
                             to="/create-packing-list"

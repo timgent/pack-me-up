@@ -56,7 +56,7 @@ describe('LandingPage', () => {
         expect(screen.queryByRole('link', { name: /get started with the wizard/i })).toBeNull()
     })
 
-    it('shows "Reconfigure your questions" as secondary link when questions exist', () => {
+    it('does not show secondary action links when questions exist', () => {
         mockUseHasQuestions.mockReturnValue(true)
 
         render(
@@ -65,7 +65,8 @@ describe('LandingPage', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getByRole('link', { name: /reconfigure your questions/i })).toBeTruthy()
+        expect(screen.queryByRole('link', { name: /reconfigure your questions/i })).toBeNull()
+        expect(screen.queryByRole('link', { name: /create a new packing list/i })).toBeNull()
     })
 
     it('displays the correct h1 heading', () => {
