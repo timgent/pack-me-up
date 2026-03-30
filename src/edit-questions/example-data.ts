@@ -338,20 +338,3 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
         ]
     };
 }
-
-// Helper function to create people for examples
-function createExamplePeople(count: number): Person[] {
-    return Array.from({ length: count }, (_, i) => ({
-        id: generateUUID(),
-        name: i === 0 ? "Me" : `Person ${i + 1}`,
-        ageRange: undefined
-    }));
-}
-
-export const exampleData = {
-    "Basic packing list for 1": createExampleData(createExamplePeople(1)),
-    "Basic packing list for 2": createExampleData(createExamplePeople(2)),
-    "Basic packing list for 3": createExampleData(createExamplePeople(3)),
-    "Basic packing list for 4": createExampleData(createExamplePeople(4)),
-    "Basic packing list for 5": createExampleData(createExamplePeople(5)),
-}; 
