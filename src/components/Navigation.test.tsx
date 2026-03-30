@@ -49,7 +49,7 @@ describe('Navigation', () => {
         expect(screen.queryByText('Redo Setup Wizard')).toBeNull()
     })
 
-    it('shows "Redo Setup Wizard" nav link when questions exist', () => {
+    it('hides the wizard nav link when questions exist', () => {
         mockUseHasQuestions.mockReturnValue(true)
 
         render(
@@ -58,8 +58,8 @@ describe('Navigation', () => {
             </MemoryRouter>
         )
 
-        expect(screen.getAllByText('Redo Setup Wizard').length).toBeGreaterThan(0)
         expect(screen.queryByText('Setup Wizard')).toBeNull()
+        expect(screen.queryByText('Redo Setup Wizard')).toBeNull()
     })
 
     it('hides Backups link when not logged in', () => {

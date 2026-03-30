@@ -62,21 +62,6 @@ export const LandingPage = () => {
                             >
                                 📋 View Packing Lists
                             </Link>
-                            <div className="text-gray-600 space-x-3">
-                                <Link
-                                    to="/create-packing-list"
-                                    className="text-primary-700 font-semibold hover:underline"
-                                >
-                                    create a new packing list
-                                </Link>
-                                <span>·</span>
-                                <Link
-                                    to="/wizard"
-                                    className="text-primary-700 font-semibold hover:underline"
-                                >
-                                    reconfigure your questions
-                                </Link>
-                            </div>
                         </>
                     ) : (
                         <>
@@ -86,15 +71,6 @@ export const LandingPage = () => {
                             >
                                 ✨ Get Started with the Wizard
                             </Link>
-                            <div className="text-gray-600">
-                                or{' '}
-                                <Link
-                                    to="/create-packing-list"
-                                    className="text-primary-700 font-semibold hover:underline"
-                                >
-                                    create a packing list directly
-                                </Link>
-                            </div>
                         </>
                     )}
                 </div>
