@@ -4,10 +4,6 @@ import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { Navigation } from './Navigation'
 
-vi.mock('../hooks/useHasQuestions', () => ({
-    useHasQuestions: vi.fn(),
-}))
-
 vi.mock('./SolidPodContext', () => ({
     useSolidPod: vi.fn(),
 }))
@@ -16,10 +12,8 @@ vi.mock('./SolidProviderSelector', () => ({
     SolidProviderSelector: () => null,
 }))
 
-import { useHasQuestions } from '../hooks/useHasQuestions'
 import { useSolidPod } from './SolidPodContext'
 
-const mockUseHasQuestions = vi.mocked(useHasQuestions)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 
 describe('Navigation', () => {
@@ -36,35 +30,7 @@ describe('Navigation', () => {
         })
     })
 
-    it('shows "Setup Wizard" nav link when no questions exist', () => {
-        mockUseHasQuestions.mockReturnValue(false)
-
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
-
-        expect(screen.getAllByText('Setup Wizard').length).toBeGreaterThan(0)
-        expect(screen.queryByText('Redo Setup Wizard')).toBeNull()
-    })
-
-    it('hides the wizard nav link when questions exist', () => {
-        mockUseHasQuestions.mockReturnValue(true)
-
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
-
-        expect(screen.queryByText('Setup Wizard')).toBeNull()
-        expect(screen.queryByText('Redo Setup Wizard')).toBeNull()
-    })
-
     it('hides Backups link when not logged in', () => {
-        mockUseHasQuestions.mockReturnValue(false)
-
         render(
             <MemoryRouter>
                 <Navigation />
@@ -75,8 +41,6 @@ describe('Navigation', () => {
     })
 
     it('shows "My Questions & Items" nav link instead of "Edit Questions"', () => {
-        mockUseHasQuestions.mockReturnValue(false)
-
         render(
             <MemoryRouter>
                 <Navigation />
@@ -98,7 +62,6 @@ describe('Navigation', () => {
             login: vi.fn(),
             logout: vi.fn(),
         })
-        mockUseHasQuestions.mockReturnValue(false)
 
         render(
             <MemoryRouter>
