@@ -35,8 +35,17 @@ describe('useHasQuestions', () => {
         await waitFor(() => expect(result.current).toBe(false))
     })
 
-    it('returns true when questions exist', async () => {
+    it('returns false when document exists but has no questions', async () => {
         const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [] }) })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        const { result } = renderHook(() => useHasQuestions())
+
+        await waitFor(() => expect(result.current).toBe(false))
+    })
+
+    it('returns true when at least one question exists', async () => {
+        const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [{ id: '1', text: 'Do you need a jacket?' }] }) })
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
         const { result } = renderHook(() => useHasQuestions())

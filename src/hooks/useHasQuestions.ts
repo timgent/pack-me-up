@@ -7,7 +7,7 @@ export const useHasQuestions = () => {
 
     useEffect(() => {
         db.getQuestionSet()
-            .then(() => setHasQuestions(true))
+            .then((doc) => setHasQuestions(doc.questions.length > 0))
             .catch((err: unknown) => {
                 const hasName = typeof err === 'object' && err !== null && 'name' in err
                 if (!hasName || (err as { name: string }).name !== 'not_found') console.error(err)
