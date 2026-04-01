@@ -61,16 +61,29 @@ function ConsumerWithActions() {
 }
 
 describe('SolidPodContext', () => {
+    let originalLocation: Location
+
     beforeEach(() => {
         vi.spyOn(console, 'log').mockImplementation(() => {})
         vi.spyOn(console, 'error').mockImplementation(() => {})
         mockSession = makeMockSession()
         mockGetDefaultSession.mockReturnValue(mockSession as never)
+        sessionStorage.clear()
+        originalLocation = window.location
     })
 
     afterEach(() => {
         vi.restoreAllMocks()
+        sessionStorage.clear()
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
     })
+
+    function setWindowLocation(search: string, hash = '') {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { ...originalLocation, search, hash },
+        })
+    }
 
     it('starts with isLoggedIn false and sessionExpired false', async () => {
         render(
@@ -172,6 +185,35 @@ describe('SolidPodContext', () => {
         await waitFor(() => {
             expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
             expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
+    })
+
+    it('saves current route to sessionStorage before session restore when not in OAuth callback', async () => {
+        setWindowLocation('', '#/create-packing-list')
+
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(sessionStorage.getItem('authReturnTo')).toBe('/create-packing-list')
+        })
+    })
+
+    it('does not overwrite sessionStorage authReturnTo when in OAuth callback', async () => {
+        setWindowLocation('?code=abc123&state=xyz', '#/solid-pod-handle-redirect')
+        sessionStorage.setItem('authReturnTo', '/existing-route')
+
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(sessionStorage.getItem('authReturnTo')).toBe('/existing-route')
         })
     })
 

@@ -7,6 +7,7 @@ import {
   logout as solidLogout
 } from "@inrupt/solid-client-authn-browser";
 import { isAuthenticationError } from "../services/solidPod";
+import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
 
 interface SolidPodContextValue {
   session: Session | null;
@@ -99,6 +100,17 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     const initializeSession = async () => {
       try {
         console.log("Initializing Solid session...");
+
+        // Save the current route before session restore may redirect away.
+        // sessionStorage persists through redirect cycles in the same tab, so
+        // SolidPodHandleRedirectPage can use this to return the user to the
+        // correct page instead of the stale returnTo stored at login time.
+        const isOAuthCallback = new URLSearchParams(window.location.search).has("code") ||
+          new URLSearchParams(window.location.search).has("state");
+        if (!isOAuthCallback) {
+          sessionStorage.setItem(AUTH_RETURN_TO_KEY, window.location.hash.substring(1) || "/");
+        }
+
         await handleIncomingRedirect({ restorePreviousSession: true });
         const currentSession = getDefaultSession();
         console.log("Session initialized:", {
