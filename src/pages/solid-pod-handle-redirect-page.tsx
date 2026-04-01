@@ -1,16 +1,22 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+export const AUTH_RETURN_TO_KEY = "authReturnTo";
+
 export const SolidPodHandleRedirectPage = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Get the returnTo parameter from the URL
-        const params = new URLSearchParams(window.location.search);
-        const returnTo = params.get("returnTo") || "/";
+        const storedRoute = sessionStorage.getItem(AUTH_RETURN_TO_KEY);
+        if (storedRoute) {
+            sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+            navigate(storedRoute);
+            return;
+        }
 
-        // Redirect to the return route
-        navigate(returnTo);
+        // Fallback: use returnTo from URL params (covers cases where sessionStorage was not set)
+        const params = new URLSearchParams(window.location.search);
+        navigate(params.get("returnTo") || "/");
     }, [navigate]);
 
     return (
