@@ -42,7 +42,7 @@ export function EditQuestionsForm() {
   const watchedFormValues = useWatch({ control });
 
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
-  const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(null);
+  const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(true);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -461,7 +461,7 @@ export function EditQuestionsForm() {
           <div className="hidden lg:block">
             <Button
               type="button"
-              onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+              onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
               variant="secondary"
             >
               Add Question
@@ -542,7 +542,7 @@ export function EditQuestionsForm() {
             )}
             <Button
               type="button"
-              onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+              onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
               variant="secondary"
             >
               Add Question
@@ -622,7 +622,7 @@ export function EditQuestionsForm() {
             <div className="flex flex-wrap items-center gap-3 justify-center">
             <Button
               type="button"
-              onClick={() => appendQuestion(newDraftQuestion(questionFields.length))}
+              onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
               variant="secondary"
             >
               Add Question

@@ -15,7 +15,7 @@ interface AlwaysNeededItemsSectionProps {
 }
 
 export function AlwaysNeededItemsSection({ control, register, watch, setValue, people }: AlwaysNeededItemsSectionProps) {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -58,7 +58,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
                 <div>
-                    <h2 className="text-lg font-medium text-gray-900">Always Needed Items</h2>
+                    <h2 className="text-lg font-medium text-gray-900">Always Needed Items <span className="text-sm font-normal text-gray-500">({itemFields.length} {itemFields.length === 1 ? 'item' : 'items'})</span></h2>
                     <p className="text-sm text-gray-600">Items that should always be included in the packing list.</p>
                 </div>
             </button>
