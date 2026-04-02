@@ -1,15 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
+import { Control, UseFormRegister } from 'react-hook-form'
 import { PeopleSection } from './people-section'
-import { Person } from './types'
+import { PackingListQuestionSet, Person } from './types'
 
 const mockRegister = vi.fn().mockReturnValue({
-    name: '' as any,
+    name: 'people.0.name',
     ref: vi.fn(),
     onChange: vi.fn(),
     onBlur: vi.fn(),
-})
+}) as unknown as UseFormRegister<PackingListQuestionSet>
 
 const mockPeople: Person[] = [
     { id: '1', name: 'Alice' },
@@ -19,7 +20,7 @@ const mockPeople: Person[] = [
 function renderPeopleSection(fields: Person[] = mockPeople) {
     return render(
         <PeopleSection
-            control={undefined as any}
+            control={null as unknown as Control<PackingListQuestionSet>}
             register={mockRegister}
             fields={fields}
             append={vi.fn()}
