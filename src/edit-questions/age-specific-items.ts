@@ -95,12 +95,12 @@ export function getMale(people: Person[]): Person[] {
  * Get female teenagers and adults
  */
 export function getFemaleTeenagersAndAdults(people: Person[]): Person[] {
-    return people.filter(p => p.gender === 'female' && (p.ageRange === 'Teenager' || p.ageRange === 'Adult'))
+    return filterByGender(filterByAgeRanges(people, ['Teenager', 'Adult']), 'female')
 }
 
 /**
  * Get male teenagers and adults
  */
 export function getMaleTeenagersAndAdults(people: Person[]): Person[] {
-    return people.filter(p => p.gender === 'male' && (p.ageRange === 'Teenager' || p.ageRange === 'Adult'))
+    return filterByGender(filterByAgeRanges(people, ['Teenager', 'Adult']), 'male')
 }

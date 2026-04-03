@@ -243,6 +243,7 @@ describe('Wizard', () => {
         )
     })
 
+
     describe("Who's Packing? - remove person", () => {
         function renderWizard() {
             const db = makeDb()

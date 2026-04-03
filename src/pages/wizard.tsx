@@ -95,7 +95,7 @@ export const Wizard = () => {
     }
 
     const handleAddPerson = () => {
-        append({ name: `Person ${fields.length + 1}`, ageRange: undefined })
+        append({ name: `Person ${fields.length + 1}`, ageRange: undefined, gender: undefined })
     }
 
     const handleRemovePerson = (index: number) => {
