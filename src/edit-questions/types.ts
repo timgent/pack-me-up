@@ -13,11 +13,23 @@ export const AGE_RANGE_OPTIONS = [
   { value: 'Adult' as const, label: '🧑 Adult (18+)' }
 ] as const
 
+// Gender Type
+export const GenderSchema = z.enum(['male', 'female', 'other', 'prefer-not-to-say'])
+export type Gender = z.infer<typeof GenderSchema>
+
+export const GENDER_OPTIONS = [
+  { value: 'male' as const, label: 'Male' },
+  { value: 'female' as const, label: 'Female' },
+  { value: 'other' as const, label: 'Non-binary / other' },
+  { value: 'prefer-not-to-say' as const, label: 'Prefer not to say' },
+] as const
+
 // Zod Schemas
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
-  ageRange: AgeRangeSchema.optional()
+  ageRange: AgeRangeSchema.optional(),
+  gender: GenderSchema.optional()
 })
 
 export const PersonSelectionSchema = z.object({

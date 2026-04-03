@@ -18,7 +18,9 @@ import {
     getAdults,
     getTeenagersAndAdults,
     getChildrenAndOlder,
-    getToddlersAndOlder
+    getToddlersAndOlder,
+    getFemaleTeenagersAndAdults,
+    getMaleTeenagersAndAdults,
 } from './age-specific-items';
 
 /**
@@ -83,6 +85,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             order: 2,
             items: [
                 item("Cycling shorts", people, getTeenagersAndAdults),
+                item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Helmet", people, getTeenagersAndAdults),
                 item("Water bottle", people, getTeenagersAndAdults),
                 item("Bike repair kit", people, getTeenagersAndAdults),
@@ -96,6 +99,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             items: [
                 item("Running shoes", people, getTeenagersAndAdults),
                 item("Running clothes", people, getTeenagersAndAdults),
+                item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Sports watch", people, getTeenagersAndAdults),
                 item("Running socks", people, getTeenagersAndAdults)
             ]
@@ -106,6 +110,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             order: 4,
             items: [
                 item("Climbing shoes", people, getTeenagersAndAdults),
+                item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Chalk bag", people, getTeenagersAndAdults),
                 item("Harness", people, getTeenagersAndAdults),
                 item("Climbing gloves", people, getTeenagersAndAdults),
@@ -118,6 +123,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             order: 5,
             items: [
                 item("Hiking boots", people, getChildrenAndOlder),
+                item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Daypack/Backpack", people, getTeenagersAndAdults),
                 item("Walking poles", people, getAdults),
                 item("Trail map", people, getAdults),
@@ -199,6 +205,9 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             item("Passport/ID", people, getAdults),
                             item("Pajamas", people),
                             item("Toiletries bag", people, getTeenagersAndAdults),
+                            item("Menstrual products", people, getFemaleTeenagersAndAdults),
+                            item("Bra", people, getFemaleTeenagersAndAdults),
+                            item("Shaving kit", people, getMaleTeenagersAndAdults),
                             item("Underwear", people, getToddlersAndOlder),
                             item("Socks", people),
                             item("T-shirt/Top", people),

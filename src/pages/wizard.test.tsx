@@ -228,6 +228,22 @@ describe('Wizard', () => {
         )
     })
 
+    it('renders a gender select for each person', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText('Select gender...')).toBeTruthy()
+        )
+    })
+
+
     describe("Who's Packing? - remove person", () => {
         function renderWizard() {
             const db = makeDb()

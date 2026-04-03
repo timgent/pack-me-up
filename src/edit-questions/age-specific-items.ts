@@ -1,4 +1,4 @@
-import { Person, AgeRange } from './types'
+import { Person, AgeRange, Gender } from './types'
 
 /**
  * Helper function to filter people by age range
@@ -68,4 +68,39 @@ export function getChildrenAndOlder(people: Person[]): Person[] {
  */
 export function getToddlersAndOlder(people: Person[]): Person[] {
     return filterByAgeRanges(people, ['Toddler', 'Child', 'Teenager', 'Adult'])
+}
+
+/**
+ * Helper to filter people by gender
+ */
+function filterByGender(people: Person[], gender: Gender): Person[] {
+    return people.filter(p => p.gender === gender)
+}
+
+/**
+ * Get all female people
+ */
+export function getFemale(people: Person[]): Person[] {
+    return filterByGender(people, 'female')
+}
+
+/**
+ * Get all male people
+ */
+export function getMale(people: Person[]): Person[] {
+    return filterByGender(people, 'male')
+}
+
+/**
+ * Get female teenagers and adults
+ */
+export function getFemaleTeenagersAndAdults(people: Person[]): Person[] {
+    return filterByGender(filterByAgeRanges(people, ['Teenager', 'Adult']), 'female')
+}
+
+/**
+ * Get male teenagers and adults
+ */
+export function getMaleTeenagersAndAdults(people: Person[]): Person[] {
+    return filterByGender(filterByAgeRanges(people, ['Teenager', 'Adult']), 'male')
 }
