@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react'
 import { HashRouter } from 'react-router-dom'
 import { Route } from 'react-router-dom'
 import { Routes } from 'react-router-dom'
@@ -22,6 +23,7 @@ function App() {
       <SolidPodProvider>
         <DatabaseProvider>
         <HashRouter>
+            <Analytics />
           <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
             <Navigation />
             <SessionExpiredBanner />
