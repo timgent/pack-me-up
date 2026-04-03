@@ -101,10 +101,38 @@ describe('createExampleData - gender-specific items', () => {
         expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
     })
 
-    it('includes Sports bra selected for female adult swimmer', () => {
+    it('includes Sports bra selected for female adult runner', () => {
+        const result = createExampleData([femaleAdult, maleAdult])
+        const activities = result.questions.find(q => q.text === 'What activities will you be doing?')!
+        const runningItems = activities.options.find(o => o.id === ACTIVITY_OPTION_IDS.running)!.items
+        const item = runningItems.find(i => i.text === 'Sports bra')
+        expect(item).toBeTruthy()
+        expect(item!.personSelections.find(ps => ps.personId === femaleAdult.id)?.selected).toBe(true)
+        expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
+    })
+
+    it('does not include Sports bra in swimming (swimsuit covers that)', () => {
         const result = createExampleData([femaleAdult, maleAdult])
         const items = getSwimmingItems(result)
-        const item = items.find(i => i.text === 'Sports bra')
+        expect(items.find(i => i.text === 'Sports bra')).toBeUndefined()
+    })
+
+    it('includes Sports bra for female adults in cycling, hiking, and climbing', () => {
+        const result = createExampleData([femaleAdult, maleAdult])
+        const activities = result.questions.find(q => q.text === 'What activities will you be doing?')!
+        for (const actId of [ACTIVITY_OPTION_IDS.cycling, ACTIVITY_OPTION_IDS.hiking, ACTIVITY_OPTION_IDS.climbing]) {
+            const items = activities.options.find(o => o.id === actId)!.items
+            const bra = items.find(i => i.text === 'Sports bra')
+            expect(bra, `Sports bra missing from ${actId}`).toBeTruthy()
+            expect(bra!.personSelections.find(ps => ps.personId === femaleAdult.id)?.selected).toBe(true)
+            expect(bra!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
+        }
+    })
+
+    it('includes Bra selected for female adult in overnight packing', () => {
+        const result = createExampleData([femaleAdult, maleAdult])
+        const items = getOvernightYesItems(result)
+        const item = items.find(i => i.text === 'Bra')
         expect(item).toBeTruthy()
         expect(item!.personSelections.find(ps => ps.personId === femaleAdult.id)?.selected).toBe(true)
         expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
