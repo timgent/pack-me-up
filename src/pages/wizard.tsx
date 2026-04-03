@@ -10,7 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { wizardSchema, WizardFormData } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
-import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
+import { AGE_RANGE_OPTIONS, GENDER_OPTIONS } from '../edit-questions/types'
 
 const SOLID_POD_UPSELL_SHOWN_KEY = 'solid-pod-upsell-shown'
 
@@ -102,7 +102,7 @@ export const Wizard = () => {
         if (fields.length > 1) {
             remove(index)
         } else {
-            update(0, { name: '', ageRange: undefined })
+            update(0, { name: '', ageRange: undefined, gender: undefined })
         }
     }
 
@@ -146,7 +146,7 @@ export const Wizard = () => {
                         {fields.map((field, index) => (
                             <div key={field.id} className="bg-primary-50 p-4 rounded-xl border border-primary-200">
                                 <div className="flex items-start gap-4">
-                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                                 Name
@@ -181,6 +181,25 @@ export const Wizard = () => {
                                             {errors.people?.[index]?.ageRange && (
                                                 <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.ageRange?.message}</p>
                                             )}
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Gender{' '}
+                                                <span className="text-xs text-gray-500 font-normal">
+                                                    (optional)
+                                                </span>
+                                            </label>
+                                            <select
+                                                {...register(`people.${index}.gender`)}
+                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                            >
+                                                <option value="">Select gender...</option>
+                                                {GENDER_OPTIONS.map(option => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
                                     <button

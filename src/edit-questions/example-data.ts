@@ -18,7 +18,9 @@ import {
     getAdults,
     getTeenagersAndAdults,
     getChildrenAndOlder,
-    getToddlersAndOlder
+    getToddlersAndOlder,
+    getFemaleTeenagersAndAdults,
+    getMaleTeenagersAndAdults,
 } from './age-specific-items';
 
 /**
@@ -50,6 +52,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             order: 0,
             items: [
                 item("Swimsuit", people, getToddlersAndOlder),
+                item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Swim towel", people),
                 item("Goggles", people, getChildrenAndOlder),
                 item("Swim cap", people, getChildrenAndOlder),
@@ -199,6 +202,8 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             item("Passport/ID", people, getAdults),
                             item("Pajamas", people),
                             item("Toiletries bag", people, getTeenagersAndAdults),
+                            item("Menstrual products", people, getFemaleTeenagersAndAdults),
+                            item("Shaving kit", people, getMaleTeenagersAndAdults),
                             item("Underwear", people, getToddlersAndOlder),
                             item("Socks", people),
                             item("T-shirt/Top", people),

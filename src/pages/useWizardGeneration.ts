@@ -17,7 +17,8 @@ export function useWizardGeneration() {
         const people: Person[] = data.people.map(p => ({
             id: generateUUID(),
             name: p.name,
-            ageRange: p.ageRange
+            ageRange: p.ageRange,
+            gender: p.gender
         }))
         return createExampleData(people, [])
     }
