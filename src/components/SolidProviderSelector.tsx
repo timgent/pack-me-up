@@ -5,21 +5,30 @@ import { Button } from './Button';
 export interface SolidProvider {
   name: string;
   issuer: string;
+  description?: string;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const COMMON_PROVIDERS: SolidProvider[] = [
   {
-    name: 'Inrupt',
-    issuer: 'https://login.inrupt.com'
+    name: 'Inrupt PodSpaces',
+    issuer: 'https://login.inrupt.com',
+    description: 'Free · run by Inrupt (Tim Berners-Lee\'s company)'
   },
   {
     name: 'solidcommunity.net',
-    issuer: 'https://solidcommunity.net'
+    issuer: 'https://solidcommunity.net',
+    description: 'Free · community-run, backed by the Open Data Institute'
   },
   {
     name: 'solidweb.org',
-    issuer: 'https://solidweb.org'
+    issuer: 'https://solidweb.org',
+    description: 'Free · EU-hosted'
+  },
+  {
+    name: 'Private Data Pod',
+    issuer: 'https://privatedatapod.com',
+    description: 'Free · 1 GB storage · beginner-friendly'
   }
 ];
 
@@ -73,14 +82,17 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-800 underline"
             >
-              Learn more about Solid
+              Get a free Pod
             </a>
           </p>
         </div>
 
         <div className="border-t border-gray-200 pt-4">
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="text-sm text-gray-600 mb-1">
             Choose your Solid Pod provider to get started:
+          </p>
+          <p className="text-xs text-green-700 font-medium mb-3">
+            All providers below are free — no payment required.
           </p>
         </div>
 
@@ -92,10 +104,17 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
               className="w-full text-left px-4 py-3 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-md transition-colors"
             >
               <div className="font-medium text-gray-900">{provider.name}</div>
-              <div className="text-sm text-gray-500">{provider.issuer}</div>
+              {provider.description && (
+                <div className="text-xs text-green-700 font-medium">{provider.description}</div>
+              )}
+              <div className="text-xs text-gray-400">{provider.issuer}</div>
             </button>
           ))}
         </div>
+
+        <p className="text-xs text-gray-500 text-center">
+          No Pod? No problem — your data saves locally in your browser automatically.
+        </p>
 
         {!showCustomInput ? (
           <Button
