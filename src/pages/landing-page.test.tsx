@@ -98,16 +98,16 @@ describe('LandingPage', () => {
         expect(solidPodHeading.closest('[class*="bg-primary-950"]')).toBeNull()
     })
 
-    it('shows a "Login with Solid Pod" button on the page when not logged in', () => {
+    it('shows a "Get a free Solid Pod" button on the page when not logged in', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        expect(screen.getByRole('button', { name: /login with solid pod/i })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /get a free solid pod/i })).toBeTruthy()
     })
 
     it('opens the provider selector modal when the login button is clicked', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        const loginButton = screen.getByRole('button', { name: /login with solid pod/i })
+        const loginButton = screen.getByRole('button', { name: /get a free solid pod/i })
         fireEvent.click(loginButton)
         expect(screen.getByRole('dialog')).toBeTruthy()
     })
