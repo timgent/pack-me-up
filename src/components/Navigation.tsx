@@ -63,7 +63,13 @@ export const Navigation = () => {
                             </div>
                         </div>
                         {/* Solid Login/Logout section */}
-                        <div className="hidden md:flex items-center gap-2">
+                        <div className="hidden md:flex items-center gap-4">
+                            <a
+                                href="mailto:tim.packmeup@gmail.com"
+                                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white/70 hover:text-white transition-colors duration-200"
+                            >
+                                Feedback
+                            </a>
                             {isLoggedIn ? (
                                 <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl">
                                     <span className="text-sm font-medium truncate max-w-xs" title={webId}>
@@ -155,6 +161,13 @@ export const Navigation = () => {
                                 Backups
                             </Link>
                         )}
+                        <a
+                            href="mailto:tim.packmeup@gmail.com"
+                            className="block px-3 py-2 rounded-xl text-base font-medium text-white/70 hover:text-white transition-colors duration-200"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Feedback
+                        </a>
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">
                             {isLoggedIn ? (
