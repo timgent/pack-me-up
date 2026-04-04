@@ -3,25 +3,21 @@ import { useNavigate } from 'react-router-dom'
 import { PackingList } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, loadMultipleFilesFromPod, saveFileToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
-    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
     const [listToDelete, setListToDelete] = useState<{ id: string; name: string } | null>(null)
     const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
     const [renameValue, setRenameValue] = useState('')
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
-    const { showToast } = useToast()
     const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
@@ -41,8 +37,10 @@ export function PackingLists() {
         try {
             const list = packingLists.find(l => l.id === listToRename.id)
             if (!list) return
-            await db.savePackingList({ ...list, name: renameValue })
-            setPackingLists(packingLists.map(l => l.id === listToRename.id ? { ...l, name: renameValue } : l))
+            const updatedList = { ...list, name: renameValue }
+            await db.savePackingList(updatedList)
+            setPackingLists(packingLists.map(l => l.id === listToRename.id ? updatedList : l))
+            syncListToPod(updatedList)
         } catch (err) {
             console.error('Error renaming packing list:', err)
         } finally {
@@ -61,6 +59,7 @@ export function PackingLists() {
             }
             await db.savePackingList(newList)
             setPackingLists([newList, ...packingLists])
+            syncListToPod(newList)
         } catch (err) {
             console.error('Error duplicating packing list:', err)
         }
@@ -68,9 +67,11 @@ export function PackingLists() {
 
     const confirmDeletePackingList = async () => {
         if (!listToDelete) return
+        const { id } = listToDelete
         try {
-            await db.deletePackingList(listToDelete.id)
-            setPackingLists(packingLists.filter(list => list.id !== listToDelete.id))
+            await db.deletePackingList(id)
+            setPackingLists(packingLists.filter(list => list.id !== id))
+            removeListFromPod(id)
         } catch (err) {
             console.error('Error deleting packing list:', err)
         } finally {
@@ -78,82 +79,71 @@ export function PackingLists() {
         }
     }
 
-    const handleSaveToPod = async () => {
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
-            return
-        }
-
-        setIsSaving(true)
+    const syncListToPod = async (list: PackingList) => {
+        if (!isLoggedIn) return
         try {
-            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-
-            const result = await saveMultipleFilesToPod(session!, containerUrl, packingLists)
-
-            if (result.success) {
-                showToast(`Successfully saved ${result.successCount} packing list(s) to Solid Pod!`, 'success')
-            } else {
-                showToast(`Saved ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
-            }
+            const podUrl = await getPrimaryPodUrl(session)
+            if (!podUrl) return
+            await saveFileToPod({
+                session: session!,
+                containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
+                filename: `${list.id}.json`,
+                data: list,
+            })
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
-        } finally {
-            setIsSaving(false)
         }
     }
 
-    const handleLoadFromPod = async () => {
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
-            return
+    const removeListFromPod = async (id: string) => {
+        if (!isLoggedIn) return
+        try {
+            const podUrl = await getPrimaryPodUrl(session)
+            if (!podUrl) return
+            await deleteFileFromPod(session!, `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`)
+        } catch (error) {
+            handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         }
+    }
 
-        setIsLoadingFromPod(true)
+    const loadFromPod = async () => {
+        const podUrl = await getPrimaryPodUrl(session)
+        if (!podUrl) return null
+
         try {
             const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-
             const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
                 session: session!,
                 containerPath: containerUrl
             })
 
-            if (result.totalCount === 0) {
-                showToast(POD_ERROR_MESSAGES.NO_DATA_FOUND('packing lists'), 'error')
-                return
-            }
+            if (result.totalCount === 0) return result
 
-            // First, delete all existing local packing lists
             const existingLists = await db.getAllPackingLists()
             for (const existingList of existingLists) {
                 await db.deletePackingList(existingList.id)
             }
-
-            // Then save each loaded list to local database
             for (const list of loadedLists) {
-                // Remove _rev to avoid conflicts with local database version
                 delete list._rev
                 await db.savePackingList(list)
             }
 
-            // Refresh the local list
             const allLists = await db.getAllPackingLists()
             setPackingLists(allLists)
 
-            if (result.success) {
-                showToast(`Successfully loaded ${result.successCount} packing list(s) from Solid Pod!`, 'success')
-            } else {
-                showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
-            }
+            return result
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
-        } finally {
-            setIsLoadingFromPod(false)
+            return null
         }
     }
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            loadFromPod()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoggedIn])
 
     useEffect(() => {
         const fetchPackingLists = async () => {
@@ -177,35 +167,9 @@ export function PackingLists() {
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                        <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
-                    </div>
-                    {isLoggedIn && (
-                        <div className="flex gap-3">
-                            <Button
-                                type="button"
-                                onClick={handleSaveToPod}
-                                disabled={isSaving || packingLists.length === 0}
-                                variant="ghost"
-                                className="text-base"
-                            >
-                                <span className="text-2xl mr-2">☁️</span>
-                                {isSaving ? 'Saving to Pod...' : 'Save to Pod'}
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleLoadFromPod}
-                                disabled={isLoadingFromPod}
-                                variant="ghost"
-                                className="text-base"
-                            >
-                                <span className="text-2xl mr-2">📥</span>
-                                {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
-                            </Button>
-                        </div>
-                    )}
+                <div className="mb-2">
+                    <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
+                    <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                 </div>
             </div>
 
