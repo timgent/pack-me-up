@@ -13,7 +13,7 @@ export const COMMON_PROVIDERS: SolidProvider[] = [
   {
     name: 'Inrupt PodSpaces',
     issuer: 'https://login.inrupt.com',
-    description: 'Free · run by Inrupt (Tim Berners-Lee\'s company)'
+    description: 'Free · run by Inrupt (founded by Tim Berners-Lee, inventor of the Web)'
   },
   {
     name: 'solidcommunity.net',
