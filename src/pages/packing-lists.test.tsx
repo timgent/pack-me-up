@@ -41,9 +41,13 @@ vi.mock('../services/solidPod', () => ({
 
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
+import { useToast } from '../components/ToastContext'
+import { getPrimaryPodUrl, loadMultipleFilesFromPod } from '../services/solidPod'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
+const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
+const mockLoadMultipleFilesFromPod = vi.mocked(loadMultipleFilesFromPod)
 
 const testPackingList = {
     id: 'list-1',
@@ -380,5 +384,63 @@ describe('PackingLists duplicate', () => {
                 expect.objectContaining({ name: 'Copy of Summer Holiday', id: 'new-uuid' })
             )
         })
+    })
+})
+
+describe('PackingLists auto-sync on login', () => {
+    const loggedInSession = { fetch: vi.fn() } as any
+
+    function makeLoggedInDb(lists = [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }]) {
+        return {
+            getAllPackingLists: vi.fn().mockResolvedValue(lists),
+            deletePackingList: vi.fn().mockResolvedValue(undefined),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+    }
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: loggedInSession,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
+    })
+
+    it('automatically calls loadMultipleFilesFromPod on mount when logged in', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb() as unknown as PackingAppDatabase })
+        mockLoadMultipleFilesFromPod.mockResolvedValue({
+            data: [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }],
+            result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
+        })
+
+        renderComponent()
+
+        await waitFor(() => {
+            expect(mockLoadMultipleFilesFromPod).toHaveBeenCalled()
+        })
+    })
+
+    it('does not show a "no data found" toast when pod has no packing lists on auto-sync', async () => {
+        const showToast = vi.fn()
+        vi.mocked(useToast).mockReturnValue({ showToast })
+        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb([]) as unknown as PackingAppDatabase })
+        mockLoadMultipleFilesFromPod.mockResolvedValue({
+            data: [],
+            result: { success: true, successCount: 0, failCount: 0, totalCount: 0 },
+        })
+
+        renderComponent()
+
+        await waitFor(() => {
+            expect(mockLoadMultipleFilesFromPod).toHaveBeenCalled()
+        })
+        expect(showToast).not.toHaveBeenCalledWith(
+            expect.stringContaining('No packing lists found'),
+            expect.anything()
+        )
     })
 })

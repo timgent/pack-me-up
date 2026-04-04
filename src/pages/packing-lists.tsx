@@ -78,6 +78,41 @@ export function PackingLists() {
         }
     }
 
+    const loadFromPod = async () => {
+        const podUrl = await getPrimaryPodUrl(session)
+        if (!podUrl) return null
+
+        setIsLoadingFromPod(true)
+        try {
+            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+            const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
+                session: session!,
+                containerPath: containerUrl
+            })
+
+            if (result.totalCount === 0) return result
+
+            const existingLists = await db.getAllPackingLists()
+            for (const existingList of existingLists) {
+                await db.deletePackingList(existingList.id)
+            }
+            for (const list of loadedLists) {
+                delete list._rev
+                await db.savePackingList(list)
+            }
+
+            const allLists = await db.getAllPackingLists()
+            setPackingLists(allLists)
+
+            return result
+        } catch (error) {
+            handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
+            return null
+        } finally {
+            setIsLoadingFromPod(false)
+        }
+    }
+
     const handleSaveToPod = async () => {
         const podUrl = await getPrimaryPodUrl(session)
 
@@ -106,54 +141,32 @@ export function PackingLists() {
 
     const handleLoadFromPod = async () => {
         const podUrl = await getPrimaryPodUrl(session)
-
         if (!podUrl) {
             showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
             return
         }
 
-        setIsLoadingFromPod(true)
-        try {
-            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+        const result = await loadFromPod()
+        if (!result) return
 
-            const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
-                session: session!,
-                containerPath: containerUrl
-            })
+        if (result.totalCount === 0) {
+            showToast(POD_ERROR_MESSAGES.NO_DATA_FOUND('packing lists'), 'error')
+            return
+        }
 
-            if (result.totalCount === 0) {
-                showToast(POD_ERROR_MESSAGES.NO_DATA_FOUND('packing lists'), 'error')
-                return
-            }
-
-            // First, delete all existing local packing lists
-            const existingLists = await db.getAllPackingLists()
-            for (const existingList of existingLists) {
-                await db.deletePackingList(existingList.id)
-            }
-
-            // Then save each loaded list to local database
-            for (const list of loadedLists) {
-                // Remove _rev to avoid conflicts with local database version
-                delete list._rev
-                await db.savePackingList(list)
-            }
-
-            // Refresh the local list
-            const allLists = await db.getAllPackingLists()
-            setPackingLists(allLists)
-
-            if (result.success) {
-                showToast(`Successfully loaded ${result.successCount} packing list(s) from Solid Pod!`, 'success')
-            } else {
-                showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
-            }
-        } catch (error) {
-            handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
-        } finally {
-            setIsLoadingFromPod(false)
+        if (result.success) {
+            showToast(`Successfully loaded ${result.successCount} packing list(s) from Solid Pod!`, 'success')
+        } else {
+            showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
         }
     }
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            loadFromPod()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoggedIn])
 
     useEffect(() => {
         const fetchPackingLists = async () => {
