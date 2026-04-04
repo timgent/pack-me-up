@@ -194,6 +194,20 @@ export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
 }
 
 /**
+ * Deletes a single file from a Pod
+ */
+export async function deleteFileFromPod(session: Session, fileUrl: string): Promise<void> {
+    try {
+        await deleteFile(fileUrl, { fetch: session.fetch })
+    } catch (error) {
+        if (isAuthenticationError(error)) {
+            handlePodError(error)
+        }
+        throw error
+    }
+}
+
+/**
  * Loads a single file from a Pod
  */
 export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T> {
