@@ -75,16 +75,6 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
             <li><strong>Privacy-focused</strong> - you choose who can access it</li>
             <li><strong>Portable</strong> - use your Pod with any Solid app</li>
           </ul>
-          <p className="text-xs text-gray-600 mt-2">
-            <a
-              href="https://solidproject.org/users/get-a-pod"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline"
-            >
-              Get a free Pod
-            </a>
-          </p>
         </div>
 
         <div className="border-t border-gray-200 pt-4">
