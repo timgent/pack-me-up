@@ -582,3 +582,54 @@ describe('PackingLists pod sync on mutation', () => {
         expect(mockSaveFileToPod).not.toHaveBeenCalled()
     })
 })
+
+describe('PackingLists local-only lists preserved when loading from pod', () => {
+    const loggedInSession = { fetch: vi.fn() } as unknown as Session
+
+    const podList = { id: 'pod-list-1', name: 'Old Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }
+    const localOnlyList = { id: 'local-only-1', name: 'Newly Created List', createdAt: '2026-02-01T00:00:00Z', items: [] }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: loggedInSession,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
+        // Pod has only the old list (local-only-1 was never synced)
+        mockLoadMultipleFilesFromPod.mockResolvedValue({
+            data: [podList],
+            result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
+        })
+        mockSaveFileToPod.mockResolvedValue(undefined)
+    })
+
+    it('shows locally created list that has not yet been synced to pod', async () => {
+        // Simulate a real DB: starts with both lists, and deletePackingList actually removes from state
+        const dbState = new Map([
+            [podList.id, podList],
+            [localOnlyList.id, localOnlyList],
+        ])
+
+        const db = {
+            getAllPackingLists: vi.fn().mockImplementation(async () => Array.from(dbState.values())),
+            deletePackingList: vi.fn().mockImplementation(async (id: string) => { dbState.delete(id) }),
+            savePackingList: vi.fn().mockImplementation(async (list: typeof podList) => {
+                dbState.set(list.id, list)
+                return { rev: '1' }
+            }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await waitFor(() => {
+            expect(screen.getByText(/Old Pod List/)).toBeTruthy()
+            expect(screen.getByText(/Newly Created List/)).toBeTruthy()
+        })
+    })
+})
