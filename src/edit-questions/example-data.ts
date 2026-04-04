@@ -212,6 +212,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             item("Socks", people),
                             item("T-shirt/Top", people),
                             item("Trousers/Shorts", people),
+                            item("Jumper", people),
                             // Baby items
                             item("Baby monitor", people, getBabies),
                             item("Nightlight", people, getBabies),
