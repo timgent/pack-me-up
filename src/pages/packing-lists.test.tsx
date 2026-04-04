@@ -41,6 +41,7 @@ vi.mock('../services/solidPod', () => ({
     },
 }))
 
+import type { Session } from '@inrupt/solid-client-authn-browser'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
@@ -392,7 +393,7 @@ describe('PackingLists duplicate', () => {
 })
 
 describe('PackingLists auto-sync on login', () => {
-    const loggedInSession = { fetch: vi.fn() } as any
+    const loggedInSession = { fetch: vi.fn() } as unknown as Session
 
     function makeLoggedInDb(lists = [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }]) {
         return {
@@ -450,7 +451,7 @@ describe('PackingLists auto-sync on login', () => {
 })
 
 describe('PackingLists pod sync on mutation', () => {
-    const loggedInSession = { fetch: vi.fn() } as any
+    const loggedInSession = { fetch: vi.fn() } as unknown as Session
 
     function makeDb() {
         return {
