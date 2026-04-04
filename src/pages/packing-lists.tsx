@@ -3,25 +3,21 @@ import { useNavigate } from 'react-router-dom'
 import { PackingList } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { useToast } from '../components/ToastContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveMultipleFilesToPod, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
-    const [isLoadingFromPod, setIsLoadingFromPod] = useState(false)
     const [listToDelete, setListToDelete] = useState<{ id: string; name: string } | null>(null)
     const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
     const [renameValue, setRenameValue] = useState('')
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
-    const { showToast } = useToast()
     const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
@@ -82,7 +78,6 @@ export function PackingLists() {
         const podUrl = await getPrimaryPodUrl(session)
         if (!podUrl) return null
 
-        setIsLoadingFromPod(true)
         try {
             const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
             const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
@@ -108,56 +103,6 @@ export function PackingLists() {
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
             return null
-        } finally {
-            setIsLoadingFromPod(false)
-        }
-    }
-
-    const handleSaveToPod = async () => {
-        const podUrl = await getPrimaryPodUrl(session)
-
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN, 'error')
-            return
-        }
-
-        setIsSaving(true)
-        try {
-            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-
-            const result = await saveMultipleFilesToPod(session!, containerUrl, packingLists)
-
-            if (result.success) {
-                showToast(`Successfully saved ${result.successCount} packing list(s) to Solid Pod!`, 'success')
-            } else {
-                showToast(`Saved ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
-            }
-        } catch (error) {
-            handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const handleLoadFromPod = async () => {
-        const podUrl = await getPrimaryPodUrl(session)
-        if (!podUrl) {
-            showToast(POD_ERROR_MESSAGES.NOT_LOGGED_IN_LOAD, 'error')
-            return
-        }
-
-        const result = await loadFromPod()
-        if (!result) return
-
-        if (result.totalCount === 0) {
-            showToast(POD_ERROR_MESSAGES.NO_DATA_FOUND('packing lists'), 'error')
-            return
-        }
-
-        if (result.success) {
-            showToast(`Successfully loaded ${result.successCount} packing list(s) from Solid Pod!`, 'success')
-        } else {
-            showToast(`Loaded ${result.successCount}/${result.totalCount} packing list(s). ${result.failCount} failed.`, 'error')
         }
     }
 
@@ -190,35 +135,9 @@ export function PackingLists() {
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                        <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
-                    </div>
-                    {isLoggedIn && (
-                        <div className="flex gap-3">
-                            <Button
-                                type="button"
-                                onClick={handleSaveToPod}
-                                disabled={isSaving || packingLists.length === 0}
-                                variant="ghost"
-                                className="text-base"
-                            >
-                                <span className="text-2xl mr-2">☁️</span>
-                                {isSaving ? 'Saving to Pod...' : 'Save to Pod'}
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleLoadFromPod}
-                                disabled={isLoadingFromPod}
-                                variant="ghost"
-                                className="text-base"
-                            >
-                                <span className="text-2xl mr-2">📥</span>
-                                {isLoadingFromPod ? 'Loading from Pod...' : 'Load from Pod'}
-                            </Button>
-                        </div>
-                    )}
+                <div className="mb-2">
+                    <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
+                    <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                 </div>
             </div>
 
