@@ -202,9 +202,9 @@ export function PackingLists() {
                                 onClick={() => navigate(`/view-lists/${list.id}`)}
                                 className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-soft border-2 p-6 hover:shadow-glow-primary hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
                             >
-                                <div className="flex justify-between items-center mb-3">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                                     <h3 className="text-xl font-bold text-gray-900">✈️ {list.name}</h3>
-                                    <div className="flex items-center gap-4">
+                                    <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
                                         <span className="text-sm font-medium text-gray-600 bg-white/60 px-3 py-1 rounded-lg">
                                             📅 {new Date(list.createdAt).toLocaleDateString()}
                                         </span>

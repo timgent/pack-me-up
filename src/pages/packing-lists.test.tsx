@@ -351,6 +351,29 @@ describe('PackingLists rename', () => {
     })
 })
 
+describe('PackingLists mobile layout', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('action buttons container wraps on small screens (has flex-wrap class)', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        renderComponent()
+        await screen.findByText(/Summer Holiday/)
+        const buttonsContainer = document.querySelector('[data-testid="list-actions"]')
+        expect(buttonsContainer).not.toBeNull()
+        expect(buttonsContainer!.className).toContain('flex-wrap')
+    })
+})
+
 describe('PackingLists duplicate', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
