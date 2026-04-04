@@ -60,6 +60,9 @@ export function SolidPodPrompt({
             <h4 className="font-bold text-primary-900 text-sm">Benefits of using a Solid Pod:</h4>
             <ul className="text-sm text-gray-700 space-y-1.5 ml-4 list-disc">
               <li>
+                <strong>Free</strong> - All major Pod providers are free to sign up
+              </li>
+              <li>
                 <strong>Multi-device access</strong> - Access your packing lists from any device
               </li>
               <li>
