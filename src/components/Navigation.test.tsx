@@ -51,6 +51,18 @@ describe('Navigation', () => {
         expect(screen.queryByText('Edit Questions')).toBeNull()
     })
 
+    it('shows feedback email link', () => {
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        const feedbackLinks = screen.getAllByRole('link', { name: /feedback/i })
+        expect(feedbackLinks.length).toBeGreaterThan(0)
+        expect(feedbackLinks[0].getAttribute('href')).toBe('mailto:tim.packmeup@gmail.com')
+    })
+
     it('shows Backups link when logged in', () => {
         mockUseSolidPod.mockReturnValue({
             session: null,
