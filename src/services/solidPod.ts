@@ -110,10 +110,13 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
         return null
     }
 
-    const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
-
-    if (podUrls && podUrls.length > 0) {
-        return podUrls[0]
+    try {
+        const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
+        if (podUrls && podUrls.length > 0) {
+            return podUrls[0]
+        }
+    } catch {
+        // getPodUrlAll failed (e.g. CSS v7 doesn't expose pim:storage) — fall through to derivation
     }
 
     // Fallback: derive Pod URL from WebID using CSS convention.
