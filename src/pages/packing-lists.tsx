@@ -120,12 +120,24 @@ export function PackingLists() {
             if (result.totalCount === 0) return result
 
             const existingLists = await db.getAllPackingLists()
+            const podListIds = new Set(loadedLists.map(l => l.id))
+
+            // Only delete local lists that are also in the pod (they'll be replaced with the pod version).
+            // Local-only lists (not yet synced) are preserved and synced up to the pod.
             for (const existingList of existingLists) {
-                await db.deletePackingList(existingList.id)
+                if (podListIds.has(existingList.id)) {
+                    await db.deletePackingList(existingList.id)
+                }
             }
             for (const list of loadedLists) {
                 delete list._rev
                 await db.savePackingList(list)
+            }
+
+            // Sync any local-only lists to the pod so they aren't lost on future loads
+            const localOnlyLists = existingLists.filter(l => !podListIds.has(l.id))
+            for (const localList of localOnlyLists) {
+                await syncListToPod(localList)
             }
 
             const allLists = await db.getAllPackingLists()

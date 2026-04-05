@@ -24,12 +24,23 @@ vi.mock('../hooks/useHasQuestions', () => ({
     useHasQuestions: vi.fn(),
 }))
 
+vi.mock('../services/solidPod', () => ({
+    getPrimaryPodUrl: vi.fn(),
+    saveFileToPod: vi.fn(),
+    POD_CONTAINERS: { PACKING_LISTS: 'pack-me-up/packing-lists/' },
+    POD_ERROR_MESSAGES: { SAVE_FAILED: 'Save failed' },
+}))
+
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
 import { ToastType } from '../components/Toast'
 import { PackingAppDatabase } from '../services/database'
 import { CreatePackingList } from './create-packing-list'
+import { getPrimaryPodUrl, saveFileToPod } from '../services/solidPod'
+
+const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
+const mockSaveFileToPod = vi.mocked(saveFileToPod)
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockUseDatabase = vi.mocked(useDatabase)
@@ -506,5 +517,73 @@ describe('CreatePackingList - login button', () => {
         const loginButton = screen.getByRole('button', { name: /login with solid pod/i })
         fireEvent.click(loginButton)
         expect(screen.getByRole('dialog')).toBeTruthy()
+    })
+})
+
+describe('CreatePackingList – pod sync on creation', () => {
+    const loggedInSession = { fetch: vi.fn() } as ReturnType<typeof useSolidPod>['session']
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            session: loggedInSession,
+            isLoggedIn: true,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
+        mockSaveFileToPod.mockResolvedValue(undefined)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('syncs the newly created list to the pod immediately after saving', async () => {
+        mockUseDatabase.mockReturnValue({
+            db: makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([]) }),
+        } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My New List' } })
+        fireEvent.click(screen.getByRole('radio', { name: /beach/i }))
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => {
+            expect(mockSaveFileToPod).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
+                    data: expect.objectContaining({ name: 'My New List' }),
+                })
+            )
+        })
+    })
+
+    it('does not call saveFileToPod when not logged in', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([]) })
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My New List' } })
+        fireEvent.click(screen.getByRole('radio', { name: /beach/i }))
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(vi.mocked(db.savePackingList)).toHaveBeenCalled())
+        expect(mockSaveFileToPod).not.toHaveBeenCalled()
     })
 })

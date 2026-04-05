@@ -9,6 +9,7 @@ import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
+import { getPrimaryPodUrl, saveFileToPod, POD_CONTAINERS } from '../services/solidPod'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -144,7 +145,7 @@ export function CreatePackingList() {
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
-    const { isLoggedIn, login } = useSolidPod()
+    const { isLoggedIn, login, session } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { db } = useDatabase()
     const navigate = useNavigate()
@@ -294,6 +295,17 @@ export function CreatePackingList() {
         }
         try {
             await db.savePackingList(packingList)
+            if (isLoggedIn) {
+                const podUrl = await getPrimaryPodUrl(session)
+                if (podUrl) {
+                    await saveFileToPod({
+                        session: session!,
+                        containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
+                        filename: `${packingList.id}.json`,
+                        data: packingList,
+                    })
+                }
+            }
             showToast('Packing list created successfully!', 'success')
             // Navigate to the newly created packing list
             navigate(`/view-lists/${packingList.id}`)
