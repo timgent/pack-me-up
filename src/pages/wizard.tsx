@@ -168,7 +168,7 @@ export const Wizard = () => {
                                                 </span>
                                             </label>
                                             <select
-                                                {...register(`people.${index}.ageRange`)}
+                                                {...register(`people.${index}.ageRange`, { setValueAs: v => v === '' ? undefined : v })}
                                                 className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                             >
                                                 <option value="">Select age range...</option>
@@ -190,7 +190,7 @@ export const Wizard = () => {
                                                 </span>
                                             </label>
                                             <select
-                                                {...register(`people.${index}.gender`)}
+                                                {...register(`people.${index}.gender`, { setValueAs: v => v === '' ? undefined : v })}
                                                 className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                             >
                                                 <option value="">Select gender...</option>

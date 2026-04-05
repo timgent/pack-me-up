@@ -26,6 +26,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
+  timeout: 90_000,
   use: {
     baseURL: APP_URL,
     trace: 'on-first-retry',

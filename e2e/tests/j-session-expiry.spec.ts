@@ -1,38 +1,32 @@
 import { test, expect } from '../fixtures'
-import { loginToCss } from '../helpers/login'
 
 const CSS_ISSUER = process.env.CSS_ISSUER ?? 'http://localhost:4001'
-const TEST_EMAIL = 'test@example.com'
-const TEST_PASSWORD = 'test1234'
+const TEST_POD_NAME = 'testuser'
 
 test.describe('J – Session Expiry', () => {
   test('J1: session expired banner shows when pod returns 401', async ({ authedPage: page }) => {
-    // Invalidate the Solid session by clearing OIDC tokens from storage
-    // The app stores solid-client-authn session info in sessionStorage
-    await page.evaluate(() => {
-      // Clear all OIDC-related storage so next Pod request returns 401
-      const keysToRemove: string[] = []
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i)
-        if (key) keysToRemove.push(key)
+    // Intercept the webId HEAD request to simulate a 401 (session expired).
+    // SolidPodContext's validateSession makes a HEAD request to the webId when
+    // the tab becomes visible; a 401 triggers setSessionExpired(true).
+    const webIdUrl = `${CSS_ISSUER}/${TEST_POD_NAME}/profile/card`
+    await page.route(webIdUrl, route => {
+      if (route.request().method() === 'HEAD') {
+        return route.fulfill({ status: 401 })
       }
-      keysToRemove.forEach(k => sessionStorage.removeItem(k))
-      // Also clear relevant localStorage entries
-      const lsKeys: string[] = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && (key.includes('solid') || key.includes('oidc') || key.includes('inrupt'))) {
-          lsKeys.push(key)
-        }
-      }
-      lsKeys.forEach(k => localStorage.removeItem(k))
+      return route.continue()
     })
-    // Trigger a Pod operation by navigating to a page that loads from Pod
-    await page.goto('/#/view-lists')
-    // The session-expired banner or re-login prompt should appear
-    // The SessionExpiredBanner component shows when session expires
-    await expect(
-      page.getByText(/session expired|login again|re-login/i)
-    ).toBeVisible({ timeout: 15_000 })
+
+    // Simulate the user leaving and returning to the tab (triggers validateSession)
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    // The SessionExpiredBanner shows "Your session has expired." and a "Log in again" button
+    await expect(page.getByText(/session has expired/i).first()).toBeVisible({ timeout: 15_000 })
   })
 })

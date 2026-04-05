@@ -104,6 +104,10 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                 cancelText="Start fresh"
                 onConfirm={async () => {
                     await db.copyAllDataFrom(localDb)
+                    // Mark as dismissed so a full-page reload doesn't re-prompt
+                    // (local data was copied; pod will be out of sync until next
+                    // explicit save, but hasPodData checks the remote pod)
+                    localStorage.setItem(`pod-migration-dismissed-${namespace}`, 'true')
                     setShowMigrationPrompt(false)
                 }}
                 onClose={() => {

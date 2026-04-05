@@ -1,15 +1,22 @@
 import { chromium } from '@playwright/test'
 import { spawn } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { createCssAccount } from './helpers/css-api'
 import { loginToCss } from './helpers/login'
 import {
   CSS_PORT, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, TEST_POD_NAME,
-  AUTH_STATE_FILE, CSS_PID_FILE, CHROMIUM_PATH, APP_URL
+  AUTH_STATE_FILE, CSS_PID_FILE, APP_URL
 } from '../playwright.config'
 
-async function waitForUrl(url: string, maxWaitMs = 30_000): Promise<void> {
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const localChromium = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+const executablePath = existsSync(localChromium) ? localChromium : undefined
+// Use locally-installed CSS binary (installed as devDependency) — avoids npx download in CI
+const CSS_BIN = path.resolve(__dirname, '../node_modules/.bin/community-solid-server')
+
+async function waitForUrl(url: string, maxWaitMs = 90_000): Promise<void> {
   const deadline = Date.now() + maxWaitMs
   while (Date.now() < deadline) {
     try {
@@ -22,11 +29,11 @@ async function waitForUrl(url: string, maxWaitMs = 30_000): Promise<void> {
 }
 
 export default async function globalSetup() {
-  // 1. Start CSS
+  // 1. Start CSS (use local devDependency binary to avoid npx download in CI)
   const cssProc = spawn(
-    'npx',
-    ['--yes', '@solid/community-server', '-p', String(CSS_PORT)],
-    { stdio: 'pipe', shell: true, detached: false }
+    CSS_BIN,
+    ['-p', String(CSS_PORT)],
+    { stdio: 'pipe', detached: false }
   )
   writeFileSync(CSS_PID_FILE, String(cssProc.pid))
   process.env.CSS_ISSUER = CSS_ISSUER
@@ -47,7 +54,7 @@ export default async function globalSetup() {
   // 4. Browser login → save storage state
   mkdirSync(path.dirname(AUTH_STATE_FILE), { recursive: true })
   const browser = await chromium.launch({
-    executablePath: CHROMIUM_PATH,
+    executablePath,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   })
   const context = await browser.newContext()

@@ -20,31 +20,26 @@ export const test = base.extend<MyFixtures>({
   },
 
   authedContext: async ({ browser }, use) => {
-    let context: BrowserContext
-    try {
-      context = await browser.newContext({ storageState: AUTH_STATE_FILE })
-    } catch {
-      // Auth file doesn't exist — do a fresh login
-      context = await browser.newContext()
-      const page = await context.newPage()
-      await page.goto('/')
-      await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
-      await context.storageState({ path: AUTH_STATE_FILE })
-    }
+    // Always do a fresh login. inrupt's silent-auth (prompt=none) redirect gets stuck on CSS v7,
+    // so we can't rely on storageState-based session restoration.
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await page.goto('/')
+    await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await context.storageState({ path: AUTH_STATE_FILE })
+    await page.close()
     await use(context)
     await context.close()
   },
 
   authedPage: async ({ authedContext }, use) => {
     const page = await authedContext.newPage()
+    // The context already has a valid session from authedContext's fresh login.
+    // The app will try to restore the session (prompt=none), but since the same
+    // CSS process is running and consent was just given, this should succeed quickly.
+    // Wait up to 30 seconds for "Logout" to appear.
     await page.goto('/')
-    // Verify we're still logged in
-    const isLoggedIn = await page.locator('button:has-text("Logout")').isVisible({ timeout: 5_000 }).catch(() => false)
-    if (!isLoggedIn) {
-      // Session expired — re-login
-      await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
-      await authedContext.storageState({ path: AUTH_STATE_FILE })
-    }
+    await page.getByRole('button', { name: 'Logout' }).first().waitFor({ state: 'visible', timeout: 30_000 })
     await use(page)
   },
 })

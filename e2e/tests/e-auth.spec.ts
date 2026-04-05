@@ -11,10 +11,10 @@ test.describe('E – Solid Pod Authentication', () => {
     await expect(page.getByRole('button', { name: 'Login with Solid Pod' })).toBeVisible()
     await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
-    // webId should be displayed
+    // webId should be displayed (use .first() to avoid strict mode violations when multiple elements match)
     await expect(page.getByText(/testuser.*profile|profile.*testuser/i).or(
       page.locator('span:has-text("localhost:4001/testuser")')
-    )).toBeVisible()
+    ).first()).toBeVisible()
   })
 
   test('E2: logout returns to unauthenticated state', async ({ authedPage: page }) => {

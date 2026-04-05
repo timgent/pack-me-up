@@ -3,17 +3,19 @@ import { test, expect } from '../fixtures'
 async function runWizard(page: import('@playwright/test').Page) {
   await page.goto('/#/wizard')
   await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
-  await expect(page.getByText('Questions Generated Successfully')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('button', { name: /Create My First Packing List/i }).click()
   try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
   await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
 }
 
 async function createList(page: import('@playwright/test').Page, name: string) {
-  await page.getByLabel('Packing List Name').fill(name)
+  // Wait for the question set to load (questions appear on the page)
+  await page.waitForLoadState('networkidle')
+  await page.getByPlaceholder('Enter a name for your packing list').fill(name)
   await page.getByRole('button', { name: 'Create Packing List' }).click()
   // Navigates to /view-lists/:id
-  await page.waitForURL(/#\/view-lists\//, { timeout: 5_000 })
+  await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
 }
 
 test.describe('C – Packing Lists', () => {
@@ -26,26 +28,30 @@ test.describe('C – Packing Lists', () => {
   test('C2: check item as packed persists on reload', async ({ freshPage: page }) => {
     await runWizard(page)
     await createList(page, 'Test Trip')
-    // Find the first unchecked item and check it
-    const firstCheckbox = page.locator('input[type="checkbox"]').first()
-    await firstCheckbox.check()
-    // Wait for auto-save
-    await expect(page.getByText(/saved/i)).toBeVisible({ timeout: 8_000 })
-    // Reload and verify the item is still checked
+    // Click the first checkbox (use click() not check() - item hides after packing, making check() stale)
+    await page.locator('input[type="checkbox"]').first().click()
+    // Wait for auto-save indicator
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    // Reload and show packed items to verify the item is still checked
     await page.reload()
+    await page.getByRole('button', { name: 'Show Packed' }).click()
     await expect(page.locator('input[type="checkbox"]').first()).toBeChecked()
   })
 
   test('C3: uncheck a packed item', async ({ freshPage: page }) => {
     await runWizard(page)
     await createList(page, 'Test Trip 2')
-    // Check first item
-    const firstCheckbox = page.locator('input[type="checkbox"]').first()
-    await firstCheckbox.check()
-    await expect(page.getByText(/saved/i)).toBeVisible({ timeout: 8_000 })
-    // Uncheck it
-    await firstCheckbox.uncheck()
-    await expect(page.getByText(/saved/i)).toBeVisible({ timeout: 8_000 })
+    // Click the first checkbox to pack the item
+    await page.locator('input[type="checkbox"]').first().click()
+    // Wait for auto-save to complete and indicator to disappear
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 5_000 })
+    // Show packed items, then uncheck
+    await page.getByRole('button', { name: 'Show Packed' }).click()
+    await page.locator('input[type="checkbox"]').first().click()
+    // Wait for the unpack auto-save to complete
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 5_000 })
     await page.reload()
     await expect(page.locator('input[type="checkbox"]').first()).not.toBeChecked()
   })
@@ -81,6 +87,7 @@ test.describe('C – Packing Lists', () => {
     // Confirmation dialog
     await expect(page.getByText(/Are you sure.*delete/i)).toBeVisible()
     await page.getByRole('button', { name: /^Delete$/ }).click()
-    await expect(page.getByText('To Delete')).not.toBeVisible({ timeout: 5_000 })
+    // Use heading selector to avoid matching the confirmation dialog text
+    await expect(page.getByRole('heading', { name: /To Delete/i })).not.toBeVisible({ timeout: 5_000 })
   })
 })

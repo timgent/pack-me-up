@@ -5,12 +5,14 @@ test.describe('H – Backups', () => {
     // Run wizard and create a list while logged in
     await page.goto('/#/wizard')
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
-    await expect(page.getByText('Questions Generated Successfully')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()
-    await page.waitForURL(/#\/create-packing-list/)
-    await page.getByLabel('Packing List Name').fill('Backup Test List')
+    try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
+    await page.waitForLoadState('networkidle')
+    await page.getByPlaceholder('Enter a name for your packing list').fill('Backup Test List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
-    await page.waitForURL(/#\/view-lists\//)
+    await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
     // Give pod sync time
     await page.waitForTimeout(3_000)
   }
@@ -35,17 +37,18 @@ test.describe('H – Backups', () => {
     // Handle window.confirm for restore
     page.on('dialog', dialog => dialog.accept())
     await page.getByRole('button', { name: 'Restore' }).first().click()
-    await expect(page.getByText(/restored/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/backup restored/i)).toBeVisible({ timeout: 10_000 })
   })
 
   test('H3: delete a backup removes it from the list', async ({ authedPage: page }) => {
     await page.goto('/#/backups')
-    // Ensure at least one backup exists (create one if needed)
-    const hasBackups = await page.getByRole('button', { name: 'Restore' }).isVisible({ timeout: 3_000 }).catch(() => false)
-    if (!hasBackups) {
-      await page.getByRole('button', { name: 'Create Backup' }).click()
-      await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
-    }
+    // Wait for any existing backups to load from Pod
+    await page.waitForLoadState('networkidle')
+    // Create a fresh backup to guarantee at least one exists
+    await page.getByRole('button', { name: 'Create Backup' }).click()
+    await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
+    // Wait for the newly created backup to appear in the list
+    await expect(page.getByRole('button', { name: 'Restore' }).first()).toBeVisible({ timeout: 5_000 })
     const initialCount = await page.getByRole('button', { name: 'Restore' }).count()
     await page.getByRole('button', { name: 'Delete' }).first().click()
     await expect(page.getByText(/deleted/i)).toBeVisible({ timeout: 5_000 })

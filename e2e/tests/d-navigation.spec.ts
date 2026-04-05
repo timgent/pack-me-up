@@ -26,10 +26,10 @@ test.describe('D – Navigation & UI', () => {
     await expect(page.locator('.md\\:block .space-x-2')).not.toBeVisible()
     // Click hamburger
     await page.getByRole('button', { name: 'Open main menu' }).click()
-    // Mobile nav links visible
-    await expect(page.getByRole('link', { name: /My Questions & Items/i }).nth(1)).toBeVisible()
+    // Mobile nav link visible (desktop nav is display:none at this viewport, so only 1 link found)
+    await expect(page.getByRole('link', { name: /My Questions & Items/i }).first()).toBeVisible()
     // Click hamburger again to close
     await page.getByRole('button', { name: 'Open main menu' }).click()
-    await expect(page.getByRole('link', { name: /My Questions & Items/i }).nth(1)).not.toBeVisible()
+    await expect(page.getByRole('link', { name: /My Questions & Items/i }).first()).not.toBeVisible()
   })
 })

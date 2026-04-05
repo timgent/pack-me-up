@@ -1,5 +1,5 @@
 import { Session } from '@inrupt/solid-client-authn-browser'
-import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile } from '@inrupt/solid-client'
 
 /**
  * Pod container paths under the user's Pod root
@@ -112,11 +112,30 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
 
     const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
 
-    if (!podUrls || podUrls.length === 0) {
-        return null
+    if (podUrls && podUrls.length > 0) {
+        return podUrls[0]
     }
 
-    return podUrls[0]
+    // Fallback: derive Pod URL from WebID using CSS convention.
+    // WebID = http://host/podName/profile/card#me → Pod = http://host/podName/
+    // This covers CSS v7 installations that don't include pim:storage in the profile.
+    try {
+        const url = new URL(session.info.webId)
+        url.hash = ''
+        const path = url.pathname
+        if (path.endsWith('/profile/card')) {
+            url.pathname = path.slice(0, -'profile/card'.length)
+            return url.toString()
+        }
+        // Generic fallback: use the first path segment as Pod root
+        const firstSegment = path.split('/').find(s => s.length > 0)
+        if (firstSegment) {
+            url.pathname = '/' + firstSegment + '/'
+            return url.toString()
+        }
+    } catch { /* ignore URL parse errors */ }
+
+    return null
 }
 
 /**
@@ -152,44 +171,21 @@ export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
 
     const json = JSON.stringify(data, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
-    const file = new File([blob], filename, { type: 'application/json' })
 
-    // Try saveFileInContainer first (creates new file in container)
+    // Use overwriteFile (PUT) directly to the exact URL — this creates the file if it
+    // doesn't exist or replaces it if it does, regardless of server-side slug behaviour.
+    // This avoids CSS v7's saveFileInContainer creating a duplicate instead of 409-ing.
     try {
-        await saveFileInContainer(
-            containerPath,
-            file,
-            {
-                fetch: session.fetch,
-                slug: filename
-            }
-        )
-    } catch (saveError: unknown) {
-        // Check for authentication errors first
-        if (isAuthenticationError(saveError)) {
-            handlePodError(saveError)
+        const fileUrl = `${containerPath}${filename}`
+        await overwriteFile(fileUrl, blob, {
+            fetch: session.fetch,
+            contentType: 'application/json'
+        })
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) {
+            handlePodError(error)
         }
-
-        // If container doesn't exist (404) or file already exists (409),
-        // use overwriteFile instead
-        const saveStatusCode = getStatusCode(saveError)
-        if (saveStatusCode === 404 || saveStatusCode === 409) {
-            try {
-                const fileUrl = `${containerPath}${filename}`
-                await overwriteFile(fileUrl, blob, {
-                    fetch: session.fetch,
-                    contentType: 'application/json'
-                })
-            } catch (overwriteError: unknown) {
-                // Check for authentication errors in overwrite
-                if (isAuthenticationError(overwriteError)) {
-                    handlePodError(overwriteError)
-                }
-                throw overwriteError
-            }
-        } else {
-            throw saveError
-        }
+        throw error
     }
 }
 
