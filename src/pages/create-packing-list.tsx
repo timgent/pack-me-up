@@ -124,12 +124,12 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                                 <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
                                             )}
                                         </div>
-                                        <div className="flex gap-2 items-center flex-wrap">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                             <select
                                                 aria-label={`Destination for ${item.itemText}`}
                                                 value={destValue}
                                                 onChange={(e) => setDestinations(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                                className="text-sm border border-amber-300 rounded px-2 py-1 flex-1 min-w-0"
+                                                className="w-full text-sm border border-amber-300 rounded px-2 py-1 sm:flex-1 sm:min-w-0"
                                             >
                                                 <option value="always">Always Needed Items</option>
                                                 {questionSet.questions.flatMap(q =>
@@ -140,20 +140,22 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                                     ))
                                                 )}
                                             </select>
-                                            <Button
-                                                type="button"
-                                                variant="primary"
-                                                onClick={() => onSaveToQuestionSet(listId, item, destination)}
-                                            >
-                                                Add
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="secondary"
-                                                onClick={() => onSkip(listId, item)}
-                                            >
-                                                Skip
-                                            </Button>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="primary"
+                                                    onClick={() => onSaveToQuestionSet(listId, item, destination)}
+                                                >
+                                                    Add
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() => onSkip(listId, item)}
+                                                >
+                                                    Skip
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                     )
