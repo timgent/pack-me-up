@@ -355,7 +355,7 @@ describe('CreatePackingList – suggestion card', () => {
         expect(screen.queryByText('Sunscreen SPF50')).toBeNull()
     })
 
-    it('"Always include" calls db.saveQuestionSet and db.savePackingList with reviewed:true', async () => {
+    it('"Add" calls db.saveQuestionSet and db.savePackingList with reviewed:true', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
 
@@ -363,7 +363,7 @@ describe('CreatePackingList – suggestion card', () => {
         await waitFor(() => screen.getByText(/past trips you added items/i))
         fireEvent.click(screen.getByRole('button', { name: /review/i }))
 
-        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
 
         await waitFor(() => {
             expect(db.saveQuestionSet).toHaveBeenCalledWith(
@@ -384,14 +384,14 @@ describe('CreatePackingList – suggestion card', () => {
         expect(screen.queryByText('Sunscreen SPF50')).toBeNull()
     })
 
-    it('"Always include" sets selected:true for the matching person in personSelections', async () => {
+    it('"Add" sets selected:true for the matching person in personSelections', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
         fireEvent.click(screen.getByRole('button', { name: /review/i }))
-        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
 
         await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
 
@@ -444,7 +444,7 @@ describe('CreatePackingList – suggestion card', () => {
         expect((select as HTMLSelectElement).value).toBe('always')
     })
 
-    it('"Always include" with default selection adds to alwaysNeededItems', async () => {
+    it('"Add" with default selection adds to alwaysNeededItems', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
 
@@ -453,7 +453,7 @@ describe('CreatePackingList – suggestion card', () => {
         fireEvent.click(screen.getByRole('button', { name: /review/i }))
 
         // default is "always" — don't change the select
-        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
 
         await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -466,7 +466,7 @@ describe('CreatePackingList – suggestion card', () => {
         expect(savedQs.questions[0].options[0].items).toHaveLength(0)
     })
 
-    it('"Always include" with a question/option selected adds to that option\'s items, not alwaysNeededItems', async () => {
+    it('"Add" with a question/option selected adds to that option\'s items, not alwaysNeededItems', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
 
@@ -477,7 +477,7 @@ describe('CreatePackingList – suggestion card', () => {
         const select = screen.getByRole('combobox', { name: /destination for sunscreen spf50/i })
         fireEvent.change(select, { target: { value: 'q1::o1' } })
 
-        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
 
         await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
         const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
@@ -487,7 +487,7 @@ describe('CreatePackingList – suggestion card', () => {
         )
     })
 
-    it('"Always include" uses updated _rev from first save when processing second item', async () => {
+    it('"Add" uses updated _rev from first save when processing second item', async () => {
         const secondItem: PackingListItem = {
             ...customItem,
             id: 'custom-2',
@@ -506,9 +506,9 @@ describe('CreatePackingList – suggestion card', () => {
         await waitFor(() => screen.getByText(/past trips you added items/i))
         fireEvent.click(screen.getByRole('button', { name: /review/i }))
 
-        fireEvent.click(screen.getAllByRole('button', { name: /always include/i })[0])
+        fireEvent.click(screen.getAllByRole('button', { name: /^add$/i })[0])
         await waitFor(() => expect(saveQuestionSet).toHaveBeenCalledTimes(1))
-        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
         await waitFor(() => expect(saveQuestionSet).toHaveBeenCalledTimes(2))
 
         // Second save must use the _rev returned by the first save

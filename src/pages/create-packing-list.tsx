@@ -82,7 +82,7 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
         <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
             <div className="flex items-start justify-between gap-4">
                 <p className="text-amber-900 font-medium">
-                    On past trips you added items that aren't in your question set yet. Want to save any for next time?
+                    On past trips you added items that aren't in your question set yet. Want to add any for next time?
                 </p>
                 <button
                     type="button"
@@ -145,7 +145,7 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                                 variant="primary"
                                                 onClick={() => onSaveToQuestionSet(listId, item, destination)}
                                             >
-                                                Always include
+                                                Add
                                             </Button>
                                             <Button
                                                 type="button"
