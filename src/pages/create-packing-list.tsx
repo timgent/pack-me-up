@@ -286,11 +286,13 @@ export function CreatePackingList() {
         const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionIds: string[] }) => {
             const questionId = qa.questionId
             const selectedOptionIds = qa.selectedOptionIds || []
-            const question = questionSet.questions.find((q) => q.id === questionId)!
+            const question = questionSet.questions.find((q) => q.id === questionId)
+            if (!question) return []
 
-            // For each selected option, get all items
-            return selectedOptionIds.flatMap((selectedOptionId) => {
-                const selectedOption = question.options.find((option) => (option.id === selectedOptionId))!
+            // For each selected option, get all items (filter out null values from unselected radio buttons)
+            return selectedOptionIds.filter(Boolean).flatMap((selectedOptionId) => {
+                const selectedOption = question.options.find((option) => (option.id === selectedOptionId))
+                if (!selectedOption) return []
                 const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
                     const selectedPeople = item.personSelections.filter((person) => (
                         person.selected && selectedPeopleIds.includes(person.personId)
