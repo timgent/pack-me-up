@@ -253,8 +253,19 @@ export function ViewPackingList() {
         try {
             setAutoSaveStatus('saving')
 
-            const updatedItems = packingList.items.filter(item => item.id !== itemId)
-            const updatedPackingList: PackingList = { ...packingList, items: updatedItems }
+            const item = packingList.items.find(i => i.id === itemId)
+            const updatedItems = packingList.items.filter(i => i.id !== itemId)
+
+            // Track deletions for question-set items so the user can be prompted later
+            const newDeletedItems = item && item.questionId !== ''
+                ? [...(packingList.deletedItems ?? []), { ...item, reviewed: false }]
+                : (packingList.deletedItems ?? [])
+
+            const updatedPackingList: PackingList = {
+                ...packingList,
+                items: updatedItems,
+                deletedItems: newDeletedItems,
+            }
 
             // Remove from form values
             const currentFormValues = getValues('items')

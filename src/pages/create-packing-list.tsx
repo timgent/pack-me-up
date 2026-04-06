@@ -21,6 +21,34 @@ export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     })
 }
 
+export function getUnreviewedDeletedItems(
+    packingLists: PackingList[],
+    questionSet: PackingListQuestionSet
+): Array<{ listId: string; listName: string; item: PackingListItem }> {
+    // Build a normalised set of all item texts currently in the question set
+    const existingTexts = new Set<string>()
+    for (const item of questionSet.alwaysNeededItems) {
+        existingTexts.add(item.text.trim().toLowerCase())
+    }
+    for (const question of questionSet.questions) {
+        for (const option of question.options) {
+            for (const item of option.items) {
+                existingTexts.add(item.text.trim().toLowerCase())
+            }
+        }
+    }
+
+    const results: Array<{ listId: string; listName: string; item: PackingListItem }> = []
+    for (const list of packingLists) {
+        for (const item of (list.deletedItems ?? [])) {
+            if (item.reviewed === true) continue
+            if (!existingTexts.has(item.itemText.trim().toLowerCase())) continue
+            results.push({ listId: list.id, listName: list.name, item })
+        }
+    }
+    return results
+}
+
 export function getUnreviewedCustomItems(
     packingLists: PackingList[],
     questionSet: PackingListQuestionSet
@@ -137,6 +165,92 @@ function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: Sug
     )
 }
 
+interface DeletionSuggestionCardProps {
+    suggestions: Array<{ listId: string; listName: string; item: PackingListItem }>
+    onRemovePermanently: (listId: string, item: PackingListItem) => void
+    onKeep: (listId: string, item: PackingListItem) => void
+    onDismiss: () => void
+}
+
+function DeletionSuggestionCard({ suggestions, onRemovePermanently, onKeep, onDismiss }: DeletionSuggestionCardProps) {
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    const grouped = useMemo(() => {
+        const map = new Map<string, { listName: string; items: Array<{ listId: string; item: PackingListItem }> }>()
+        for (const s of suggestions) {
+            if (!map.has(s.listId)) {
+                map.set(s.listId, { listName: s.listName, items: [] })
+            }
+            map.get(s.listId)!.items.push({ listId: s.listId, item: s.item })
+        }
+        return Array.from(map.values())
+    }, [suggestions])
+
+    return (
+        <div className="bg-red-50 rounded-lg border border-red-200 p-4">
+            <div className="flex items-start justify-between gap-4">
+                <p className="text-red-900 font-medium">
+                    On past trips you previously removed items that are still in your question set. Want to stop including them?
+                </p>
+                <button
+                    type="button"
+                    aria-label="Dismiss removals"
+                    onClick={onDismiss}
+                    className="text-red-600 hover:text-red-900 text-xl leading-none flex-shrink-0"
+                >
+                    ×
+                </button>
+            </div>
+            {!isExpanded ? (
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(true)}
+                    className="mt-2 text-sm text-red-700 underline"
+                    aria-label="Review removals"
+                >
+                    Review removals
+                </button>
+            ) : (
+                <div className="mt-4 space-y-4">
+                    {grouped.map(({ listName, items }) => (
+                        <div key={listName}>
+                            <p className="text-sm text-red-700 font-semibold mb-2">From: {listName}</p>
+                            <div className="space-y-2">
+                                {items.map(({ listId, item }) => (
+                                    <div key={item.id} className="flex items-center justify-between gap-2 bg-white rounded border border-red-200 px-3 py-2">
+                                        <div>
+                                            <span className="font-medium text-gray-900">{item.itemText}</span>
+                                            {item.personName && (
+                                                <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                onClick={() => onRemovePermanently(listId, item)}
+                                            >
+                                                Remove permanently
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                onClick={() => onKeep(listId, item)}
+                                            >
+                                                Keep
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 export function CreatePackingList() {
     const [questionSet, setQuestionSet] = useState<PackingListQuestionSet | null>(null)
     const [allPackingLists, setAllPackingLists] = useState<PackingList[]>([])
@@ -144,6 +258,7 @@ export function CreatePackingList() {
     const [noQuestionsFound, setNoQuestionsFound] = useState(false)
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
+    const [isDeletionSuggestionDismissed, setIsDeletionSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
     const { isLoggedIn, login, session } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
@@ -195,6 +310,11 @@ export function CreatePackingList() {
         [allPackingLists, questionSet]
     )
 
+    const deletionSuggestions = useMemo(
+        () => questionSet ? getUnreviewedDeletedItems(allPackingLists, questionSet) : [],
+        [allPackingLists, questionSet]
+    )
+
     const handleAlwaysInclude = async (listId: string, item: PackingListItem) => {
         if (!questionSet) return
 
@@ -231,6 +351,55 @@ export function CreatePackingList() {
         }
         const { rev } = await db.savePackingList(updatedList)
         setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+    }
+
+    const markDeletedReviewed = async (listId: string, item: PackingListItem) => {
+        const list = allPackingLists.find(l => l.id === listId)
+        if (!list) return
+        const updatedList: PackingList = {
+            ...list,
+            deletedItems: (list.deletedItems ?? []).map(i => i.id === item.id ? { ...i, reviewed: true } : i),
+        }
+        const { rev } = await db.savePackingList(updatedList)
+        setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+    }
+
+    const handleRemovePermanently = async (listId: string, item: PackingListItem) => {
+        if (!questionSet) return
+
+        let updatedQs: PackingListQuestionSet
+        if (item.questionId === 'always-needed') {
+            updatedQs = {
+                ...questionSet,
+                alwaysNeededItems: questionSet.alwaysNeededItems.filter(
+                    i => i.text.trim().toLowerCase() !== item.itemText.trim().toLowerCase()
+                ),
+            }
+        } else {
+            updatedQs = {
+                ...questionSet,
+                questions: questionSet.questions.map(q =>
+                    q.id !== item.questionId ? q : {
+                        ...q,
+                        options: q.options.map(o =>
+                            o.id !== item.optionId ? o : {
+                                ...o,
+                                items: o.items.filter(
+                                    i => i.text.trim().toLowerCase() !== item.itemText.trim().toLowerCase()
+                                ),
+                            }
+                        ),
+                    }
+                ),
+            }
+        }
+        const { rev } = await db.saveQuestionSet(updatedQs)
+        setQuestionSet({ ...updatedQs, _rev: rev })
+        await markDeletedReviewed(listId, item)
+    }
+
+    const handleKeepDeleted = async (listId: string, item: PackingListItem) => {
+        await markDeletedReviewed(listId, item)
     }
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
@@ -414,6 +583,17 @@ export function CreatePackingList() {
                         onAlwaysInclude={handleAlwaysInclude}
                         onSkip={handleSkip}
                         onDismiss={() => setIsSuggestionDismissed(true)}
+                    />
+                </div>
+            )}
+
+            {deletionSuggestions.length > 0 && !isDeletionSuggestionDismissed && (
+                <div className="mb-6">
+                    <DeletionSuggestionCard
+                        suggestions={deletionSuggestions}
+                        onRemovePermanently={handleRemovePermanently}
+                        onKeep={handleKeepDeleted}
+                        onDismiss={() => setIsDeletionSuggestionDismissed(true)}
                     />
                 </div>
             )}

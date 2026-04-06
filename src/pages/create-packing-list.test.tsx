@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { deduplicateItems, getUnreviewedCustomItems } from './create-packing-list'
+import { deduplicateItems, getUnreviewedCustomItems, getUnreviewedDeletedItems } from './create-packing-list'
 import { PackingListItem, PackingList } from '../create-packing-list/types'
 import { PackingListQuestionSet } from '../edit-questions/types'
 
@@ -585,5 +585,252 @@ describe('CreatePackingList – pod sync on creation', () => {
 
         await waitFor(() => expect(vi.mocked(db.savePackingList)).toHaveBeenCalled())
         expect(mockSaveFileToPod).not.toHaveBeenCalled()
+    })
+})
+
+// ─── getUnreviewedDeletedItems ────────────────────────────────────────────────
+
+const makeDeletedItem = (overrides: Partial<PackingListItem> = {}): PackingListItem => ({
+    id: 'deleted-1',
+    itemText: 'Passport',
+    personName: 'Alice',
+    personId: 'p1',
+    questionId: 'always-needed',
+    optionId: 'always-needed',
+    packed: false,
+    ...overrides,
+})
+
+const makeQsWithAlwaysNeeded = (itemText: string): PackingListQuestionSet => ({
+    people: [{ id: 'p1', name: 'Alice' }],
+    alwaysNeededItems: [{ text: itemText, personSelections: [] }],
+    questions: [],
+})
+
+describe('getUnreviewedDeletedItems', () => {
+    it('returns empty array when no lists have deletedItems', () => {
+        const list = makePackingList({ items: [] })
+        expect(getUnreviewedDeletedItems([list], makeQuestionSet())).toHaveLength(0)
+    })
+
+    it('returns empty array when deletedItems is empty', () => {
+        const list = makePackingList({ items: [], deletedItems: [] })
+        expect(getUnreviewedDeletedItems([list], makeQuestionSet())).toHaveLength(0)
+    })
+
+    it('returns an unreviewed deleted item that still exists in the question set', () => {
+        const item = makeDeletedItem()
+        const list = makePackingList({ items: [], deletedItems: [item] })
+        const qs = makeQsWithAlwaysNeeded('Passport')
+        const result = getUnreviewedDeletedItems([list], qs)
+        expect(result).toHaveLength(1)
+        expect(result[0]).toMatchObject({ listId: 'list-1', listName: 'Paris Trip', item })
+    })
+
+    it('excludes deleted item with reviewed: true', () => {
+        const item = makeDeletedItem({ reviewed: true })
+        const list = makePackingList({ items: [], deletedItems: [item] })
+        const qs = makeQsWithAlwaysNeeded('Passport')
+        expect(getUnreviewedDeletedItems([list], qs)).toHaveLength(0)
+    })
+
+    it('excludes deleted item whose text is no longer in the question set', () => {
+        const item = makeDeletedItem({ itemText: 'Old Item' })
+        const list = makePackingList({ items: [], deletedItems: [item] })
+        expect(getUnreviewedDeletedItems([list], makeQuestionSet())).toHaveLength(0)
+    })
+
+    it('returns deleted items from question options when still in question set', () => {
+        const item = makeDeletedItem({ itemText: 'Sunscreen', questionId: 'q1', optionId: 'o1' })
+        const list = makePackingList({ items: [], deletedItems: [item] })
+        const qs: PackingListQuestionSet = {
+            ...makeQuestionSet(),
+            questions: [{
+                id: 'q1', text: 'Beach', order: 0, type: 'saved',
+                options: [{ id: 'o1', text: 'Yes', order: 0, items: [{ text: 'Sunscreen', personSelections: [] }] }],
+            }],
+        }
+        expect(getUnreviewedDeletedItems([list], qs)).toHaveLength(1)
+    })
+
+    it('returns deleted items from multiple lists with correct listId and listName', () => {
+        const list1 = makePackingList({
+            id: 'list-1', name: 'Paris Trip',
+            items: [], deletedItems: [makeDeletedItem({ id: 'd1', itemText: 'Passport' })],
+        })
+        const list2 = makePackingList({
+            id: 'list-2', name: 'London Trip',
+            items: [], deletedItems: [makeDeletedItem({ id: 'd2', itemText: 'Passport' })],
+        })
+        const qs = makeQsWithAlwaysNeeded('Passport')
+        const result = getUnreviewedDeletedItems([list1, list2], qs)
+        expect(result).toHaveLength(2)
+        expect(result[0].listId).toBe('list-1')
+        expect(result[1].listId).toBe('list-2')
+    })
+})
+
+// ─── CreatePackingList – deletion suggestion card ─────────────────────────────
+
+const deletedItem: PackingListItem = {
+    id: 'deleted-item-1',
+    itemText: 'Passport',
+    personName: 'Alice',
+    personId: 'p1',
+    questionId: 'always-needed',
+    optionId: 'always-needed',
+    packed: false,
+}
+
+const testQsWithPassport: PackingListQuestionSet = {
+    people: [{ id: 'p1', name: 'Alice' }],
+    alwaysNeededItems: [{ text: 'Passport', personSelections: [{ personId: 'p1', selected: true }] }],
+    questions: [
+        {
+            id: 'q1',
+            text: 'Where are you going?',
+            order: 0,
+            type: 'saved',
+            options: [{ id: 'o1', text: 'Beach', order: 0, items: [] }],
+        },
+    ],
+}
+
+const listWithDeletedItem: PackingList = {
+    id: 'past-list-2',
+    name: 'Rome Trip',
+    createdAt: '2026-02-01T00:00:00Z',
+    items: [],
+    deletedItems: [deletedItem],
+}
+
+function makeDeletionDb(overrides: Record<string, unknown> = {}) {
+    return {
+        getQuestionSet: vi.fn().mockResolvedValue(testQsWithPassport),
+        getAllPackingLists: vi.fn().mockResolvedValue([listWithDeletedItem]),
+        saveQuestionSet: vi.fn().mockResolvedValue({ rev: '2' }),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        ...overrides,
+    }
+}
+
+describe('CreatePackingList – deletion suggestion card', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({ isLoggedIn: false } as ReturnType<typeof useSolidPod>)
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('does not show deletion card when there are no unreviewed deleted items', async () => {
+        const noDeleted: PackingList = { ...listWithDeletedItem, deletedItems: [] }
+        mockUseDatabase.mockReturnValue({
+            db: makeDeletionDb({ getAllPackingLists: vi.fn().mockResolvedValue([noDeleted]) }),
+        } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+        expect(screen.queryByText(/previously removed/i)).toBeNull()
+    })
+
+    it('shows deletion card when there are unreviewed deleted items', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+    })
+
+    it('deletion card is collapsed by default and expands on click', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+
+        expect(screen.queryByText('Passport')).toBeNull()
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+        screen.getByText('Passport')
+    })
+
+    it('dismissing the deletion card hides it', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+
+        fireEvent.click(screen.getByRole('button', { name: /dismiss removals/i }))
+        expect(screen.queryByText(/previously removed/i)).toBeNull()
+    })
+
+    it('"Keep" marks the deletedItems entry as reviewed:true via db.savePackingList', async () => {
+        const db = makeDeletionDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+        fireEvent.click(screen.getByRole('button', { name: /keep/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalledWith(
+            expect.objectContaining({
+                deletedItems: expect.arrayContaining([
+                    expect.objectContaining({ id: 'deleted-item-1', reviewed: true }),
+                ]),
+            })
+        ))
+        expect(screen.queryByText('Passport')).toBeNull()
+    })
+
+    it('"Remove permanently" removes item from alwaysNeededItems and marks reviewed', async () => {
+        const db = makeDeletionDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+        fireEvent.click(screen.getByRole('button', { name: /remove permanently/i }))
+
+        await waitFor(() => {
+            expect(db.saveQuestionSet).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    alwaysNeededItems: expect.not.arrayContaining([
+                        expect.objectContaining({ text: 'Passport' }),
+                    ]),
+                })
+            )
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    deletedItems: expect.arrayContaining([
+                        expect.objectContaining({ id: 'deleted-item-1', reviewed: true }),
+                    ]),
+                })
+            )
+        })
+        expect(screen.queryByText('Passport')).toBeNull()
+    })
+
+    it('deletion card disappears when all items are acted on', async () => {
+        const secondDeleted: PackingListItem = {
+            ...deletedItem, id: 'deleted-item-2', itemText: 'Passport',
+        }
+        const listWithTwo: PackingList = {
+            ...listWithDeletedItem,
+            deletedItems: [deletedItem, secondDeleted],
+        }
+        const db = makeDeletionDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]) })
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+
+        const keepButtons = screen.getAllByRole('button', { name: /keep/i })
+        fireEvent.click(keepButtons[0])
+        await waitFor(() => screen.getAllByRole('button', { name: /keep/i }).length < 2)
+        fireEvent.click(screen.getByRole('button', { name: /keep/i }))
+
+        await waitFor(() => expect(screen.queryByText(/previously removed/i)).toBeNull())
     })
 })
