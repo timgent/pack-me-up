@@ -117,19 +117,19 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                             return { type: 'option', questionId, optionId }
                                         })()
                                     return (
-                                    <div key={item.id} className="flex items-center justify-between gap-2 bg-white rounded border border-amber-200 px-3 py-2">
+                                    <div key={item.id} className="flex flex-col gap-2 bg-white rounded border border-amber-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
                                             <span className="font-medium text-gray-900">{item.itemText}</span>
                                             {item.personName && (
                                                 <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
                                             )}
                                         </div>
-                                        <div className="flex gap-2 flex-shrink-0 items-center">
+                                        <div className="flex gap-2 items-center flex-wrap">
                                             <select
                                                 aria-label={`Destination for ${item.itemText}`}
                                                 value={destValue}
                                                 onChange={(e) => setDestinations(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                                className="text-sm border border-amber-300 rounded px-2 py-1"
+                                                className="text-sm border border-amber-300 rounded px-2 py-1 flex-1 min-w-0"
                                             >
                                                 <option value="always">Always Needed Items</option>
                                                 {questionSet.questions.flatMap(q =>
