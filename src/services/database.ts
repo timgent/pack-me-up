@@ -175,7 +175,9 @@ export class PackingAppDatabase {
                 data: {
                     name: packingList.name,
                     createdAt: packingList.createdAt,
-                    items: packingList.items
+                    lastModified: packingList.lastModified,
+                    items: packingList.items,
+                    deletedItems: packingList.deletedItems,
                 }
             }
 
@@ -205,7 +207,9 @@ export class PackingAppDatabase {
                         _rev: row.doc._rev,
                         name: row.doc.data.name,
                         createdAt: row.doc.data.createdAt,
-                        items: row.doc.data.items
+                        lastModified: row.doc.data.lastModified,
+                        items: row.doc.data.items,
+                        deletedItems: row.doc.data.deletedItems,
                     }
                     packingLists.push(packingList)
                 }
