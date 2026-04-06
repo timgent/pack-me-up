@@ -429,6 +429,64 @@ describe('CreatePackingList – suggestion card', () => {
         expect(secondCallArg._rev).toBe('rev-2')
     })
 
+    it('destination select renders with "Always Needed Items" default and question/option entries', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        const select = screen.getByRole('combobox', { name: /destination for sunscreen spf50/i })
+        expect(select).toBeDefined()
+        const options = Array.from((select as HTMLSelectElement).options).map(o => o.text)
+        expect(options).toContain('Always Needed Items')
+        expect(options).toContain('Where are you going?: Beach')
+        expect((select as HTMLSelectElement).value).toBe('always')
+    })
+
+    it('"Always include" with default selection adds to alwaysNeededItems', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        // default is "always" — don't change the select
+        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalledWith(
+            expect.objectContaining({
+                alwaysNeededItems: expect.arrayContaining([
+                    expect.objectContaining({ text: 'Sunscreen SPF50' }),
+                ]),
+            })
+        ))
+        const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
+        expect(savedQs.questions[0].options[0].items).toHaveLength(0)
+    })
+
+    it('"Always include" with a question/option selected adds to that option\'s items, not alwaysNeededItems', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        const select = screen.getByRole('combobox', { name: /destination for sunscreen spf50/i })
+        fireEvent.change(select, { target: { value: 'q1::o1' } })
+
+        fireEvent.click(screen.getByRole('button', { name: /always include/i }))
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
+        const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
+        expect(savedQs.alwaysNeededItems).toHaveLength(0)
+        expect(savedQs.questions[0].options[0].items).toContainEqual(
+            expect.objectContaining({ text: 'Sunscreen SPF50' })
+        )
+    })
+
     it('"Always include" uses updated _rev from first save when processing second item', async () => {
         const secondItem: PackingListItem = {
             ...customItem,

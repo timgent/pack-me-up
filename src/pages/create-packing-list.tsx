@@ -50,15 +50,21 @@ export function getUnreviewedCustomItems(
     return results
 }
 
+type SaveDestination =
+    | { type: 'always' }
+    | { type: 'option'; questionId: string; optionId: string }
+
 interface SuggestionCardProps {
     suggestions: Array<{ listId: string; listName: string; item: PackingListItem }>
-    onAlwaysInclude: (listId: string, item: PackingListItem) => void
+    questionSet: PackingListQuestionSet
+    onSaveToQuestionSet: (listId: string, item: PackingListItem, destination: SaveDestination) => void
     onSkip: (listId: string, item: PackingListItem) => void
     onDismiss: () => void
 }
 
-function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: SuggestionCardProps) {
+function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip, onDismiss }: SuggestionCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
+    const [destinations, setDestinations] = useState<Record<string, string>>({})
 
     // Group by list
     const grouped = useMemo(() => {
@@ -102,7 +108,15 @@ function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: Sug
                         <div key={listName}>
                             <p className="text-sm text-amber-700 font-semibold mb-2">From: {listName}</p>
                             <div className="space-y-2">
-                                {items.map(({ listId, item }) => (
+                                {items.map(({ listId, item }) => {
+                                    const destValue = destinations[item.id] ?? 'always'
+                                    const destination: SaveDestination = destValue === 'always'
+                                        ? { type: 'always' }
+                                        : (() => {
+                                            const [questionId, optionId] = destValue.split('::')
+                                            return { type: 'option', questionId, optionId }
+                                        })()
+                                    return (
                                     <div key={item.id} className="flex items-center justify-between gap-2 bg-white rounded border border-amber-200 px-3 py-2">
                                         <div>
                                             <span className="font-medium text-gray-900">{item.itemText}</span>
@@ -110,11 +124,26 @@ function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: Sug
                                                 <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
                                             )}
                                         </div>
-                                        <div className="flex gap-2 flex-shrink-0">
+                                        <div className="flex gap-2 flex-shrink-0 items-center">
+                                            <select
+                                                aria-label={`Destination for ${item.itemText}`}
+                                                value={destValue}
+                                                onChange={(e) => setDestinations(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                                className="text-sm border border-amber-300 rounded px-2 py-1"
+                                            >
+                                                <option value="always">Always Needed Items</option>
+                                                {questionSet.questions.flatMap(q =>
+                                                    q.options.map(o => (
+                                                        <option key={`${q.id}::${o.id}`} value={`${q.id}::${o.id}`}>
+                                                            {q.text}: {o.text}
+                                                        </option>
+                                                    ))
+                                                )}
+                                            </select>
                                             <Button
                                                 type="button"
                                                 variant="primary"
-                                                onClick={() => onAlwaysInclude(listId, item)}
+                                                onClick={() => onSaveToQuestionSet(listId, item, destination)}
                                             >
                                                 Always include
                                             </Button>
@@ -127,7 +156,8 @@ function SuggestionCard({ suggestions, onAlwaysInclude, onSkip, onDismiss }: Sug
                                             </Button>
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     ))}
@@ -195,26 +225,40 @@ export function CreatePackingList() {
         [allPackingLists, questionSet]
     )
 
-    const handleAlwaysInclude = async (listId: string, item: PackingListItem) => {
+    const handleSaveToQuestionSet = async (listId: string, item: PackingListItem, destination: SaveDestination) => {
         if (!questionSet) return
 
-        // Build personSelections for every person in the question set
         const personSelections = questionSet.people.map(p => ({
             personId: p.id,
             selected: p.name.toLowerCase() === item.personName.toLowerCase(),
         }))
+        const newItem = { text: item.itemText, personSelections }
 
-        const updatedQs: PackingListQuestionSet = {
-            ...questionSet,
-            alwaysNeededItems: [
-                ...questionSet.alwaysNeededItems,
-                { text: item.itemText, personSelections },
-            ],
+        let updatedQs: PackingListQuestionSet
+        if (destination.type === 'always') {
+            updatedQs = {
+                ...questionSet,
+                alwaysNeededItems: [...questionSet.alwaysNeededItems, newItem],
+            }
+        } else {
+            updatedQs = {
+                ...questionSet,
+                questions: questionSet.questions.map(q =>
+                    q.id !== destination.questionId ? q : {
+                        ...q,
+                        options: q.options.map(o =>
+                            o.id !== destination.optionId ? o : {
+                                ...o,
+                                items: [...o.items, newItem],
+                            }
+                        ),
+                    }
+                ),
+            }
         }
         const { rev } = await db.saveQuestionSet(updatedQs)
         setQuestionSet({ ...updatedQs, _rev: rev })
 
-        // Mark reviewed on the packing list
         await markReviewed(listId, item)
     }
 
@@ -411,7 +455,8 @@ export function CreatePackingList() {
                 <div className="mb-6">
                     <SuggestionCard
                         suggestions={suggestions}
-                        onAlwaysInclude={handleAlwaysInclude}
+                        questionSet={questionSet}
+                        onSaveToQuestionSet={handleSaveToQuestionSet}
                         onSkip={handleSkip}
                         onDismiss={() => setIsSuggestionDismissed(true)}
                     />
