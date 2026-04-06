@@ -183,7 +183,11 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("Playing cards/Travel games", people, getChildren),
             // Teenager items
             item("Headphones", people, getTeenagers),
-            item("Phone charger", people, getTeenagers)
+            item("Phone charger", people, getTeenagers),
+            // First aid / medication
+            item("First aid kit", people),
+            item("Plasters / Band-aids", people),
+            item("Pain relief (paracetamol / ibuprofen)", people, getAdults),
         ],
         questions: [
             {
