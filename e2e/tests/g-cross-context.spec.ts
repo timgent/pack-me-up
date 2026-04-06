@@ -58,7 +58,10 @@ test.describe('G – Cross-context Pod Sync', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
     // Verify the rename is visible on this page before checking context B
     await expect(page.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 5_000 })
-    await page.waitForTimeout(4_000)
+    // Reload page A to confirm pod has the rename (loadFromPod overwrites local from pod)
+    await page.reload()
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 10_000 })
 
     // Context B: should see renamed list
     const ctxB = await browser.newContext({ storageState: 'e2e/.auth/user.json' })
