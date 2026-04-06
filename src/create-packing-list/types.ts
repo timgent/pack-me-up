@@ -5,6 +5,7 @@ export interface PackingList {
     createdAt: string
     lastModified?: string // ISO timestamp for conflict resolution
     items: PackingListItem[]
+    deletedItems?: PackingListItem[]
 }
 
 export interface PackingListItem {
