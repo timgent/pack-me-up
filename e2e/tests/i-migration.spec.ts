@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures'
 import { createCssAccount } from '../helpers/css-api'
 import { loginToCss } from '../helpers/login'
+import { fillPersonRequiredFields } from '../helpers/wizard'
 
 const CSS_ISSUER = process.env.CSS_ISSUER ?? 'http://localhost:4001'
 const CSS_PORT = new URL(CSS_ISSUER).port ? parseInt(new URL(CSS_ISSUER).port) : 4001
@@ -22,6 +23,7 @@ test.describe('I – Data Migration', () => {
   // Shared helper: run the wizard to generate questions (saves to local DB)
   async function generateLocalData(page: import('@playwright/test').Page) {
     await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     // The Success Modal's backdrop blocks the nav; dismiss it by clicking an action button

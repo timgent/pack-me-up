@@ -1,8 +1,10 @@
 import { test, expect } from '../fixtures'
+import { fillPersonRequiredFields } from '../helpers/wizard'
 
 test.describe('G – Cross-context Pod Sync', () => {
   async function runWizard(page: import('@playwright/test').Page) {
     await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()

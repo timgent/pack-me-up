@@ -1,7 +1,9 @@
 import { test, expect } from '../fixtures'
+import { fillPersonRequiredFields } from '../helpers/wizard'
 
 async function setupWizardAndGoToQuestions(page: import('@playwright/test').Page) {
   await page.goto('/#/wizard')
+  await fillPersonRequiredFields(page)
   await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
   // Use role heading to distinguish modal title from toast notification
   await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
@@ -73,8 +75,10 @@ test.describe('B – Editing Questions', () => {
     await page.goto('/#/wizard')
     const nameInputs = page.locator('input[type="text"]')
     await nameInputs.first().fill('PersonA')
+    await fillPersonRequiredFields(page, 0)
     await page.getByRole('button', { name: /Add Another Person/i }).click()
     await nameInputs.nth(1).fill('PersonB')
+    await fillPersonRequiredFields(page, 1)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Refine My Packing List Questions/i }).click()

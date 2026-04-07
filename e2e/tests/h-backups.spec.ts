@@ -1,9 +1,11 @@
 import { test, expect } from '../fixtures'
+import { fillPersonRequiredFields } from '../helpers/wizard'
 
 test.describe('H – Backups', () => {
   async function setupWithList(page: import('@playwright/test').Page) {
     // Run wizard and create a list while logged in
     await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()

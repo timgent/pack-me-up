@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures'
+import { fillPersonRequiredFields } from '../helpers/wizard'
 
 // Helper: wait for the wizard success modal (modal heading, not the toast)
 async function waitForWizardSuccess(page: import('@playwright/test').Page) {
@@ -17,6 +18,7 @@ test.describe('A – Onboarding & Wizard', () => {
   test('A2: wizard with one person redirects to create-packing-list after dismissing pod prompt', async ({ freshPage: page }) => {
     await page.goto('/#/wizard')
     // name field is pre-filled with "Me"
+    await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     // Success modal (use role heading to distinguish from toast)
     await waitForWizardSuccess(page)
@@ -36,9 +38,11 @@ test.describe('A – Onboarding & Wizard', () => {
     // Name inputs are text inputs (label not programmatically linked to input)
     const nameInputs = page.locator('input[type="text"]')
     await nameInputs.first().fill('Alice')
+    await fillPersonRequiredFields(page, 0)
     // Add second person
     await page.getByRole('button', { name: /Add Another Person/i }).click()
     await nameInputs.nth(1).fill('Bob')
+    await fillPersonRequiredFields(page, 1)
     // Generate
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await waitForWizardSuccess(page)
@@ -57,6 +61,7 @@ test.describe('A – Onboarding & Wizard', () => {
   test('A4: wizard shows warning when questions already exist and confirmation on submit', async ({ freshPage: page }) => {
     // First run: create questions
     await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await waitForWizardSuccess(page)
     await page.getByRole('button', { name: /Refine My Packing List Questions/i }).click()
@@ -67,6 +72,7 @@ test.describe('A – Onboarding & Wizard', () => {
     // Second run: wizard should warn (data was saved in first run)
     await page.goto('/#/wizard')
     await expect(page.getByText(/already have packing list questions/i)).toBeVisible({ timeout: 10_000 })
+    await fillPersonRequiredFields(page)
     // Submit again → confirmation dialog
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     await expect(page.getByText('Existing Data Found')).toBeVisible()
