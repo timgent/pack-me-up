@@ -11,7 +11,6 @@
       }
     ]
   },
-  "instructions": "This project uses the RIPER workflow with 3 consolidated agents (research-innovate, plan-execute, review). See .claude/project-info.md for detailed context.",
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
@@ -29,7 +28,7 @@
     }
   },
   "project": {
-    "description": "Your project description here",
-    "name": "your-project-name"
+    "description": "Packing list generation web app",
+    "name": "Pack Me Up"
   }
 }
