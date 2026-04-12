@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
@@ -10,6 +10,7 @@ import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPrimaryPodUrl, saveFileToPod, POD_CONTAINERS } from '../services/solidPod'
+import { usePodSync } from '../hooks/usePodSync'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -302,6 +303,28 @@ export function CreatePackingList() {
             name: '',
             questionAnswers: []
         }
+    })
+
+    // Sync question set from pod once on page load so the list is created from
+    // the most up-to-date question set, even if another device updated it since login.
+    const handleQuestionSetPodSync = useCallback((podData: PackingListQuestionSet) => {
+        const podTime = podData.lastModified ? new Date(podData.lastModified).getTime() : 0
+        const localTime = questionSet?.lastModified ? new Date(questionSet.lastModified).getTime() : 0
+        if (!questionSet || podTime > localTime) {
+            db.saveQuestionSet(podData).then(({ rev }) => {
+                setQuestionSet({ ...podData, _rev: rev })
+            }).catch(err => console.error('Failed to save synced question set:', err))
+        }
+    }, [questionSet, db])
+
+    usePodSync<PackingListQuestionSet>({
+        pathConfig: {
+            container: POD_CONTAINERS.ROOT,
+            filename: 'packing-list-questions.json',
+        },
+        syncOnMount: true,
+        enabled: isLoggedIn,
+        onSyncSuccess: handleQuestionSetPodSync,
     })
 
     useEffect(() => {

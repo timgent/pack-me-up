@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { deduplicateItems, getUnreviewedCustomItems, getUnreviewedDeletedItems } from './create-packing-list'
@@ -24,6 +24,16 @@ vi.mock('../hooks/useHasQuestions', () => ({
     useHasQuestions: vi.fn(),
 }))
 
+vi.mock('../hooks/usePodSync', () => ({
+    usePodSync: vi.fn().mockReturnValue({
+        lastSync: null,
+        isSyncing: false,
+        error: null,
+        saveToPod: vi.fn(),
+        syncFromPod: vi.fn(),
+    }),
+}))
+
 vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(),
     saveFileToPod: vi.fn(),
@@ -38,9 +48,11 @@ import { ToastType } from '../components/Toast'
 import { PackingAppDatabase } from '../services/database'
 import { CreatePackingList } from './create-packing-list'
 import { getPrimaryPodUrl, saveFileToPod } from '../services/solidPod'
+import { usePodSync } from '../hooks/usePodSync'
 
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
 const mockSaveFileToPod = vi.mocked(saveFileToPod)
+const mockUsePodSync = vi.mocked(usePodSync)
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockUseDatabase = vi.mocked(useDatabase)
@@ -890,5 +902,139 @@ describe('CreatePackingList – deletion suggestion card', () => {
         fireEvent.click(screen.getByRole('button', { name: /keep/i }))
 
         await waitFor(() => expect(screen.queryByText(/previously removed/i)).toBeNull())
+    })
+})
+
+// ─── CreatePackingList – question set pod sync on mount ───────────────────────
+
+describe('CreatePackingList – question set pod sync on mount', () => {
+    const localQuestionSet: PackingListQuestionSet = {
+        ...testQuestionSet,
+        lastModified: '2024-01-01T10:00:00.000Z',
+    }
+
+    function makeSyncDb(overrides: Record<string, unknown> = {}) {
+        return {
+            getQuestionSet: vi.fn().mockResolvedValue(localQuestionSet),
+            getAllPackingLists: vi.fn().mockResolvedValue([]),
+            saveQuestionSet: vi.fn().mockResolvedValue({ rev: 'rev-synced' }),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+            ...overrides,
+        }
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUsePodSync.mockReturnValue({
+            lastSync: null,
+            isSyncing: false,
+            error: null,
+            saveToPod: vi.fn(),
+            syncFromPod: vi.fn(),
+        })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('calls usePodSync with syncOnMount:true for the question set when logged in', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null, isLoggedIn: true, webId: 'https://example.com/profile#me',
+            isLoading: false, login: vi.fn(), logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeSyncDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        expect(mockUsePodSync).toHaveBeenCalledWith(
+            expect.objectContaining({
+                syncOnMount: true,
+                enabled: true,
+                pathConfig: expect.objectContaining({ filename: 'packing-list-questions.json' }),
+            })
+        )
+    })
+
+    it('does not enable usePodSync for question set when not logged in', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null, isLoggedIn: false, webId: undefined,
+            isLoading: false, login: vi.fn(), logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeSyncDb() } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        expect(mockUsePodSync).toHaveBeenCalledWith(
+            expect.objectContaining({
+                syncOnMount: true,
+                enabled: false,
+            })
+        )
+    })
+
+    it('updates the displayed question set when pod data is newer', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null, isLoggedIn: true, webId: 'https://example.com/profile#me',
+            isLoading: false, login: vi.fn(), logout: vi.fn(),
+        })
+        const db = makeSyncDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        // Capture the onSyncSuccess callback
+        let capturedOnSyncSuccess: ((data: PackingListQuestionSet) => void) | undefined
+        mockUsePodSync.mockImplementation((opts) => {
+            capturedOnSyncSuccess = opts.onSyncSuccess as (data: PackingListQuestionSet) => void
+            return { lastSync: null, isSyncing: false, error: null, saveToPod: vi.fn(), syncFromPod: vi.fn() }
+        })
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        // Simulate pod returning a newer question set with an extra person
+        const newerPodQs: PackingListQuestionSet = {
+            ...testQuestionSet,
+            lastModified: '2024-06-01T12:00:00.000Z',
+            people: [{ id: 'p1', name: 'Alice' }, { id: 'p2', name: 'Bob' }],
+        }
+        await act(async () => {
+            capturedOnSyncSuccess!(newerPodQs)
+        })
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalledWith(
+            expect.objectContaining({ lastModified: newerPodQs.lastModified })
+        ))
+    })
+
+    it('does not overwrite local question set when pod data is older', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null, isLoggedIn: true, webId: 'https://example.com/profile#me',
+            isLoading: false, login: vi.fn(), logout: vi.fn(),
+        })
+        const db = makeSyncDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        let capturedOnSyncSuccess: ((data: PackingListQuestionSet) => void) | undefined
+        mockUsePodSync.mockImplementation((opts) => {
+            capturedOnSyncSuccess = opts.onSyncSuccess as (data: PackingListQuestionSet) => void
+            return { lastSync: null, isSyncing: false, error: null, saveToPod: vi.fn(), syncFromPod: vi.fn() }
+        })
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        // Simulate pod returning an OLDER question set
+        const olderPodQs: PackingListQuestionSet = {
+            ...testQuestionSet,
+            lastModified: '2023-01-01T00:00:00.000Z',
+        }
+        await act(async () => {
+            capturedOnSyncSuccess!(olderPodQs)
+        })
+
+        expect(db.saveQuestionSet).not.toHaveBeenCalled()
     })
 })
