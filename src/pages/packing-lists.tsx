@@ -6,7 +6,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, loadMultipleFilesFromPod, saveFileToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, saveFileToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
@@ -105,45 +105,6 @@ export function PackingLists() {
             handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         }
     }
-
-    const loadFromPod = async () => {
-        const podUrl = await getPrimaryPodUrl(session)
-        if (!podUrl) return null
-
-        try {
-            const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-            const { data: loadedLists, result } = await loadMultipleFilesFromPod<PackingList>({
-                session: session!,
-                containerPath: containerUrl
-            })
-
-            if (result.totalCount === 0) return result
-
-            const existingLists = await db.getAllPackingLists()
-            for (const existingList of existingLists) {
-                await db.deletePackingList(existingList.id)
-            }
-            for (const list of loadedLists) {
-                delete list._rev
-                await db.savePackingList(list)
-            }
-
-            const allLists = await db.getAllPackingLists()
-            setPackingLists(allLists)
-
-            return result
-        } catch (error) {
-            handlePodError(error, POD_ERROR_MESSAGES.LOAD_FAILED)
-            return null
-        }
-    }
-
-    useEffect(() => {
-        if (isLoggedIn) {
-            loadFromPod()
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoggedIn])
 
     useEffect(() => {
         const fetchPackingLists = async () => {
