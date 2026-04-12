@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import type { PackingAppDatabase } from '../services/database'
 import { useHasQuestions } from './useHasQuestions'
 
 vi.mock('../components/DatabaseContext', () => ({
@@ -11,10 +10,10 @@ import { useDatabase } from '../components/DatabaseContext'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 
-function makeDb(overrides: { getQuestionSet?: ReturnType<typeof vi.fn> } = {}) {
+function makeContextValue(overrides: { loadQuestionSet?: ReturnType<typeof vi.fn> } = {}) {
     return {
-        getQuestionSet: overrides.getQuestionSet ?? vi.fn().mockResolvedValue({ questions: [] }),
-    }
+        loadQuestionSet: overrides.loadQuestionSet ?? vi.fn().mockResolvedValue({ questions: [] }),
+    } as ReturnType<typeof useDatabase>
 }
 
 describe('useHasQuestions', () => {
@@ -27,8 +26,7 @@ describe('useHasQuestions', () => {
     })
 
     it('returns false when no questions exist (not_found)', async () => {
-        const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue({ loadQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) }))
 
         const { result } = renderHook(() => useHasQuestions())
 
@@ -36,8 +34,7 @@ describe('useHasQuestions', () => {
     })
 
     it('returns false when document exists but has no questions', async () => {
-        const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [] }) })
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue({ loadQuestionSet: vi.fn().mockResolvedValue({ questions: [] }) }))
 
         const { result } = renderHook(() => useHasQuestions())
 
@@ -45,8 +42,7 @@ describe('useHasQuestions', () => {
     })
 
     it('returns true when at least one question exists', async () => {
-        const db = makeDb({ getQuestionSet: vi.fn().mockResolvedValue({ questions: [{ id: '1', text: 'Do you need a jacket?' }] }) })
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue({ loadQuestionSet: vi.fn().mockResolvedValue({ questions: [{ id: '1', text: 'Do you need a jacket?' }] }) }))
 
         const { result } = renderHook(() => useHasQuestions())
 
@@ -54,8 +50,7 @@ describe('useHasQuestions', () => {
     })
 
     it('returns false and logs error for unexpected errors', async () => {
-        const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue(new Error('unexpected')) })
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue({ loadQuestionSet: vi.fn().mockRejectedValue(new Error('unexpected')) }))
 
         const { result } = renderHook(() => useHasQuestions())
 
