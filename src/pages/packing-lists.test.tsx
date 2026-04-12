@@ -45,14 +45,12 @@ import type { Session } from '@inrupt/solid-client-authn-browser'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
-import { getPrimaryPodUrl, loadMultipleFilesFromPod, saveFileToPod, deleteFileFromPod } from '../services/solidPod'
+import { getPrimaryPodUrl, loadMultipleFilesFromPod } from '../services/solidPod'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
 const mockLoadMultipleFilesFromPod = vi.mocked(loadMultipleFilesFromPod)
-const mockSaveFileToPod = vi.mocked(saveFileToPod)
-const mockDeleteFileFromPod = vi.mocked(deleteFileFromPod)
 
 const testPackingList = {
     id: 'list-1',
@@ -72,7 +70,21 @@ function makeDb() {
     return {
         getAllPackingLists: vi.fn().mockResolvedValue([testList]),
         deletePackingList: vi.fn().mockResolvedValue(undefined),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
     }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeContextValue(db: any) {
+    return {
+        db: db as unknown as PackingAppDatabase,
+        savePackingList: db.savePackingList ?? vi.fn().mockResolvedValue({ rev: '1' }),
+        deletePackingList: db.deletePackingList,
+        loadPackingList: vi.fn().mockResolvedValue(null),
+        listPackingLists: db.getAllPackingLists,
+        saveQuestionSet: vi.fn().mockResolvedValue({ rev: '1' }),
+        loadQuestionSet: vi.fn().mockResolvedValue({ people: [], questions: [], alwaysNeededItems: [] }),
+    } as ReturnType<typeof useDatabase>
 }
 
 function renderComponent() {
@@ -93,13 +105,12 @@ describe('PackingLists', () => {
             login: vi.fn(),
             logout: vi.fn(),
         })
-        mockUseDatabase.mockReturnValue({
-            db: {
-                getAllPackingLists: vi.fn().mockResolvedValue([testPackingList]),
-                deletePackingList: vi.fn(),
-                savePackingList: vi.fn(),
-            } as unknown as PackingAppDatabase,
-        })
+        const db = {
+            getAllPackingLists: vi.fn().mockResolvedValue([testPackingList]),
+            deletePackingList: vi.fn().mockResolvedValue(undefined),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
         localStorage.clear()
     })
 
@@ -141,15 +152,14 @@ describe('PackingLists progress bar minimum width', () => {
             optionId: 'o1',
             packed: i === 0, // only 1 of 130 packed → 1%
         }))
-        mockUseDatabase.mockReturnValue({
-            db: {
-                getAllPackingLists: vi.fn().mockResolvedValue([{
-                    id: 'list-1', name: 'Big List', createdAt: '2026-01-01T00:00:00Z', items,
-                }]),
-                deletePackingList: vi.fn(),
-                savePackingList: vi.fn(),
-            } as unknown as PackingAppDatabase,
-        })
+        const db = {
+            getAllPackingLists: vi.fn().mockResolvedValue([{
+                id: 'list-1', name: 'Big List', createdAt: '2026-01-01T00:00:00Z', items,
+            }]),
+            deletePackingList: vi.fn().mockResolvedValue(undefined),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         render(<MemoryRouter><PackingLists /></MemoryRouter>)
 
@@ -171,15 +181,14 @@ describe('PackingLists progress bar minimum width', () => {
             optionId: 'o1',
             packed: false,
         }))
-        mockUseDatabase.mockReturnValue({
-            db: {
-                getAllPackingLists: vi.fn().mockResolvedValue([{
-                    id: 'list-2', name: 'Empty Progress', createdAt: '2026-01-01T00:00:00Z', items,
-                }]),
-                deletePackingList: vi.fn(),
-                savePackingList: vi.fn(),
-            } as unknown as PackingAppDatabase,
-        })
+        const db = {
+            getAllPackingLists: vi.fn().mockResolvedValue([{
+                id: 'list-2', name: 'Empty Progress', createdAt: '2026-01-01T00:00:00Z', items,
+            }]),
+            deletePackingList: vi.fn().mockResolvedValue(undefined),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         render(<MemoryRouter><PackingLists /></MemoryRouter>)
 
@@ -205,7 +214,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('does not delete immediately when Delete is clicked', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -218,7 +227,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('shows a confirmation dialog with the list name when Delete is clicked', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -234,7 +243,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('cancels deletion when Cancel is clicked in the dialog', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -254,7 +263,7 @@ describe('PackingLists delete confirmation', () => {
 
     it('deletes the list when confirmed in the dialog', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -286,7 +295,7 @@ describe('PackingLists rename', () => {
 
     it('shows a Rename button on each list card', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -297,7 +306,7 @@ describe('PackingLists rename', () => {
 
     it('opens a rename modal pre-filled with the current list name when Rename is clicked', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -313,7 +322,7 @@ describe('PackingLists rename', () => {
 
     it('calls savePackingList with the new name when Save is clicked', async () => {
         const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '2' }) }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -335,7 +344,7 @@ describe('PackingLists rename', () => {
 
     it('does not call savePackingList when Cancel is clicked in the rename modal', async () => {
         const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '2' }) }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -365,7 +374,7 @@ describe('PackingLists mobile layout', () => {
 
     it('action buttons container wraps on small screens (has flex-wrap class)', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
         renderComponent()
         await screen.findByText(/Summer Holiday/)
         const buttonsContainer = document.querySelector('[data-testid="list-actions"]')
@@ -388,7 +397,7 @@ describe('PackingLists duplicate', () => {
 
     it('shows a Duplicate button on each list card', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -399,7 +408,7 @@ describe('PackingLists duplicate', () => {
 
     it('calls savePackingList with a new list named "Copy of {name}" when Duplicate is clicked', async () => {
         const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '1' }) }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 
@@ -439,7 +448,7 @@ describe('PackingLists auto-sync on login', () => {
     })
 
     it('automatically calls loadMultipleFilesFromPod on mount when logged in', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb() as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(makeLoggedInDb()))
         mockLoadMultipleFilesFromPod.mockResolvedValue({
             data: [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }],
             result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
@@ -455,7 +464,7 @@ describe('PackingLists auto-sync on login', () => {
     it('does not show a "no data found" toast when pod has no packing lists on auto-sync', async () => {
         const showToast = vi.fn()
         vi.mocked(useToast).mockReturnValue({ showToast })
-        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb([]) as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(makeLoggedInDb([])))
         mockLoadMultipleFilesFromPod.mockResolvedValue({
             data: [],
             result: { success: true, successCount: 0, failCount: 0, totalCount: 0 },
@@ -499,12 +508,11 @@ describe('PackingLists pod sync on mutation', () => {
             data: [],
             result: { success: true, successCount: 0, failCount: 0, totalCount: 0 },
         })
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockDeleteFileFromPod.mockResolvedValue(undefined)
     })
 
-    it('saves renamed list to pod after rename is confirmed', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    it('calls savePackingList with the renamed list after rename is confirmed', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
         await screen.findByText(/Summer Holiday/)
@@ -515,17 +523,15 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    filename: 'list-1.json',
-                    data: expect.objectContaining({ id: 'list-1', name: 'Winter Holiday' }),
-                })
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'list-1', name: 'Winter Holiday' })
             )
         })
     })
 
-    it('saves duplicated list to pod after duplicate', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    it('calls savePackingList with the duplicated list after duplicate', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
         await screen.findByText(/Summer Holiday/)
@@ -533,17 +539,15 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    filename: 'new-uuid.json',
-                    data: expect.objectContaining({ name: 'Copy of Summer Holiday' }),
-                })
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'Copy of Summer Holiday', id: 'new-uuid' })
             )
         })
     })
 
-    it('deletes list from pod after delete is confirmed', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    it('calls deletePackingList with the list id after delete is confirmed', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
         await screen.findByText(/Summer Holiday/)
@@ -553,14 +557,11 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
         await waitFor(() => {
-            expect(mockDeleteFileFromPod).toHaveBeenCalledWith(
-                loggedInSession,
-                'https://timgent.solidcommunity.net/packing-lists/list-1.json'
-            )
+            expect(db.deletePackingList).toHaveBeenCalledWith('list-1')
         })
     })
 
-    it('does not call saveFileToPod when not logged in', async () => {
+    it('calls savePackingList even when not logged in', async () => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
             session: null,
@@ -569,7 +570,8 @@ describe('PackingLists pod sync on mutation', () => {
             login: vi.fn(),
             logout: vi.fn(),
         })
-        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
         await screen.findByText(/Summer Holiday/)
@@ -577,9 +579,10 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
 
         await waitFor(() => {
-            expect(makeDb().savePackingList).toBeDefined()
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'Copy of Summer Holiday' })
+            )
         })
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
     })
 })
 
@@ -605,7 +608,6 @@ describe('PackingLists local-only lists preserved when loading from pod', () => 
             data: [podList],
             result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
         })
-        mockSaveFileToPod.mockResolvedValue(undefined)
     })
 
     it('shows locally created list that has not yet been synced to pod', async () => {
@@ -623,7 +625,7 @@ describe('PackingLists local-only lists preserved when loading from pod', () => 
                 return { rev: '1' }
             }),
         }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderComponent()
 

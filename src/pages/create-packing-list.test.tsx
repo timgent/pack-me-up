@@ -268,6 +268,18 @@ function makeDb(overrides: Record<string, unknown> = {}) {
     }
 }
 
+function makeContextValue(db: ReturnType<typeof makeDb> | ReturnType<typeof makeDeletionDb>) {
+    return {
+        db: db as unknown as PackingAppDatabase,
+        savePackingList: db.savePackingList,
+        saveQuestionSet: db.saveQuestionSet,
+        loadPackingList: vi.fn().mockResolvedValue(null),
+        listPackingLists: db.getAllPackingLists,
+        deletePackingList: vi.fn().mockResolvedValue(undefined),
+        loadQuestionSet: db.getQuestionSet,
+    } as ReturnType<typeof useDatabase>
+}
+
 function renderCreatePackingList() {
     return render(
         <MemoryRouter>
@@ -292,9 +304,7 @@ describe('CreatePackingList – suggestion card', () => {
             ...pastList,
             items: [{ ...customItem, questionId: 'q1', optionId: 'o1', personId: 'p1' }],
         }
-        mockUseDatabase.mockReturnValue({
-            db: makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([noCustomList]) }),
-        } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([noCustomList]) })))
 
         renderCreatePackingList()
         // Wait for loading to finish, then confirm no suggestion card
@@ -303,14 +313,14 @@ describe('CreatePackingList – suggestion card', () => {
     })
 
     it('shows suggestion card when there are unreviewed custom items', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
     })
 
     it('card body is collapsed by default and expands on click', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -325,7 +335,7 @@ describe('CreatePackingList – suggestion card', () => {
     })
 
     it('dismissing the card hides it', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -337,7 +347,7 @@ describe('CreatePackingList – suggestion card', () => {
 
     it('"Skip" calls db.savePackingList with reviewed:true and removes item from card', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -357,7 +367,7 @@ describe('CreatePackingList – suggestion card', () => {
 
     it('"Add" calls db.saveQuestionSet and db.savePackingList with reviewed:true', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -386,7 +396,7 @@ describe('CreatePackingList – suggestion card', () => {
 
     it('"Add" sets selected:true for the matching person in personSelections', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -413,7 +423,7 @@ describe('CreatePackingList – suggestion card', () => {
             return Promise.resolve({ rev: `rev-${saveCallCount + 1}` })
         })
         const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]), savePackingList })
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -430,7 +440,7 @@ describe('CreatePackingList – suggestion card', () => {
     })
 
     it('destination select renders with "Always Needed Items" default and question/option entries', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -446,7 +456,7 @@ describe('CreatePackingList – suggestion card', () => {
 
     it('"Add" with default selection adds to alwaysNeededItems', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -468,7 +478,7 @@ describe('CreatePackingList – suggestion card', () => {
 
     it('"Add" with a question/option selected adds to that option\'s items, not alwaysNeededItems', async () => {
         const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -500,7 +510,7 @@ describe('CreatePackingList – suggestion card', () => {
             return Promise.resolve({ rev: `qs-rev-${qsSaveCount + 1}` })
         })
         const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]), saveQuestionSet })
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -524,7 +534,7 @@ describe('CreatePackingList – suggestion card', () => {
         }
         const listWithTwo: PackingList = { ...pastList, items: [customItem, secondItem] }
         const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]) })
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/past trips you added items/i))
@@ -553,7 +563,15 @@ describe('CreatePackingList - login button', () => {
             login: vi.fn(),
             logout: vi.fn(),
         })
-        mockUseDatabase.mockReturnValue({ db: null as unknown as PackingAppDatabase })
+        mockUseDatabase.mockReturnValue({
+            db: null as unknown as PackingAppDatabase,
+            savePackingList: vi.fn(),
+            saveQuestionSet: vi.fn(),
+            loadPackingList: vi.fn(),
+            listPackingLists: vi.fn().mockResolvedValue([]),
+            deletePackingList: vi.fn(),
+            loadQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }),
+        } as ReturnType<typeof useDatabase>)
         mockUseToast.mockReturnValue({ showToast: vi.fn() as (message: string, type: ToastType) => void })
     })
 
@@ -600,10 +618,9 @@ describe('CreatePackingList – pod sync on creation', () => {
         cleanup()
     })
 
-    it('syncs the newly created list to the pod immediately after saving', async () => {
-        mockUseDatabase.mockReturnValue({
-            db: makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([]) }),
-        } as ReturnType<typeof useDatabase>)
+    it('calls savePackingList with the newly created list when logged in', async () => {
+        const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([]) })
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
@@ -613,11 +630,8 @@ describe('CreatePackingList – pod sync on creation', () => {
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
-                    data: expect.objectContaining({ name: 'My New List' }),
-                })
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'My New List' })
             )
         })
     })
@@ -632,7 +646,7 @@ describe('CreatePackingList – pod sync on creation', () => {
             logout: vi.fn(),
         })
         const db = makeDb({ getAllPackingLists: vi.fn().mockResolvedValue([]) })
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
@@ -785,9 +799,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
 
     it('does not show deletion card when there are no unreviewed deleted items', async () => {
         const noDeleted: PackingList = { ...listWithDeletedItem, deletedItems: [] }
-        mockUseDatabase.mockReturnValue({
-            db: makeDeletionDb({ getAllPackingLists: vi.fn().mockResolvedValue([noDeleted]) }),
-        } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDeletionDb({ getAllPackingLists: vi.fn().mockResolvedValue([noDeleted]) })))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
@@ -795,14 +807,14 @@ describe('CreatePackingList – deletion suggestion card', () => {
     })
 
     it('shows deletion card when there are unreviewed deleted items', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDeletionDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))
     })
 
     it('deletion card is collapsed by default and expands on click', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDeletionDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))
@@ -813,7 +825,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
     })
 
     it('dismissing the deletion card hides it', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeDeletionDb() } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(makeDeletionDb()))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))
@@ -824,7 +836,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
 
     it('"Keep" marks the deletedItems entry as reviewed:true via db.savePackingList', async () => {
         const db = makeDeletionDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))
@@ -843,7 +855,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
 
     it('"Remove permanently" removes item from alwaysNeededItems and marks reviewed', async () => {
         const db = makeDeletionDb()
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))
@@ -878,7 +890,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
             deletedItems: [deletedItem, secondDeleted],
         }
         const db = makeDeletionDb({ getAllPackingLists: vi.fn().mockResolvedValue([listWithTwo]) })
-        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseDatabase.mockReturnValue(makeContextValue(db))
 
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/previously removed/i))

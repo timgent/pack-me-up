@@ -9,7 +9,6 @@ import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
-import { getPrimaryPodUrl, saveFileToPod, POD_CONTAINERS } from '../services/solidPod'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -292,9 +291,9 @@ export function CreatePackingList() {
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const [isDeletionSuggestionDismissed, setIsDeletionSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
-    const { isLoggedIn, login, session } = useSolidPod()
+    const { isLoggedIn, login } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const { db } = useDatabase()
+    const { db, savePackingList, saveQuestionSet, listPackingLists, loadQuestionSet } = useDatabase()
     const navigate = useNavigate()
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
@@ -314,8 +313,8 @@ export function CreatePackingList() {
             setIsLoading(true)
             try {
                 const [doc, lists] = await Promise.all([
-                    db.getQuestionSet(),
-                    db.getAllPackingLists(),
+                    loadQuestionSet(),
+                    listPackingLists(),
                 ])
                 setQuestionSet(doc)
                 setAllPackingLists(lists)
@@ -335,7 +334,7 @@ export function CreatePackingList() {
             }
         }
         fetchQuestionSet()
-    }, [db, showToast])
+    }, [loadQuestionSet, listPackingLists, showToast])
 
     const suggestions = useMemo(
         () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],
@@ -378,7 +377,7 @@ export function CreatePackingList() {
                 ),
             }
         }
-        const { rev } = await db.saveQuestionSet(updatedQs)
+        const { rev } = await saveQuestionSet(updatedQs)
         setQuestionSet({ ...updatedQs, _rev: rev })
 
         await markReviewed(listId, item)
@@ -395,7 +394,7 @@ export function CreatePackingList() {
             ...list,
             items: list.items.map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
-        const { rev } = await db.savePackingList(updatedList)
+        const { rev } = await savePackingList(updatedList)
         setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
     }
 
@@ -406,7 +405,7 @@ export function CreatePackingList() {
             ...list,
             deletedItems: (list.deletedItems ?? []).map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
-        const { rev } = await db.savePackingList(updatedList)
+        const { rev } = await savePackingList(updatedList)
         setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
     }
 
@@ -439,7 +438,7 @@ export function CreatePackingList() {
                 ),
             }
         }
-        const { rev } = await db.saveQuestionSet(updatedQs)
+        const { rev } = await saveQuestionSet(updatedQs)
         setQuestionSet({ ...updatedQs, _rev: rev })
         await markDeletedReviewed(listId, item)
     }
@@ -511,18 +510,7 @@ export function CreatePackingList() {
             items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {
-            await db.savePackingList(packingList)
-            if (isLoggedIn) {
-                const podUrl = await getPrimaryPodUrl(session)
-                if (podUrl) {
-                    await saveFileToPod({
-                        session: session!,
-                        containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-                        filename: `${packingList.id}.json`,
-                        data: packingList,
-                    })
-                }
-            }
+            await savePackingList(packingList)
             showToast('Packing list created successfully!', 'success')
             // Navigate to the newly created packing list
             navigate(`/view-lists/${packingList.id}`)

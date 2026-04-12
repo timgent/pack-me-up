@@ -6,7 +6,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, loadMultipleFilesFromPod, saveFileToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, loadMultipleFilesFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
@@ -18,7 +18,7 @@ export function PackingLists() {
     const [renameValue, setRenameValue] = useState('')
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
-    const { db } = useDatabase()
+    const { db, savePackingList, deletePackingList } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
     const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
@@ -38,9 +38,8 @@ export function PackingLists() {
             const list = packingLists.find(l => l.id === listToRename.id)
             if (!list) return
             const updatedList = { ...list, name: renameValue }
-            await db.savePackingList(updatedList)
+            await savePackingList(updatedList)
             setPackingLists(packingLists.map(l => l.id === listToRename.id ? updatedList : l))
-            syncListToPod(updatedList)
         } catch (err) {
             console.error('Error renaming packing list:', err)
         } finally {
@@ -57,9 +56,8 @@ export function PackingLists() {
                 createdAt: new Date().toISOString(),
                 items: list.items.map(item => ({ ...item, id: generateUUID(), packed: false })),
             }
-            await db.savePackingList(newList)
+            await savePackingList(newList)
             setPackingLists([newList, ...packingLists])
-            syncListToPod(newList)
         } catch (err) {
             console.error('Error duplicating packing list:', err)
         }
@@ -69,40 +67,12 @@ export function PackingLists() {
         if (!listToDelete) return
         const { id } = listToDelete
         try {
-            await db.deletePackingList(id)
+            await deletePackingList(id)
             setPackingLists(packingLists.filter(list => list.id !== id))
-            removeListFromPod(id)
         } catch (err) {
             console.error('Error deleting packing list:', err)
         } finally {
             setListToDelete(null)
-        }
-    }
-
-    const syncListToPod = async (list: PackingList) => {
-        if (!isLoggedIn) return
-        try {
-            const podUrl = await getPrimaryPodUrl(session)
-            if (!podUrl) return
-            await saveFileToPod({
-                session: session!,
-                containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-                filename: `${list.id}.json`,
-                data: list,
-            })
-        } catch (error) {
-            handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
-        }
-    }
-
-    const removeListFromPod = async (id: string) => {
-        if (!isLoggedIn) return
-        try {
-            const podUrl = await getPrimaryPodUrl(session)
-            if (!podUrl) return
-            await deleteFileFromPod(session!, `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`)
-        } catch (error) {
-            handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         }
     }
 
@@ -137,7 +107,7 @@ export function PackingLists() {
             // Sync any local-only lists to the pod so they aren't lost on future loads
             const localOnlyLists = existingLists.filter(l => !podListIds.has(l.id))
             for (const localList of localOnlyLists) {
-                await syncListToPod(localList)
+                await savePackingList(localList)
             }
 
             const allLists = await db.getAllPackingLists()

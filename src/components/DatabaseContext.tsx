@@ -1,11 +1,19 @@
-import { createContext, ReactNode, useContext, useState, useEffect, Fragment } from 'react'
+import { createContext, ReactNode, useContext, useState, useEffect, Fragment, useMemo } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData } from '../services/solidPod'
+import { getPrimaryPodUrl, hasPodData, saveFileToPod, deleteFileFromPod, POD_CONTAINERS } from '../services/solidPod'
 import { ConfirmationDialog } from './ConfirmationDialog'
+import { PackingList } from '../create-packing-list/types'
+import { PackingListQuestionSet } from '../edit-questions/types'
 
 interface DatabaseContextValue {
     db: PackingAppDatabase
+    savePackingList(list: PackingList): Promise<{ rev: string }>
+    loadPackingList(id: string): Promise<PackingList>
+    listPackingLists(): Promise<PackingList[]>
+    deletePackingList(id: string): Promise<void>
+    saveQuestionSet(qs: PackingListQuestionSet): Promise<{ rev: string }>
+    loadQuestionSet(): Promise<PackingListQuestionSet>
 }
 
 const DatabaseContext = createContext<DatabaseContextValue | undefined>(undefined)
@@ -31,6 +39,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     const [isResolvingPod, setIsResolvingPod] = useState(false)
     const [showMigrationPrompt, setShowMigrationPrompt] = useState(false)
     const [localDb, setLocalDb] = useState<PackingAppDatabase | null>(null)
+    const [resolvedPodUrl, setResolvedPodUrl] = useState<string | null>(null)
 
     useEffect(() => {
         // While session is still initialising, wait
@@ -43,6 +52,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setShowMigrationPrompt(false)
             setNamespace(LOCAL_NAMESPACE)
             setDb(PackingAppDatabase.getInstance(LOCAL_NAMESPACE))
+            setResolvedPodUrl(null)
             return
         }
 
@@ -73,6 +83,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                     setLocalDb(local)
                     setNamespace(resolvedNamespace)
                     setDb(podDb)
+                    setResolvedPodUrl(podUrl)
                     setShowMigrationPrompt(true)
                     setIsResolvingPod(false)
                     return
@@ -82,6 +93,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             if (cancelled) return
             setNamespace(resolvedNamespace)
             setDb(podDb)
+            setResolvedPodUrl(podUrl)
             setIsResolvingPod(false)
         })
 
@@ -89,6 +101,52 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             cancelled = true
         }
     }, [isLoggedIn, webId, session, isLoading])
+
+    const contextValue = useMemo<DatabaseContextValue | null>(() => {
+        if (!db) return null
+        return {
+            db,
+            async savePackingList(list: PackingList) {
+                const result = await db.savePackingList(list)
+                if (isLoggedIn && session && resolvedPodUrl) {
+                    await saveFileToPod({
+                        session,
+                        containerPath: `${resolvedPodUrl}${POD_CONTAINERS.PACKING_LISTS}`,
+                        filename: `${list.id}.json`,
+                        data: list,
+                    })
+                }
+                return result
+            },
+            async loadPackingList(id: string) {
+                return db.getPackingList(id)
+            },
+            async listPackingLists() {
+                return db.getAllPackingLists()
+            },
+            async deletePackingList(id: string) {
+                await db.deletePackingList(id)
+                if (isLoggedIn && session && resolvedPodUrl) {
+                    await deleteFileFromPod(session, `${resolvedPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`)
+                }
+            },
+            async saveQuestionSet(qs: PackingListQuestionSet) {
+                const result = await db.saveQuestionSet(qs)
+                if (isLoggedIn && session && resolvedPodUrl) {
+                    await saveFileToPod({
+                        session,
+                        containerPath: `${resolvedPodUrl}${POD_CONTAINERS.ROOT}`,
+                        filename: 'packing-list-questions.json',
+                        data: qs,
+                    })
+                }
+                return result
+            },
+            async loadQuestionSet() {
+                return db.getQuestionSet()
+            },
+        }
+    }, [db, isLoggedIn, session, resolvedPodUrl])
 
     if (isLoading || isResolvingPod || !db || !namespace) {
         return null
@@ -118,7 +176,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     // namespace changes (e.g. login / logout). This ensures every page re-fetches
     // its data from the correct database instead of showing stale state.
     return (
-        <DatabaseContext.Provider value={{ db }}>
+        <DatabaseContext.Provider value={contextValue!}>
             <Fragment key={namespace}>
                 {children}
             </Fragment>

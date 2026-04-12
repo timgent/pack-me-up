@@ -13,6 +13,14 @@ vi.mock('./SolidPodContext', () => ({
 vi.mock('../services/solidPod', () => ({
   getPrimaryPodUrl: vi.fn(),
   hasPodData: vi.fn(),
+  saveFileToPod: vi.fn(),
+  deleteFileFromPod: vi.fn(),
+  POD_CONTAINERS: {
+    ROOT: 'pack-me-up/',
+    QUESTIONS: 'pack-me-up/packing-list-questions.json',
+    PACKING_LISTS: 'pack-me-up/packing-lists/',
+    BACKUPS: 'pack-me-up/backups/',
+  },
 }))
 
 // Mock PackingAppDatabase so tests don't create real filesystem databases
@@ -29,23 +37,39 @@ vi.mock('../services/database', () => {
 })
 
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData } from '../services/solidPod'
+import { getPrimaryPodUrl, hasPodData, saveFileToPod, deleteFileFromPod } from '../services/solidPod'
 import { PackingAppDatabase } from '../services/database'
+import type { PackingList } from '../create-packing-list/types'
+import type { PackingListQuestionSet } from '../edit-questions/types'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
 const mockHasPodData = vi.mocked(hasPodData)
 const mockGetInstance = vi.mocked(PackingAppDatabase.getInstance)
+const mockSaveFileToPod = vi.mocked(saveFileToPod)
+const mockDeleteFileFromPod = vi.mocked(deleteFileFromPod)
 
-/** Creates a mock db object with controllable isEmpty/copyAllDataFrom behaviour */
+/** Creates a mock db object with controllable method behaviour */
 function makeDb(namespace: string, overrides: {
   isEmpty?: boolean
   copyAllDataFrom?: ReturnType<typeof vi.fn>
+  savePackingList?: ReturnType<typeof vi.fn>
+  getPackingList?: ReturnType<typeof vi.fn>
+  getAllPackingLists?: ReturnType<typeof vi.fn>
+  deletePackingList?: ReturnType<typeof vi.fn>
+  saveQuestionSet?: ReturnType<typeof vi.fn>
+  getQuestionSet?: ReturnType<typeof vi.fn>
 } = {}) {
   return {
     getInfo: vi.fn().mockResolvedValue({ db_name: `packing-app-data--${namespace}`, doc_count: 0 }),
     isEmpty: vi.fn().mockResolvedValue(overrides.isEmpty ?? false),
     copyAllDataFrom: overrides.copyAllDataFrom ?? vi.fn().mockResolvedValue(undefined),
+    savePackingList: overrides.savePackingList ?? vi.fn().mockResolvedValue({ rev: 'rev-1' }),
+    getPackingList: overrides.getPackingList ?? vi.fn().mockResolvedValue({ id: 'list-1', name: 'Test List', createdAt: '2024-01-01', items: [] }),
+    getAllPackingLists: overrides.getAllPackingLists ?? vi.fn().mockResolvedValue([]),
+    deletePackingList: overrides.deletePackingList ?? vi.fn().mockResolvedValue(undefined),
+    saveQuestionSet: overrides.saveQuestionSet ?? vi.fn().mockResolvedValue({ rev: 'rev-1' }),
+    getQuestionSet: overrides.getQuestionSet ?? vi.fn().mockResolvedValue({ people: [], questions: [], alwaysNeededItems: [] }),
   }
 }
 
@@ -76,6 +100,10 @@ describe('DatabaseContext', () => {
     mockHasPodData.mockReset()
     // Default: pod has data → no migration prompt
     mockHasPodData.mockResolvedValue(true)
+    mockSaveFileToPod.mockReset()
+    mockSaveFileToPod.mockResolvedValue(undefined)
+    mockDeleteFileFromPod.mockReset()
+    mockDeleteFileFromPod.mockResolvedValue(undefined)
     localStorage.clear()
   })
 
@@ -320,6 +348,172 @@ describe('DatabaseContext', () => {
       await waitFor(() => screen.getByText('Start fresh'))
       fireEvent.click(screen.getByText('Start fresh'))
       expect(localStorage.getItem('pod-migration-dismissed-example.com')).toBe('true')
+    })
+  })
+
+  describe('unified data methods', () => {
+    let capturedCtx: ReturnType<typeof useDatabase> | undefined
+
+    function ContextCapture() {
+      capturedCtx = useDatabase()
+      return null
+    }
+
+    beforeEach(() => {
+      capturedCtx = undefined
+    })
+
+    function setupLoggedOut() {
+      mockUseSolidPod.mockReturnValue({
+        session: null,
+        isLoggedIn: false,
+        webId: undefined,
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+    }
+
+    function setupLoggedIn() {
+      const mockSession = { fetch: vi.fn(), info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
+      mockUseSolidPod.mockReturnValue({
+        session: mockSession as unknown as Session,
+        isLoggedIn: true,
+        webId: 'https://example.com/profile#me',
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+      mockGetPrimaryPodUrl.mockResolvedValue('https://example.com/')
+      return mockSession
+    }
+
+    it('savePackingList saves to PouchDB regardless of login state', async () => {
+      setupLoggedOut()
+      const mockDbSave = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { savePackingList: mockDbSave }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const testList: PackingList = { id: 'list-1', name: 'Test', createdAt: '2024-01-01', items: [] }
+      await capturedCtx!.savePackingList(testList)
+
+      expect(mockDbSave).toHaveBeenCalledWith(testList)
+    })
+
+    it('savePackingList also calls saveFileToPod when a session is present', async () => {
+      setupLoggedIn()
+      const mockDbSave = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { savePackingList: mockDbSave }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const testList: PackingList = { id: 'list-1', name: 'Test', createdAt: '2024-01-01', items: [] }
+      await capturedCtx!.savePackingList(testList)
+
+      expect(mockDbSave).toHaveBeenCalledWith(testList)
+      expect(mockSaveFileToPod).toHaveBeenCalledWith(expect.objectContaining({
+        filename: 'list-1.json',
+        data: testList,
+      }))
+    })
+
+    it('savePackingList does not call saveFileToPod when session is null', async () => {
+      setupLoggedOut()
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const testList: PackingList = { id: 'list-1', name: 'Test', createdAt: '2024-01-01', items: [] }
+      await capturedCtx!.savePackingList(testList)
+
+      expect(mockSaveFileToPod).not.toHaveBeenCalled()
+    })
+
+    it('loadPackingList returns the list from PouchDB', async () => {
+      setupLoggedOut()
+      const testList: PackingList = { id: 'list-1', name: 'Test', createdAt: '2024-01-01', items: [] }
+      const mockDbGet = vi.fn().mockResolvedValue(testList)
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { getPackingList: mockDbGet }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const result = await capturedCtx!.loadPackingList('list-1')
+
+      expect(mockDbGet).toHaveBeenCalledWith('list-1')
+      expect(result).toEqual(testList)
+    })
+
+    it('listPackingLists returns all lists from PouchDB', async () => {
+      setupLoggedOut()
+      const testLists: PackingList[] = [
+        { id: 'list-1', name: 'Test 1', createdAt: '2024-01-01', items: [] },
+        { id: 'list-2', name: 'Test 2', createdAt: '2024-01-02', items: [] },
+      ]
+      const mockDbGetAll = vi.fn().mockResolvedValue(testLists)
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { getAllPackingLists: mockDbGetAll }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const result = await capturedCtx!.listPackingLists()
+
+      expect(mockDbGetAll).toHaveBeenCalled()
+      expect(result).toEqual(testLists)
+    })
+
+    it('deletePackingList removes from PouchDB and calls pod delete when logged in', async () => {
+      setupLoggedIn()
+      const mockDbDelete = vi.fn().mockResolvedValue(undefined)
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { deletePackingList: mockDbDelete }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      await capturedCtx!.deletePackingList('list-1')
+
+      expect(mockDbDelete).toHaveBeenCalledWith('list-1')
+      expect(mockDeleteFileFromPod).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.stringContaining('list-1.json'),
+      )
+    })
+
+    it('saveQuestionSet persists to PouchDB and to Pod when logged in', async () => {
+      setupLoggedIn()
+      const mockDbSaveQs = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { saveQuestionSet: mockDbSaveQs }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const testQs: PackingListQuestionSet = { people: [], questions: [], alwaysNeededItems: [] }
+      await capturedCtx!.saveQuestionSet(testQs)
+
+      expect(mockDbSaveQs).toHaveBeenCalledWith(testQs)
+      expect(mockSaveFileToPod).toHaveBeenCalledWith(expect.objectContaining({
+        filename: 'packing-list-questions.json',
+        data: testQs,
+      }))
+    })
+
+    it('loadQuestionSet returns the question set from PouchDB', async () => {
+      setupLoggedOut()
+      const testQs: PackingListQuestionSet = { people: [], questions: [], alwaysNeededItems: [] }
+      const mockDbGetQs = vi.fn().mockResolvedValue(testQs)
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { getQuestionSet: mockDbGetQs }))
+
+      render(<DatabaseProvider><ContextCapture /></DatabaseProvider>)
+      await waitFor(() => expect(capturedCtx).toBeDefined())
+
+      const result = await capturedCtx!.loadQuestionSet()
+
+      expect(mockDbGetQs).toHaveBeenCalled()
+      expect(result).toEqual(testQs)
     })
   })
 })
