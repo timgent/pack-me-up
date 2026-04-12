@@ -31,9 +31,15 @@ export interface PodSyncOptions<T> {
   pathConfig: PodPathConfig;
 
   /**
-   * Polling interval in milliseconds (null to disable polling)
+   * Polling interval in milliseconds (null/undefined to disable polling)
    */
   pollInterval?: number;
+
+  /**
+   * Sync once on mount even when pollInterval is not set.
+   * Default: false (no breaking change for existing callers that rely on pollInterval).
+   */
+  syncOnMount?: boolean;
 
   /**
    * Callback when sync from Pod succeeds
@@ -97,7 +103,8 @@ export interface PodSyncState<T> {
 export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   const {
     pathConfig,
-    pollInterval = 10000, // Default: poll every 10 seconds
+    pollInterval,
+    syncOnMount = false,
     onSyncSuccess,
     onSyncError,
     onSaveSuccess,
@@ -262,10 +269,16 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   }, [enabled, isLoggedIn, session, pathConfig, onSaveSuccess, onSaveError]);
 
   /**
-   * Set up polling interval
+   * Sync on mount (and/or) set up polling interval.
+   *
+   * - syncOnMount: true  → performs one sync immediately on mount (no polling)
+   * - pollInterval: N    → performs one sync immediately on mount AND polls every N ms
+   * - both false/unset   → no automatic sync
+   *
+   * Existing callers that pass pollInterval retain their original behaviour.
    */
   useEffect(() => {
-    if (!enabled || !isLoggedIn || !pollInterval) {
+    if (!enabled || !isLoggedIn) {
       return;
     }
 
@@ -276,8 +289,14 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       return;
     }
 
-    // Do an initial sync when the hook mounts or login state changes
-    syncFromPod();
+    // Do an initial sync when syncOnMount is true OR polling is configured
+    if (syncOnMount || pollInterval) {
+      syncFromPod();
+    }
+
+    if (!pollInterval) {
+      return;
+    }
 
     // Set up the polling interval
     const interval = setInterval(() => {
@@ -291,7 +310,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     // pathConfigKey is a stable string representation of pathConfig to avoid object reference issues
     // The interval only needs to restart when the actual config values change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, isLoggedIn, pollInterval, pathConfigKey]);
+  }, [enabled, isLoggedIn, syncOnMount, pollInterval, pathConfigKey]);
 
   return {
     lastSync,

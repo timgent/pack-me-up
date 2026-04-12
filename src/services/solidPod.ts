@@ -1,5 +1,8 @@
 import { Session } from '@inrupt/solid-client-authn-browser'
 import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile } from '@inrupt/solid-client'
+import { PackingAppDatabase } from './database'
+import { PackingListQuestionSet } from '../edit-questions/types'
+import { PackingList } from '../create-packing-list/types'
 
 /**
  * Pod container paths under the user's Pod root
@@ -394,4 +397,111 @@ export async function loadMultipleFilesFromPod<T>(
             totalCount: jsonFileUrls.length
         }
     }
+}
+
+/**
+ * Result of a full sync from Pod to local DB
+ */
+export interface SyncAllResult {
+    /** true if the pod question set was newer than local and was saved */
+    questionSetSynced: boolean
+    /** number of packing lists downloaded from pod and saved locally */
+    packingListsSynced: number
+    /** number of local-only packing lists uploaded to pod */
+    packingListsUploaded: number
+}
+
+/**
+ * Performs a full one-way sync from the Solid Pod into the local database.
+ *
+ * - Question set: pod wins if it is newer than the local copy (fallback-to-pod
+ *   strategy). If no local copy exists, the pod data is always saved.
+ * - Packing lists: all lists present on the pod are saved locally (pod wins for
+ *   any conflicting IDs). Local-only lists (not yet on the pod) are uploaded so
+ *   data is never lost.
+ *
+ * 404 responses are treated as "no data" and handled gracefully.
+ * Authentication errors (401/403) are re-thrown immediately.
+ * Other non-critical errors are logged and skipped so one failure does not
+ * prevent the rest of the sync from completing.
+ */
+export async function syncAllDataFromPod(
+    session: Session,
+    podUrl: string,
+    db: PackingAppDatabase
+): Promise<SyncAllResult> {
+    let questionSetSynced = false
+    let packingListsSynced = 0
+    let packingListsUploaded = 0
+
+    // ── 1. Question set ──────────────────────────────────────────────────────
+    try {
+        const podQs = await loadFileFromPod<PackingListQuestionSet>({
+            session,
+            fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
+        })
+
+        let localQs: PackingListQuestionSet | null = null
+        try {
+            localQs = await db.getQuestionSet()
+        } catch {
+            // not_found is expected for a fresh login
+        }
+
+        const podTime = podQs.lastModified ? new Date(podQs.lastModified).getTime() : 0
+        const localTime = localQs?.lastModified ? new Date(localQs.lastModified).getTime() : 0
+
+        // Fallback-to-pod: save when there is no local copy OR pod is newer
+        if (!localQs || podTime > localTime) {
+            await db.saveQuestionSet({ ...podQs, _rev: undefined })
+            questionSetSynced = true
+        }
+    } catch (err: unknown) {
+        if (err instanceof AuthenticationError) throw err
+        const status = getStatusCode(err)
+        if (status !== 404) {
+            console.error('syncAllDataFromPod: error syncing question set', err)
+        }
+        // 404 = no question set on pod yet → silently skip
+    }
+
+    // ── 2. Packing lists ─────────────────────────────────────────────────────
+    const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+
+    const { data: podLists } = await loadMultipleFilesFromPod<PackingList>({
+        session,
+        containerPath: containerUrl,
+    })
+
+    const podListIds = new Set(podLists.map((l) => l.id))
+
+    // Save all pod lists to local DB (pod wins for conflicting IDs)
+    for (const podList of podLists) {
+        try {
+            await db.savePackingList({ ...podList, _rev: undefined })
+            packingListsSynced++
+        } catch (err) {
+            console.error(`syncAllDataFromPod: error saving packing list ${podList.id}`, err)
+        }
+    }
+
+    // Upload any local-only lists to the pod so they are not lost
+    const localLists = await db.getAllPackingLists()
+    for (const localList of localLists) {
+        if (podListIds.has(localList.id)) continue
+        try {
+            await saveFileToPod({
+                session,
+                containerPath: containerUrl,
+                filename: `${localList.id}.json`,
+                data: localList,
+            })
+            packingListsUploaded++
+        } catch (err) {
+            if (err instanceof AuthenticationError) throw err
+            console.error(`syncAllDataFromPod: error uploading local list ${localList.id}`, err)
+        }
+    }
+
+    return { questionSetSynced, packingListsSynced, packingListsUploaded }
 }

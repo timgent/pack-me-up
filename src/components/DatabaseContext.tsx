@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useState, useEffect, Fragment } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData } from '../services/solidPod'
+import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface DatabaseContextValue {
@@ -83,6 +83,14 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setNamespace(resolvedNamespace)
             setDb(podDb)
             setIsResolvingPod(false)
+
+            // Background sync: pull latest data from pod into local DB.
+            // Fire-and-forget – a sync failure must not block the app.
+            if (podUrl && session) {
+                syncAllDataFromPod(session, podUrl, podDb).catch(err => {
+                    console.error('Background login sync failed:', err)
+                })
+            }
         })
 
         return () => {

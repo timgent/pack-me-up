@@ -13,6 +13,7 @@ vi.mock('./SolidPodContext', () => ({
 vi.mock('../services/solidPod', () => ({
   getPrimaryPodUrl: vi.fn(),
   hasPodData: vi.fn(),
+  syncAllDataFromPod: vi.fn(),
 }))
 
 // Mock PackingAppDatabase so tests don't create real filesystem databases
@@ -29,12 +30,13 @@ vi.mock('../services/database', () => {
 })
 
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData } from '../services/solidPod'
+import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
 import { PackingAppDatabase } from '../services/database'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
 const mockHasPodData = vi.mocked(hasPodData)
+const mockSyncAllDataFromPod = vi.mocked(syncAllDataFromPod)
 const mockGetInstance = vi.mocked(PackingAppDatabase.getInstance)
 
 /** Creates a mock db object with controllable isEmpty/copyAllDataFrom behaviour */
@@ -76,6 +78,8 @@ describe('DatabaseContext', () => {
     mockHasPodData.mockReset()
     // Default: pod has data → no migration prompt
     mockHasPodData.mockResolvedValue(true)
+    mockSyncAllDataFromPod.mockReset()
+    mockSyncAllDataFromPod.mockResolvedValue({ questionSetSynced: false, packingListsSynced: 0, packingListsUploaded: 0 })
     localStorage.clear()
   })
 
@@ -320,6 +324,85 @@ describe('DatabaseContext', () => {
       await waitFor(() => screen.getByText('Start fresh'))
       fireEvent.click(screen.getByText('Start fresh'))
       expect(localStorage.getItem('pod-migration-dismissed-example.com')).toBe('true')
+    })
+  })
+
+  describe('login sync', () => {
+    const mockSession = { info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
+
+    beforeEach(() => {
+      mockUseSolidPod.mockReturnValue({
+        session: mockSession as unknown as Session,
+        isLoggedIn: true,
+        webId: 'https://example.com/profile#me',
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+      mockGetPrimaryPodUrl.mockResolvedValue('https://example.com/')
+    })
+
+    it('calls syncAllDataFromPod after pod namespace is established', async () => {
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      expect(mockSyncAllDataFromPod).toHaveBeenCalledWith(
+        mockSession,
+        'https://example.com/',
+        expect.anything()
+      )
+    })
+
+    it('does not call syncAllDataFromPod when not logged in', async () => {
+      mockUseSolidPod.mockReturnValue({
+        session: null,
+        isLoggedIn: false,
+        webId: undefined,
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      expect(mockSyncAllDataFromPod).not.toHaveBeenCalled()
+    })
+
+    it('does not call syncAllDataFromPod when migration prompt is shown', async () => {
+      mockHasPodData.mockResolvedValue(false)
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByText(/you have local data/i))
+      expect(mockSyncAllDataFromPod).not.toHaveBeenCalled()
+    })
+
+    it('does not crash when syncAllDataFromPod throws', async () => {
+      mockSyncAllDataFromPod.mockRejectedValue(new Error('Network error'))
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      // Children still render despite sync error
+      await waitFor(() => screen.getByTestId('child'))
+      expect(console.error).toHaveBeenCalled()
     })
   })
 })

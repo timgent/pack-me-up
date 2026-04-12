@@ -27,9 +27,7 @@ vi.mock('../hooks/usePodErrorHandler', () => ({
 
 vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(),
-    saveMultipleFilesToPod: vi.fn(),
     saveFileToPod: vi.fn(),
-    loadMultipleFilesFromPod: vi.fn(),
     deleteFileFromPod: vi.fn(),
     POD_CONTAINERS: { PACKING_LISTS: '/packing-lists/' },
     POD_ERROR_MESSAGES: {
@@ -44,13 +42,11 @@ vi.mock('../services/solidPod', () => ({
 import type { Session } from '@inrupt/solid-client-authn-browser'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { useToast } from '../components/ToastContext'
-import { getPrimaryPodUrl, loadMultipleFilesFromPod, saveFileToPod, deleteFileFromPod } from '../services/solidPod'
+import { getPrimaryPodUrl, saveFileToPod, deleteFileFromPod } from '../services/solidPod'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
-const mockLoadMultipleFilesFromPod = vi.mocked(loadMultipleFilesFromPod)
 const mockSaveFileToPod = vi.mocked(saveFileToPod)
 const mockDeleteFileFromPod = vi.mocked(deleteFileFromPod)
 
@@ -415,64 +411,6 @@ describe('PackingLists duplicate', () => {
     })
 })
 
-describe('PackingLists auto-sync on login', () => {
-    const loggedInSession = { fetch: vi.fn() } as unknown as Session
-
-    function makeLoggedInDb(lists = [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }]) {
-        return {
-            getAllPackingLists: vi.fn().mockResolvedValue(lists),
-            deletePackingList: vi.fn().mockResolvedValue(undefined),
-            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
-        }
-    }
-
-    beforeEach(() => {
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: true,
-            session: loggedInSession,
-            webId: 'https://timgent.solidcommunity.net/profile/card#me',
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
-    })
-
-    it('automatically calls loadMultipleFilesFromPod on mount when logged in', async () => {
-        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb() as unknown as PackingAppDatabase })
-        mockLoadMultipleFilesFromPod.mockResolvedValue({
-            data: [{ id: 'pod-list-1', name: 'Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }],
-            result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
-        })
-
-        renderComponent()
-
-        await waitFor(() => {
-            expect(mockLoadMultipleFilesFromPod).toHaveBeenCalled()
-        })
-    })
-
-    it('does not show a "no data found" toast when pod has no packing lists on auto-sync', async () => {
-        const showToast = vi.fn()
-        vi.mocked(useToast).mockReturnValue({ showToast })
-        mockUseDatabase.mockReturnValue({ db: makeLoggedInDb([]) as unknown as PackingAppDatabase })
-        mockLoadMultipleFilesFromPod.mockResolvedValue({
-            data: [],
-            result: { success: true, successCount: 0, failCount: 0, totalCount: 0 },
-        })
-
-        renderComponent()
-
-        await waitFor(() => {
-            expect(mockLoadMultipleFilesFromPod).toHaveBeenCalled()
-        })
-        expect(showToast).not.toHaveBeenCalledWith(
-            expect.stringContaining('No packing lists found'),
-            expect.anything()
-        )
-    })
-})
-
 describe('PackingLists pod sync on mutation', () => {
     const loggedInSession = { fetch: vi.fn() } as unknown as Session
 
@@ -495,10 +433,6 @@ describe('PackingLists pod sync on mutation', () => {
             logout: vi.fn(),
         })
         mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
-        mockLoadMultipleFilesFromPod.mockResolvedValue({
-            data: [],
-            result: { success: true, successCount: 0, failCount: 0, totalCount: 0 },
-        })
         mockSaveFileToPod.mockResolvedValue(undefined)
         mockDeleteFileFromPod.mockResolvedValue(undefined)
     })
@@ -583,53 +517,3 @@ describe('PackingLists pod sync on mutation', () => {
     })
 })
 
-describe('PackingLists local-only lists preserved when loading from pod', () => {
-    const loggedInSession = { fetch: vi.fn() } as unknown as Session
-
-    const podList = { id: 'pod-list-1', name: 'Old Pod List', createdAt: '2026-01-01T00:00:00Z', items: [] }
-    const localOnlyList = { id: 'local-only-1', name: 'Newly Created List', createdAt: '2026-02-01T00:00:00Z', items: [] }
-
-    beforeEach(() => {
-        vi.clearAllMocks()
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: true,
-            session: loggedInSession,
-            webId: 'https://timgent.solidcommunity.net/profile/card#me',
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
-        // Pod has only the old list (local-only-1 was never synced)
-        mockLoadMultipleFilesFromPod.mockResolvedValue({
-            data: [podList],
-            result: { success: true, successCount: 1, failCount: 0, totalCount: 1 },
-        })
-        mockSaveFileToPod.mockResolvedValue(undefined)
-    })
-
-    it('shows locally created list that has not yet been synced to pod', async () => {
-        // Simulate a real DB: starts with both lists, and deletePackingList actually removes from state
-        const dbState = new Map([
-            [podList.id, podList],
-            [localOnlyList.id, localOnlyList],
-        ])
-
-        const db = {
-            getAllPackingLists: vi.fn().mockImplementation(async () => Array.from(dbState.values())),
-            deletePackingList: vi.fn().mockImplementation(async (id: string) => { dbState.delete(id) }),
-            savePackingList: vi.fn().mockImplementation(async (list: typeof podList) => {
-                dbState.set(list.id, list)
-                return { rev: '1' }
-            }),
-        }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
-
-        renderComponent()
-
-        await waitFor(() => {
-            expect(screen.getByText(/Old Pod List/)).toBeTruthy()
-            expect(screen.getByText(/Newly Created List/)).toBeTruthy()
-        })
-    })
-})
