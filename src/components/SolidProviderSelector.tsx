@@ -34,7 +34,7 @@ export const COMMON_PROVIDERS: SolidProvider[] = [
 
 export const LAST_PROVIDER_KEY = 'solid-last-provider-issuer';
 
-const DEFAULT_PROVIDER = COMMON_PROVIDERS.find(p => p.issuer === 'https://solidcommunity.net')!;
+const DEFAULT_PROVIDER = COMMON_PROVIDERS.find(p => p.issuer === 'https://login.inrupt.com')!;
 
 function getLastUsedProvider(): SolidProvider | null {
   const issuer = localStorage.getItem(LAST_PROVIDER_KEY);
