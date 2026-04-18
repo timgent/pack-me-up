@@ -532,6 +532,7 @@ export function CreatePackingList() {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
+            lastModified: new Date().toISOString(),
             items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {

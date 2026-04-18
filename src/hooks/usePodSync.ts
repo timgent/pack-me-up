@@ -120,6 +120,17 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   // Use ref to prevent concurrent syncs
   const isSyncingRef = useRef(false);
 
+  // Refs for callbacks so syncFromPod/saveToPod always call the latest version,
+  // even when captured by a stale closure in the polling useEffect.
+  const onSyncSuccessRef = useRef(onSyncSuccess);
+  onSyncSuccessRef.current = onSyncSuccess;
+  const onSyncErrorRef = useRef(onSyncError);
+  onSyncErrorRef.current = onSyncError;
+  const onSaveSuccessRef = useRef(onSaveSuccess);
+  onSaveSuccessRef.current = onSaveSuccess;
+  const onSaveErrorRef = useRef(onSaveError);
+  onSaveErrorRef.current = onSaveError;
+
   // Create a stable key for pathConfig to use in useEffect dependencies
   // This prevents the interval from restarting when pathConfig object reference changes
   const pathConfigKey = useMemo(() => {
@@ -187,8 +198,8 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
 
       setLastSync(new Date());
 
-      if (onSyncSuccess) {
-        onSyncSuccess(data);
+      if (onSyncSuccessRef.current) {
+        onSyncSuccessRef.current(data);
       }
     } catch (err: unknown) {
       // 404 errors are expected when file doesn't exist yet - not a real error
@@ -200,15 +211,15 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
           : (err instanceof Error ? err.message : 'Failed to sync from Pod');
         setError(errorMessage);
 
-        if (onSyncError) {
-          onSyncError(errorMessage);
+        if (onSyncErrorRef.current) {
+          onSyncErrorRef.current(errorMessage);
         }
       }
     } finally {
       setIsSyncing(false);
       isSyncingRef.current = false;
     }
-  }, [enabled, isLoggedIn, session, getFileUrl, onSyncSuccess, onSyncError]);
+  }, [enabled, isLoggedIn, session, getFileUrl]);
 
   /**
    * Save data to the Pod
@@ -248,8 +259,8 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
 
       setLastSync(new Date());
 
-      if (onSaveSuccess) {
-        onSaveSuccess();
+      if (onSaveSuccessRef.current) {
+        onSaveSuccessRef.current();
       }
 
       return true;
@@ -260,13 +271,13 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         : (err instanceof Error ? err.message : 'Failed to save to Pod');
       setError(errorMessage);
 
-      if (onSaveError) {
-        onSaveError(errorMessage);
+      if (onSaveErrorRef.current) {
+        onSaveErrorRef.current(errorMessage);
       }
 
       return false;
     }
-  }, [enabled, isLoggedIn, session, pathConfig, onSaveSuccess, onSaveError]);
+  }, [enabled, isLoggedIn, session, pathConfig]);
 
   /**
    * Sync on mount (and/or) set up polling interval.

@@ -22,6 +22,7 @@ const executablePath = existsSync(localChromium) ? localChromium : undefined
 export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: true,
+  workers: 4,
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   globalSetup: './e2e/global-setup.ts',

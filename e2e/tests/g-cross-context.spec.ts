@@ -6,6 +6,7 @@ test.describe('G – Cross-context Pod Sync', () => {
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    try { await page.getByRole('button', { name: 'Yes, Override' }).click({ timeout: 3_000 }) } catch { /* ok */ }
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()
     try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
@@ -37,8 +38,7 @@ test.describe('G – Cross-context Pod Sync', () => {
     const ctxB = await browser.newContext({ storageState: 'e2e/.auth/user.json' })
     const pageB = await ctxB.newPage()
     await pageB.goto('/#/view-lists')
-    await pageB.waitForLoadState('networkidle')
-    await pageB.waitForTimeout(3_000)
+    await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
     await expect(pageB.getByText('Cross-Context List A')).toBeVisible({ timeout: 8_000 })
     await ctxB.close()
   })
@@ -69,9 +69,9 @@ test.describe('G – Cross-context Pod Sync', () => {
     const ctxB = await browser.newContext({ storageState: 'e2e/.auth/user.json' })
     const pageB = await ctxB.newPage()
     await pageB.goto('/#/view-lists')
-    await pageB.waitForLoadState('networkidle')
-    await pageB.waitForTimeout(3_000)
-    await expect(pageB.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 8_000 })
+    // Wait for the login sync to finish — the loading text disappears when syncAllDataFromPod completes
+    await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
+    await expect(pageB.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 10_000 })
     await ctxB.close()
   })
 })

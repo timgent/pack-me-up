@@ -356,31 +356,36 @@ export async function loadMultipleFilesFromPod<T>(
         }
     }
 
+    // Load all files in parallel for faster sync
+    const settled = await Promise.allSettled(
+        jsonFileUrls.map(fileUrl =>
+            getFile(fileUrl, { fetch: session.fetch })
+                .then(file => file.text())
+                .then(text => ({ fileUrl, item: JSON.parse(text) as T }))
+        )
+    )
+
     const loadedData: T[] = []
     let successCount = 0
     let failCount = 0
 
-    // Load each file
-    for (const fileUrl of jsonFileUrls) {
-        try {
-            const file = await getFile(fileUrl, { fetch: session.fetch })
-            const text = await file.text()
-            const item = JSON.parse(text) as T
-
-            loadedData.push(item)
+    for (let i = 0; i < settled.length; i++) {
+        const result = settled[i]
+        const fileUrl = jsonFileUrls[i]
+        if (result.status === 'fulfilled') {
+            loadedData.push(result.value.item)
             successCount++
-
             if (onFileLoaded) {
-                onFileLoaded(item)
+                onFileLoaded(result.value.item)
             }
-        } catch (error: unknown) {
-            // Check for authentication errors
+        } else {
+            const error = result.reason
+            // Re-throw authentication errors immediately
             if (isAuthenticationError(error)) {
                 handlePodError(error)
             }
             console.error(`Error loading file ${fileUrl}:`, error)
             failCount++
-
             if (onError) {
                 onError(fileUrl, error instanceof Error ? error : new Error(String(error)))
             }
@@ -433,29 +438,45 @@ export async function syncAllDataFromPod(
     let packingListsSynced = 0
     let packingListsUploaded = 0
 
-    // ── 1. Question set ──────────────────────────────────────────────────────
-    try {
-        const podQs = await loadFileFromPod<PackingListQuestionSet>({
+    const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+
+    // ── Download question set and packing lists in parallel ──────────────────
+    const [podQsResult, podListsResult] = await Promise.allSettled([
+        loadFileFromPod<PackingListQuestionSet>({
             session,
             fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
-        })
+        }),
+        loadMultipleFilesFromPod<PackingList>({
+            session,
+            containerPath: containerUrl,
+        }),
+    ])
 
-        let localQs: PackingListQuestionSet | null = null
+    // ── 1. Question set ──────────────────────────────────────────────────────
+    if (podQsResult.status === 'fulfilled') {
         try {
-            localQs = await db.getQuestionSet()
-        } catch {
-            // not_found is expected for a fresh login
-        }
+            const podQs = podQsResult.value
+            let localQs: PackingListQuestionSet | null = null
+            try {
+                localQs = await db.getQuestionSet()
+            } catch {
+                // not_found is expected for a fresh login
+            }
 
-        const podTime = podQs.lastModified ? new Date(podQs.lastModified).getTime() : 0
-        const localTime = localQs?.lastModified ? new Date(localQs.lastModified).getTime() : 0
+            const podTime = podQs.lastModified ? new Date(podQs.lastModified).getTime() : 0
+            const localTime = localQs?.lastModified ? new Date(localQs.lastModified).getTime() : 0
 
-        // Fallback-to-pod: save when there is no local copy OR pod is newer
-        if (!localQs || podTime > localTime) {
-            await db.saveQuestionSet({ ...podQs, _rev: undefined })
-            questionSetSynced = true
+            // Fallback-to-pod: save when there is no local copy OR pod is newer
+            if (!localQs || podTime > localTime) {
+                await db.saveQuestionSet({ ...podQs, _rev: undefined })
+                questionSetSynced = true
+            }
+        } catch (err: unknown) {
+            if (err instanceof AuthenticationError) throw err
+            console.error('syncAllDataFromPod: error syncing question set', err)
         }
-    } catch (err: unknown) {
+    } else {
+        const err = podQsResult.reason
         if (err instanceof AuthenticationError) throw err
         const status = getStatusCode(err)
         if (status !== 404) {
@@ -465,22 +486,25 @@ export async function syncAllDataFromPod(
     }
 
     // ── 2. Packing lists ─────────────────────────────────────────────────────
-    const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    if (podListsResult.status === 'rejected') {
+        const err = podListsResult.reason
+        if (err instanceof AuthenticationError) throw err
+        console.error('syncAllDataFromPod: error loading packing lists', err)
+        return { questionSetSynced, packingListsSynced, packingListsUploaded }
+    }
 
-    const { data: podLists } = await loadMultipleFilesFromPod<PackingList>({
-        session,
-        containerPath: containerUrl,
-    })
-
+    const { data: podLists } = podListsResult.value
     const podListIds = new Set(podLists.map((l) => l.id))
 
-    // Save all pod lists to local DB (pod wins for conflicting IDs)
-    for (const podList of podLists) {
-        try {
-            await db.savePackingList({ ...podList, _rev: undefined })
+    // Save all pod lists to local DB in parallel (pod wins for conflicting IDs)
+    const saveResults = await Promise.allSettled(
+        podLists.map(podList => db.savePackingList({ ...podList, _rev: undefined }))
+    )
+    for (let i = 0; i < saveResults.length; i++) {
+        if (saveResults[i].status === 'fulfilled') {
             packingListsSynced++
-        } catch (err) {
-            console.error(`syncAllDataFromPod: error saving packing list ${podList.id}`, err)
+        } else {
+            console.error(`syncAllDataFromPod: error saving packing list ${podLists[i].id}`, (saveResults[i] as PromiseRejectedResult).reason)
         }
     }
 

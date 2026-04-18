@@ -18,7 +18,7 @@ export function PackingLists() {
     const [renameValue, setRenameValue] = useState('')
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
-    const { db } = useDatabase()
+    const { db, loginSyncVersion, loginSyncInProgress } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
     const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
@@ -71,7 +71,7 @@ export function PackingLists() {
         try {
             await db.deletePackingList(id)
             setPackingLists(packingLists.filter(list => list.id !== id))
-            removeListFromPod(id)
+            await removeListFromPod(id)
         } catch (err) {
             console.error('Error deleting packing list:', err)
         } finally {
@@ -119,9 +119,9 @@ export function PackingLists() {
         }
 
         fetchPackingLists()
-    }, [db, isLoggedIn])
+    }, [db, isLoggedIn, loginSyncVersion])
 
-    if (isLoading) {
+    if (isLoading || loginSyncInProgress) {
         return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>
     }
 

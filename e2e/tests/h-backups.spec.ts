@@ -7,6 +7,7 @@ test.describe('H – Backups', () => {
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    try { await page.getByRole('button', { name: 'Yes, Override' }).click({ timeout: 3_000 }) } catch { /* ok */ }
     await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()
     try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
@@ -27,8 +28,8 @@ test.describe('H – Backups', () => {
     // Toast success
     await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
     // Backup entry appears
-    await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible()
-    await expect(page.locator('text=/packing list/')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Restore' }).first()).toBeVisible()
+    await expect(page.locator('text=/packing list/').first()).toBeVisible()
   })
 
   test('H2: restore from backup replaces current data', async ({ authedPage: page }) => {
