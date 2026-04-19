@@ -433,6 +433,8 @@ describe('CreatePackingList – suggestion card', () => {
 
         fireEvent.click(screen.getAllByRole('button', { name: /skip/i })[0])
         await waitFor(() => expect(savePackingList).toHaveBeenCalledTimes(1))
+        // Wait for the first item to be removed before clicking the remaining skip button
+        await waitFor(() => expect(screen.getAllByRole('button', { name: /skip/i })).toHaveLength(1))
         fireEvent.click(screen.getByRole('button', { name: /skip/i }))
         await waitFor(() => expect(savePackingList).toHaveBeenCalledTimes(2))
 
