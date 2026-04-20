@@ -127,11 +127,12 @@ export function PackingLists() {
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="mb-8">
+            <div className="mb-8 flex justify-between items-start">
                 <div className="mb-2">
                     <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
                     <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
                 </div>
+                <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
             </div>
 
             {packingLists.length === 0 ? (

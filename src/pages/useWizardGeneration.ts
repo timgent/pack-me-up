@@ -5,13 +5,29 @@ import { createExampleData } from '../edit-questions/example-data'
 import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
 import { generateUUID } from '../utils/uuid'
-import { Person } from '../edit-questions/types'
+import { Person, PackingListQuestionSet } from '../edit-questions/types'
+import { usePodSync } from '../hooks/usePodSync'
+import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
+import { POD_CONTAINERS } from '../services/solidPod'
 
 export function useWizardGeneration() {
     const { showToast } = useToast()
     const { db } = useDatabase()
     const [isLoading, setIsLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
+
+    const { saveToPod } = usePodSync<PackingListQuestionSet>({
+        pathConfig: {
+            container: POD_CONTAINERS.ROOT,
+            filename: 'packing-list-questions.json'
+        }
+    })
+
+    const { saveWithSyncPrevention } = useSyncCoordinator<PackingListQuestionSet>({
+        currentData: null,
+        saveToLocalDb: (data) => db.saveQuestionSet(data),
+        updateFormAndState: () => {},
+    })
 
     const generateQuestionSet = (data: WizardFormData) => {
         const people: Person[] = data.people.map(p => ({
@@ -29,10 +45,10 @@ export function useWizardGeneration() {
         try {
             const questionSet = generateQuestionSet(data)
 
-            await db.saveQuestionSet({
-                _id: QUESTION_SET_ID,
-                ...questionSet
-            })
+            await saveWithSyncPrevention(
+                { _id: QUESTION_SET_ID, ...questionSet },
+                saveToPod
+            )
 
             showToast('Packing list questions generated successfully!', 'success')
             setIsSuccess(true)
