@@ -9,6 +9,12 @@ vi.mock('../utils/uuid', () => ({
     generateUUID: vi.fn(() => 'new-uuid'),
 }))
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('react-router-dom')>()
+    return { ...actual, useNavigate: () => mockNavigate }
+})
+
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
 }))
@@ -408,6 +414,40 @@ describe('PackingLists duplicate', () => {
                 expect.objectContaining({ name: 'Copy of Summer Holiday', id: 'new-uuid' })
             )
         })
+    })
+})
+
+describe('PackingLists new list button', () => {
+    beforeEach(() => {
+        mockNavigate.mockClear()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue([testList]),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+            } as unknown as PackingAppDatabase,
+        })
+    })
+
+    it('renders a New List button', async () => {
+        renderComponent()
+        await screen.findByText(/Summer Holiday/)
+        expect(screen.getByRole('button', { name: /new list/i })).toBeTruthy()
+    })
+
+    it('navigates to /create-packing-list when New List is clicked', async () => {
+        renderComponent()
+        await screen.findByText(/Summer Holiday/)
+        fireEvent.click(screen.getByRole('button', { name: /new list/i }))
+        expect(mockNavigate).toHaveBeenCalledWith('/create-packing-list')
     })
 })
 
