@@ -15,6 +15,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
 
@@ -100,8 +101,9 @@ export function EditQuestionsForm() {
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
     pathConfig: {
       container: POD_CONTAINERS.ROOT,
-      filename: 'packing-list-questions.json'
+      filename: 'packing-list-questions.ttl'
     },
+    rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
     pollInterval: 5000, // Poll every 5 seconds for faster sync
     enabled: isLoggedIn, // Only sync when logged in
     onSyncSuccess: handleSyncSuccess,

@@ -955,7 +955,7 @@ describe('CreatePackingList – question set pod sync on mount', () => {
             expect.objectContaining({
                 syncOnMount: true,
                 enabled: true,
-                pathConfig: expect.objectContaining({ filename: 'packing-list-questions.json' }),
+                pathConfig: expect.objectContaining({ filename: 'packing-list-questions.ttl' }),
             })
         )
     })

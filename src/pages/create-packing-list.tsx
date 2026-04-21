@@ -11,6 +11,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPrimaryPodUrl, saveFileToPod, POD_CONTAINERS } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
+import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -320,8 +321,9 @@ export function CreatePackingList() {
     usePodSync<PackingListQuestionSet>({
         pathConfig: {
             container: POD_CONTAINERS.ROOT,
-            filename: 'packing-list-questions.json',
+            filename: 'packing-list-questions.ttl',
         },
+        rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
         syncOnMount: true,
         enabled: isLoggedIn,
         onSyncSuccess: handleQuestionSetPodSync,

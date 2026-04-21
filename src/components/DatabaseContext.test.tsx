@@ -16,6 +16,11 @@ vi.mock('../services/solidPod', () => ({
   syncAllDataFromPod: vi.fn(),
 }))
 
+vi.mock('../services/rdfMigration', () => ({
+  detectPodDataFormat: vi.fn(),
+  migrateJsonToRdf: vi.fn(),
+}))
+
 // Mock PackingAppDatabase so tests don't create real filesystem databases
 vi.mock('../services/database', () => {
   return {
@@ -31,12 +36,15 @@ vi.mock('../services/database', () => {
 
 import { useSolidPod } from './SolidPodContext'
 import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
+import { detectPodDataFormat, migrateJsonToRdf } from '../services/rdfMigration'
 import { PackingAppDatabase } from '../services/database'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
 const mockHasPodData = vi.mocked(hasPodData)
 const mockSyncAllDataFromPod = vi.mocked(syncAllDataFromPod)
+const mockDetectPodDataFormat = vi.mocked(detectPodDataFormat)
+const mockMigrateJsonToRdf = vi.mocked(migrateJsonToRdf)
 const mockGetInstance = vi.mocked(PackingAppDatabase.getInstance)
 
 /** Creates a mock db object with controllable isEmpty/copyAllDataFrom behaviour */
@@ -80,6 +88,10 @@ describe('DatabaseContext', () => {
     mockHasPodData.mockResolvedValue(true)
     mockSyncAllDataFromPod.mockReset()
     mockSyncAllDataFromPod.mockResolvedValue({ questionSetSynced: false, packingListsSynced: 0, packingListsUploaded: 0 })
+    mockDetectPodDataFormat.mockReset()
+    mockDetectPodDataFormat.mockResolvedValue('rdf')
+    mockMigrateJsonToRdf.mockReset()
+    mockMigrateJsonToRdf.mockResolvedValue({ questionSetMigrated: false, packingListsMigrated: 0, errors: [] })
     localStorage.clear()
   })
 
@@ -403,6 +415,117 @@ describe('DatabaseContext', () => {
       // Children still render despite sync error
       await waitFor(() => screen.getByTestId('child'))
       expect(console.error).toHaveBeenCalled()
+    })
+  })
+
+  describe('RDF migration on login', () => {
+    const mockSession = { info: { isLoggedIn: true, webId: 'https://example.com/profile#me' } }
+
+    beforeEach(() => {
+      mockUseSolidPod.mockReturnValue({
+        session: mockSession as unknown as Session,
+        isLoggedIn: true,
+        webId: 'https://example.com/profile#me',
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+      mockGetPrimaryPodUrl.mockResolvedValue('https://example.com/')
+    })
+
+    it('calls detectPodDataFormat on login', async () => {
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(mockDetectPodDataFormat).toHaveBeenCalledWith(
+        mockSession,
+        'https://example.com/',
+      ))
+    })
+
+    it('calls migrateJsonToRdf when format is json', async () => {
+      mockDetectPodDataFormat.mockResolvedValue('json')
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(mockMigrateJsonToRdf).toHaveBeenCalledWith(
+        mockSession,
+        'https://example.com/',
+      ))
+    })
+
+    it('does not call migrateJsonToRdf when format is rdf', async () => {
+      mockDetectPodDataFormat.mockResolvedValue('rdf')
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(mockSyncAllDataFromPod).toHaveBeenCalled())
+      expect(mockMigrateJsonToRdf).not.toHaveBeenCalled()
+    })
+
+    it('does not call migrateJsonToRdf when format is empty', async () => {
+      mockDetectPodDataFormat.mockResolvedValue('empty')
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(mockSyncAllDataFromPod).toHaveBeenCalled())
+      expect(mockMigrateJsonToRdf).not.toHaveBeenCalled()
+    })
+
+    it('still calls syncAllDataFromPod even when migration throws', async () => {
+      mockDetectPodDataFormat.mockResolvedValue('json')
+      mockMigrateJsonToRdf.mockRejectedValue(new Error('migration failed'))
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(mockSyncAllDataFromPod).toHaveBeenCalled())
+      expect(console.error).toHaveBeenCalled()
+    })
+
+    it('calls syncAllDataFromPod after migration completes', async () => {
+      mockDetectPodDataFormat.mockResolvedValue('json')
+      const migrationOrder: string[] = []
+      mockMigrateJsonToRdf.mockImplementation(async () => {
+        migrationOrder.push('migrate')
+        return { questionSetMigrated: true, packingListsMigrated: 0, errors: [] }
+      })
+      mockSyncAllDataFromPod.mockImplementation(async () => {
+        migrationOrder.push('sync')
+        return { questionSetSynced: false, packingListsSynced: 0, packingListsUploaded: 0 }
+      })
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      await waitFor(() => expect(migrationOrder).toEqual(['migrate', 'sync']))
     })
   })
 })

@@ -9,6 +9,7 @@ import { Person, PackingListQuestionSet } from '../edit-questions/types'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 
 export function useWizardGeneration() {
     const { showToast } = useToast()
@@ -19,8 +20,9 @@ export function useWizardGeneration() {
     const { saveToPod } = usePodSync<PackingListQuestionSet>({
         pathConfig: {
             container: POD_CONTAINERS.ROOT,
-            filename: 'packing-list-questions.json'
-        }
+            filename: 'packing-list-questions.ttl'
+        },
+        rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
     })
 
     const { saveWithSyncPrevention } = useSyncCoordinator<PackingListQuestionSet>({

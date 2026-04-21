@@ -12,15 +12,20 @@ import type { PackingList } from '../create-packing-list/types'
 // Setup PouchDB with memory adapter for testing
 PouchDB.plugin(PouchDBMemoryAdapter)
 
-vi.mock('@inrupt/solid-client', () => ({
-    getFile: vi.fn(),
-    getSolidDataset: vi.fn(),
-    getContainedResourceUrlAll: vi.fn(),
-    getPodUrlAll: vi.fn(),
-    saveFileInContainer: vi.fn(),
-    overwriteFile: vi.fn(),
-    deleteFile: vi.fn(),
-}))
+vi.mock('@inrupt/solid-client', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@inrupt/solid-client')>()
+    return {
+        ...actual,
+        getFile: vi.fn(),
+        getSolidDataset: vi.fn(),
+        getContainedResourceUrlAll: vi.fn(),
+        getPodUrlAll: vi.fn(),
+        saveFileInContainer: vi.fn(),
+        overwriteFile: vi.fn(),
+        deleteFile: vi.fn(),
+        saveSolidDatasetAt: vi.fn(),
+    }
+})
 
 // Mock solidPod service functions
 vi.mock('./solidPod', async (importOriginal) => {
@@ -30,18 +35,21 @@ vi.mock('./solidPod', async (importOriginal) => {
         saveFileToPod: vi.fn(),
         loadFileFromPod: vi.fn(),
         saveMultipleFilesToPod: vi.fn(),
+        saveRdfToPod: vi.fn(),
+        saveMultipleRdfToPod: vi.fn(),
     }
 })
 
 import { getSolidDataset, getContainedResourceUrlAll, deleteFile } from '@inrupt/solid-client'
-import { saveFileToPod, loadFileFromPod, saveMultipleFilesToPod } from './solidPod'
+import { saveFileToPod, loadFileFromPod, saveRdfToPod, saveMultipleRdfToPod } from './solidPod'
 
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockDeleteFile = vi.mocked(deleteFile)
 const mockSaveFileToPod = vi.mocked(saveFileToPod)
 const mockLoadFileFromPod = vi.mocked(loadFileFromPod)
-const mockSaveMultipleFilesToPod = vi.mocked(saveMultipleFilesToPod)
+const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
+const mockSaveMultipleRdfToPod = vi.mocked(saveMultipleRdfToPod)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
@@ -327,8 +335,8 @@ describe('restoreBackup', () => {
             packingLists: [{ ...mockPackingList, id: 'new-list' }]
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 1, failCount: 0, totalCount: 1 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 1, failCount: 0, totalCount: 1 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
@@ -345,8 +353,8 @@ describe('restoreBackup', () => {
             packingLists: [mockPackingList, { ...mockPackingList, id: 'pl-2', name: 'Mountain Trip' }]
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 2, failCount: 0, totalCount: 2 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 2, failCount: 0, totalCount: 2 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
@@ -364,8 +372,8 @@ describe('restoreBackup', () => {
             packingLists: []
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
@@ -373,7 +381,7 @@ describe('restoreBackup', () => {
         expect(qs.people).toEqual(mockQuestionSet.people)
     })
 
-    it('calls saveFileToPod for question set when present', async () => {
+    it('calls saveRdfToPod for question set when present', async () => {
         const backupFile = {
             version: 1 as const,
             createdAt: '2025-01-01T00:00:00.000Z',
@@ -381,21 +389,20 @@ describe('restoreBackup', () => {
             packingLists: []
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
-        expect(mockSaveFileToPod).toHaveBeenCalledWith(
+        expect(mockSaveRdfToPod).toHaveBeenCalledWith(
             expect.objectContaining({
                 session: mockSession,
-                containerPath: `${POD_URL}pack-me-up/`,
-                filename: 'packing-list-questions.json',
+                fileUrl: `${POD_URL}pack-me-up/packing-list-questions.ttl`,
             })
         )
     })
 
-    it('calls saveMultipleFilesToPod for packing lists', async () => {
+    it('calls saveMultipleRdfToPod for packing lists', async () => {
         const backupFile = {
             version: 1 as const,
             createdAt: '2025-01-01T00:00:00.000Z',
@@ -403,19 +410,20 @@ describe('restoreBackup', () => {
             packingLists: [mockPackingList]
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 1, failCount: 0, totalCount: 1 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 1, failCount: 0, totalCount: 1 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
-        expect(mockSaveMultipleFilesToPod).toHaveBeenCalledWith(
+        expect(mockSaveMultipleRdfToPod).toHaveBeenCalledWith(
             mockSession,
             `${POD_URL}pack-me-up/packing-lists/`,
-            expect.arrayContaining([expect.objectContaining({ id: 'pl-1' })])
+            expect.arrayContaining([expect.objectContaining({ id: 'pl-1' })]),
+            expect.any(Function)
         )
     })
 
-    it('does not call saveFileToPod for question set when not present', async () => {
+    it('does not call saveRdfToPod for question set when not present', async () => {
         const backupFile = {
             version: 1 as const,
             createdAt: '2025-01-01T00:00:00.000Z',
@@ -423,12 +431,12 @@ describe('restoreBackup', () => {
             packingLists: []
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
 
         await restoreBackup(mockSession, POD_URL, db, backupUrl)
 
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+        expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
 
     it('handles missing question set in DB gracefully (not_found)', async () => {
@@ -440,8 +448,8 @@ describe('restoreBackup', () => {
             packingLists: []
         }
         mockLoadFileFromPod.mockResolvedValue(backupFile)
-        mockSaveFileToPod.mockResolvedValue(undefined)
-        mockSaveMultipleFilesToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
+        mockSaveRdfToPod.mockResolvedValue(undefined)
+        mockSaveMultipleRdfToPod.mockResolvedValue({ success: true, successCount: 0, failCount: 0, totalCount: 0 })
 
         // Should not throw even if question set doesn't exist in DB before restore
         await expect(restoreBackup(mockSession, POD_URL, db, backupUrl)).resolves.not.toThrow()
