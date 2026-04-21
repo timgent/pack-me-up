@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useState, useEffect, useRef, Frag
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
 import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
+import { detectPodDataFormat, migrateJsonToRdf } from '../services/rdfMigration'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface DatabaseContextValue {
@@ -107,21 +108,30 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setDb(podDb)
             setIsResolvingPod(false)
 
-            // Background sync: pull latest data from pod into local DB.
+            // Background: detect format, migrate if needed, then sync.
             // Only run once per namespace (login event), not on every session refresh.
-            // Fire-and-forget – a sync failure must not block the app.
+            // Fire-and-forget – failures must not block the app.
             if (podUrl && session) {
                 syncedNamespaceRef.current = resolvedNamespace
                 setLoginSyncInProgress(true)
-                syncAllDataFromPod(session, podUrl, podDb)
-                    .then(() => {
+                ;(async () => {
+                    try {
+                        const format = await detectPodDataFormat(session, podUrl)
+                        if (format === 'json') {
+                            await migrateJsonToRdf(session, podUrl)
+                        }
+                    } catch (err) {
+                        console.error('RDF migration failed:', err)
+                    }
+                    try {
+                        await syncAllDataFromPod(session, podUrl, podDb)
                         setLoginSyncVersion(v => v + 1)
-                        setLoginSyncInProgress(false)
-                    })
-                    .catch(err => {
+                    } catch (err) {
                         console.error('Background login sync failed:', err)
+                    } finally {
                         setLoginSyncInProgress(false)
-                    })
+                    }
+                })()
             }
         })
 

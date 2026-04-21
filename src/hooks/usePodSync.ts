@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { SolidDataset } from '@inrupt/solid-client';
 import { useSolidPod } from '../components/SolidPodContext';
-import { getPrimaryPodUrl, loadFileFromPod, saveFileToPod, AuthenticationError } from '../services/solidPod';
+import { getPrimaryPodUrl, loadRdfFromPod, saveRdfToPod, AuthenticationError } from '../services/solidPod';
 
 /**
  * Configuration for Pod file paths
@@ -29,6 +30,14 @@ export interface PodSyncOptions<T> {
    * Configuration for Pod file path
    */
   pathConfig: PodPathConfig;
+
+  /**
+   * RDF serialization/deserialization functions
+   */
+  rdf: {
+    serialize: (data: T, datasetUrl: string) => SolidDataset;
+    deserialize: (dataset: SolidDataset, url: string) => T;
+  };
 
   /**
    * Polling interval in milliseconds (null/undefined to disable polling)
@@ -103,6 +112,7 @@ export interface PodSyncState<T> {
 export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   const {
     pathConfig,
+    rdf,
     pollInterval,
     syncOnMount = false,
     onSyncSuccess,
@@ -191,10 +201,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         return;
       }
 
-      const data = await loadFileFromPod<T>({
-        session: session!,
-        fileUrl,
-      });
+      const data = await loadRdfFromPod<T>(session!, fileUrl, rdf.deserialize);
 
       setLastSync(new Date());
 
@@ -219,7 +226,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       setIsSyncing(false);
       isSyncingRef.current = false;
     }
-  }, [enabled, isLoggedIn, session, getFileUrl]);
+  }, [enabled, isLoggedIn, session, getFileUrl, rdf]);
 
   /**
    * Save data to the Pod
@@ -238,23 +245,17 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         throw new Error('No pod URL found');
       }
 
-      const { container, filename, resourceId } = pathConfig;
-      const containerUrl = `${podUrl}${container}`;
+      const fileUrl = getFileUrl(podUrl);
 
-      // Resolve the filename
-      const resolvedFilename = typeof filename === 'function'
-        ? (resourceId ? filename(resourceId) : null)
-        : (filename.includes('/') ? filename.split('/').pop() : filename);
-
-      if (!resolvedFilename) {
+      if (!fileUrl) {
         throw new Error('Cannot save: missing resource ID');
       }
 
-      await saveFileToPod({
+      await saveRdfToPod({
         session: session!,
-        containerPath: containerUrl,
-        filename: resolvedFilename,
+        fileUrl,
         data,
+        serializer: rdf.serialize,
       });
 
       setLastSync(new Date());
@@ -277,7 +278,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
 
       return false;
     }
-  }, [enabled, isLoggedIn, session, pathConfig]);
+  }, [enabled, isLoggedIn, session, getFileUrl, rdf]);
 
   /**
    * Sync on mount (and/or) set up polling interval.
