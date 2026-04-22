@@ -8,11 +8,6 @@ import {
     getBoolean,
     getInteger,
     getDatetime,
-    addStringNoLocale,
-    addBoolean,
-    addInteger,
-    addDatetime,
-    addUrl,
 } from '@inrupt/solid-client'
 import type { SolidDataset, Thing } from '@inrupt/solid-client'
 import { PMU, RDF, DCTERMS } from './rdfVocab'
