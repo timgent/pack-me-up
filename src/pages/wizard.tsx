@@ -273,7 +273,7 @@ Are you sure you want to continue?"
             {/* Success Modal */}
             <Modal
                 isOpen={showSuccessModal}
-                onClose={() => {}}
+                onClose={() => setShowSuccessModal(false)}
                 title="🎉 Questions Generated Successfully!"
             >
                 <div className="space-y-6">

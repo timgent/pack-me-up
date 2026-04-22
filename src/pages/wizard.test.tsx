@@ -109,6 +109,33 @@ describe('Wizard', () => {
         expect(screen.queryByText(/great! your questions are ready/i)).toBeNull()
     })
 
+    it('closes the success modal when the X button is clicked', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        mockUseWizardGeneration.mockReturnValue({
+            isLoading: false,
+            isSuccess: true,
+            generateAndSave: vi.fn(),
+        })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        )
+
+        const closeButton = screen.getByRole('button', { name: /close/i })
+        closeButton.click()
+
+        await waitFor(() =>
+            expect(screen.queryByText(/questions generated successfully/i)).toBeNull()
+        )
+    })
+
     it('shows pod prompt only after a success modal CTA is clicked', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
