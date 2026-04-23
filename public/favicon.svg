@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <!-- Suitcase body -->
-  <rect x="8" y="22" width="48" height="34" rx="4" fill="#4F46E5"/>
-  <!-- Suitcase handle -->
-  <path d="M22 22V16a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v6" stroke="#4F46E5" stroke-width="4" stroke-linecap="round" fill="none"/>
-  <!-- Latch -->
-  <rect x="28" y="35" width="8" height="6" rx="2" fill="white"/>
-  <!-- Horizontal strap -->
-  <rect x="8" y="36" width="48" height="4" fill="#3730A3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Badge background: primary-900, elevated from nav's primary-950 -->
+  <rect width="64" height="64" rx="14" fill="#134e4a"/>
+  <!-- Carry handle -->
+  <path d="M22 22v-6a10 10 0 0 1 20 0v6" stroke="#2dd4bf" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- Main bag body -->
+  <rect x="10" y="22" width="44" height="33" rx="8" fill="#14b8a6"/>
+  <!-- Front pocket -->
+  <rect x="16" y="34" width="32" height="17" rx="5" fill="#0d9488"/>
+  <!-- Zipper pull -->
+  <circle cx="32" cy="34" r="2.5" fill="#2dd4bf"/>
 </svg>
