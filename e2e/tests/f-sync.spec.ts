@@ -46,12 +46,13 @@ test.describe('F – Solid Pod Sync', () => {
     const page2 = await context2.newPage()
     await page2.goto('/#/manage-questions')
     await page2.waitForLoadState('networkidle')
-    // usePodSync polls every 5s; wait for it to fetch questions from Pod and update the form
-    await page2.waitForTimeout(8_000)
-    // Expand the People section (may be collapsed) and check that the person name input is there
-    await page2.getByRole('button', { name: /People/i }).first().click()
-    // Person names are in input fields; "Sync Test Person" was appended, so it's the last person input
-    await expect(page2.locator('input[placeholder="Enter person name"]').last()).toHaveValue('Sync Test Person', { timeout: 5_000 })
+    // Expand People section if collapsed (inputs are conditionally rendered)
+    const personInputs = page2.locator('input[placeholder="Enter person name"]')
+    if (await personInputs.count() === 0) {
+      await page2.getByRole('button', { name: /People/i }).first().click()
+    }
+    // usePodSync polls every 5s; wait up to 20s for the form to reflect the Pod update
+    await expect(personInputs.last()).toHaveValue('Sync Test Person', { timeout: 20_000 })
     await context2.close()
   })
 

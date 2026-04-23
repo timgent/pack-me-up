@@ -40,7 +40,7 @@ export function PackingLists() {
             const updatedList = { ...list, name: renameValue }
             await db.savePackingList(updatedList)
             setPackingLists(packingLists.map(l => l.id === listToRename.id ? updatedList : l))
-            syncListToPod(updatedList)
+            await syncListToPod(updatedList)
         } catch (err) {
             console.error('Error renaming packing list:', err)
         } finally {
