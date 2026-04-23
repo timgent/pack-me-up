@@ -41,14 +41,14 @@ describe('SolidProviderSelector', () => {
   })
 
   describe('default provider (no last-used stored)', () => {
-    it('shows solidcommunity.net as the primary option', () => {
+    it('shows Inrupt PodSpaces as the primary option', () => {
       render(<SolidProviderSelector {...defaultProps} />)
-      expect(getPrimaryProviderName()).toBe('solidcommunity.net')
+      expect(getPrimaryProviderName()).toBe('Inrupt PodSpaces')
     })
 
     it('hides other providers by default', () => {
       render(<SolidProviderSelector {...defaultProps} />)
-      expect(isProviderVisible('Inrupt PodSpaces')).toBe(false)
+      expect(isProviderVisible('solidcommunity.net')).toBe(false)
       expect(isProviderVisible('solidweb.org')).toBe(false)
       expect(isProviderVisible('Private Data Pod')).toBe(false)
     })
@@ -56,7 +56,7 @@ describe('SolidProviderSelector', () => {
     it('shows other providers when "Other providers" is clicked', () => {
       render(<SolidProviderSelector {...defaultProps} />)
       fireEvent.click(screen.getByRole('button', { name: /other providers/i }))
-      expect(isProviderVisible('Inrupt PodSpaces')).toBe(true)
+      expect(isProviderVisible('solidcommunity.net')).toBe(true)
       expect(isProviderVisible('solidweb.org')).toBe(true)
       expect(isProviderVisible('Private Data Pod')).toBe(true)
     })
@@ -76,32 +76,32 @@ describe('SolidProviderSelector', () => {
       expect(isProviderVisible('Inrupt PodSpaces')).toBe(false)
     })
 
-    it('falls back to solidcommunity.net for an unrecognised issuer', () => {
+    it('falls back to Inrupt PodSpaces for an unrecognised issuer', () => {
       localStorage.setItem(LAST_PROVIDER_KEY, 'https://unknown-provider.example.com')
       render(<SolidProviderSelector {...defaultProps} />)
-      expect(getPrimaryProviderName()).toBe('solidcommunity.net')
+      expect(getPrimaryProviderName()).toBe('Inrupt PodSpaces')
     })
   })
 
   describe('saving last-used provider', () => {
     it('saves the selected provider issuer to localStorage', () => {
       render(<SolidProviderSelector {...defaultProps} />)
-      clickProvider('solidcommunity.net')
-      expect(localStorage.getItem(LAST_PROVIDER_KEY)).toBe('https://solidcommunity.net')
+      clickProvider('Inrupt PodSpaces')
+      expect(localStorage.getItem(LAST_PROVIDER_KEY)).toBe('https://login.inrupt.com')
     })
 
     it('saves a different provider when selected from the expanded list', () => {
       render(<SolidProviderSelector {...defaultProps} />)
       fireEvent.click(screen.getByRole('button', { name: /other providers/i }))
-      clickProvider('Inrupt PodSpaces')
-      expect(localStorage.getItem(LAST_PROVIDER_KEY)).toBe('https://login.inrupt.com')
+      clickProvider('solidcommunity.net')
+      expect(localStorage.getItem(LAST_PROVIDER_KEY)).toBe('https://solidcommunity.net')
     })
 
     it('calls onSelect with the issuer', () => {
       const onSelect = vi.fn()
       render(<SolidProviderSelector {...defaultProps} onSelect={onSelect} />)
-      clickProvider('solidcommunity.net')
-      expect(onSelect).toHaveBeenCalledWith('https://solidcommunity.net')
+      clickProvider('Inrupt PodSpaces')
+      expect(onSelect).toHaveBeenCalledWith('https://login.inrupt.com')
     })
   })
 })
