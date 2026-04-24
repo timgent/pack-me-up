@@ -103,6 +103,7 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
 
           {/* Primary provider */}
           <button
+            aria-label={primaryProvider.name}
             onClick={() => handleProviderSelect(primaryProvider.issuer)}
             className="w-full text-left px-4 py-3 border-2 border-blue-400 bg-blue-50 hover:bg-blue-100 hover:border-blue-500 rounded-md transition-colors"
           >
@@ -129,6 +130,7 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
               {otherProviders.map((provider) => (
                 <button
                   key={provider.issuer}
+                  aria-label={provider.name}
                   onClick={() => handleProviderSelect(provider.issuer)}
                   className="w-full text-left px-4 py-3 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-md transition-colors"
                 >

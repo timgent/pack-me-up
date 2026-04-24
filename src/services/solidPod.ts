@@ -113,13 +113,35 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
         return null
     }
 
-    const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
-
-    if (!podUrls || podUrls.length === 0) {
-        return null
+    try {
+        const podUrls = await getPodUrlAll(session.info.webId, { fetch: session.fetch })
+        if (podUrls && podUrls.length > 0) {
+            return podUrls[0]
+        }
+    } catch {
+        // getPodUrlAll failed (e.g. CSS v7 doesn't expose pim:storage) — fall through to derivation
     }
 
-    return podUrls[0]
+    // Fallback: derive Pod URL from WebID using CSS convention.
+    // WebID = http://host/podName/profile/card#me → Pod = http://host/podName/
+    // This covers CSS v7 installations that don't include pim:storage in the profile.
+    try {
+        const url = new URL(session.info.webId)
+        url.hash = ''
+        const path = url.pathname
+        if (path.endsWith('/profile/card')) {
+            url.pathname = path.slice(0, -'profile/card'.length)
+            return url.toString()
+        }
+        // Generic fallback: use the first path segment as Pod root
+        const firstSegment = path.split('/').find(s => s.length > 0)
+        if (firstSegment) {
+            url.pathname = '/' + firstSegment + '/'
+            return url.toString()
+        }
+    } catch { /* ignore URL parse errors */ }
+
+    return null
 }
 
 /**
@@ -155,44 +177,21 @@ export async function saveFileToPod(options: SaveToPodOptions): Promise<void> {
 
     const json = JSON.stringify(data, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
-    const file = new File([blob], filename, { type: 'application/json' })
 
-    // Try saveFileInContainer first (creates new file in container)
+    // Use overwriteFile (PUT) directly to the exact URL — this creates the file if it
+    // doesn't exist or replaces it if it does, regardless of server-side slug behaviour.
+    // This avoids CSS v7's saveFileInContainer creating a duplicate instead of 409-ing.
     try {
-        await saveFileInContainer(
-            containerPath,
-            file,
-            {
-                fetch: session.fetch,
-                slug: filename
-            }
-        )
-    } catch (saveError: unknown) {
-        // Check for authentication errors first
-        if (isAuthenticationError(saveError)) {
-            handlePodError(saveError)
+        const fileUrl = `${containerPath}${filename}`
+        await overwriteFile(fileUrl, blob, {
+            fetch: session.fetch,
+            contentType: 'application/json'
+        })
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) {
+            handlePodError(error)
         }
-
-        // If container doesn't exist (404) or file already exists (409),
-        // use overwriteFile instead
-        const saveStatusCode = getStatusCode(saveError)
-        if (saveStatusCode === 404 || saveStatusCode === 409) {
-            try {
-                const fileUrl = `${containerPath}${filename}`
-                await overwriteFile(fileUrl, blob, {
-                    fetch: session.fetch,
-                    contentType: 'application/json'
-                })
-            } catch (overwriteError: unknown) {
-                // Check for authentication errors in overwrite
-                if (isAuthenticationError(overwriteError)) {
-                    handlePodError(overwriteError)
-                }
-                throw overwriteError
-            }
-        } else {
-            throw saveError
-        }
+        throw error
     }
 }
 
@@ -357,31 +356,36 @@ export async function loadMultipleFilesFromPod<T>(
         }
     }
 
+    // Load all files in parallel for faster sync
+    const settled = await Promise.allSettled(
+        jsonFileUrls.map(fileUrl =>
+            getFile(fileUrl, { fetch: session.fetch })
+                .then(file => file.text())
+                .then(text => ({ fileUrl, item: JSON.parse(text) as T }))
+        )
+    )
+
     const loadedData: T[] = []
     let successCount = 0
     let failCount = 0
 
-    // Load each file
-    for (const fileUrl of jsonFileUrls) {
-        try {
-            const file = await getFile(fileUrl, { fetch: session.fetch })
-            const text = await file.text()
-            const item = JSON.parse(text) as T
-
-            loadedData.push(item)
+    for (let i = 0; i < settled.length; i++) {
+        const result = settled[i]
+        const fileUrl = jsonFileUrls[i]
+        if (result.status === 'fulfilled') {
+            loadedData.push(result.value.item)
             successCount++
-
             if (onFileLoaded) {
-                onFileLoaded(item)
+                onFileLoaded(result.value.item)
             }
-        } catch (error: unknown) {
-            // Check for authentication errors
+        } else {
+            const error = result.reason
+            // Re-throw authentication errors immediately
             if (isAuthenticationError(error)) {
                 handlePodError(error)
             }
             console.error(`Error loading file ${fileUrl}:`, error)
             failCount++
-
             if (onError) {
                 onError(fileUrl, error instanceof Error ? error : new Error(String(error)))
             }
@@ -434,29 +438,45 @@ export async function syncAllDataFromPod(
     let packingListsSynced = 0
     let packingListsUploaded = 0
 
-    // ── 1. Question set ──────────────────────────────────────────────────────
-    try {
-        const podQs = await loadFileFromPod<PackingListQuestionSet>({
+    const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+
+    // ── Download question set and packing lists in parallel ──────────────────
+    const [podQsResult, podListsResult] = await Promise.allSettled([
+        loadFileFromPod<PackingListQuestionSet>({
             session,
             fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
-        })
+        }),
+        loadMultipleFilesFromPod<PackingList>({
+            session,
+            containerPath: containerUrl,
+        }),
+    ])
 
-        let localQs: PackingListQuestionSet | null = null
+    // ── 1. Question set ──────────────────────────────────────────────────────
+    if (podQsResult.status === 'fulfilled') {
         try {
-            localQs = await db.getQuestionSet()
-        } catch {
-            // not_found is expected for a fresh login
-        }
+            const podQs = podQsResult.value
+            let localQs: PackingListQuestionSet | null = null
+            try {
+                localQs = await db.getQuestionSet()
+            } catch {
+                // not_found is expected for a fresh login
+            }
 
-        const podTime = podQs.lastModified ? new Date(podQs.lastModified).getTime() : 0
-        const localTime = localQs?.lastModified ? new Date(localQs.lastModified).getTime() : 0
+            const podTime = podQs.lastModified ? new Date(podQs.lastModified).getTime() : 0
+            const localTime = localQs?.lastModified ? new Date(localQs.lastModified).getTime() : 0
 
-        // Fallback-to-pod: save when there is no local copy OR pod is newer
-        if (!localQs || podTime > localTime) {
-            await db.saveQuestionSet({ ...podQs, _rev: undefined })
-            questionSetSynced = true
+            // Fallback-to-pod: save when there is no local copy OR pod is newer
+            if (!localQs || podTime > localTime) {
+                await db.saveQuestionSet({ ...podQs, _rev: undefined })
+                questionSetSynced = true
+            }
+        } catch (err: unknown) {
+            if (err instanceof AuthenticationError) throw err
+            console.error('syncAllDataFromPod: error syncing question set', err)
         }
-    } catch (err: unknown) {
+    } else {
+        const err = podQsResult.reason
         if (err instanceof AuthenticationError) throw err
         const status = getStatusCode(err)
         if (status !== 404) {
@@ -466,22 +486,25 @@ export async function syncAllDataFromPod(
     }
 
     // ── 2. Packing lists ─────────────────────────────────────────────────────
-    const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    if (podListsResult.status === 'rejected') {
+        const err = podListsResult.reason
+        if (err instanceof AuthenticationError) throw err
+        console.error('syncAllDataFromPod: error loading packing lists', err)
+        return { questionSetSynced, packingListsSynced, packingListsUploaded }
+    }
 
-    const { data: podLists } = await loadMultipleFilesFromPod<PackingList>({
-        session,
-        containerPath: containerUrl,
-    })
-
+    const { data: podLists } = podListsResult.value
     const podListIds = new Set(podLists.map((l) => l.id))
 
-    // Save all pod lists to local DB (pod wins for conflicting IDs)
-    for (const podList of podLists) {
-        try {
-            await db.savePackingList({ ...podList, _rev: undefined })
+    // Save all pod lists to local DB in parallel (pod wins for conflicting IDs)
+    const saveResults = await Promise.allSettled(
+        podLists.map(podList => db.savePackingList({ ...podList, _rev: undefined }))
+    )
+    for (let i = 0; i < saveResults.length; i++) {
+        if (saveResults[i].status === 'fulfilled') {
             packingListsSynced++
-        } catch (err) {
-            console.error(`syncAllDataFromPod: error saving packing list ${podList.id}`, err)
+        } else {
+            console.error(`syncAllDataFromPod: error saving packing list ${podLists[i].id}`, (saveResults[i] as PromiseRejectedResult).reason)
         }
     }
 
@@ -490,11 +513,12 @@ export async function syncAllDataFromPod(
     for (const localList of localLists) {
         if (podListIds.has(localList.id)) continue
         try {
-            await saveFileToPod({
-                session,
-                containerPath: containerUrl,
-                filename: `${localList.id}.json`,
-                data: localList,
+            const json = JSON.stringify(localList, null, 2)
+            const file = new File([json], `${localList.id}.json`, { type: 'application/json' })
+            await saveFileInContainer(containerUrl, file, {
+                slug: `${localList.id}.json`,
+                contentType: 'application/json',
+                fetch: session.fetch,
             })
             packingListsUploaded++
         } catch (err) {

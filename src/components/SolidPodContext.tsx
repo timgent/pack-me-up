@@ -157,20 +157,28 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const handleSessionExpired = async () => {
+      console.log("Session validation failed - session has expired");
+      await solidLogout();
+      const updatedSession = getDefaultSession();
+      setSession(updatedSession);
+      setSessionVersion(v => v + 1);
+      setIsLoggedIn(false);
+      setSessionExpired(true);
+    };
+
     const validateSession = async () => {
       try {
         // Make a lightweight HEAD request to verify the session is still valid
-        await session.fetch(session.info.webId!, { method: 'HEAD' });
+        const response = await session.fetch(session.info.webId!, { method: 'HEAD' });
+        // fetch() doesn't throw on 4xx; check status explicitly
+        if (response.status === 401 || response.status === 403) {
+          await handleSessionExpired();
+        }
       } catch (error: unknown) {
         // If authentication error, the session has expired
         if (isAuthenticationError(error)) {
-          console.log("Session validation failed - session has expired");
-          await solidLogout();
-          const updatedSession = getDefaultSession();
-          setSession(updatedSession);
-          setSessionVersion(v => v + 1);
-          setIsLoggedIn(false);
-          setSessionExpired(true);
+          await handleSessionExpired();
         } else {
           // Network errors or other issues - log but don't logout
           console.error("Session validation failed with non-auth error:", error);

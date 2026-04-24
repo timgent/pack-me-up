@@ -478,7 +478,8 @@ export function CreatePackingList() {
         const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionIds: string[] }) => {
             const questionId = qa.questionId
             const selectedOptionIds = qa.selectedOptionIds || []
-            const question = questionSet.questions.find((q) => q.id === questionId)!
+            const question = questionSet.questions.find((q) => q.id === questionId)
+            if (!question) return []
 
             // For each selected option, get all items
             return selectedOptionIds.flatMap((selectedOptionId) => {
@@ -531,6 +532,7 @@ export function CreatePackingList() {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
+            lastModified: new Date().toISOString(),
             items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {

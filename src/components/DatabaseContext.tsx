@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState, useEffect, Fragment } from 'react'
+import { createContext, ReactNode, useContext, useState, useEffect, useRef, Fragment } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
 import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
@@ -6,6 +6,10 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface DatabaseContextValue {
     db: PackingAppDatabase
+    /** Increments each time the background login sync completes, so components can re-fetch. */
+    loginSyncVersion: number
+    /** True while the background login sync is in progress; components can show a loading state. */
+    loginSyncInProgress: boolean
 }
 
 const DatabaseContext = createContext<DatabaseContextValue | undefined>(undefined)
@@ -31,6 +35,13 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     const [isResolvingPod, setIsResolvingPod] = useState(false)
     const [showMigrationPrompt, setShowMigrationPrompt] = useState(false)
     const [localDb, setLocalDb] = useState<PackingAppDatabase | null>(null)
+    const [loginSyncVersion, setLoginSyncVersion] = useState(0)
+    const [loginSyncInProgress, setLoginSyncInProgress] = useState(false)
+
+    // Track the namespace we have already synced so that session-object refreshes
+    // (which change the `session` reference without changing the actual identity)
+    // do not trigger a second full syncAllDataFromPod call.
+    const syncedNamespaceRef = useRef<string | null>(null)
 
     useEffect(() => {
         // While session is still initialising, wait
@@ -40,15 +51,21 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
 
         if (!isLoggedIn || !webId) {
             // Not logged in — use the local namespace immediately
+            syncedNamespaceRef.current = null
             setShowMigrationPrompt(false)
             setNamespace(LOCAL_NAMESPACE)
             setDb(PackingAppDatabase.getInstance(LOCAL_NAMESPACE))
             return
         }
 
-        // Logged in — resolve the pod URL to use as namespace
+        // Logged in — resolve the pod URL to use as namespace.
+        // Skip the expensive resolution step if we have already completed it for
+        // this identity (handles OIDC session-object refreshes that re-fire the effect).
+        const alreadySynced = syncedNamespaceRef.current !== null
         let cancelled = false
-        setIsResolvingPod(true)
+        if (!alreadySynced) {
+            setIsResolvingPod(true)
+        }
 
         getPrimaryPodUrl(session).then(async podUrl => {
             if (cancelled) return
@@ -56,6 +73,12 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             const resolvedNamespace = podUrl
                 ? PackingAppDatabase.sanitizePodUrl(podUrl)
                 : PackingAppDatabase.sanitizePodUrl(webId)
+
+            // Session refreshed with same identity — nothing to do.
+            if (syncedNamespaceRef.current === resolvedNamespace) {
+                if (!alreadySynced) setIsResolvingPod(false)
+                return
+            }
 
             const podDb = PackingAppDatabase.getInstance(resolvedNamespace)
             const local = PackingAppDatabase.getInstance(LOCAL_NAMESPACE)
@@ -85,11 +108,20 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setIsResolvingPod(false)
 
             // Background sync: pull latest data from pod into local DB.
+            // Only run once per namespace (login event), not on every session refresh.
             // Fire-and-forget – a sync failure must not block the app.
             if (podUrl && session) {
-                syncAllDataFromPod(session, podUrl, podDb).catch(err => {
-                    console.error('Background login sync failed:', err)
-                })
+                syncedNamespaceRef.current = resolvedNamespace
+                setLoginSyncInProgress(true)
+                syncAllDataFromPod(session, podUrl, podDb)
+                    .then(() => {
+                        setLoginSyncVersion(v => v + 1)
+                        setLoginSyncInProgress(false)
+                    })
+                    .catch(err => {
+                        console.error('Background login sync failed:', err)
+                        setLoginSyncInProgress(false)
+                    })
             }
         })
 
@@ -112,6 +144,10 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                 cancelText="Start fresh"
                 onConfirm={async () => {
                     await db.copyAllDataFrom(localDb)
+                    // Mark as dismissed so a full-page reload doesn't re-prompt
+                    // (local data was copied; pod will be out of sync until next
+                    // explicit save, but hasPodData checks the remote pod)
+                    localStorage.setItem(`pod-migration-dismissed-${namespace}`, 'true')
                     setShowMigrationPrompt(false)
                 }}
                 onClose={() => {
@@ -126,7 +162,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
     // namespace changes (e.g. login / logout). This ensures every page re-fetches
     // its data from the correct database instead of showing stale state.
     return (
-        <DatabaseContext.Provider value={{ db }}>
+        <DatabaseContext.Provider value={{ db, loginSyncVersion, loginSyncInProgress }}>
             <Fragment key={namespace}>
                 {children}
             </Fragment>

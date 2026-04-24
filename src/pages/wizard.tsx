@@ -95,14 +95,16 @@ export const Wizard = () => {
     }
 
     const handleAddPerson = () => {
-        append({ name: `Person ${fields.length + 1}`, ageRange: undefined, gender: undefined })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        append({ name: `Person ${fields.length + 1}` } as any)
     }
 
     const handleRemovePerson = (index: number) => {
         if (fields.length > 1) {
             remove(index)
         } else {
-            update(0, { name: '', ageRange: undefined, gender: undefined })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            update(0, { name: '' } as any)
         }
     }
 
@@ -162,10 +164,7 @@ export const Wizard = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                Age Range{' '}
-                                                <span className="text-xs text-gray-500 font-normal">
-                                                    (optional)
-                                                </span>
+                                                Age Range
                                             </label>
                                             <select
                                                 {...register(`people.${index}.ageRange`)}
@@ -184,10 +183,7 @@ export const Wizard = () => {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                Gender{' '}
-                                                <span className="text-xs text-gray-500 font-normal">
-                                                    (optional)
-                                                </span>
+                                                Gender
                                             </label>
                                             <select
                                                 {...register(`people.${index}.gender`)}
