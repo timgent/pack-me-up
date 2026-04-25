@@ -11,6 +11,9 @@ export const TEST_EMAIL = 'test@example.com'
 export const TEST_PASSWORD = 'test1234'
 export const TEST_POD_NAME = 'testuser'
 export const AUTH_STATE_FILE = path.join(__dirname, 'e2e/.auth/user.json')
+export const SCHEMA_COMPAT_EMAIL = 'schema-compat@example.com'
+export const SCHEMA_COMPAT_PASSWORD = 'test1234'
+export const SCHEMA_COMPAT_POD_NAME = 'schemacompat'
 export const CSS_PID_FILE = path.join(__dirname, '.e2e-css-pid')
 export const APP_URL = 'http://localhost:4173'
 
