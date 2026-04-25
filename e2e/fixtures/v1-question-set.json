@@ -1,0 +1,49 @@
+{
+  "people": [
+    {
+      "id": "sc-person-1",
+      "name": "Alice",
+      "ageRange": "Adult",
+      "gender": "female"
+    }
+  ],
+  "alwaysNeededItems": [
+    {
+      "text": "Passport",
+      "personSelections": [
+        { "personId": "sc-person-1", "selected": true }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "sc-q-1",
+      "type": "saved",
+      "text": "Will you be staying overnight?",
+      "questionType": "single-choice",
+      "order": 0,
+      "options": [
+        {
+          "id": "sc-opt-yes",
+          "text": "Yes",
+          "order": 0,
+          "items": [
+            {
+              "text": "Pyjamas",
+              "personSelections": [
+                { "personId": "sc-person-1", "selected": true }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sc-opt-no",
+          "text": "No",
+          "order": 1,
+          "items": []
+        }
+      ]
+    }
+  ],
+  "lastModified": "2024-01-01T00:00:00.000Z"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "v1-list-schema-compat",
+  "name": "Schema Compat Test Trip",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "lastModified": "2024-01-01T00:00:00.000Z",
+  "items": [
+    {
+      "id": "sc-item-1",
+      "itemText": "Pyjamas",
+      "personId": "sc-person-1",
+      "personName": "Alice",
+      "questionId": "sc-q-1",
+      "optionId": "sc-opt-yes",
+      "packed": false,
+      "category": "Clothes",
+      "reviewed": false
+    },
+    {
+      "id": "sc-item-2",
+      "itemText": "Passport",
+      "personId": "sc-person-1",
+      "personName": "Alice",
+      "questionId": "",
+      "optionId": "",
+      "packed": false,
+      "category": "Travel Documents",
+      "reviewed": false
+    }
+  ],
+  "deletedItems": []
+}

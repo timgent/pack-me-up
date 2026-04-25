@@ -1,5 +1,5 @@
 import { test as base, BrowserContext, Page } from '@playwright/test'
-import { AUTH_STATE_FILE, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../playwright.config'
+import { AUTH_STATE_FILE, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../playwright.config'
 import { loginToCss } from './helpers/login'
 
 type MyFixtures = {
@@ -9,6 +9,8 @@ type MyFixtures = {
   authedPage: Page
   /** A fresh context with a pre-loaded auth state */
   authedContext: BrowserContext
+  /** A page logged in as the schema-compat account (pod pre-seeded with v1 JSON fixtures) */
+  schemaCompatPage: Page
 }
 
 export const test = base.extend<MyFixtures>({
@@ -41,6 +43,15 @@ export const test = base.extend<MyFixtures>({
     await page.goto('/')
     await page.getByRole('button', { name: 'Logout' }).first().waitFor({ state: 'visible', timeout: 30_000 })
     await use(page)
+  },
+
+  schemaCompatPage: async ({ browser }, use) => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await page.goto('/')
+    await loginToCss(page, CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)
+    await use(page)
+    await context.close()
   },
 })
 

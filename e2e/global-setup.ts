@@ -5,10 +5,14 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { createCssAccount } from './helpers/css-api'
 import { loginToCss } from './helpers/login'
+import { loginToExistingCssAccount, createCssClientCredentials, getCssBearerToken, seedPodWithJsonFixtures } from './helpers/pod-seed'
 import {
   CSS_PORT, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, TEST_POD_NAME,
-  AUTH_STATE_FILE, CSS_PID_FILE, APP_URL
+  AUTH_STATE_FILE, CSS_PID_FILE, APP_URL,
+  SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD, SCHEMA_COMPAT_POD_NAME,
 } from '../playwright.config'
+import v1QuestionSet from './fixtures/v1-question-set.json' with { type: 'json' }
+import v1PackingList from './fixtures/v1-packing-list.json' with { type: 'json' }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const localChromium = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
@@ -42,9 +46,24 @@ export default async function globalSetup() {
   await waitForUrl(`http://localhost:${CSS_PORT}/.account/`)
   console.log('[setup] CSS ready')
 
-  // 2. Create test account
+  // 2. Create test accounts
   await createCssAccount(CSS_PORT, TEST_EMAIL, TEST_PASSWORD, TEST_POD_NAME)
   console.log(`[setup] Test account created: ${TEST_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD, SCHEMA_COMPAT_POD_NAME)
+  console.log(`[setup] Schema-compat account created: ${SCHEMA_COMPAT_EMAIL}`)
+
+  // 2a. Seed schema-compat pod with v1 JSON fixtures (server-side, no browser needed)
+  const accountToken = await loginToExistingCssAccount(CSS_PORT, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)
+  const webId = `http://localhost:${CSS_PORT}/${SCHEMA_COMPAT_POD_NAME}/profile/card#me`
+  const { id: clientId, secret: clientSecret } = await createCssClientCredentials(CSS_PORT, accountToken, webId)
+  const podUrl = `http://localhost:${CSS_PORT}/${SCHEMA_COMPAT_POD_NAME}/`
+  const bearerToken = await getCssBearerToken(CSS_PORT, clientId, clientSecret, webId)
+  await seedPodWithJsonFixtures(podUrl, bearerToken, {
+    questionSet: v1QuestionSet,
+    packingLists: [v1PackingList],
+  })
+  console.log('[setup] Schema-compat pod seeded with v1 JSON fixtures')
 
   // 3. Wait for app
   console.log('[setup] Waiting for app...')
