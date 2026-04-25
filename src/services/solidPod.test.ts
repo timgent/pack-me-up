@@ -32,12 +32,11 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, saveFileInContainer, saveSolidDatasetAt } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, saveSolidDatasetAt } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
-const mockSaveFileInContainer = vi.mocked(saveFileInContainer)
 const mockSaveSolidDatasetAt = vi.mocked(saveSolidDatasetAt)
 
 const mockSession = {
@@ -207,13 +206,6 @@ function makePackingList(id: string, overrides: Partial<PackingList> = {}): Pack
     }
 }
 
-/** Blob whose .text() returns the given JSON */
-function jsonBlob(data: unknown): Blob & WithServerResourceInfo {
-    const text = JSON.stringify(data)
-    return {
-        text: () => Promise.resolve(text),
-    } as unknown as Blob & WithServerResourceInfo
-}
 
 function makeDb(overrides: Partial<{
     questionSet: PackingListQuestionSet | null
@@ -405,7 +397,7 @@ describe('loadRdfFromPod', () => {
             packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
         )
 
-        const result = await loadRdfFromPod(mockSession, url, (ds, u) => {
+        const result = await loadRdfFromPod(mockSession, url, (_ds, _u) => {
             return { id: 'test-id', name: 'Test', createdAt: new Date().toISOString(), items: [] }
         })
 
@@ -456,7 +448,7 @@ describe('saveRdfToPod', () => {
     it('throws AuthenticationError on 401', async () => {
         mockSaveSolidDatasetAt.mockRejectedValueOnce({ statusCode: 401 })
         await expect(
-            saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => ({} as any) })
+            saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => ({} as unknown as SolidDataset) })
         ).rejects.toThrow(AuthenticationError)
     })
 })
@@ -491,7 +483,7 @@ describe('loadMultipleRdfFromPod', () => {
     it('returns empty array when container is 404', async () => {
         mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 404 })
 
-        const { data } = await loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL, () => null as any)
+        const { data } = await loadMultipleRdfFromPod<PackingList>(mockSession, LISTS_CONTAINER_URL, () => null as unknown as PackingList)
 
         expect(data).toHaveLength(0)
     })
