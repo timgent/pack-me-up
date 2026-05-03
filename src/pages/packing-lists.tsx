@@ -6,7 +6,8 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveFileToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES } from '../services/solidPod'
+import { packingListToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
@@ -84,11 +85,11 @@ export function PackingLists() {
         try {
             const podUrl = await getPrimaryPodUrl(session)
             if (!podUrl) return
-            await saveFileToPod({
+            await saveRdfToPod({
                 session: session!,
-                containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-                filename: `${list.id}.json`,
+                fileUrl: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
                 data: list,
+                serializer: packingListToDataset,
             })
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
@@ -100,7 +101,7 @@ export function PackingLists() {
         try {
             const podUrl = await getPrimaryPodUrl(session)
             if (!podUrl) return
-            await deleteFileFromPod(session!, `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`)
+            await deleteFileFromPod(session!, `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`)
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         }

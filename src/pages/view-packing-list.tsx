@@ -11,6 +11,7 @@ import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
+import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 
 type FormData = {
     items: Record<string, boolean>
@@ -110,9 +111,10 @@ export function ViewPackingList() {
     const { saveToPod } = usePodSync<PackingList>({
         pathConfig: {
             container: POD_CONTAINERS.PACKING_LISTS,
-            filename: (id) => `${id}.json`,
+            filename: (id) => `${id}.ttl`,
             resourceId: id || null
         },
+        rdf: { serialize: packingListToDataset, deserialize: datasetToPackingList },
         pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
         onSyncSuccess: handleSyncSuccess,

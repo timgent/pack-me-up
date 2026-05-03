@@ -6,11 +6,13 @@ import { PackingAppDatabase } from './database'
 import {
     saveFileToPod,
     loadFileFromPod,
-    saveMultipleFilesToPod,
+    saveRdfToPod,
+    saveMultipleRdfToPod,
     handlePodError,
     isAuthenticationError,
     POD_CONTAINERS,
 } from './solidPod'
+import { questionSetToDataset, packingListToDataset } from './rdfSerialization'
 
 function hasName(err: unknown): err is { name: string } {
     return typeof err === 'object' && err !== null && 'name' in err
@@ -173,19 +175,20 @@ export async function restoreBackup(
         await db.savePackingList({ ...list, _rev: undefined })
     }
 
-    // 5. Push to live pod
+    // 5. Push to live pod as RDF
     if (backupFile.questionSet) {
-        await saveFileToPod({
+        await saveRdfToPod({
             session,
-            containerPath: `${podUrl}${POD_CONTAINERS.ROOT}`,
-            filename: 'packing-list-questions.json',
+            fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
             data: backupFile.questionSet,
+            serializer: questionSetToDataset,
         })
     }
 
-    await saveMultipleFilesToPod(
+    await saveMultipleRdfToPod(
         session,
         `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-        backupFile.packingLists
+        backupFile.packingLists,
+        packingListToDataset
     )
 }

@@ -9,8 +9,9 @@ import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
-import { getPrimaryPodUrl, saveFileToPod, POD_CONTAINERS } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
+import { questionSetToDataset, datasetToQuestionSet, packingListToDataset } from '../services/rdfSerialization'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -320,8 +321,9 @@ export function CreatePackingList() {
     usePodSync<PackingListQuestionSet>({
         pathConfig: {
             container: POD_CONTAINERS.ROOT,
-            filename: 'packing-list-questions.json',
+            filename: 'packing-list-questions.ttl',
         },
+        rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
         syncOnMount: true,
         enabled: isLoggedIn,
         onSyncSuccess: handleQuestionSetPodSync,
@@ -540,11 +542,11 @@ export function CreatePackingList() {
             if (isLoggedIn) {
                 const podUrl = await getPrimaryPodUrl(session)
                 if (podUrl) {
-                    await saveFileToPod({
+                    await saveRdfToPod({
                         session: session!,
-                        containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-                        filename: `${packingList.id}.json`,
+                        fileUrl: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${packingList.id}.ttl`,
                         data: packingList,
+                        serializer: packingListToDataset,
                     })
                 }
             }

@@ -1,15 +1,19 @@
 import { Session } from '@inrupt/solid-client-authn-browser'
-import { getPodUrlAll, saveFileInContainer, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, saveSolidDatasetAt } from '@inrupt/solid-client'
+import type { SolidDataset } from '@inrupt/solid-client'
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
+import { packingListToDataset, datasetToPackingList, datasetToQuestionSet } from './rdfSerialization'
 
 /**
  * Pod container paths under the user's Pod root
  */
 export const POD_CONTAINERS = {
     ROOT: 'pack-me-up/',
-    QUESTIONS: 'pack-me-up/packing-list-questions.json',
+    QUESTIONS: 'pack-me-up/packing-list-questions.ttl',
+    QUESTIONS_LEGACY_JSON: 'pack-me-up/packing-list-questions.json',
+    MIGRATION_MARKER: 'pack-me-up/migrated-to-rdf.ttl',
     PACKING_LISTS: 'pack-me-up/packing-lists/',
     BACKUPS: 'pack-me-up/backups/',
 } as const
@@ -146,10 +150,20 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
 
 /**
  * Checks whether the user's Solid Pod contains any data saved by this app.
- * Checks the questions file first, then the packing lists container.
- * Uses remote requests so it works correctly on any device, regardless of local cache state.
+ * Checks for migration marker, RDF questions file, then legacy JSON questions file,
+ * then the packing lists container. Works for both pre- and post-migration pods.
  */
 export async function hasPodData(session: Session, podUrl: string): Promise<boolean> {
+    // Check migration marker (fast path for migrated pods)
+    try {
+        await getFile(`${podUrl}${POD_CONTAINERS.MIGRATION_MARKER}`, { fetch: session.fetch })
+        return true
+    } catch (err: unknown) {
+        if (isAuthenticationError(err)) handlePodError(err)
+        if (getStatusCode(err) !== 404) throw err
+    }
+
+    // Check RDF questions file
     try {
         await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS}`, { fetch: session.fetch })
         return true
@@ -158,9 +172,18 @@ export async function hasPodData(session: Session, podUrl: string): Promise<bool
         if (getStatusCode(err) !== 404) throw err
     }
 
+    // Check legacy JSON questions file
+    try {
+        await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS_LEGACY_JSON}`, { fetch: session.fetch })
+        return true
+    } catch (err: unknown) {
+        if (isAuthenticationError(err)) handlePodError(err)
+        if (getStatusCode(err) !== 404) throw err
+    }
+
     try {
         const dataset = await getSolidDataset(`${podUrl}${POD_CONTAINERS.PACKING_LISTS}`, { fetch: session.fetch })
-        return getContainedResourceUrlAll(dataset).some(url => url.endsWith('.json'))
+        return getContainedResourceUrlAll(dataset).some(url => url.endsWith('.ttl') || url.endsWith('.json'))
     } catch (err: unknown) {
         if (isAuthenticationError(err)) handlePodError(err)
         if (getStatusCode(err) === 404) return false
@@ -226,6 +249,148 @@ export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T
         }
         throw error
     }
+}
+
+// ── RDF Pod operations ────────────────────────────────────────────────────────
+
+export interface SaveRdfToPodOptions<T> {
+    session: Session
+    fileUrl: string
+    data: T
+    serializer: (data: T, datasetUrl: string) => SolidDataset
+}
+
+/**
+ * Loads an RDF dataset from a Pod URL and deserializes it via the provided function.
+ */
+export async function loadRdfFromPod<T>(
+    session: Session,
+    fileUrl: string,
+    deserializer: (dataset: SolidDataset, datasetUrl: string) => T
+): Promise<T> {
+    try {
+        const dataset = await getSolidDataset(fileUrl, { fetch: session.fetch })
+        return deserializer(dataset, fileUrl)
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        throw error
+    }
+}
+
+/**
+ * Serializes data to RDF and saves it as a dataset at the given Pod URL.
+ */
+export async function saveRdfToPod<T>(options: SaveRdfToPodOptions<T>): Promise<void> {
+    const { session, fileUrl, data, serializer } = options
+    try {
+        const dataset = serializer(data, fileUrl)
+        await saveSolidDatasetAt(fileUrl, dataset, { fetch: session.fetch })
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        throw error
+    }
+}
+
+/**
+ * Loads all .ttl files from a Pod container, deserializing each via the provided function.
+ */
+export async function loadMultipleRdfFromPod<T>(
+    session: Session,
+    containerUrl: string,
+    deserializer: (dataset: SolidDataset, datasetUrl: string) => T,
+    onError?: (fileUrl: string, error: Error) => void
+): Promise<{ data: T[]; result: PodSyncResult }> {
+    let dataset
+    try {
+        dataset = await getSolidDataset(containerUrl, { fetch: session.fetch })
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        if (getStatusCode(error) === 404) {
+            return { data: [], result: { success: false, successCount: 0, failCount: 0, totalCount: 0 } }
+        }
+        throw error
+    }
+
+    const ttlUrls = getContainedResourceUrlAll(dataset).filter(url => url.endsWith('.ttl'))
+
+    if (ttlUrls.length === 0) {
+        return { data: [], result: { success: true, successCount: 0, failCount: 0, totalCount: 0 } }
+    }
+
+    const loadedData: T[] = []
+    let successCount = 0
+    let failCount = 0
+
+    for (const fileUrl of ttlUrls) {
+        try {
+            const fileDataset = await getSolidDataset(fileUrl, { fetch: session.fetch })
+            loadedData.push(deserializer(fileDataset, fileUrl))
+            successCount++
+        } catch (error: unknown) {
+            if (isAuthenticationError(error)) handlePodError(error)
+            console.error(`loadMultipleRdfFromPod: error loading ${fileUrl}`, error)
+            failCount++
+            if (onError) onError(fileUrl, error instanceof Error ? error : new Error(String(error)))
+        }
+    }
+
+    return {
+        data: loadedData,
+        result: { success: failCount === 0, successCount, failCount, totalCount: ttlUrls.length }
+    }
+}
+
+/**
+ * Saves an array of items as .ttl files in a Pod container, deleting orphaned .ttl files.
+ */
+export async function saveMultipleRdfToPod<T extends { id: string }>(
+    session: Session,
+    containerUrl: string,
+    items: T[],
+    serializer: (item: T, datasetUrl: string) => SolidDataset
+): Promise<PodSyncResult> {
+    let successCount = 0
+    let failCount = 0
+    let deleteCount = 0
+
+    // Detect and remove orphaned .ttl files
+    try {
+        const dataset = await getSolidDataset(containerUrl, { fetch: session.fetch })
+        const ttlUrls = getContainedResourceUrlAll(dataset).filter(url => url.endsWith('.ttl'))
+        const currentIds = new Set(items.map(item => item.id))
+
+        for (const fileUrl of ttlUrls) {
+            const filename = fileUrl.split('/').pop()
+            const itemId = filename?.replace('.ttl', '')
+            if (itemId && !currentIds.has(itemId)) {
+                try {
+                    await deleteFile(fileUrl, { fetch: session.fetch })
+                    deleteCount++
+                } catch (error: unknown) {
+                    if (isAuthenticationError(error)) handlePodError(error)
+                    console.error(`saveMultipleRdfToPod: error deleting ${fileUrl}`, error)
+                    failCount++
+                }
+            }
+        }
+    } catch (error: unknown) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        if (getStatusCode(error) !== 404) console.error('saveMultipleRdfToPod: error checking container', error)
+    }
+
+    for (const item of items) {
+        try {
+            const fileUrl = `${containerUrl}${item.id}.ttl`
+            await saveRdfToPod({ session, fileUrl, data: item, serializer })
+            successCount++
+        } catch (error: unknown) {
+            if (error instanceof AuthenticationError) throw error
+            console.error(`saveMultipleRdfToPod: error saving ${item.id}`, error)
+            failCount++
+        }
+    }
+
+    return { success: failCount === 0, successCount, failCount, totalCount: items.length + deleteCount }
 }
 
 /**
@@ -442,14 +607,16 @@ export async function syncAllDataFromPod(
 
     // ── Download question set and packing lists in parallel ──────────────────
     const [podQsResult, podListsResult] = await Promise.allSettled([
-        loadFileFromPod<PackingListQuestionSet>({
+        loadRdfFromPod<PackingListQuestionSet>(
             session,
-            fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
-        }),
-        loadMultipleFilesFromPod<PackingList>({
+            `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
+            datasetToQuestionSet,
+        ),
+        loadMultipleRdfFromPod<PackingList>(
             session,
-            containerPath: containerUrl,
-        }),
+            containerUrl,
+            datasetToPackingList,
+        ),
     ])
 
     // ── 1. Question set ──────────────────────────────────────────────────────
@@ -513,12 +680,11 @@ export async function syncAllDataFromPod(
     for (const localList of localLists) {
         if (podListIds.has(localList.id)) continue
         try {
-            const json = JSON.stringify(localList, null, 2)
-            const file = new File([json], `${localList.id}.json`, { type: 'application/json' })
-            await saveFileInContainer(containerUrl, file, {
-                slug: `${localList.id}.json`,
-                contentType: 'application/json',
-                fetch: session.fetch,
+            await saveRdfToPod({
+                session,
+                fileUrl: `${containerUrl}${localList.id}.ttl`,
+                data: localList,
+                serializer: packingListToDataset,
             })
             packingListsUploaded++
         } catch (err) {
