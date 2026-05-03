@@ -36,7 +36,7 @@ vi.mock('../hooks/usePodSync', () => ({
 
 vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(),
-    saveFileToPod: vi.fn(),
+    saveRdfToPod: vi.fn(),
     POD_CONTAINERS: { PACKING_LISTS: 'pack-me-up/packing-lists/' },
     POD_ERROR_MESSAGES: { SAVE_FAILED: 'Save failed' },
 }))
@@ -47,11 +47,11 @@ import { useToast } from '../components/ToastContext'
 import { ToastType } from '../components/Toast'
 import { PackingAppDatabase } from '../services/database'
 import { CreatePackingList } from './create-packing-list'
-import { getPrimaryPodUrl, saveFileToPod } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
 
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
-const mockSaveFileToPod = vi.mocked(saveFileToPod)
+const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
 const mockUsePodSync = vi.mocked(usePodSync)
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
@@ -607,7 +607,7 @@ describe('CreatePackingList – pod sync on creation', () => {
         })
         mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
         mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
-        mockSaveFileToPod.mockResolvedValue(undefined)
+        mockSaveRdfToPod.mockResolvedValue(undefined)
     })
 
     afterEach(() => {
@@ -627,16 +627,16 @@ describe('CreatePackingList – pod sync on creation', () => {
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
+            expect(mockSaveRdfToPod).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
+                    fileUrl: expect.stringContaining('pack-me-up/packing-lists/'),
                     data: expect.objectContaining({ name: 'My New List' }),
                 })
             )
         })
     })
 
-    it('does not call saveFileToPod when not logged in', async () => {
+    it('does not call saveRdfToPod when not logged in', async () => {
         mockUseSolidPod.mockReturnValue({
             session: null,
             isLoggedIn: false,
@@ -656,7 +656,7 @@ describe('CreatePackingList – pod sync on creation', () => {
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => expect(vi.mocked(db.savePackingList)).toHaveBeenCalled())
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+        expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
 })
 

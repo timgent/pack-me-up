@@ -33,7 +33,7 @@ vi.mock('../hooks/usePodErrorHandler', () => ({
 
 vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(),
-    saveFileToPod: vi.fn(),
+    saveRdfToPod: vi.fn(),
     deleteFileFromPod: vi.fn(),
     POD_CONTAINERS: { PACKING_LISTS: '/packing-lists/' },
     POD_ERROR_MESSAGES: {
@@ -48,12 +48,12 @@ vi.mock('../services/solidPod', () => ({
 import type { AppSession as Session } from '../types/AppSession'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { getPrimaryPodUrl, saveFileToPod, deleteFileFromPod } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod } from '../services/solidPod'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
-const mockSaveFileToPod = vi.mocked(saveFileToPod)
+const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
 const mockDeleteFileFromPod = vi.mocked(deleteFileFromPod)
 
 const testPackingList = {
@@ -473,7 +473,7 @@ describe('PackingLists pod sync on mutation', () => {
             logout: vi.fn(),
         })
         mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
-        mockSaveFileToPod.mockResolvedValue(undefined)
+        mockSaveRdfToPod.mockResolvedValue(undefined)
         mockDeleteFileFromPod.mockResolvedValue(undefined)
     })
 
@@ -489,9 +489,9 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
+            expect(mockSaveRdfToPod).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    filename: 'list-1.json',
+                    fileUrl: expect.stringContaining('list-1.ttl'),
                     data: expect.objectContaining({ id: 'list-1', name: 'Winter Holiday' }),
                 })
             )
@@ -507,9 +507,9 @@ describe('PackingLists pod sync on mutation', () => {
         fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
 
         await waitFor(() => {
-            expect(mockSaveFileToPod).toHaveBeenCalledWith(
+            expect(mockSaveRdfToPod).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    filename: 'new-uuid.json',
+                    fileUrl: expect.stringContaining('.ttl'),
                     data: expect.objectContaining({ name: 'Copy of Summer Holiday' }),
                 })
             )
@@ -529,12 +529,12 @@ describe('PackingLists pod sync on mutation', () => {
         await waitFor(() => {
             expect(mockDeleteFileFromPod).toHaveBeenCalledWith(
                 loggedInSession,
-                'https://timgent.solidcommunity.net/packing-lists/list-1.json'
+                'https://timgent.solidcommunity.net/packing-lists/list-1.ttl'
             )
         })
     })
 
-    it('does not call saveFileToPod when not logged in', async () => {
+    it('does not call saveRdfToPod when not logged in', async () => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
             session: null,
@@ -553,7 +553,7 @@ describe('PackingLists pod sync on mutation', () => {
         await waitFor(() => {
             expect(makeDb().savePackingList).toBeDefined()
         })
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+        expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
 })
 
