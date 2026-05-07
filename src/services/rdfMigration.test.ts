@@ -15,15 +15,22 @@ vi.mock('./solidPod', () => ({
     },
 }))
 
+vi.mock('@inrupt/solid-client', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@inrupt/solid-client')>()
+    return { ...actual, getFile: vi.fn() }
+})
+
 import {
     loadFileFromPod,
     loadMultipleFilesFromPod,
     saveRdfToPod,
 } from './solidPod'
+import { getFile } from '@inrupt/solid-client'
 import { detectPodDataFormat, migrateJsonToRdf } from './rdfMigration'
 import type { PackingListQuestionSet } from '../edit-questions/types'
 import type { PackingList } from '../create-packing-list/types'
 
+const mockGetFile = vi.mocked(getFile)
 const mockLoadFileFromPod = vi.mocked(loadFileFromPod)
 const mockLoadMultipleFilesFromPod = vi.mocked(loadMultipleFilesFromPod)
 const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
@@ -46,28 +53,28 @@ function makePackingList(id: string, overrides: Partial<PackingList> = {}): Pack
 describe('detectPodDataFormat', () => {
     beforeEach(() => {
         vi.spyOn(console, 'error').mockImplementation(() => {})
+        mockGetFile.mockReset()
     })
     afterEach(() => {
         vi.restoreAllMocks()
     })
 
     it('returns "rdf" when migration marker file exists', async () => {
-        mockLoadFileFromPod.mockResolvedValueOnce({} as PackingListQuestionSet) // marker exists
+        mockGetFile.mockResolvedValueOnce({} as Blob) // marker exists
 
         const result = await detectPodDataFormat(mockSession, POD_URL)
 
         expect(result).toBe('rdf')
-        expect(mockLoadFileFromPod).toHaveBeenCalledWith(
-            expect.objectContaining({
-                fileUrl: `${POD_URL}pack-me-up/migrated-to-rdf.ttl`,
-            })
+        expect(mockGetFile).toHaveBeenCalledWith(
+            `${POD_URL}pack-me-up/migrated-to-rdf.ttl`,
+            expect.objectContaining({ fetch: mockSession.fetch })
         )
     })
 
     it('returns "rdf" when ttl questions file exists (no marker)', async () => {
-        mockLoadFileFromPod
+        mockGetFile
             .mockRejectedValueOnce({ statusCode: 404 }) // no marker
-            .mockResolvedValueOnce({} as PackingListQuestionSet) // ttl questions exists
+            .mockResolvedValueOnce({} as Blob) // ttl questions exists
 
         const result = await detectPodDataFormat(mockSession, POD_URL)
 
@@ -75,10 +82,10 @@ describe('detectPodDataFormat', () => {
     })
 
     it('returns "json" when only json questions file exists', async () => {
-        mockLoadFileFromPod
+        mockGetFile
             .mockRejectedValueOnce({ statusCode: 404 }) // no marker
             .mockRejectedValueOnce({ statusCode: 404 }) // no ttl
-            .mockResolvedValueOnce({} as PackingListQuestionSet) // json exists
+            .mockResolvedValueOnce({} as Blob) // json exists
 
         const result = await detectPodDataFormat(mockSession, POD_URL)
 
@@ -86,7 +93,7 @@ describe('detectPodDataFormat', () => {
     })
 
     it('returns "empty" when no files exist', async () => {
-        mockLoadFileFromPod
+        mockGetFile
             .mockRejectedValueOnce({ statusCode: 404 })
             .mockRejectedValueOnce({ statusCode: 404 })
             .mockRejectedValueOnce({ statusCode: 404 })
@@ -98,7 +105,7 @@ describe('detectPodDataFormat', () => {
 
     it('re-throws non-404 errors', async () => {
         const serverError = { statusCode: 500 }
-        mockLoadFileFromPod.mockRejectedValueOnce(serverError)
+        mockGetFile.mockRejectedValueOnce(serverError)
 
         await expect(detectPodDataFormat(mockSession, POD_URL)).rejects.toEqual(serverError)
     })

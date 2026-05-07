@@ -37,7 +37,7 @@ export function EditQuestionsForm() {
   });
   const { showToast } = useToast();
   const { isLoggedIn } = useSolidPod();
-  const { db } = useDatabase();
+  const { db, loginSyncInProgress } = useDatabase();
 
   // Watch all form values for auto-save
   const watchedFormValues = useWatch({ control });
@@ -286,9 +286,14 @@ export function EditQuestionsForm() {
       }
     }
 
+    // Skip while the login sync is running: syncAllDataFromPod hasn't written
+    // pod data into the local DB yet, so reading now would find nothing and
+    // create a default "Me" question set that immediately auto-saves to the pod,
+    // overwriting the real data that arrives moments later.
+    if (loginSyncInProgress) return
     loadQuestionSet()
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally runs once on mount
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginSyncInProgress])
 
   const { fields: questionFields, append: appendQuestion, remove: removeQuestion, move: moveQuestion } = useFieldArray({
     control,

@@ -17,6 +17,10 @@ import { CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../../p
 //      on the same local DB, which is fully populated before any test begins.
 test.describe.configure({ mode: 'serial' })
 
+// Run serially: K1 migrates the shared schema-compat pod (JSON → RDF); K2/K3
+// must start after K1 finishes so they find the .ttl files already in place.
+test.describe.configure({ mode: 'serial' })
+
 test.describe('K – JSON Schema Compatibility', () => {
   let page: import('@playwright/test').Page
   let ctx: import('@playwright/test').BrowserContext

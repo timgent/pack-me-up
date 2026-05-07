@@ -146,33 +146,28 @@ export async function restoreBackup(
         fileUrl: backupUrl,
     })
 
-    // 2. Delete all existing packing lists from local DB
+    // 2. Snapshot current list IDs so we can clean up extras after restoring.
+    //    Do NOT delete lists first: deleting then re-creating the same ID in PouchDB
+    //    leaves a tombstone that causes a 409 conflict on re-creation.
     const existingLists = await db.getAllPackingLists()
-    for (const list of existingLists) {
-        await db.deletePackingList(list.id)
-    }
+    const backupListIds = new Set(backupFile.packingLists.map(l => l.id))
 
-    // 3. Try to delete existing question set (catch not_found gracefully)
-    try {
-        const qs = await db.getQuestionSet()
-        // To delete, we need to save with an intent to remove - but PouchDB doesn't have a simple
-        // deleteQuestionSet method. We'll handle by overwriting with the backup data.
-        // If there's no backup question set, we need to clear it by removing the doc.
-        // Since PackingAppDatabase doesn't expose a deleteQuestionSet, we do this via the raw db.
-        // We'll overwrite it below regardless, so just proceed.
-        void qs // suppress unused warning
-    } catch (err: unknown) {
-        if (!hasName(err) || err.name !== 'not_found') throw err
-        // Question set doesn't exist - that's fine
-    }
-
-    // 4. Save restored question set + packing lists to local DB
+    // 3. Save restored question set + packing lists to local DB.
+    //    saveQuestionSet / savePackingList each read the existing _rev so they
+    //    overwrite in-place without conflicts.
     if (backupFile.questionSet) {
         await db.saveQuestionSet({ ...backupFile.questionSet, _rev: undefined })
     }
 
     for (const list of backupFile.packingLists) {
         await db.savePackingList({ ...list, _rev: undefined })
+    }
+
+    // 4. Delete any local lists that are not in the backup
+    for (const list of existingLists) {
+        if (!backupListIds.has(list.id)) {
+            await db.deletePackingList(list.id)
+        }
     }
 
     // 5. Push to live pod as RDF

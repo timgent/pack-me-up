@@ -1,5 +1,5 @@
 import type { AppSession as Session } from '../types/AppSession'
-import { createSolidDataset } from '@inrupt/solid-client'
+import { createSolidDataset, getFile } from '@inrupt/solid-client'
 import {
     loadFileFromPod,
     loadMultipleFilesFromPod,
@@ -26,9 +26,12 @@ export async function detectPodDataFormat(
     session: Session,
     podUrl: string
 ): Promise<'rdf' | 'json' | 'empty'> {
+    // Use getFile for existence checks — loadFileFromPod would JSON.parse the TTL
+    // content and throw a SyntaxError, which would be misidentified as a real error.
+
     // Fast path: migration marker exists
     try {
-        await loadFileFromPod({ session, fileUrl: `${podUrl}${POD_CONTAINERS.MIGRATION_MARKER}` })
+        await getFile(`${podUrl}${POD_CONTAINERS.MIGRATION_MARKER}`, { fetch: session.fetch })
         return 'rdf'
     } catch (err) {
         if (getStatusCode(err) !== 404) throw err
@@ -36,7 +39,7 @@ export async function detectPodDataFormat(
 
     // Check for RDF questions file
     try {
-        await loadFileFromPod({ session, fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS}` })
+        await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS}`, { fetch: session.fetch })
         return 'rdf'
     } catch (err) {
         if (getStatusCode(err) !== 404) throw err
@@ -44,7 +47,7 @@ export async function detectPodDataFormat(
 
     // Check for legacy JSON questions file
     try {
-        await loadFileFromPod({ session, fileUrl: `${podUrl}${POD_CONTAINERS.QUESTIONS_LEGACY_JSON}` })
+        await getFile(`${podUrl}${POD_CONTAINERS.QUESTIONS_LEGACY_JSON}`, { fetch: session.fetch })
         return 'json'
     } catch (err) {
         if (getStatusCode(err) !== 404) throw err

@@ -83,11 +83,16 @@ test.describe('G – Cross-context Pod Sync', () => {
     await renameInput.clear()
     await renameInput.fill(renamedName)
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
+    // Verify the rename is visible on this page before checking context B
     await expect(page.getByText(renamedName)).toBeVisible({ timeout: 5_000 })
-
-    // Reload page A: triggers syncAllDataFromPod again which loads the renamed list from pod.
+    // confirmRenamePackingList is async; wait for all in-flight network requests
+    // (including syncListToPod's GET + PUT) to settle before reloading.
+    // networkidle is more reliable than a fixed timeout.
+    await page.waitForLoadState('networkidle', { timeout: 15_000 })
+    // Reload page A to confirm pod has the rename (loadFromPod overwrites local from pod)
     await page.reload()
-    await expect(page.getByText(renamedName)).toBeVisible({ timeout: 30_000 })
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText(renamedName)).toBeVisible({ timeout: 10_000 })
 
     const { ctx: ctxB, pg: pageB } = await freshLogin(browser)
     await pageB.goto('/#/view-lists')
