@@ -89,6 +89,57 @@ test.describe('F – Solid Pod Sync', () => {
     await context2.close()
   })
 
+  test('F5: rapid checkbox ticks persist without 409 conflict (stale-rev regression)', async ({ authedPage: page }) => {
+    await runWizardLoggedIn(page)
+    await createList(page, 'Rapid Check Test')
+
+    // Keep packed items visible so their checkboxes stay in the DOM while we tick them.
+    await page.getByRole('button', { name: 'Show Packed' }).click()
+
+    const checkboxes = page.locator('input[type="checkbox"]')
+    await expect(checkboxes.first()).toBeVisible()
+
+    // Capture stable name attributes (items.{id}) for post-reload assertions.
+    const box0Name = await checkboxes.nth(0).getAttribute('name')
+    const box1Name = await checkboxes.nth(1).getAttribute('name')
+
+    // Add artificial latency to pod PUT requests for the packing-lists container.
+    // This opens the stale-_rev window that caused the original bug:
+    //   - local DB save completes in <50 ms  → PouchDB advances _rev
+    //   - pod PUT completes in ~1 500 ms     → component state _rev still stale
+    //   - 800 ms debounce fires between them → second save sees stale _rev
+    await page.route('**/pack-me-up/packing-lists/**', async (route) => {
+      if (route.request().method() === 'PUT') {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      await route.continue()
+    })
+
+    // First checkbox: debounce (800 ms) fires → local DB save → pod PUT begins (delayed 1 500 ms).
+    await checkboxes.nth(0).click()
+
+    // Wait long enough for the first debounce to fire and local DB save to complete (~850 ms),
+    // but NOT long enough for the pod PUT to return (fires at 800 + 1 500 = 2 300 ms).
+    // During this window the component-state _rev is one generation behind PouchDB.
+    await page.waitForTimeout(1000)
+
+    // Second checkbox while first pod PUT is still in-flight — the exact sequence that
+    // previously caused "Document update conflict" 409 errors on the local DB save.
+    await checkboxes.nth(1).click()
+
+    // Both saves must complete without surfacing an error status.
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-red-600')).not.toBeVisible()
+
+    // Reload and verify BOTH items persisted.  A silent 409 on the second save returns
+    // null from saveWithSyncPrevention, leaving that item unchecked after a reload.
+    await page.reload()
+    await page.getByRole('button', { name: 'Show Packed' }).click()
+    await expect(page.locator(`input[name="${box0Name}"]`)).toBeChecked({ timeout: 5_000 })
+    await expect(page.locator(`input[name="${box1Name}"]`)).toBeChecked({ timeout: 5_000 })
+  })
+
   test('F4: item check state visible from second context after Pod sync', async ({ authedPage: page, browser }) => {
     await runWizardLoggedIn(page)
     await createList(page, 'Check Sync Test')
