@@ -152,41 +152,51 @@ export class PackingAppDatabase {
     public async savePackingList(packingList: PackingList): Promise<{ rev: string }> {
         const docId = `packing-list:${packingList.id}`
         const now = new Date().toISOString()
+        const MAX_RETRIES = 3
 
-        try {
-            let existingDoc: PackingListDocument | undefined
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
-                const doc = await this.db.get(docId)
-                if (doc.docType === 'packing-list') {
-                    existingDoc = doc
+                let existingDoc: PackingListDocument | undefined
+                try {
+                    const doc = await this.db.get(docId)
+                    if (doc.docType === 'packing-list') {
+                        existingDoc = doc
+                    }
+                } catch (err: unknown) {
+                    if (!hasName(err) || err.name !== 'not_found') {
+                        throw err
+                    }
                 }
-            } catch (err: unknown) {
-                if (!hasName(err) || err.name !== 'not_found') {
-                    throw err
-                }
-            }
 
-            const docToSave: PackingListDocument = {
-                _id: docId,
-                _rev: packingList._rev || existingDoc?._rev,
-                docType: 'packing-list',
-                createdAt: existingDoc?.createdAt || now,
-                updatedAt: now,
-                data: {
-                    name: packingList.name,
-                    createdAt: packingList.createdAt,
-                    lastModified: packingList.lastModified,
-                    items: packingList.items,
-                    deletedItems: packingList.deletedItems,
+                const docToSave: PackingListDocument = {
+                    _id: docId,
+                    // Always use the freshly-fetched _rev to avoid stale-rev conflicts.
+                    // The component state _rev can lag behind PouchDB while a pod save is
+                    // still in-flight, causing 409s on rapid checkbox toggles.
+                    _rev: existingDoc?._rev,
+                    docType: 'packing-list',
+                    createdAt: existingDoc?.createdAt || now,
+                    updatedAt: now,
+                    data: {
+                        name: packingList.name,
+                        createdAt: packingList.createdAt,
+                        lastModified: packingList.lastModified,
+                        items: packingList.items,
+                        deletedItems: packingList.deletedItems,
+                    }
                 }
-            }
 
-            const result = await this.db.put(docToSave)
-            return { rev: result.rev }
-        } catch (err) {
-            console.error('Error saving packing list:', err)
-            throw err
+                const result = await this.db.put(docToSave)
+                return { rev: result.rev }
+            } catch (err) {
+                if (hasName(err) && err.name === 'conflict' && attempt < MAX_RETRIES) {
+                    continue
+                }
+                console.error('Error saving packing list:', err)
+                throw err
+            }
         }
+        throw new Error('savePackingList: max retries exceeded')
     }
 
     public async getAllPackingLists(): Promise<PackingList[]> {
