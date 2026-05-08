@@ -510,6 +510,50 @@ describe('PackingAppDatabase', () => {
     })
   })
 
+  describe('Stale Revision Handling', () => {
+    // Regression test for: 409 conflict when rapidly checking packing list items.
+    //
+    // Root cause: saveWithSyncPrevention only updates component state (_rev) after
+    // the pod save completes (network-bound). If the user checks a second checkbox
+    // while the pod save is still in-flight, the second save arrives with the
+    // pre-first-save _rev — stale by one generation — causing a 409 from PouchDB.
+    it('succeeds when called with a stale _rev (simulates rapid checkbox ticks during pod save)', async () => {
+      const list: PackingList = {
+        id: 'pl-stale-rev',
+        name: 'Trip',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        items: [{ id: 'item-1', itemText: 'Sunscreen', personId: 'p1', personName: 'Alice', questionId: '', optionId: '', packed: false }]
+      }
+
+      // Save #1 — initial save; component state will hold rev1.
+      const rev1Result = await db.savePackingList(list)
+      const rev1 = rev1Result.rev
+
+      // Save #2 — first checkbox tick: local DB save completes, pod save starts.
+      // PouchDB now has rev2 but component state still shows rev1 (pod save in-flight).
+      await db.savePackingList({
+        ...list,
+        _rev: rev1,
+        items: [{ ...list.items[0], packed: true }]
+      })
+
+      // Save #3 — second checkbox tick fires (debounce) while pod save is still in-flight.
+      // Component state still holds the stale rev1; this is the exact bug scenario.
+      const staleRevList: PackingList = {
+        ...list,
+        _rev: rev1, // stale — PouchDB is already one revision ahead
+        items: [{ ...list.items[0], packed: true, itemText: 'Sunscreen (updated)' }]
+      }
+
+      // Must not throw a 409 conflict error.
+      const result = await db.savePackingList(staleRevList)
+      expect(result.rev).toBeTruthy()
+
+      const saved = await db.getPackingList('pl-stale-rev')
+      expect(saved.items[0].itemText).toBe('Sunscreen (updated)')
+    })
+  })
+
   describe('Revision Handling', () => {
     it('should handle concurrent updates with revision conflicts', async () => {
       const mockQuestionSet: PackingListQuestionSet = {
