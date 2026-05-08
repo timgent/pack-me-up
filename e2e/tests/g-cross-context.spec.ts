@@ -1,7 +1,21 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
+import { loginToCss } from '../helpers/login'
+import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
+
+// G tests share the same pod user: both run the wizard (writes to the question-set resource)
+// and create lists. Parallel execution causes one wizard save to overwrite another mid-test.
+test.describe.configure({ mode: 'serial' })
 
 test.describe('G – Cross-context Pod Sync', () => {
+  async function freshLogin(browser: import('@playwright/test').Browser) {
+    const ctx = await browser.newContext()
+    const pg = await ctx.newPage()
+    await pg.goto('/')
+    await loginToCss(pg, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    return { ctx, pg }
+  }
+
   async function runWizard(page: import('@playwright/test').Page) {
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
@@ -34,9 +48,8 @@ test.describe('G – Cross-context Pod Sync', () => {
     // Sync to Pod by checking an item
     await syncToPod(page)
 
-    // Context B: same auth state – loadFromPod should find the list
-    const ctxB = await browser.newContext({ storageState: 'e2e/.auth/user.json' })
-    const pageB = await ctxB.newPage()
+    // Context B: fresh login so session restoration is reliable (storageState is flaky on CSS v7)
+    const { ctx: ctxB, pg: pageB } = await freshLogin(browser)
     await pageB.goto('/#/view-lists')
     await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
     await expect(pageB.getByText('Cross-Context List A')).toBeVisible({ timeout: 8_000 })
@@ -65,9 +78,8 @@ test.describe('G – Cross-context Pod Sync', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 10_000 })
 
-    // Context B: should see renamed list
-    const ctxB = await browser.newContext({ storageState: 'e2e/.auth/user.json' })
-    const pageB = await ctxB.newPage()
+    // Context B: fresh login so session restoration is reliable (storageState is flaky on CSS v7)
+    const { ctx: ctxB, pg: pageB } = await freshLogin(browser)
     await pageB.goto('/#/view-lists')
     // Wait for the login sync to finish — the loading text disappears when syncAllDataFromPod completes
     await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })

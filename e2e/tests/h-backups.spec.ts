@@ -1,6 +1,10 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 
+// H tests share the same user's backups pod resource; running them in parallel causes
+// concurrent creates/deletes to make counts non-deterministic.
+test.describe.configure({ mode: 'serial' })
+
 test.describe('H – Backups', () => {
   async function setupWithList(page: import('@playwright/test').Page) {
     // Run wizard and create a list while logged in
