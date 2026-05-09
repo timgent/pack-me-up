@@ -6,14 +6,36 @@
  * with committed v1 JSON fixtures (e2e/fixtures/). If any field rename or
  * structural change breaks the read path, one of these tests will fail.
  */
-import { test, expect } from '../fixtures'
+import { test, expect } from '@playwright/test'
+import { loginToCss } from '../helpers/login'
+import { CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../../playwright.config'
 
-// K tests share the same schema-compat pod user. Serial mode avoids any
-// Playwright scheduling ambiguity and keeps pod state predictable.
+// All K tests share a single login so that:
+//   1. CSS only handles one schema-compat OIDC session (avoids session accumulation
+//      after the 30+ logins that precede K tests in the workers=1 CI run).
+//   2. Login sync (syncAllDataFromPod) runs exactly once — all three tests operate
+//      on the same local DB, which is fully populated before any test begins.
 test.describe.configure({ mode: 'serial' })
 
 test.describe('K – JSON Schema Compatibility', () => {
-  test('K1: question set page loads people and questions from v1 JSON', async ({ schemaCompatPage: page }) => {
+  let page: import('@playwright/test').Page
+  let ctx: import('@playwright/test').BrowserContext
+
+  test.beforeAll(async ({ browser }) => {
+    ctx = await browser.newContext()
+    page = await ctx.newPage()
+    await page.goto('/')
+    await loginToCss(page, CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)
+    // Wait for the login sync to fully complete so local DB is populated before tests run.
+    await page.goto('/#/view-lists')
+    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
+  })
+
+  test.afterAll(async () => {
+    await ctx.close()
+  })
+
+  test('K1: question set page loads people and questions from v1 JSON', async () => {
     await page.goto('/#/manage-questions')
     await page.waitForLoadState('networkidle')
 
@@ -30,13 +52,11 @@ test.describe('K – JSON Schema Compatibility', () => {
     await expect(questionInputs.first()).toHaveValue('Will you be staying overnight?', { timeout: 10_000 })
   })
 
-  test('K2: individual packing list loads items from v1 JSON', async ({ schemaCompatPage: page }) => {
+  test('K2: individual packing list loads items from v1 JSON', async () => {
     await page.goto('/#/view-lists')
+    await page.waitForLoadState('networkidle')
 
-    // Wait for pod sync to complete before checking list presence
-    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
-
-    // The pre-seeded list should be visible
+    // The pre-seeded list should be visible (already synced in beforeAll)
     await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 10_000 })
 
     // Navigate into the list
@@ -48,26 +68,25 @@ test.describe('K – JSON Schema Compatibility', () => {
     await expect(page.getByText('Passport')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('K3: new packing list can be created when question set is loaded from v1 JSON', async ({ schemaCompatPage: page }) => {
-    // Wait for sync to complete via view-lists (same pattern as K2) before navigating to create.
-    // Use the nav link for subsequent navigation (hash change, no full page reload/OIDC re-auth).
+  test('K3: new packing list can be created when question set is loaded from v1 JSON', async () => {
+    // Navigate to create-packing-list via nav link (hash change, no OIDC re-auth needed)
     await page.goto('/#/view-lists')
-    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
+    await page.waitForLoadState('networkidle')
 
     await page.getByRole('link', { name: 'Create List' }).first().click()
     await page.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
 
-    // The question from the fixture should appear as a form question
+    // The question from the fixture should appear (local DB already has it from beforeAll sync)
     await expect(page.getByText('Will you be staying overnight?')).toBeVisible({ timeout: 15_000 })
 
-    // Wait for any background pod syncs (usePodSync syncOnMount) to settle before submitting
+    // Wait for background pod sync (usePodSync syncOnMount) to settle before submitting
     await page.waitForLoadState('networkidle')
 
     // Fill in a name and create the list
     await page.getByPlaceholder('Enter a name for your packing list').fill('K3 New List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
 
-    // Pod write + navigation — allow generous time since CSS may be under load from prior tests
+    // Pod write + navigation
     await page.waitForURL(/#\/view-lists\//, { timeout: 20_000 })
     await expect(page.getByText('K3 New List')).toBeVisible({ timeout: 10_000 })
   })
