@@ -8,6 +8,10 @@
  */
 import { test, expect } from '../fixtures'
 
+// K tests share the same schema-compat pod user. Serial mode avoids any
+// Playwright scheduling ambiguity and keeps pod state predictable.
+test.describe.configure({ mode: 'serial' })
+
 test.describe('K – JSON Schema Compatibility', () => {
   test('K1: question set page loads people and questions from v1 JSON', async ({ schemaCompatPage: page }) => {
     await page.goto('/#/manage-questions')
@@ -50,18 +54,21 @@ test.describe('K – JSON Schema Compatibility', () => {
     await page.goto('/#/view-lists')
     await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
 
-    await page.getByRole('link', { name: 'Create List' }).click()
-    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
+    await page.getByRole('link', { name: 'Create List' }).first().click()
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
 
     // The question from the fixture should appear as a form question
-    await expect(page.getByText('Will you be staying overnight?')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Will you be staying overnight?')).toBeVisible({ timeout: 15_000 })
+
+    // Wait for any background pod syncs (usePodSync syncOnMount) to settle before submitting
+    await page.waitForLoadState('networkidle')
 
     // Fill in a name and create the list
     await page.getByPlaceholder('Enter a name for your packing list').fill('K3 New List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
 
-    // Should navigate to the new list's view page
-    await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
-    await expect(page.getByText('K3 New List')).toBeVisible()
+    // Pod write + navigation — allow generous time since CSS may be under load from prior tests
+    await page.waitForURL(/#\/view-lists\//, { timeout: 20_000 })
+    await expect(page.getByText('K3 New List')).toBeVisible({ timeout: 10_000 })
   })
 })
