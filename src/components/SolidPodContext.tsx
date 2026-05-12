@@ -197,6 +197,25 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [session, session?.info.isLoggedIn, session?.info.webId]);
 
+  // Periodically make an authenticated request so the library uses its refresh
+  // token to renew the access token before it expires, preventing unnecessary
+  // re-logins when the access token silently expires between user actions.
+  useEffect(() => {
+    if (!session?.info.isLoggedIn || !session?.info.webId) {
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        await session.fetch(session.info.webId!, { method: 'HEAD' });
+      } catch {
+        // Best-effort: session event listeners handle any real auth failures
+      }
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [session, session?.info.isLoggedIn, session?.info.webId]);
+
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
     const redirectUrl = new URL("/pod-auth-callback.html", window.location.href);

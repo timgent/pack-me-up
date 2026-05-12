@@ -217,6 +217,34 @@ describe('SolidPodContext', () => {
         })
     })
 
+    it('periodically calls session.fetch to keep the session alive', async () => {
+        const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+
+        mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
+        mockGetDefaultSession.mockReturnValue(mockSession as never)
+
+        render(<Wrapper><Consumer /></Wrapper>)
+
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
+        })
+
+        const keepaliveCall = setIntervalSpy.mock.calls.find(
+            ([, delay]) => delay === 10 * 60 * 1000
+        )
+        expect(keepaliveCall).toBeDefined()
+
+        mockSession.fetch.mockClear()
+        await act(async () => {
+            await (keepaliveCall![0] as () => Promise<void>)()
+        })
+
+        expect(mockSession.fetch).toHaveBeenCalledWith(
+            'https://user.example.org/profile/card#me',
+            { method: 'HEAD' }
+        )
+    })
+
     it('clearSessionExpired sets sessionExpired to false', async () => {
         mockSession = makeMockSession(true, 'https://user.example.org/profile/card#me')
         mockGetDefaultSession.mockReturnValue(mockSession as never)
