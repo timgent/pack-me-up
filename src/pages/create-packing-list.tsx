@@ -296,7 +296,7 @@ export function CreatePackingList() {
     const { showToast } = useToast()
     const { isLoggedIn, login, session } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const { db } = useDatabase()
+    const { db, loginSyncInProgress } = useDatabase()
     const navigate = useNavigate()
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
@@ -330,6 +330,8 @@ export function CreatePackingList() {
     })
 
     useEffect(() => {
+        if (loginSyncInProgress) return
+
         const fetchQuestionSet = async () => {
             if (!db) {
                 setNoQuestionsFound(true)
@@ -360,7 +362,7 @@ export function CreatePackingList() {
             }
         }
         fetchQuestionSet()
-    }, [db, showToast])
+    }, [db, showToast, loginSyncInProgress])
 
     const suggestions = useMemo(
         () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],

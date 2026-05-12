@@ -32,12 +32,12 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, saveSolidDatasetAt } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
-const mockSaveSolidDatasetAt = vi.mocked(saveSolidDatasetAt)
+const mockOverwriteFile = vi.mocked(overwriteFile)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
@@ -45,6 +45,10 @@ const mockSession = {
 } as unknown as Session
 
 const POD_URL = 'https://pod.example.com/'
+
+// Ensure each test starts with clean mock state (vi.restoreAllMocks in inner afterEach
+// hooks doesn't fully clear permanent mockRejectedValue defaults on vi.fn() mocks).
+beforeEach(() => { vi.resetAllMocks() })
 
 describe('hasPodData', () => {
     beforeEach(() => {
@@ -351,14 +355,14 @@ describe('syncAllDataFromPod', () => {
                 .mockRejectedValueOnce({ statusCode: 404 }) // no question set
                 .mockResolvedValueOnce(makeContainerDataset([])) // empty container
 
-            mockSaveSolidDatasetAt.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
-            expect(mockSaveSolidDatasetAt).toHaveBeenCalledWith(
+            expect(mockOverwriteFile).toHaveBeenCalledWith(
                 expect.stringContaining('local-only.ttl'),
-                expect.anything(),
-                expect.objectContaining({ fetch: mockSession.fetch })
+                expect.any(Blob),
+                expect.objectContaining({ fetch: mockSession.fetch, contentType: 'text/turtle' })
             )
             expect(result.packingListsUploaded).toBe(1)
         })
@@ -375,7 +379,7 @@ describe('syncAllDataFromPod', () => {
                 .mockResolvedValueOnce(makeContainerDataset([podListUrl]))
                 .mockResolvedValueOnce(makeRdfListDataset(podList))
 
-            mockSaveSolidDatasetAt.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
@@ -426,10 +430,10 @@ describe('loadRdfFromPod', () => {
 describe('saveRdfToPod', () => {
     afterEach(() => { vi.restoreAllMocks() })
 
-    it('serializes data and calls saveSolidDatasetAt', async () => {
+    it('serializes data and calls overwriteFile with Turtle content', async () => {
         const list = makePackingList('my-list')
         const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
-        mockSaveSolidDatasetAt.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
         await saveRdfToPod({
             session: mockSession,
@@ -438,17 +442,17 @@ describe('saveRdfToPod', () => {
             serializer: packingListToDataset,
         })
 
-        expect(mockSaveSolidDatasetAt).toHaveBeenCalledWith(
+        expect(mockOverwriteFile).toHaveBeenCalledWith(
             url,
-            expect.anything(),
-            expect.objectContaining({ fetch: mockSession.fetch })
+            expect.any(Blob),
+            expect.objectContaining({ fetch: mockSession.fetch, contentType: 'text/turtle' })
         )
     })
 
     it('throws AuthenticationError on 401', async () => {
-        mockSaveSolidDatasetAt.mockRejectedValueOnce({ statusCode: 401 })
+        mockOverwriteFile.mockRejectedValueOnce({ statusCode: 401 })
         await expect(
-            saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => ({} as unknown as SolidDataset) })
+            saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => createSolidDataset() })
         ).rejects.toThrow(AuthenticationError)
     })
 })
@@ -513,19 +517,19 @@ describe('saveMultipleRdfToPod', () => {
     it('saves each item as a ttl file', async () => {
         const lists = [makePackingList('list-1'), makePackingList('list-2')]
         mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 404 }) // no existing files
-        mockSaveSolidDatasetAt.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
         const result = await saveMultipleRdfToPod(mockSession, LISTS_CONTAINER_URL, lists, packingListToDataset)
 
-        expect(mockSaveSolidDatasetAt).toHaveBeenCalledWith(
+        expect(mockOverwriteFile).toHaveBeenCalledWith(
             expect.stringContaining('list-1.ttl'),
-            expect.anything(),
-            expect.any(Object)
+            expect.any(Blob),
+            expect.objectContaining({ contentType: 'text/turtle' })
         )
-        expect(mockSaveSolidDatasetAt).toHaveBeenCalledWith(
+        expect(mockOverwriteFile).toHaveBeenCalledWith(
             expect.stringContaining('list-2.ttl'),
-            expect.anything(),
-            expect.any(Object)
+            expect.any(Blob),
+            expect.objectContaining({ contentType: 'text/turtle' })
         )
         expect(result.successCount).toBe(2)
     })
@@ -539,7 +543,7 @@ describe('saveMultipleRdfToPod', () => {
         mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValueOnce([orphanUrl])
         mockDeleteFile.mockResolvedValueOnce(undefined)
-        mockSaveSolidDatasetAt.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
         await saveMultipleRdfToPod(mockSession, LISTS_CONTAINER_URL, [activeList], packingListToDataset)
 

@@ -1,5 +1,5 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, saveSolidDatasetAt, getThingAll, removeThing, setThing } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle } from '@inrupt/solid-client'
 import type { SolidDataset } from '@inrupt/solid-client'
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
@@ -278,44 +278,18 @@ export async function loadRdfFromPod<T>(
 }
 
 /**
- * Serializes data to RDF and saves it as a dataset at the given Pod URL.
+ * Serializes data to RDF (Turtle) and saves it as a full PUT at the given Pod URL.
  *
- * Fetches the existing resource first (if present) so that saveSolidDatasetAt can
- * send a conditional PUT using the ETag rather than `If-None-Match: *`.
- * Without this, ESS returns 412 Precondition Failed on second and subsequent saves.
+ * Uses overwriteFile with solidDatasetAsTurtle to avoid SPARQL UPDATE (PATCH),
+ * which produces truncated Turtle on CSS v7 when adding new triples.
  */
 export async function saveRdfToPod<T>(options: SaveRdfToPodOptions<T>): Promise<void> {
     const { session, fileUrl, data, serializer } = options
     try {
         const newDataset = serializer(data, fileUrl)
-
-        // Try to fetch the existing resource to obtain its ETag / resource info.
-        let existingDataset: SolidDataset | undefined
-        try {
-            existingDataset = await getSolidDataset(fileUrl, { fetch: session.fetch })
-        } catch (err) {
-            if (getStatusCode(err) !== 404) throw err
-            // 404 → new resource; If-None-Match: * is correct for creation
-        }
-
-        let datasetToSave: SolidDataset
-        if (existingDataset !== undefined) {
-            // Clear all Things from the fetched dataset (preserves internal_resourceInfo / ETag),
-            // then repopulate with the freshly serialised Things.
-            let cleared: SolidDataset = existingDataset
-            for (const thing of getThingAll(existingDataset)) {
-                cleared = removeThing(cleared, thing)
-            }
-            let merged: SolidDataset = cleared
-            for (const thing of getThingAll(newDataset)) {
-                merged = setThing(merged, thing)
-            }
-            datasetToSave = merged
-        } else {
-            datasetToSave = newDataset
-        }
-
-        await saveSolidDatasetAt(fileUrl, datasetToSave, { fetch: session.fetch })
+        const turtleContent = await solidDatasetAsTurtle(newDataset)
+        const blob = new Blob([turtleContent], { type: 'text/turtle' })
+        await overwriteFile(fileUrl, blob, { fetch: session.fetch, contentType: 'text/turtle' })
     } catch (error: unknown) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
