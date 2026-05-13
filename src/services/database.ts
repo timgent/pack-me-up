@@ -95,39 +95,49 @@ export class PackingAppDatabase {
     public async saveQuestionSet(questionSet: PackingListQuestionSet): Promise<{ rev: string }> {
         const docId = 'question-set:1'
         const now = new Date().toISOString()
+        const MAX_RETRIES = 3
 
-        try {
-            let existingDoc: QuestionSetDocument | undefined
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
-                const doc = await this.db.get(docId)
-                if (doc.docType === 'question-set') {
-                    existingDoc = doc
+                let existingDoc: QuestionSetDocument | undefined
+                try {
+                    const doc = await this.db.get(docId)
+                    if (doc.docType === 'question-set') {
+                        existingDoc = doc
+                    }
+                } catch (err: unknown) {
+                    if (!hasName(err) || err.name !== 'not_found') {
+                        throw err
+                    }
                 }
-            } catch (err: unknown) {
-                if (!hasName(err) || err.name !== 'not_found') {
-                    throw err
-                }
-            }
 
-            const docToSave: QuestionSetDocument = {
-                _id: docId,
-                _rev: questionSet._rev || existingDoc?._rev,
-                docType: 'question-set',
-                createdAt: existingDoc?.createdAt || now,
-                updatedAt: now,
-                data: {
-                    people: questionSet.people,
-                    alwaysNeededItems: questionSet.alwaysNeededItems,
-                    questions: questionSet.questions
+                const docToSave: QuestionSetDocument = {
+                    _id: docId,
+                    // Always use the freshly-fetched _rev to avoid stale-rev conflicts.
+                    // The component state _rev can lag behind PouchDB while a pod save is
+                    // still in-flight, causing 409s on rapid question-set updates.
+                    _rev: existingDoc?._rev,
+                    docType: 'question-set',
+                    createdAt: existingDoc?.createdAt || now,
+                    updatedAt: now,
+                    data: {
+                        people: questionSet.people,
+                        alwaysNeededItems: questionSet.alwaysNeededItems,
+                        questions: questionSet.questions
+                    }
                 }
-            }
 
-            const result = await this.db.put(docToSave)
-            return { rev: result.rev }
-        } catch (err) {
-            console.error('Error saving question set:', err)
-            throw err
+                const result = await this.db.put(docToSave)
+                return { rev: result.rev }
+            } catch (err) {
+                if (hasName(err) && err.name === 'conflict' && attempt < MAX_RETRIES) {
+                    continue
+                }
+                console.error('Error saving question set:', err)
+                throw err
+            }
         }
+        throw new Error('saveQuestionSet: max retries exceeded')
     }
 
     public async getPackingList(id: string): Promise<PackingList> {

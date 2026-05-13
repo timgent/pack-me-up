@@ -413,18 +413,21 @@ describe('PackingAppDatabase', () => {
       await expect(db.getPackingList('test')).rejects.toThrow('Invalid document type for packing list')
     })
 
-    it('should log errors when saving fails', async () => {
+    it('should log errors when saving fails due to unexpected db error', async () => {
       const consoleSpy = vi.spyOn(console, 'error')
 
-      const invalidQuestionSet: PackingListQuestionSet = {
+      // @ts-expect-error - Accessing private property for testing
+      const rawDb = db.db
+      vi.spyOn(rawDb, 'get').mockRejectedValueOnce(Object.assign(new Error('unexpected db error'), { name: 'unknown_error' }))
+
+      const qs: PackingListQuestionSet = {
         _id: '1',
-        _rev: 'invalid-rev',
         people: [],
         alwaysNeededItems: [],
         questions: []
       }
 
-      await expect(db.saveQuestionSet(invalidQuestionSet)).rejects.toThrow()
+      await expect(db.saveQuestionSet(qs)).rejects.toThrow()
       expect(consoleSpy).toHaveBeenCalledWith('Error saving question set:', expect.any(Object))
     })
   })
@@ -511,6 +514,44 @@ describe('PackingAppDatabase', () => {
   })
 
   describe('Stale Revision Handling', () => {
+    // Regression test for: 409 conflict when saving question set from the
+    // "On past trips..." suggestion dialogue. The dialogue saves each item
+    // one-at-a-time in sequence; after the first save completes locally the
+    // component state _rev is stale by the time the second save fires, so
+    // saveQuestionSet must always use the freshly-fetched _rev and retry on 409.
+    it('saveQuestionSet succeeds when called with a stale _rev (simulates rapid suggestion saves)', async () => {
+      const qs: PackingListQuestionSet = {
+        _id: '1',
+        people: [{ id: 'p1', name: 'Alice' }],
+        alwaysNeededItems: [],
+        questions: []
+      }
+
+      // Save #1 — initial save; component state will hold rev1.
+      const rev1Result = await db.saveQuestionSet(qs)
+      const rev1 = rev1Result.rev
+
+      // Save #2 — first suggestion accepted, DB now on rev2; component state still rev1.
+      await db.saveQuestionSet({
+        ...qs,
+        _rev: rev1,
+        alwaysNeededItems: [{ text: 'Passport', personSelections: [] }]
+      })
+
+      // Save #3 — second suggestion accepted with stale rev1. Must not throw 409.
+      const staleRevQs: PackingListQuestionSet = {
+        ...qs,
+        _rev: rev1, // stale — PouchDB is already one revision ahead
+        alwaysNeededItems: [{ text: 'Passport', personSelections: [] }, { text: 'Charger', personSelections: [] }]
+      }
+
+      const result = await db.saveQuestionSet(staleRevQs)
+      expect(result.rev).toBeTruthy()
+
+      const saved = await db.getQuestionSet()
+      expect(saved.alwaysNeededItems).toHaveLength(2)
+    })
+
     // Regression test for: 409 conflict when rapidly checking packing list items.
     //
     // Root cause: saveWithSyncPrevention only updates component state (_rev) after
@@ -555,7 +596,7 @@ describe('PackingAppDatabase', () => {
   })
 
   describe('Revision Handling', () => {
-    it('should handle concurrent updates with revision conflicts', async () => {
+    it('should succeed on concurrent updates with stale revision (retries with fresh rev)', async () => {
       const mockQuestionSet: PackingListQuestionSet = {
         _id: '1',
         people: [{ id: 'p1', name: 'Alice' }],
@@ -569,8 +610,10 @@ describe('PackingAppDatabase', () => {
       const update1 = { ...mockQuestionSet, _rev: firstVersion._rev, people: [{ id: 'p1', name: 'Alice Updated' }] }
       await db.saveQuestionSet(update1)
 
+      // Stale rev — saveQuestionSet must retry with fresh rev and succeed.
       const update2 = { ...mockQuestionSet, _rev: firstVersion._rev, people: [{ id: 'p2', name: 'Bob' }] }
-      await expect(db.saveQuestionSet(update2)).rejects.toThrow()
+      const result = await db.saveQuestionSet(update2)
+      expect(result.rev).toBeTruthy()
     })
 
     it('should allow saving without rev for new documents', async () => {
