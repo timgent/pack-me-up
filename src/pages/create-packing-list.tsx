@@ -317,7 +317,7 @@ export function CreatePackingList() {
         }
     }, [questionSet, db])
 
-    usePodSync<PackingListQuestionSet>({
+    const { saveToPod: saveQuestionSetToPod } = usePodSync<PackingListQuestionSet>({
         pathConfig: {
             container: POD_CONTAINERS.ROOT,
             filename: 'packing-list-questions.json',
@@ -401,8 +401,16 @@ export function CreatePackingList() {
                 ),
             }
         }
-        const { rev } = await db.saveQuestionSet(updatedQs)
-        setQuestionSet({ ...updatedQs, _rev: rev })
+        // Stamp a lastModified so manage-questions' fallback-to-pod sync resolution
+        // won't overwrite this save with stale pod data.
+        const updatedQsWithTimestamp = { ...updatedQs, lastModified: new Date().toISOString() }
+        const { rev } = await db.saveQuestionSet(updatedQsWithTimestamp)
+        const savedQs = { ...updatedQsWithTimestamp, _rev: rev }
+        setQuestionSet(savedQs)
+
+        // Push to pod so the updated question set is available on any device and
+        // survives the next pod sync in manage-questions.
+        await saveQuestionSetToPod(savedQs)
 
         await markReviewed(listId, item)
     }

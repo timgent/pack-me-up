@@ -156,6 +156,42 @@ test.describe('F – Solid Pod Sync', () => {
     await expect(page.locator(`input[name="${box1Name}"]`)).toBeChecked({ timeout: 5_000 })
   })
 
+  test('F6: custom item added via suggestion card persists in question set after pod sync', async ({ authedPage: page }) => {
+    await runWizardLoggedIn(page)
+    await createList(page, 'Suggestion Save Trip')
+
+    // Add a custom item (questionId = '' marks it as a suggestion candidate)
+    const customItemName = 'super special sunscreen'
+    await page.getByPlaceholder('Add new item...').first().fill(customItemName)
+    await page.getByRole('button', { name: 'Add' }).first().click()
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 5_000 })
+
+    // Trigger the suggestion card by navigating to create-packing-list
+    await page.goto('/#/create-packing-list')
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText(/On past trips you added items/)).toBeVisible({ timeout: 8_000 })
+
+    // Expand and accept the suggestion (default destination: Always Needed Items)
+    await page.getByRole('button', { name: /Review suggestions/i }).click()
+    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+    await page.getByRole('button', { name: 'Add' }).first().click()
+    // Wait for suggestion card to disappear (item marked reviewed, pod save complete)
+    await expect(page.getByText(/On past trips you added items/)).not.toBeVisible({ timeout: 10_000 })
+
+    // Navigate to manage-questions and verify the item survives pod sync
+    await page.goto('/#/manage-questions')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
+    await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
+
+    // Wait a full pod-poll cycle (5 s) + buffer so the sync fires.
+    // Without the fix the pod would overwrite the local change and the item disappears.
+    await page.waitForTimeout(7_000)
+
+    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+  })
+
   test('F4: item check state visible from second context after Pod sync', async ({ authedPage: page, browser }) => {
     await runWizardLoggedIn(page)
     await createList(page, 'Check Sync Test')
