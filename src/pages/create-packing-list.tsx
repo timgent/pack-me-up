@@ -419,6 +419,18 @@ export function CreatePackingList() {
         await markReviewed(listId, item)
     }
 
+    const pushListToPod = async (list: PackingList) => {
+        if (!isLoggedIn || !session) return
+        const podUrl = await getPrimaryPodUrl(session)
+        if (!podUrl) return
+        await saveFileToPod({
+            session,
+            containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
+            filename: `${list.id}.json`,
+            data: list,
+        })
+    }
+
     const markReviewed = async (listId: string, item: PackingListItem) => {
         const list = allPackingLists.find(l => l.id === listId)
         if (!list) return
@@ -427,7 +439,9 @@ export function CreatePackingList() {
             items: list.items.map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
         const { rev } = await db.savePackingList(updatedList)
-        setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+        const savedList = { ...updatedList, _rev: rev }
+        setAllPackingLists(prev => prev.map(l => l.id === listId ? savedList : l))
+        await pushListToPod(savedList)
     }
 
     const markDeletedReviewed = async (listId: string, item: PackingListItem) => {
@@ -438,7 +452,9 @@ export function CreatePackingList() {
             deletedItems: (list.deletedItems ?? []).map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
         const { rev } = await db.savePackingList(updatedList)
-        setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+        const savedList = { ...updatedList, _rev: rev }
+        setAllPackingLists(prev => prev.map(l => l.id === listId ? savedList : l))
+        await pushListToPod(savedList)
     }
 
     const handleRemovePermanently = async (listId: string, item: PackingListItem) => {

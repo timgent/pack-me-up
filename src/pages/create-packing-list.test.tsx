@@ -907,6 +907,140 @@ describe('CreatePackingList – deletion suggestion card', () => {
     })
 })
 
+// ─── CreatePackingList – skip/keep syncs reviewed flag to pod ────────────────
+
+describe('CreatePackingList – skip syncs reviewed flag to pod', () => {
+    const loggedInSession = { fetch: vi.fn() } as ReturnType<typeof useSolidPod>['session']
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            session: loggedInSession,
+            isLoggedIn: true,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
+        mockSaveFileToPod.mockResolvedValue(undefined)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('pushes the packing list with reviewed:true to the pod after Skip when logged in', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+        fireEvent.click(screen.getByRole('button', { name: /skip/i }))
+
+        await waitFor(() => expect(mockSaveFileToPod).toHaveBeenCalledWith(
+            expect.objectContaining({
+                containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
+                filename: `${pastList.id}.json`,
+                data: expect.objectContaining({
+                    items: expect.arrayContaining([
+                        expect.objectContaining({ id: 'custom-1', reviewed: true }),
+                    ]),
+                }),
+            })
+        ))
+    })
+
+    it('does not push to pod after Skip when not logged in', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+        fireEvent.click(screen.getByRole('button', { name: /skip/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+    })
+})
+
+describe('CreatePackingList – keep/remove-permanently syncs reviewed flag to pod', () => {
+    const loggedInSession = { fetch: vi.fn() } as ReturnType<typeof useSolidPod>['session']
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            session: loggedInSession,
+            isLoggedIn: true,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
+        mockSaveFileToPod.mockResolvedValue(undefined)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('pushes the packing list with reviewed:true to the pod after Keep when logged in', async () => {
+        const db = makeDeletionDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+        fireEvent.click(screen.getByRole('button', { name: /keep/i }))
+
+        await waitFor(() => expect(mockSaveFileToPod).toHaveBeenCalledWith(
+            expect.objectContaining({
+                containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
+                filename: `${listWithDeletedItem.id}.json`,
+                data: expect.objectContaining({
+                    deletedItems: expect.arrayContaining([
+                        expect.objectContaining({ id: 'deleted-item-1', reviewed: true }),
+                    ]),
+                }),
+            })
+        ))
+    })
+
+    it('does not push to pod after Keep when not logged in', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        const db = makeDeletionDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/previously removed/i))
+        fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
+        fireEvent.click(screen.getByRole('button', { name: /keep/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+    })
+})
+
 // ─── CreatePackingList – question set pod sync on mount ───────────────────────
 
 describe('CreatePackingList – question set pod sync on mount', () => {
