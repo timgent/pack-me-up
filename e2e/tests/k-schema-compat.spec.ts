@@ -27,8 +27,13 @@ test.describe('K – JSON Schema Compatibility', () => {
     await page.goto('/')
     await loginToCss(page, CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)
     // Wait for the login sync to fully complete so local DB is populated before tests run.
+    // Waiting only for the loading indicator to hide is insufficient — if loginSyncInProgress
+    // becomes true after the first render, the indicator may never appear and the selector
+    // resolves immediately while syncAllDataFromPod is still in flight.  Waiting for the
+    // seeded list to appear guarantees syncAllDataFromPod has finished writing to local DB.
     await page.goto('/#/view-lists')
     await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
+    await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 60_000 })
   })
 
   test.afterAll(async () => {
