@@ -4,7 +4,7 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { ItemPeopleSection } from './item-people-section'
 
 interface OptionSectionProps {
@@ -19,6 +19,7 @@ interface OptionSectionProps {
 }
 
 export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
+    const [isExpanded, setIsExpanded] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -45,7 +46,22 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-start gap-2 sm:gap-4 mb-4">
+            <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors duration-200 mt-7"
+                    title={isExpanded ? 'Collapse' : 'Expand'}
+                >
+                    <svg
+                        className={`w-5 h-5 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
                 <div className="flex-1">
                     <Input
                         label={`Option ${optionIndex + 1}`}
@@ -60,7 +76,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 />
             </div>
 
-            <div className="ml-0 sm:ml-4 space-y-3">
+            {isExpanded && <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
@@ -108,7 +124,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 >
                     Add Item
                 </Button>
-            </div>
+            </div>}
         </div>
     );
 } 
