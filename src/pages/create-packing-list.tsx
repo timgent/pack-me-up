@@ -250,14 +250,14 @@ function DeletionSuggestionCard({ suggestions, onRemovePermanently, onKeep, onDi
                             <p className="text-sm text-red-700 font-semibold mb-2">From: {listName}</p>
                             <div className="space-y-2">
                                 {items.map(({ listId, item }) => (
-                                    <div key={item.id} className="flex items-start justify-between gap-2 bg-white rounded border border-red-200 px-3 py-2">
-                                        <div className="flex flex-col">
+                                    <div key={item.id} className="flex flex-col gap-2 bg-white rounded border border-red-200 px-3 py-2">
+                                        <div>
                                             <span className="font-medium text-gray-900">{item.itemText}</span>
                                             {item.personName && (
-                                                <span className="text-sm text-gray-500">for {item.personName}</span>
+                                                <span className="ml-2 text-sm text-gray-500">for {item.personName}</span>
                                             )}
                                         </div>
-                                        <div className="flex gap-2 flex-shrink-0">
+                                        <div className="flex gap-2">
                                             <Button
                                                 type="button"
                                                 variant="primary"
