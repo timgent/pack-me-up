@@ -83,7 +83,9 @@ test.describe('F – Solid Pod Sync', () => {
     const { ctx: context2, pg: page2 } = await freshLogin(browser)
     await page2.goto('/#/view-lists')
     await page2.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
-    await expect(page2.getByText('Sync Test List')).toBeVisible({ timeout: 8_000 })
+    // Use first() and a long timeout: the loading indicator may disappear before
+    // syncAllDataFromPod finishes, and retries can create duplicate list names.
+    await expect(page2.getByText('Sync Test List').first()).toBeVisible({ timeout: 60_000 })
     await context2.close()
   })
 
@@ -203,8 +205,11 @@ test.describe('F – Solid Pod Sync', () => {
     const { ctx: context2, pg: page2 } = await freshLogin(browser)
     await page2.goto('/#/view-lists')
     await page2.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
+    // Wait for the list explicitly — the loading indicator may disappear before
+    // syncAllDataFromPod finishes, and retries can leave duplicate list names.
+    await expect(page2.getByText('Check Sync Test').first()).toBeVisible({ timeout: 60_000 })
     // Navigate to the specific list
-    await page2.getByText('Check Sync Test').click()
+    await page2.getByText('Check Sync Test').first().click()
     await page2.waitForURL(/#\/view-lists\//, { timeout: 5_000 })
     await page2.waitForLoadState('networkidle')
     // Show packed items and verify the item is checked

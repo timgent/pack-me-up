@@ -28,7 +28,10 @@ test.describe('G – Cross-context Pod Sync', () => {
   }
 
   async function createList(page: import('@playwright/test').Page, name: string) {
-    await page.waitForLoadState('networkidle')
+    // Wait only for the form input (local DB read completes quickly) rather than
+    // networkidle — pod sync requests can take a very long time on a busy CSS server
+    // after the preceding F-suite tests, causing the full suite to exceed 90 s.
+    await page.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 30_000 })
     await page.getByPlaceholder('Enter a name for your packing list').fill(name)
     await page.getByRole('button', { name: 'Create Packing List' }).click()
     await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
@@ -52,7 +55,9 @@ test.describe('G – Cross-context Pod Sync', () => {
     const { ctx: ctxB, pg: pageB } = await freshLogin(browser)
     await pageB.goto('/#/view-lists')
     await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
-    await expect(pageB.getByText('Cross-Context List A')).toBeVisible({ timeout: 8_000 })
+    // Use first() and a long timeout: the loading indicator may disappear before
+    // syncAllDataFromPod finishes, and serial-block retries can create duplicate list names.
+    await expect(pageB.getByText('Cross-Context List A').first()).toBeVisible({ timeout: 60_000 })
     await ctxB.close()
   })
 
@@ -83,7 +88,7 @@ test.describe('G – Cross-context Pod Sync', () => {
     await pageB.goto('/#/view-lists')
     // Wait for the login sync to finish — the loading text disappears when syncAllDataFromPod completes
     await pageB.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
-    await expect(pageB.getByText('Renamed Cross Sync')).toBeVisible({ timeout: 10_000 })
+    await expect(pageB.getByText('Renamed Cross Sync').first()).toBeVisible({ timeout: 60_000 })
     await ctxB.close()
   })
 })
