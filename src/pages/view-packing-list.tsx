@@ -50,11 +50,19 @@ export function ViewPackingList() {
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
     const [editingItemText, setEditingItemText] = useState<string>('')
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+    const [collapsedPersons, setCollapsedPersons] = useState<Set<string>>(new Set())
 
     const toggleCategory = (key: string) =>
         setCollapsedCategories(prev => {
             const next = new Set(prev)
             if (next.has(key)) { next.delete(key) } else { next.add(key) }
+            return next
+        })
+
+    const togglePerson = (personName: string) =>
+        setCollapsedPersons(prev => {
+            const next = new Set(prev)
+            if (next.has(personName)) { next.delete(personName) } else { next.add(personName) }
             return next
         })
 
@@ -474,10 +482,18 @@ export function ViewPackingList() {
                             return (
                             <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                                 <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                                    {personName}'s Items
-                                    <span className="ml-2 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
+                                    <button
+                                        type="button"
+                                        aria-label={`${collapsedPersons.has(personName) ? 'Expand' : 'Collapse'} ${personName}'s list`}
+                                        onClick={() => togglePerson(personName)}
+                                        className="flex items-center gap-2 w-full text-left"
+                                    >
+                                        <span className="text-sm text-gray-400">{collapsedPersons.has(personName) ? '▶' : '▼'}</span>
+                                        <span>{personName}'s Items</span>
+                                        <span className="ml-2 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
+                                    </button>
                                 </h2>
-                                <div>
+                                {!collapsedPersons.has(personName) && <div>
                                     {groupByCategory(items).map(({ category, items: catItems }) => {
                                         const sectionKey = `${personName}::${category}`
                                         const isCollapsed = collapsedCategories.has(sectionKey)
@@ -598,7 +614,7 @@ export function ViewPackingList() {
                                             </button>
                                         </div>
                                     </div>
-                                </div>
+                                </div>}
                             </div>
                         )})}
                     </div>

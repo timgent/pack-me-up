@@ -576,3 +576,67 @@ describe('ViewPackingList inline item editing', () => {
         expect(db.savePackingList).not.toHaveBeenCalled()
     })
 })
+
+describe('ViewPackingList expandable person sections', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...multiCategoryPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDbMultiCategory() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('person sections are expanded by default', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        expect(screen.getByText('Toothbrush')).toBeTruthy()
+        expect(screen.getByText('Nappies')).toBeTruthy()
+    })
+
+    it('clicking person header collapses that person section', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
+        expect(screen.queryByText('Toothbrush')).toBeNull()
+    })
+
+    it('collapsing one person section does not affect another', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
+        expect(screen.getByText('Nappies')).toBeTruthy()
+    })
+
+    it('clicking a collapsed person header expands their section', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
+        fireEvent.click(screen.getByRole('button', { name: /expand alice's list/i }))
+        expect(screen.getByText('Toothbrush')).toBeTruthy()
+    })
+
+    it('add-item input is hidden when person section is collapsed', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        const addInputs = screen.getAllByPlaceholderText('Add new item...')
+        expect(addInputs.length).toBeGreaterThan(0)
+        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
+        const remainingInputs = screen.getAllByPlaceholderText('Add new item...')
+        expect(remainingInputs.length).toBeLessThan(addInputs.length)
+    })
+})
