@@ -12,7 +12,6 @@ vi.mock('./SolidPodContext', () => ({
 
 vi.mock('../services/solidPod', () => ({
   getPrimaryPodUrl: vi.fn(),
-  hasPodData: vi.fn(),
   syncAllDataFromPod: vi.fn(),
 }))
 
@@ -35,13 +34,12 @@ vi.mock('../services/database', () => {
 })
 
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
+import { getPrimaryPodUrl, syncAllDataFromPod } from '../services/solidPod'
 import { detectPodDataFormat, migrateJsonToRdf } from '../services/rdfMigration'
 import { PackingAppDatabase } from '../services/database'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
-const mockHasPodData = vi.mocked(hasPodData)
 const mockSyncAllDataFromPod = vi.mocked(syncAllDataFromPod)
 const mockDetectPodDataFormat = vi.mocked(detectPodDataFormat)
 const mockMigrateJsonToRdf = vi.mocked(migrateJsonToRdf)
@@ -83,9 +81,6 @@ describe('DatabaseContext', () => {
     mockGetInstance.mockReset()
     mockGetInstance.mockImplementation(defaultInstanceFactory)
     mockGetPrimaryPodUrl.mockReset()
-    mockHasPodData.mockReset()
-    // Default: pod has data → no migration prompt
-    mockHasPodData.mockResolvedValue(true)
     mockSyncAllDataFromPod.mockReset()
     mockSyncAllDataFromPod.mockResolvedValue({ questionSetSynced: false, packingListsSynced: 0, packingListsUploaded: 0 })
     mockDetectPodDataFormat.mockReset()
@@ -227,7 +222,7 @@ describe('DatabaseContext', () => {
     })
 
     it('shows migration dialog when pod has no remote data and local has data', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       // local db: isEmpty=false (has data)
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
 
@@ -242,7 +237,7 @@ describe('DatabaseContext', () => {
     })
 
     it('does not show migration dialog when pod already has remote data', async () => {
-      mockHasPodData.mockResolvedValue(true)
+      mockDetectPodDataFormat.mockResolvedValue('rdf')
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
 
       render(
@@ -256,7 +251,7 @@ describe('DatabaseContext', () => {
     })
 
     it('does not show migration dialog when local db is empty', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       // local db: isEmpty=true
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: true }))
 
@@ -272,7 +267,7 @@ describe('DatabaseContext', () => {
 
     it('does not show migration dialog when localStorage dismissed key is set', async () => {
       localStorage.setItem('pod-migration-dismissed-example.com', 'true')
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
 
       render(
@@ -286,7 +281,7 @@ describe('DatabaseContext', () => {
     })
 
     it('copies data to pod and renders children when user clicks "Use my local data"', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       const copyAllDataFrom = vi.fn().mockResolvedValue(undefined)
       mockGetInstance.mockImplementation((ns: string) =>
         makeDb(ns, { isEmpty: false, copyAllDataFrom })
@@ -305,7 +300,7 @@ describe('DatabaseContext', () => {
     })
 
     it('skips migration and renders children when user clicks "Start fresh"', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       const copyAllDataFrom = vi.fn()
       mockGetInstance.mockImplementation((ns: string) =>
         makeDb(ns, { isEmpty: false, copyAllDataFrom })
@@ -324,7 +319,7 @@ describe('DatabaseContext', () => {
     })
 
     it('sets localStorage dismissed key when user clicks "Start fresh"', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
 
       render(
@@ -390,7 +385,7 @@ describe('DatabaseContext', () => {
     })
 
     it('does not call syncAllDataFromPod when migration prompt is shown', async () => {
-      mockHasPodData.mockResolvedValue(false)
+      mockDetectPodDataFormat.mockResolvedValue('empty')
       mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: false }))
 
       render(
@@ -479,6 +474,9 @@ describe('DatabaseContext', () => {
 
     it('does not call migrateJsonToRdf when format is empty', async () => {
       mockDetectPodDataFormat.mockResolvedValue('empty')
+      // Local db must be empty so the migration-prompt path is skipped and the
+      // background IIFE runs (where we verify migrateJsonToRdf is not called).
+      mockGetInstance.mockImplementation((ns: string) => makeDb(ns, { isEmpty: true }))
 
       render(
         <DatabaseProvider>

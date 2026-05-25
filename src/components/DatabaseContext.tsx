@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useState, useEffect, useRef, Fragment } from 'react'
 import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
-import { getPrimaryPodUrl, hasPodData, syncAllDataFromPod } from '../services/solidPod'
+import { getPrimaryPodUrl, syncAllDataFromPod } from '../services/solidPod'
 import { detectPodDataFormat, migrateJsonToRdf } from '../services/rdfMigration'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
@@ -87,11 +87,18 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             const dismissedKey = `pod-migration-dismissed-${resolvedNamespace}`
             const dismissed = localStorage.getItem(dismissedKey) === 'true'
 
+            // Detect format once so hasPodData and detectPodDataFormat don't
+            // make two separate batches of authenticated requests, which causes
+            // a DPoP nonce race on CSS and results in TypeError: Failed to fetch.
+            let cachedFormat: 'rdf' | 'json' | 'empty' | null = null
+
             if (!dismissed && podUrl && session) {
-                const [podHasRemoteData, localEmpty] = await Promise.all([
-                    hasPodData(session, podUrl),
+                const [format, localEmpty] = await Promise.all([
+                    detectPodDataFormat(session, podUrl),
                     local.isEmpty()
                 ])
+                cachedFormat = format
+                const podHasRemoteData = format !== 'empty'
                 if (!podHasRemoteData && !localEmpty) {
                     if (cancelled) return
                     setLocalDb(local)
@@ -108,7 +115,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setDb(podDb)
             setIsResolvingPod(false)
 
-            // Background: detect format, migrate if needed, then sync.
+            // Background: migrate if needed, then sync.
             // Only run once per namespace (login event), not on every session refresh.
             // Fire-and-forget – failures must not block the app.
             if (podUrl && session) {
@@ -116,7 +123,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
                 setLoginSyncInProgress(true)
                 ;(async () => {
                     try {
-                        const format = await detectPodDataFormat(session, podUrl)
+                        const format = cachedFormat ?? await detectPodDataFormat(session, podUrl)
                         if (format === 'json') {
                             await migrateJsonToRdf(session, podUrl)
                         }
