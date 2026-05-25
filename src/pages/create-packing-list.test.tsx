@@ -924,7 +924,7 @@ describe('CreatePackingList – skip syncs reviewed flag to pod', () => {
         })
         mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
         mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
-        mockSaveFileToPod.mockResolvedValue(undefined)
+        mockSaveRdfToPod.mockResolvedValue(undefined)
     })
 
     afterEach(() => {
@@ -940,10 +940,9 @@ describe('CreatePackingList – skip syncs reviewed flag to pod', () => {
         fireEvent.click(screen.getByRole('button', { name: /review/i }))
         fireEvent.click(screen.getByRole('button', { name: /skip/i }))
 
-        await waitFor(() => expect(mockSaveFileToPod).toHaveBeenCalledWith(
+        await waitFor(() => expect(mockSaveRdfToPod).toHaveBeenCalledWith(
             expect.objectContaining({
-                containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
-                filename: `${pastList.id}.json`,
+                fileUrl: `https://timgent.solidcommunity.net/pack-me-up/packing-lists/${pastList.id}.ttl`,
                 data: expect.objectContaining({
                     items: expect.arrayContaining([
                         expect.objectContaining({ id: 'custom-1', reviewed: true }),
@@ -971,7 +970,7 @@ describe('CreatePackingList – skip syncs reviewed flag to pod', () => {
         fireEvent.click(screen.getByRole('button', { name: /skip/i }))
 
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+        expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
 })
 
@@ -990,7 +989,7 @@ describe('CreatePackingList – keep/remove-permanently syncs reviewed flag to p
         })
         mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
         mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net/')
-        mockSaveFileToPod.mockResolvedValue(undefined)
+        mockSaveRdfToPod.mockResolvedValue(undefined)
     })
 
     afterEach(() => {
@@ -1006,10 +1005,9 @@ describe('CreatePackingList – keep/remove-permanently syncs reviewed flag to p
         fireEvent.click(screen.getByRole('button', { name: /review removals/i }))
         fireEvent.click(screen.getByRole('button', { name: /keep/i }))
 
-        await waitFor(() => expect(mockSaveFileToPod).toHaveBeenCalledWith(
+        await waitFor(() => expect(mockSaveRdfToPod).toHaveBeenCalledWith(
             expect.objectContaining({
-                containerPath: 'https://timgent.solidcommunity.net/pack-me-up/packing-lists/',
-                filename: `${listWithDeletedItem.id}.json`,
+                fileUrl: `https://timgent.solidcommunity.net/pack-me-up/packing-lists/${listWithDeletedItem.id}.ttl`,
                 data: expect.objectContaining({
                     deletedItems: expect.arrayContaining([
                         expect.objectContaining({ id: 'deleted-item-1', reviewed: true }),
@@ -1037,7 +1035,7 @@ describe('CreatePackingList – keep/remove-permanently syncs reviewed flag to p
         fireEvent.click(screen.getByRole('button', { name: /keep/i }))
 
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
-        expect(mockSaveFileToPod).not.toHaveBeenCalled()
+        expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
 })
 

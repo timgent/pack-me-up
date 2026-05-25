@@ -427,11 +427,11 @@ export function CreatePackingList() {
         if (!isLoggedIn || !session) return
         const podUrl = await getPrimaryPodUrl(session)
         if (!podUrl) return
-        await saveFileToPod({
+        await saveRdfToPod({
             session,
-            containerPath: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`,
-            filename: `${list.id}.json`,
+            fileUrl: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
             data: list,
+            serializer: packingListToDataset,
         })
     }
 
