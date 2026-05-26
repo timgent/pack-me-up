@@ -51,8 +51,8 @@ test.describe('L – Sharing a packing list', () => {
     })
 
     test('L1: User A shares a list; shareable link contains expected params', async () => {
-        // Share button visible immediately for own list (pod URL derived from webId synchronously)
-        await expect(pageA.getByRole('button', { name: 'Share' })).toBeVisible({ timeout: 5_000 })
+        // Share button renders immediately, enabled once pod URL resolves (~1 network round-trip)
+        await expect(pageA.getByRole('button', { name: 'Share' })).toBeEnabled({ timeout: 10_000 })
 
         // Open share modal
         await pageA.getByRole('button', { name: 'Share' }).click()
