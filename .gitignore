@@ -24,6 +24,12 @@ playwright-report/
 test-results/
 .e2e-css-pid
 
+# Capacitor Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -15,9 +15,15 @@
     "test:e2e:ui": "npm run build && playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "prepare": "husky"
+    "prepare": "husky",
+    "build:mobile": "tsc -b && vite build && npx cap copy",
+    "cap:sync": "tsc -b && vite build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.2",
     "@inrupt/solid-client": "^2.1.2",
