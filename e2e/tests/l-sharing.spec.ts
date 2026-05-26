@@ -40,7 +40,7 @@ test.describe('L – Sharing a packing list', () => {
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
         await expect(pageA.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
-        // Uncheck to leave items in clean state
+        // Uncheck to leave items in clean state for the collaboration test
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
         await expect(pageA.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
@@ -50,24 +50,22 @@ test.describe('L – Sharing a packing list', () => {
         await ctxA.close()
     })
 
-    test('L1: User A shares a list and the shareable link contains the expected params', async () => {
-        // Share button should be visible for own list
-        await expect(pageA.getByRole('button', { name: /^share$/i })).toBeVisible({ timeout: 5_000 })
+    test('L1: User A shares a list; shareable link contains expected params', async () => {
+        // Share button visible for own list (only shown when ownPodUrl is resolved)
+        await expect(pageA.getByRole('button', { name: 'Share' })).toBeVisible({ timeout: 10_000 })
 
         // Open share modal
-        await pageA.getByRole('button', { name: /^share$/i }).click()
+        await pageA.getByRole('button', { name: 'Share' }).click()
         await expect(pageA.getByText('Share packing list')).toBeVisible({ timeout: 5_000 })
 
-        // Enter User B's pod URL
+        // Enter User B's pod URL then submit via the dialog's Share button (not the toolbar one)
         const collabPodUrl = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/`
         await pageA.getByPlaceholder(/pod url/i).fill(collabPodUrl)
-        await pageA.getByRole('button', { name: /^share$/i }).click()
+        await pageA.getByRole('dialog').getByRole('button', { name: 'Share' }).click()
 
-        // Wait for the link to appear
+        // Wait for the generated link (ACL request may take a moment)
         await expect(pageA.getByRole('textbox', { name: /shareable link/i })).toBeVisible({ timeout: 15_000 })
-
-        const linkInput = pageA.getByRole('textbox', { name: /shareable link/i })
-        shareLink = await linkInput.inputValue()
+        shareLink = await pageA.getByRole('textbox', { name: /shareable link/i }).inputValue()
 
         expect(shareLink).toContain('/view-lists/')
         expect(shareLink).toContain('pod=')
@@ -76,12 +74,11 @@ test.describe('L – Sharing a packing list', () => {
         // Close modal
         await pageA.keyboard.press('Escape')
 
-        // "Shared list" badge should NOT be on User A's own view
-        expect(await pageA.getByText('Shared list').count()).toBe(0)
+        // "Shared list" badge must NOT appear on User A's own view
+        await expect(pageA.getByText('Shared list')).not.toBeVisible()
     })
 
-    test('L2: User B opens the shared link and sees the "Shared list" badge', async ({ browser }) => {
-        // User B: log in as collab user and navigate to the shared link
+    test('L2: User B opens the shared link; sees "Shared list" badge and list contents', async ({ browser }) => {
         const ctxB = await browser.newContext()
         const pageB = await ctxB.newPage()
 
@@ -89,18 +86,17 @@ test.describe('L – Sharing a packing list', () => {
             await pageB.goto('/')
             await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
 
-            // Strip the origin from the shareLink to get the hash path
-            const hashPart = shareLink.replace(/^https?:\/\/[^#]+/, '')
-            await pageB.goto(hashPart)
+            // Navigate directly to the full shareable URL
+            await pageB.goto(shareLink)
 
             // "Shared list" badge must be visible
             await expect(pageB.getByText('Shared list')).toBeVisible({ timeout: 30_000 })
 
-            // List name should match what User A created
+            // List name must match what User A created
             await expect(pageB.getByText(listName)).toBeVisible({ timeout: 15_000 })
 
             // Share button must NOT be visible on a shared list
-            expect(await pageB.getByRole('button', { name: /^share$/i }).count()).toBe(0)
+            await expect(pageB.getByRole('button', { name: 'Share' })).not.toBeVisible()
         } finally {
             await ctxB.close()
         }
@@ -114,10 +110,8 @@ test.describe('L – Sharing a packing list', () => {
             await pageB.goto('/')
             await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
 
-            const hashPart = shareLink.replace(/^https?:\/\/[^#]+/, '')
-            await pageB.goto(hashPart)
-
-            // Wait for list to load on shared view
+            // Navigate to the shared list
+            await pageB.goto(shareLink)
             await expect(pageB.getByText('Shared list')).toBeVisible({ timeout: 30_000 })
 
             // User B checks the first item
@@ -125,12 +119,12 @@ test.describe('L – Sharing a packing list', () => {
             await firstCheckbox.waitFor({ timeout: 10_000 })
             await firstCheckbox.click()
 
-            // Wait for save indicator to complete on User B's side
+            // Wait for User B's save to reach the pod (green "Saved" indicator cycle)
             await expect(pageB.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
             await expect(pageB.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
 
-            // User A's page should reflect the checked item within 10s (one poll cycle)
-            await expect(pageA.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 10_000 })
+            // User A polls every 5s — checked state should propagate within 12s
+            await expect(pageA.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 12_000 })
         } finally {
             await ctxB.close()
         }

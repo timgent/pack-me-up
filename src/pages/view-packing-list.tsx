@@ -671,7 +671,7 @@ export function ViewPackingList() {
                 isOpen={shareModalOpen}
                 onClose={() => setShareModalOpen(false)}
                 session={session}
-                fileUrl={`${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`}
+                fileUrl={`${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`}
                 listId={id}
                 sharerPodUrl={ownPodUrl}
             />
