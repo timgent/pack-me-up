@@ -33,6 +33,7 @@ import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 vi.mock('../services/solidPod', () => ({
     POD_CONTAINERS: { PACKING_LISTS: 'pack-me-up/packing-lists/' },
     getPrimaryPodUrl: vi.fn().mockResolvedValue('https://own.solidcommunity.net/'),
+    derivePodUrlFromWebId: vi.fn((webId: string) => webId.replace('/profile/card#me', '/')),
     grantCollaboratorAccess: vi.fn(),
     deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/$/, '')}/profile/card#me`),
 }))

@@ -51,8 +51,8 @@ test.describe('L – Sharing a packing list', () => {
     })
 
     test('L1: User A shares a list; shareable link contains expected params', async () => {
-        // Share button visible for own list (only shown when ownPodUrl is resolved)
-        await expect(pageA.getByRole('button', { name: 'Share' })).toBeVisible({ timeout: 10_000 })
+        // Share button visible immediately for own list (pod URL derived from webId synchronously)
+        await expect(pageA.getByRole('button', { name: 'Share' })).toBeVisible({ timeout: 5_000 })
 
         // Open share modal
         await pageA.getByRole('button', { name: 'Share' }).click()
@@ -123,8 +123,11 @@ test.describe('L – Sharing a packing list', () => {
             await expect(pageB.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
             await expect(pageB.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
 
-            // User A polls every 5s — checked state should propagate within 12s
-            await expect(pageA.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 12_000 })
+            // Confirm no pod-write error was surfaced (error toast = ACL or network failure)
+            await expect(pageB.getByText(/Failed to save to Pod/i)).not.toBeVisible()
+
+            // User A polls every 5s — give 3 full cycles (15s) for propagation
+            await expect(pageA.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 20_000 })
         } finally {
             await ctxB.close()
         }

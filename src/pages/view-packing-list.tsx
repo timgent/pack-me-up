@@ -10,7 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl } from '../services/solidPod'
+import { POD_CONTAINERS, derivePodUrlFromWebId } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 
@@ -48,7 +48,6 @@ export function ViewPackingList() {
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
-    const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
@@ -74,15 +73,12 @@ export function ViewPackingList() {
 
     const handleCheckAll = (items: PackingListItem[]) =>
         items.forEach(item => setValue(`items.${item.id}`, true))
-    const { isLoggedIn, session } = useSolidPod()
+    const { isLoggedIn, session, webId } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
 
-    useEffect(() => {
-        if (isLoggedIn && session && !foreignPodUrl) {
-            getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
-        }
-    }, [isLoggedIn, session, foreignPodUrl])
+    // Derive pod URL from webId synchronously — no network round-trip needed
+    const ownPodUrl = (!foreignPodUrl && webId) ? derivePodUrlFromWebId(webId) : null
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {

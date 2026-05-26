@@ -108,6 +108,24 @@ export function deriveWebIdFromPodUrl(podUrl: string): string {
     return `${base}/profile/card#me`
 }
 
+export function derivePodUrlFromWebId(webId: string): string | null {
+    try {
+        const url = new URL(webId)
+        url.hash = ''
+        const path = url.pathname
+        if (path.endsWith('/profile/card')) {
+            url.pathname = path.slice(0, -'profile/card'.length)
+            return url.toString()
+        }
+        const firstSegment = path.split('/').find(s => s.length > 0)
+        if (firstSegment) {
+            url.pathname = '/' + firstSegment + '/'
+            return url.toString()
+        }
+    } catch { /* ignore URL parse errors */ }
+    return null
+}
+
 export async function grantCollaboratorAccess(
     session: Session,
     fileUrl: string,
