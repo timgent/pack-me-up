@@ -40,10 +40,14 @@ test.describe('L – Sharing a packing list', () => {
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
         await expect(pageA.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
-        // Uncheck to leave items in clean state for the collaboration test
+        // Uncheck to leave items in clean state for the collaboration test.
+        // Must toggle "Show Packed" first: after checking, the item is hidden (showPacked=false),
+        // so re-evaluating the locator would find a *different* checkbox without the toggle.
+        await pageA.getByRole('button', { name: /show packed/i }).click()
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
         await expect(pageA.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
+        await pageA.getByRole('button', { name: /hide packed/i }).click()
     })
 
     test.afterAll(async () => {
@@ -58,9 +62,9 @@ test.describe('L – Sharing a packing list', () => {
         await pageA.getByRole('button', { name: 'Share' }).click()
         await expect(pageA.getByText('Share packing list')).toBeVisible({ timeout: 5_000 })
 
-        // Enter User B's pod URL then submit via the dialog's Share button (not the toolbar one)
-        const collabPodUrl = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/`
-        await pageA.getByPlaceholder(/pod url/i).fill(collabPodUrl)
+        // Enter User B's WebID then submit via the dialog's Share button (not the toolbar one)
+        const collabWebId = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`
+        await pageA.getByPlaceholder(/profile\/card#me/i).fill(collabWebId)
         await pageA.getByRole('dialog').getByRole('button', { name: 'Share' }).click()
 
         // Wait for the generated link (ACL request may take a moment)
@@ -126,8 +130,10 @@ test.describe('L – Sharing a packing list', () => {
             // Confirm no pod-write error was surfaced (error toast = ACL or network failure)
             await expect(pageB.getByText(/Failed to save to Pod/i)).not.toBeVisible()
 
-            // User A polls every 5s — give 3 full cycles (15s) for propagation
-            await expect(pageA.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 20_000 })
+            // User A polls every 5s — give 3 full cycles (15s) for propagation.
+            // With showPacked=false (default), checked items are removed from the DOM,
+            // so we verify sync via the "N packed items hidden" banner instead.
+            await expect(pageA.getByText(/packed.*hidden/i)).toBeVisible({ timeout: 20_000 })
         } finally {
             await ctxB.close()
         }

@@ -6,13 +6,11 @@ import type { AppSession } from '../types/AppSession'
 
 vi.mock('../services/solidPod', () => ({
     grantCollaboratorAccess: vi.fn(),
-    deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/$/, '')}/profile/card#me`),
 }))
 
-import { grantCollaboratorAccess, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { grantCollaboratorAccess } from '../services/solidPod'
 
 const mockGrantCollaboratorAccess = vi.mocked(grantCollaboratorAccess)
-const mockDeriveWebIdFromPodUrl = vi.mocked(deriveWebIdFromPodUrl)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://alice.solidcommunity.net/profile/card#me' },
@@ -23,7 +21,7 @@ const defaultProps = {
     isOpen: true,
     onClose: vi.fn(),
     session: mockSession,
-    fileUrl: 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json',
+    fileUrl: 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.ttl',
     listId: 'abc',
     sharerPodUrl: 'https://alice.solidcommunity.net/',
 }
@@ -60,9 +58,9 @@ describe('SharePackingListModal', () => {
             expect(screen.queryByText('Share packing list')).toBeNull()
         })
 
-        it('renders a pod URL input', () => {
+        it('renders a WebID input', () => {
             renderModal()
-            expect(screen.getByPlaceholderText(/pod url/i)).toBeTruthy()
+            expect(screen.getByPlaceholderText(/profile\/card#me/i)).toBeTruthy()
         })
 
         it('renders a Share button', () => {
@@ -72,30 +70,36 @@ describe('SharePackingListModal', () => {
     })
 
     describe('granting access', () => {
-        it('does not call grantCollaboratorAccess when pod URL input is empty', async () => {
+        it('does not call grantCollaboratorAccess when WebID input is empty', async () => {
             renderModal()
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
             expect(mockGrantCollaboratorAccess).not.toHaveBeenCalled()
         })
 
-        it('calls deriveWebIdFromPodUrl with the entered pod URL', async () => {
+        it('calls grantCollaboratorAccess with the entered WebID directly', async () => {
             mockGrantCollaboratorAccess.mockResolvedValue(undefined)
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
-            await waitFor(() => expect(mockDeriveWebIdFromPodUrl).toHaveBeenCalledWith('https://bob.solidcommunity.net/'))
+            await waitFor(() =>
+                expect(mockGrantCollaboratorAccess).toHaveBeenCalledWith(
+                    mockSession,
+                    defaultProps.fileUrl,
+                    'https://bob.solidcommunity.net/profile/card#me'
+                )
+            )
         })
 
-        it('calls grantCollaboratorAccess with session, fileUrl, and derived WebID', async () => {
+        it('trims whitespace from the WebID before calling grantCollaboratorAccess', async () => {
             mockGrantCollaboratorAccess.mockResolvedValue(undefined)
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: '  https://bob.solidcommunity.net/profile/card#me  ' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
@@ -112,8 +116,8 @@ describe('SharePackingListModal', () => {
             mockGrantCollaboratorAccess.mockResolvedValue(undefined)
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
@@ -128,8 +132,8 @@ describe('SharePackingListModal', () => {
             mockGrantCollaboratorAccess.mockResolvedValue(undefined)
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
@@ -141,8 +145,8 @@ describe('SharePackingListModal', () => {
             mockGrantCollaboratorAccess.mockReturnValue(new Promise(res => { resolveGrant = res }))
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
@@ -159,8 +163,8 @@ describe('SharePackingListModal', () => {
             mockGrantCollaboratorAccess.mockResolvedValue(undefined)
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
@@ -178,27 +182,27 @@ describe('SharePackingListModal', () => {
             mockGrantCollaboratorAccess.mockRejectedValue(new Error('ACL not supported'))
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
             await waitFor(() => expect(screen.getByText(/ACL not supported/i)).toBeTruthy())
         })
 
-        it('clears error message when pod URL input changes', async () => {
+        it('clears error message when WebID input changes', async () => {
             mockGrantCollaboratorAccess.mockRejectedValue(new Error('ACL not supported'))
             renderModal()
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://bob.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
             })
             fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
 
             await waitFor(() => expect(screen.getByText(/ACL not supported/i)).toBeTruthy())
 
-            fireEvent.change(screen.getByPlaceholderText(/pod url/i), {
-                target: { value: 'https://carol.solidcommunity.net/' },
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://carol.solidcommunity.net/profile/card#me' },
             })
 
             expect(screen.queryByText(/ACL not supported/i)).toBeNull()

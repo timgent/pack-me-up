@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AppSession } from '../types/AppSession'
-import { grantCollaboratorAccess, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { grantCollaboratorAccess } from '../services/solidPod'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { Input } from './Input'
@@ -22,19 +22,18 @@ export function SharePackingListModal({
     listId,
     sharerPodUrl,
 }: SharePackingListModalProps) {
-    const [collaboratorPodUrl, setCollaboratorPodUrl] = useState('')
+    const [collaboratorWebId, setCollaboratorWebId] = useState('')
     const [isGranting, setIsGranting] = useState(false)
     const [generatedLink, setGeneratedLink] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     const handleShare = async () => {
-        if (!collaboratorPodUrl.trim()) return
+        if (!collaboratorWebId.trim()) return
 
         setIsGranting(true)
         setError(null)
         try {
-            const webId = deriveWebIdFromPodUrl(collaboratorPodUrl)
-            await grantCollaboratorAccess(session, fileUrl, webId)
+            await grantCollaboratorAccess(session, fileUrl, collaboratorWebId.trim())
             const link = `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(sharerPodUrl)}`
             setGeneratedLink(link)
         } catch (err) {
@@ -55,11 +54,11 @@ export function SharePackingListModal({
             <div className="space-y-4">
                 <div>
                     <Input
-                        label="Collaborator's pod URL"
-                        placeholder="Pod URL (e.g. https://friend.solidcommunity.net/)"
-                        value={collaboratorPodUrl}
+                        label="Collaborator's WebID"
+                        placeholder="https://friend.solidcommunity.net/profile/card#me"
+                        value={collaboratorWebId}
                         onChange={e => {
-                            setCollaboratorPodUrl(e.target.value)
+                            setCollaboratorWebId(e.target.value)
                             setError(null)
                         }}
                         disabled={isGranting}
@@ -74,7 +73,7 @@ export function SharePackingListModal({
                     type="button"
                     variant="primary"
                     onClick={handleShare}
-                    disabled={isGranting || !collaboratorPodUrl.trim()}
+                    disabled={isGranting || !collaboratorWebId.trim()}
                 >
                     {isGranting ? 'Sharing...' : 'Share'}
                 </Button>

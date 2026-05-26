@@ -215,9 +215,11 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         onSyncSuccessRef.current(data);
       }
     } catch (err: unknown) {
-      // 404 errors are expected when file doesn't exist yet - not a real error
       const statusCode = typeof err === 'object' && err !== null ? (err as { statusCode?: number }).statusCode : undefined
-      if (statusCode !== 404) {
+      // 404 on own pod = file not yet created (expected) → silent
+      // 404 on foreign pod (pathConfig.podUrl set) = file missing or access denied → report
+      const isSilentMiss = statusCode === 404 && !pathConfig.podUrl
+      if (!isSilentMiss) {
         // Authentication errors use their own message
         const errorMessage = err instanceof AuthenticationError
           ? err.message

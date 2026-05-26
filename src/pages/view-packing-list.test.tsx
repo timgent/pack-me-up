@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ViewPackingList } from './view-packing-list'
@@ -13,8 +13,9 @@ vi.mock('../components/SolidPodContext', () => ({
     useSolidPod: vi.fn(),
 }))
 
+const mockShowToast = vi.fn()
 vi.mock('../components/ToastContext', () => ({
-    useToast: vi.fn(() => ({ showToast: vi.fn() })),
+    useToast: vi.fn(() => ({ showToast: mockShowToast })),
 }))
 
 vi.mock('../hooks/usePodSync', () => ({
@@ -34,7 +35,6 @@ vi.mock('../services/solidPod', () => ({
     POD_CONTAINERS: { PACKING_LISTS: 'pack-me-up/packing-lists/' },
     getPrimaryPodUrl: vi.fn().mockResolvedValue('https://own.solidcommunity.net/'),
     grantCollaboratorAccess: vi.fn(),
-    deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/$/, '')}/profile/card#me`),
 }))
 
 vi.mock('../components/SharePackingListModal', () => ({
@@ -757,5 +757,32 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
 
         // Loading text should remain visible since we're waiting for pod poll
         await waitFor(() => expect(screen.getByText(/loading/i)).toBeTruthy())
+    })
+
+    it('stops loading and shows a toast when foreign pod sync fails before data is loaded', async () => {
+        const dbWithNotFound = {
+            ...makeDb(),
+            getPackingList: vi.fn().mockRejectedValue({ name: 'not_found' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: dbWithNotFound as unknown as PackingAppDatabase })
+        mockShowToast.mockClear()
+
+        renderWithForeignPod(FOREIGN_POD_URL)
+
+        // Wait until the component is in the loading state (DB not_found processed)
+        await waitFor(() => expect(screen.getByText(/loading/i)).toBeTruthy())
+
+        // Simulate the pod sync failing (e.g. 403 Forbidden - ACL not set)
+        const onSyncError = mockUsePodSync.mock.calls[mockUsePodSync.mock.calls.length - 1][0].onSyncError as (e: string) => void
+        act(() => onSyncError('403 Forbidden'))
+
+        // Loading spinner should disappear
+        await waitFor(() => expect(screen.queryByText(/loading packing list/i)).toBeNull())
+
+        // Toast should have been shown
+        expect(mockShowToast).toHaveBeenCalledWith(
+            expect.stringContaining('Could not load shared list'),
+            'error'
+        )
     })
 })

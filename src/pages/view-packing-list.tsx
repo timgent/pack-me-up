@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList, PackingListItem } from '../create-packing-list/types'
@@ -49,6 +49,10 @@ export function ViewPackingList() {
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
+    // Tracks whether initial data has been loaded (local DB or pod).
+    // Used to surface a real error to the user instead of hanging on "Loading…"
+    // when a foreign-pod fetch fails.
+    const hasLoadedRef = useRef(false)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
@@ -101,6 +105,7 @@ export function ViewPackingList() {
                 return await db.savePackingList(data);
             },
             updateFormAndState: (data, newRev) => {
+                hasLoadedRef.current = true;
                 setIsLoading(false);
                 setPackingList({
                     ...data,
@@ -114,6 +119,17 @@ export function ViewPackingList() {
             },
             conflictStrategy: 'fallback-to-pod', // Use same strategy as edit questions for consistency
         });
+
+    // When viewing a shared (foreign) pod list and the initial pod fetch fails,
+    // stop the infinite loading spinner and surface the error as a toast.
+    const handleViewSyncError = useCallback((error: string) => {
+        handleSyncError(error)
+        if (foreignPodUrl && !hasLoadedRef.current) {
+            hasLoadedRef.current = true
+            setIsLoading(false)
+            showToast(`Could not load shared list: ${error}`, 'error')
+        }
+    }, [handleSyncError, foreignPodUrl, showToast])
 
     // Callback when save to Pod succeeds
     const handleSaveSuccess = useCallback(() => {
@@ -138,7 +154,7 @@ export function ViewPackingList() {
         pollInterval: 5000, // Poll every 5 seconds for faster sync
         enabled: isLoggedIn, // Only sync when logged in
         onSyncSuccess: handleSyncSuccess,
-        onSyncError: handleSyncError,
+        onSyncError: handleViewSyncError,
         onSaveSuccess: handleSaveSuccess,
         onSaveError: handleSaveError,
     });
@@ -157,6 +173,7 @@ export function ViewPackingList() {
                     initialValues[item.id] = item.packed
                 })
                 reset({ items: initialValues })
+                hasLoadedRef.current = true
                 setIsLoading(false)
             } catch (err) {
                 const isNotFound = typeof err === 'object' && err !== null && (err as { name?: string }).name === 'not_found'

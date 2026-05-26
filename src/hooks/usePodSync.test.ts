@@ -384,6 +384,55 @@ describe('usePodSync', () => {
     })
   })
 
+  describe('404 error handling', () => {
+    it('silently swallows 404 on own pod (file not yet created)', async () => {
+      setupLoggedIn()
+      mockLoadRdfFromPod.mockRejectedValue(Object.assign(new Error('Not Found'), { statusCode: 404 }))
+      const onSyncError = vi.fn()
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: staticPathConfig,  // no podUrl = own pod
+          syncOnMount: true,
+          enabled: true,
+          onSyncError,
+          rdf: rdfOptions,
+        })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(onSyncError).not.toHaveBeenCalled()
+    })
+
+    it('reports 404 on a foreign pod as a real error', async () => {
+      setupLoggedIn()
+      mockLoadRdfFromPod.mockRejectedValue(Object.assign(new Error('Not Found'), { statusCode: 404 }))
+      const onSyncError = vi.fn()
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: {
+            ...staticPathConfig,
+            podUrl: 'https://alice.solidcommunity.net/',  // foreign pod
+          },
+          syncOnMount: true,
+          enabled: true,
+          onSyncError,
+          rdf: rdfOptions,
+        })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(onSyncError).toHaveBeenCalledWith(expect.stringContaining('Not Found'))
+    })
+  })
+
   describe('podUrl override in pathConfig', () => {
     const FOREIGN_POD_URL = 'https://alice.solidcommunity.net/'
 
