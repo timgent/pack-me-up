@@ -383,4 +383,82 @@ describe('usePodSync', () => {
       expect(mockSaveRdfToPod).not.toHaveBeenCalled()
     })
   })
+
+  describe('podUrl override in pathConfig', () => {
+    const FOREIGN_POD_URL = 'https://alice.solidcommunity.net/'
+
+    it('syncFromPod uses pathConfig.podUrl instead of getPrimaryPodUrl when provided', async () => {
+      setupLoggedIn()
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: {
+            container: 'pack-me-up/packing-lists/',
+            filename: (id) => `${id}.json`,
+            resourceId: 'list-abc',
+            podUrl: FOREIGN_POD_URL,
+          },
+          enabled: true,
+        })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
+      expect(mockLoadFileFromPod).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileUrl: `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.json`,
+        })
+      )
+    })
+
+    it('saveToPod uses pathConfig.podUrl instead of getPrimaryPodUrl when provided', async () => {
+      setupLoggedIn()
+      const mockSaveFileToPod = vi.fn().mockResolvedValue(undefined)
+      const { saveFileToPod } = await import('../services/solidPod')
+      vi.mocked(saveFileToPod).mockImplementation(mockSaveFileToPod)
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: {
+            container: 'pack-me-up/packing-lists/',
+            filename: (id) => `${id}.json`,
+            resourceId: 'list-abc',
+            podUrl: FOREIGN_POD_URL,
+          },
+          enabled: true,
+        })
+      )
+
+      await act(async () => {
+        await result.current.saveToPod({ id: 'list-abc', name: 'Test' })
+      })
+
+      expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
+      expect(mockSaveFileToPod).toHaveBeenCalledWith(
+        expect.objectContaining({
+          containerPath: `${FOREIGN_POD_URL}pack-me-up/packing-lists/`,
+        })
+      )
+    })
+
+    it('falls back to getPrimaryPodUrl when pathConfig.podUrl is absent', async () => {
+      setupLoggedIn()
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: staticPathConfig,
+          enabled: true,
+        })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(mockGetPrimaryPodUrl).toHaveBeenCalled()
+    })
+  })
 })

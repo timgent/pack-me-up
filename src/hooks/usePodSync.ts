@@ -23,6 +23,12 @@ export interface PodPathConfig {
    * Optional resource ID (required when filename is a function)
    */
   resourceId?: string | null;
+
+  /**
+   * Override the pod URL — bypasses getPrimaryPodUrl when set.
+   * Use this to sync with a foreign user's pod (e.g. a shared list).
+   */
+  podUrl?: string;
 }
 
 export interface PodSyncOptions<T> {
@@ -144,11 +150,11 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
   // Create a stable key for pathConfig to use in useEffect dependencies
   // This prevents the interval from restarting when pathConfig object reference changes
   const pathConfigKey = useMemo(() => {
-    const { container, filename, resourceId } = pathConfig;
+    const { container, filename, resourceId, podUrl } = pathConfig;
     const filenameKey = typeof filename === 'function' ? 'function' : filename;
-    return `${container}:${filenameKey}:${resourceId || ''}`;
+    return `${container}:${filenameKey}:${resourceId || ''}:${podUrl || ''}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathConfig.container, pathConfig.filename, pathConfig.resourceId]);
+  }, [pathConfig.container, pathConfig.filename, pathConfig.resourceId, pathConfig.podUrl]);
 
   /**
    * Resolve the full file URL from the path configuration
@@ -188,7 +194,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     setError(null);
 
     try {
-      const podUrl = await getPrimaryPodUrl(session);
+      const podUrl = pathConfig.podUrl ?? await getPrimaryPodUrl(session);
 
       if (!podUrl) {
         throw new Error('No pod URL found');
@@ -239,7 +245,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     setError(null);
 
     try {
-      const podUrl = await getPrimaryPodUrl(session);
+      const podUrl = pathConfig.podUrl ?? await getPrimaryPodUrl(session);
 
       if (!podUrl) {
         throw new Error('No pod URL found');

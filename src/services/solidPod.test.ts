@@ -9,6 +9,10 @@ import {
     loadMultipleRdfFromPod,
     saveMultipleRdfToPod,
     POD_CONTAINERS,
+    deriveWebIdFromPodUrl,
+    grantCollaboratorAccess,
+    revokeCollaboratorAccess,
+    getCollaborators,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import type { PackingAppDatabase } from './database'
@@ -20,24 +24,29 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@inrupt/solid-client')>()
     return {
         ...actual,
-        // These are mocked so tests can control pod I/O
         getFile: vi.fn(),
         getSolidDataset: vi.fn(),
         getContainedResourceUrlAll: vi.fn(),
         getPodUrlAll: vi.fn(),
-        saveFileInContainer: vi.fn(),
         overwriteFile: vi.fn(),
         deleteFile: vi.fn(),
         saveSolidDatasetAt: vi.fn(),
+        universalAccess: {
+            ...actual.universalAccess,
+            setAgentAccess: vi.fn(),
+            getAgentAccessAll: vi.fn(),
+        },
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockOverwriteFile = vi.mocked(overwriteFile)
+const mockSetAgentAccess = vi.mocked(universalAccess.setAgentAccess)
+const mockGetAgentAccessAll = vi.mocked(universalAccess.getAgentAccessAll)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
@@ -548,5 +557,204 @@ describe('saveMultipleRdfToPod', () => {
         await saveMultipleRdfToPod(mockSession, LISTS_CONTAINER_URL, [activeList], packingListToDataset)
 
         expect(mockDeleteFile).toHaveBeenCalledWith(orphanUrl, expect.any(Object))
+    })
+})
+
+// ─── deriveWebIdFromPodUrl ───────────────────────────────────────────────────
+
+describe('deriveWebIdFromPodUrl', () => {
+    it('appends /profile/card#me to a pod URL with trailing slash', () => {
+        expect(deriveWebIdFromPodUrl('https://alice.solidcommunity.net/')).toBe(
+            'https://alice.solidcommunity.net/profile/card#me'
+        )
+    })
+
+    it('appends /profile/card#me to a pod URL without trailing slash', () => {
+        expect(deriveWebIdFromPodUrl('https://alice.solidcommunity.net')).toBe(
+            'https://alice.solidcommunity.net/profile/card#me'
+        )
+    })
+
+    it('works for pod URLs with a path segment', () => {
+        expect(deriveWebIdFromPodUrl('http://localhost:4001/alice/')).toBe(
+            'http://localhost:4001/alice/profile/card#me'
+        )
+    })
+})
+
+// ─── grantCollaboratorAccess ─────────────────────────────────────────────────
+
+describe('grantCollaboratorAccess', () => {
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json'
+    const COLLAB_WEB_ID = 'https://bob.solidcommunity.net/profile/card#me'
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('calls setAgentAccess with read, write, and append true', async () => {
+        mockSetAgentAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
+
+        await grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
+
+        expect(mockSetAgentAccess).toHaveBeenCalledWith(
+            FILE_URL,
+            COLLAB_WEB_ID,
+            { read: true, write: true, append: true },
+            { fetch: mockSession.fetch }
+        )
+    })
+
+    it('resolves successfully when setAgentAccess succeeds', async () => {
+        mockSetAgentAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
+    })
+
+    it('throws AuthenticationError on 401', async () => {
+        mockSetAgentAccess.mockRejectedValue({ statusCode: 401 })
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('throws AuthenticationError on 403', async () => {
+        mockSetAgentAccess.mockRejectedValue({ statusCode: 403 })
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('re-throws other errors unchanged', async () => {
+        const err = new Error('Network failure')
+        mockSetAgentAccess.mockRejectedValue(err)
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow('Network failure')
+    })
+
+    it('throws a descriptive error when setAgentAccess returns null', async () => {
+        mockSetAgentAccess.mockResolvedValue(null)
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
+            'grantCollaboratorAccess: server does not support access control for this resource'
+        )
+    })
+})
+
+// ─── revokeCollaboratorAccess ────────────────────────────────────────────────
+
+describe('revokeCollaboratorAccess', () => {
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json'
+    const COLLAB_WEB_ID = 'https://bob.solidcommunity.net/profile/card#me'
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('calls setAgentAccess with all modes false', async () => {
+        mockSetAgentAccess.mockResolvedValue({ read: false, write: false, append: false, controlRead: false, controlWrite: false })
+
+        await revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
+
+        expect(mockSetAgentAccess).toHaveBeenCalledWith(
+            FILE_URL,
+            COLLAB_WEB_ID,
+            { read: false, write: false, append: false, controlRead: false, controlWrite: false },
+            { fetch: mockSession.fetch }
+        )
+    })
+
+    it('throws AuthenticationError on 401', async () => {
+        mockSetAgentAccess.mockRejectedValue({ statusCode: 401 })
+
+        await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('throws AuthenticationError on 403', async () => {
+        mockSetAgentAccess.mockRejectedValue({ statusCode: 403 })
+
+        await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('throws a descriptive error when setAgentAccess returns null', async () => {
+        mockSetAgentAccess.mockResolvedValue(null)
+
+        await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
+            'revokeCollaboratorAccess: server does not support access control for this resource'
+        )
+    })
+})
+
+// ─── getCollaborators ────────────────────────────────────────────────────────
+
+describe('getCollaborators', () => {
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json'
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('returns empty array when getAgentAccessAll returns null', async () => {
+        mockGetAgentAccessAll.mockResolvedValue(null)
+
+        const result = await getCollaborators(mockSession, FILE_URL)
+
+        expect(result).toEqual([])
+    })
+
+    it('returns empty array when getAgentAccessAll returns empty object', async () => {
+        mockGetAgentAccessAll.mockResolvedValue({})
+
+        const result = await getCollaborators(mockSession, FILE_URL)
+
+        expect(result).toEqual([])
+    })
+
+    it('returns WebIDs of agents with read access', async () => {
+        mockGetAgentAccessAll.mockResolvedValue({
+            'https://bob.solidcommunity.net/profile/card#me': { read: true, write: true, append: true, controlRead: false, controlWrite: false },
+        })
+
+        const result = await getCollaborators(mockSession, FILE_URL)
+
+        expect(result).toEqual(['https://bob.solidcommunity.net/profile/card#me'])
+    })
+
+    it('excludes agents without read access', async () => {
+        mockGetAgentAccessAll.mockResolvedValue({
+            'https://bob.solidcommunity.net/profile/card#me': { read: false, write: false, append: false, controlRead: false, controlWrite: false },
+        })
+
+        const result = await getCollaborators(mockSession, FILE_URL)
+
+        expect(result).toEqual([])
+    })
+
+    it('excludes the session owner webId', async () => {
+        mockGetAgentAccessAll.mockResolvedValue({
+            [mockSession.info.webId!]: { read: true, write: true, append: true, controlRead: false, controlWrite: false },
+            'https://bob.solidcommunity.net/profile/card#me': { read: true, write: false, append: false, controlRead: false, controlWrite: false },
+        })
+
+        const result = await getCollaborators(mockSession, FILE_URL)
+
+        expect(result).toEqual(['https://bob.solidcommunity.net/profile/card#me'])
+    })
+
+    it('throws AuthenticationError on 401', async () => {
+        mockGetAgentAccessAll.mockRejectedValue({ statusCode: 401 })
+
+        await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('throws AuthenticationError on 403', async () => {
+        mockGetAgentAccessAll.mockRejectedValue({ statusCode: 403 })
+
+        await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('re-throws other errors unchanged', async () => {
+        const err = new Error('Network failure')
+        mockGetAgentAccessAll.mockRejectedValue(err)
+
+        await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow('Network failure')
     })
 })

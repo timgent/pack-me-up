@@ -10,6 +10,7 @@ import {
   CSS_PORT, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, TEST_POD_NAME,
   AUTH_STATE_FILE, CSS_PID_FILE, APP_URL,
   SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD, SCHEMA_COMPAT_POD_NAME,
+  COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME,
 } from '../playwright.config'
 import v1QuestionSet from './fixtures/v1-question-set.json' with { type: 'json' }
 import v1PackingList from './fixtures/v1-packing-list.json' with { type: 'json' }
@@ -52,6 +53,9 @@ export default async function globalSetup() {
 
   await createCssAccount(CSS_PORT, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD, SCHEMA_COMPAT_POD_NAME)
   console.log(`[setup] Schema-compat account created: ${SCHEMA_COMPAT_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME)
+  console.log(`[setup] Collab account created: ${COLLAB_EMAIL}`)
 
   // 2a. Seed schema-compat pod with v1 JSON fixtures (server-side, no browser needed)
   const accountToken = await loginToExistingCssAccount(CSS_PORT, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)

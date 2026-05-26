@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList, PackingListItem } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
@@ -10,8 +10,9 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
+import { SharePackingListModal } from '../components/SharePackingListModal'
 
 type FormData = {
     items: Record<string, boolean>
@@ -42,8 +43,12 @@ function groupByCategory(items: PackingListItem[]) {
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const foreignPodUrl = searchParams.get('pod') ?? undefined
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [shareModalOpen, setShareModalOpen] = useState(false)
+    const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     const [showPacked, setShowPacked] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
@@ -69,9 +74,15 @@ export function ViewPackingList() {
 
     const handleCheckAll = (items: PackingListItem[]) =>
         items.forEach(item => setValue(`items.${item.id}`, true))
-    const { isLoggedIn } = useSolidPod()
+    const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
+
+    useEffect(() => {
+        if (isLoggedIn && session && !foreignPodUrl) {
+            getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
+        }
+    }, [isLoggedIn, session, foreignPodUrl])
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
@@ -90,6 +101,7 @@ export function ViewPackingList() {
                 return await db.savePackingList(data);
             },
             updateFormAndState: (data, newRev) => {
+                setIsLoading(false);
                 setPackingList({
                     ...data,
                     _rev: newRev
@@ -119,7 +131,8 @@ export function ViewPackingList() {
         pathConfig: {
             container: POD_CONTAINERS.PACKING_LISTS,
             filename: (id) => `${id}.ttl`,
-            resourceId: id || null
+            resourceId: id || null,
+            podUrl: foreignPodUrl,
         },
         rdf: { serialize: packingListToDataset, deserialize: datasetToPackingList },
         pollInterval: 5000, // Poll every 5 seconds for faster sync
@@ -144,15 +157,20 @@ export function ViewPackingList() {
                     initialValues[item.id] = item.packed
                 })
                 reset({ items: initialValues })
-            } catch (err) {
-                console.error('Error fetching packing list:', err)
-            } finally {
                 setIsLoading(false)
+            } catch (err) {
+                const isNotFound = typeof err === 'object' && err !== null && (err as { name?: string }).name === 'not_found'
+                if (isNotFound && foreignPodUrl) {
+                    // Leave isLoading=true — the first pod poll will hydrate via handleSyncSuccess
+                } else {
+                    console.error('Error fetching packing list:', err)
+                    setIsLoading(false)
+                }
             }
         }
 
         fetchPackingList()
-    }, [db, id, setValue])
+    }, [db, id, setValue, foreignPodUrl])
 
     const handleItemChange = useDebouncedCallback(async () => {
         if (!packingList) {
@@ -412,6 +430,11 @@ export function ViewPackingList() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
+                                {foreignPodUrl && (
+                                    <span className="text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-full px-2 py-0.5">
+                                        Shared list
+                                    </span>
+                                )}
                                 <span className="text-sm text-gray-600 font-medium">
                                     {packedCount} / {totalCount} packed ({percentComplete}%)
                                 </span>
@@ -445,6 +468,15 @@ export function ViewPackingList() {
                                 >
                                     {showPacked ? 'Hide Packed' : 'Show Packed'}
                                 </Button>
+                                {isLoggedIn && !foreignPodUrl && ownPodUrl && (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => setShareModalOpen(true)}
+                                    >
+                                        Share
+                                    </Button>
+                                )}
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -634,6 +666,16 @@ export function ViewPackingList() {
             confirmText="Remove"
             confirmVariant="danger"
         />
+        {session && ownPodUrl && id && (
+            <SharePackingListModal
+                isOpen={shareModalOpen}
+                onClose={() => setShareModalOpen(false)}
+                session={session}
+                fileUrl={`${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.json`}
+                listId={id}
+                sharerPodUrl={ownPodUrl}
+            />
+        )}
         </>
     )
 }
