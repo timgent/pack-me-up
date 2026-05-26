@@ -394,10 +394,11 @@ describe('usePodSync', () => {
         usePodSync({
           pathConfig: {
             container: 'pack-me-up/packing-lists/',
-            filename: (id) => `${id}.json`,
+            filename: (id) => `${id}.ttl`,
             resourceId: 'list-abc',
             podUrl: FOREIGN_POD_URL,
           },
+          rdf: rdfOptions,
           enabled: true,
         })
       )
@@ -407,27 +408,25 @@ describe('usePodSync', () => {
       })
 
       expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
-      expect(mockLoadFileFromPod).toHaveBeenCalledWith(
-        expect.objectContaining({
-          fileUrl: `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.json`,
-        })
+      expect(mockLoadRdfFromPod).toHaveBeenCalledWith(
+        mockSession,
+        `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.ttl`,
+        expect.any(Function)
       )
     })
 
     it('saveToPod uses pathConfig.podUrl instead of getPrimaryPodUrl when provided', async () => {
       setupLoggedIn()
-      const mockSaveFileToPod = vi.fn().mockResolvedValue(undefined)
-      const { saveFileToPod } = await import('../services/solidPod')
-      vi.mocked(saveFileToPod).mockImplementation(mockSaveFileToPod)
 
       const { result } = renderHook(() =>
         usePodSync({
           pathConfig: {
             container: 'pack-me-up/packing-lists/',
-            filename: (id) => `${id}.json`,
+            filename: (id) => `${id}.ttl`,
             resourceId: 'list-abc',
             podUrl: FOREIGN_POD_URL,
           },
+          rdf: rdfOptions,
           enabled: true,
         })
       )
@@ -437,9 +436,9 @@ describe('usePodSync', () => {
       })
 
       expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
-      expect(mockSaveFileToPod).toHaveBeenCalledWith(
+      expect(mockSaveRdfToPod).toHaveBeenCalledWith(
         expect.objectContaining({
-          containerPath: `${FOREIGN_POD_URL}pack-me-up/packing-lists/`,
+          fileUrl: `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.ttl`,
         })
       )
     })
