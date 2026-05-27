@@ -1,5 +1,5 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt } from '@inrupt/solid-client'
 import type { SolidDataset, Access, AclDataset } from '@inrupt/solid-client'
 const { getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
@@ -223,12 +223,12 @@ export async function grantFullCollaboratorAccess(
     podUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
-    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-    const questionsFileUrl = `${podUrl}${POD_CONTAINERS.QUESTIONS}`
-    await Promise.all([
-        grantCollaboratorAccess(session, packingListsContainerUrl, collaboratorWebId),
-        grantCollaboratorAccess(session, questionsFileUrl, collaboratorWebId),
-    ])
+    // Grant at pack-me-up/ container level so access works even when sub-resources
+    // (packing-lists/, question-set.ttl) don't yet exist on the pod.
+    // acl:default propagates to all contained resources automatically.
+    const packMeUpUrl = `${podUrl}${POD_CONTAINERS.ROOT}`
+    await ensureContainerExists(session, packMeUpUrl)
+    await grantCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
 }
 
 export async function revokeFullCollaboratorAccess(
@@ -236,20 +236,36 @@ export async function revokeFullCollaboratorAccess(
     podUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
-    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-    const questionsFileUrl = `${podUrl}${POD_CONTAINERS.QUESTIONS}`
-    await Promise.all([
-        revokeCollaboratorAccess(session, packingListsContainerUrl, collaboratorWebId),
-        revokeCollaboratorAccess(session, questionsFileUrl, collaboratorWebId),
-    ])
+    const packMeUpUrl = `${podUrl}${POD_CONTAINERS.ROOT}`
+    await revokeCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
 }
 
 export async function getFullCollaborators(
     session: Session,
     podUrl: string
 ): Promise<string[]> {
-    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
-    return getCollaborators(session, packingListsContainerUrl)
+    const packMeUpUrl = `${podUrl}${POD_CONTAINERS.ROOT}`
+    try {
+        return await getCollaborators(session, packMeUpUrl)
+    } catch (err) {
+        // Container doesn't exist yet → no collaborators have been granted access
+        if (getStatusCode(err) === 404) return []
+        throw err
+    }
+}
+
+async function ensureContainerExists(session: Session, containerUrl: string): Promise<void> {
+    try {
+        await getSolidDataset(containerUrl, { fetch: session.fetch })
+    } catch (err) {
+        if (getStatusCode(err) !== 404) throw err
+        try {
+            await createContainerAt(containerUrl, { fetch: session.fetch })
+        } catch (createErr) {
+            // 409 Conflict = container was created concurrently; ignore
+            if (getStatusCode(createErr) !== 409) throw createErr
+        }
+    }
 }
 
 export async function verifyForeignPodAccess(
