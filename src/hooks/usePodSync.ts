@@ -185,7 +185,8 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
    * Load data from the Pod
    */
   const syncFromPod = useCallback(async () => {
-    if (!enabled || !isLoggedIn || isSyncingRef.current) {
+    const isForeignPod = !!pathConfig.podUrl
+    if (!enabled || (!isLoggedIn && !isForeignPod) || isSyncingRef.current) {
       return;
     }
 
@@ -207,7 +208,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         return;
       }
 
-      const data = await loadRdfFromPod<T>(session!, fileUrl, rdf.deserialize);
+      const data = await loadRdfFromPod<T>(session ?? null, fileUrl, rdf.deserialize);
 
       setLastSync(new Date());
 
@@ -298,7 +299,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
    * Existing callers that pass pollInterval retain their original behaviour.
    */
   useEffect(() => {
-    if (!enabled || !isLoggedIn) {
+    if (!enabled || (!isLoggedIn && !pathConfig.podUrl)) {
       return;
     }
 

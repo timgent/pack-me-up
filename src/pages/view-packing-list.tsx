@@ -152,7 +152,7 @@ export function ViewPackingList() {
         },
         rdf: { serialize: packingListToDataset, deserialize: datasetToPackingList },
         pollInterval: 5000, // Poll every 5 seconds for faster sync
-        enabled: isLoggedIn, // Only sync when logged in
+        enabled: isLoggedIn || !!foreignPodUrl, // Allow reading public shared lists without login
         onSyncSuccess: handleSyncSuccess,
         onSyncError: handleViewSyncError,
         onSaveSuccess: handleSaveSuccess,

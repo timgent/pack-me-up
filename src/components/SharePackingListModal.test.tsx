@@ -6,11 +6,13 @@ import type { AppSession } from '../types/AppSession'
 
 vi.mock('../services/solidPod', () => ({
     grantCollaboratorAccess: vi.fn(),
+    grantPublicAccess: vi.fn(),
 }))
 
-import { grantCollaboratorAccess } from '../services/solidPod'
+import { grantCollaboratorAccess, grantPublicAccess } from '../services/solidPod'
 
 const mockGrantCollaboratorAccess = vi.mocked(grantCollaboratorAccess)
+const mockGrantPublicAccess = vi.mocked(grantPublicAccess)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://alice.solidcommunity.net/profile/card#me' },
@@ -207,5 +209,84 @@ describe('SharePackingListModal', () => {
 
             expect(screen.queryByText(/ACL not supported/i)).toBeNull()
         })
+    })
+})
+
+describe('SharePackingListModal — anyone with the link mode', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        Object.defineProperty(navigator, 'clipboard', {
+            value: { writeText: vi.fn().mockResolvedValue(undefined) },
+            writable: true,
+        })
+        Object.defineProperty(window, 'location', {
+            value: { origin: 'https://pack-me-up.app', hash: '' },
+            writable: true,
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('renders a tab or button to switch to "anyone with the link" mode', () => {
+        renderModal()
+        expect(screen.getByRole('button', { name: /anyone with the link/i })).toBeTruthy()
+    })
+
+    it('switching to "anyone with the link" mode hides the WebID input', async () => {
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        expect(screen.queryByPlaceholderText(/profile\/card#me/i)).toBeNull()
+    })
+
+    it('shows a "Share publicly" button in "anyone with the link" mode', async () => {
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        expect(screen.getByRole('button', { name: /share publicly/i })).toBeTruthy()
+    })
+
+    it('calls grantPublicAccess (not grantCollaboratorAccess) when "Share publicly" is clicked', async () => {
+        mockGrantPublicAccess.mockResolvedValue(undefined)
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        fireEvent.click(screen.getByRole('button', { name: /share publicly/i }))
+
+        await waitFor(() => expect(mockGrantPublicAccess).toHaveBeenCalledWith(mockSession, defaultProps.fileUrl))
+        expect(mockGrantCollaboratorAccess).not.toHaveBeenCalled()
+    })
+
+    it('shows the generated link after granting public access', async () => {
+        mockGrantPublicAccess.mockResolvedValue(undefined)
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        fireEvent.click(screen.getByRole('button', { name: /share publicly/i }))
+
+        await waitFor(() => expect(screen.getByRole('textbox', { name: /shareable link/i })).toBeTruthy())
+        const linkInput = screen.getByRole('textbox', { name: /shareable link/i }) as HTMLInputElement
+        expect(linkInput.value).toContain('/view-lists/abc')
+        expect(linkInput.value).toContain('pod=')
+    })
+
+    it('shows an error when grantPublicAccess throws', async () => {
+        mockGrantPublicAccess.mockRejectedValue(new Error('ACL not supported'))
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        fireEvent.click(screen.getByRole('button', { name: /share publicly/i }))
+
+        await waitFor(() => expect(screen.getByText(/ACL not supported/i)).toBeTruthy())
+    })
+
+    it('"Copy link" copies the link to clipboard in public mode', async () => {
+        mockGrantPublicAccess.mockResolvedValue(undefined)
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+        fireEvent.click(screen.getByRole('button', { name: /share publicly/i }))
+
+        await waitFor(() => expect(screen.getByRole('button', { name: /copy link/i })).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /copy link/i }))
+
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('/view-lists/abc'))
     })
 })

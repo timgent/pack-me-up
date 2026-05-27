@@ -11,6 +11,7 @@ import {
     POD_CONTAINERS,
     deriveWebIdFromPodUrl,
     grantCollaboratorAccess,
+    grantPublicAccess,
     revokeCollaboratorAccess,
     getCollaborators,
 } from './solidPod'
@@ -35,6 +36,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
             ...actual.universalAccess,
             setAgentAccess: vi.fn(),
             getAgentAccessAll: vi.fn(),
+            setPublicAccess: vi.fn(),
         },
     }
 })
@@ -47,6 +49,7 @@ const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockOverwriteFile = vi.mocked(overwriteFile)
 const mockSetAgentAccess = vi.mocked(universalAccess.setAgentAccess)
 const mockGetAgentAccessAll = vi.mocked(universalAccess.getAgentAccessAll)
+const mockSetPublicAccess = vi.mocked(universalAccess.setPublicAccess)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
@@ -432,6 +435,18 @@ describe('loadRdfFromPod', () => {
             loadRdfFromPod(mockSession, 'https://pod.example.com/test.ttl', () => null)
         ).rejects.toEqual(err)
     })
+
+    it('uses globalThis.fetch when session is null (public access)', async () => {
+        const url = 'https://pod.example.com/public.ttl'
+        const list = makePackingList('pub-id')
+        mockGetSolidDataset.mockResolvedValueOnce(
+            packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
+        )
+
+        await loadRdfFromPod(null, url, (_ds, _u) => ({ id: 'pub-id', name: 'Public', createdAt: '', items: [] }))
+
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(url, expect.objectContaining({ fetch: globalThis.fetch }))
+    })
 })
 
 // ─── saveRdfToPod ────────────────────────────────────────────────────────────
@@ -679,6 +694,61 @@ describe('revokeCollaboratorAccess', () => {
 
         await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
             'revokeCollaboratorAccess: server does not support access control for this resource'
+        )
+    })
+})
+
+// ─── grantPublicAccess ───────────────────────────────────────────────────────
+
+describe('grantPublicAccess', () => {
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.ttl'
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('calls setPublicAccess with read, write, and append true', async () => {
+        mockSetPublicAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
+
+        await grantPublicAccess(mockSession, FILE_URL)
+
+        expect(mockSetPublicAccess).toHaveBeenCalledWith(
+            FILE_URL,
+            { read: true, write: true, append: true },
+            { fetch: mockSession.fetch }
+        )
+    })
+
+    it('resolves successfully when setPublicAccess succeeds', async () => {
+        mockSetPublicAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
+
+        await expect(grantPublicAccess(mockSession, FILE_URL)).resolves.toBeUndefined()
+    })
+
+    it('throws AuthenticationError on 401', async () => {
+        mockSetPublicAccess.mockRejectedValue({ statusCode: 401 })
+
+        await expect(grantPublicAccess(mockSession, FILE_URL)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('throws AuthenticationError on 403', async () => {
+        mockSetPublicAccess.mockRejectedValue({ statusCode: 403 })
+
+        await expect(grantPublicAccess(mockSession, FILE_URL)).rejects.toThrow(AuthenticationError)
+    })
+
+    it('re-throws other errors unchanged', async () => {
+        const err = new Error('Network failure')
+        mockSetPublicAccess.mockRejectedValue(err)
+
+        await expect(grantPublicAccess(mockSession, FILE_URL)).rejects.toThrow('Network failure')
+    })
+
+    it('throws a descriptive error when setPublicAccess returns null', async () => {
+        mockSetPublicAccess.mockResolvedValue(null)
+
+        await expect(grantPublicAccess(mockSession, FILE_URL)).rejects.toThrow(
+            'grantPublicAccess: server does not support access control for this resource'
         )
     })
 })

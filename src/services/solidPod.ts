@@ -1,7 +1,7 @@
 import { AppSession as Session } from '../types/AppSession'
 import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess } from '@inrupt/solid-client'
 import type { SolidDataset } from '@inrupt/solid-client'
-const { setAgentAccess, getAgentAccessAll } = universalAccess
+const { setAgentAccess, getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
@@ -140,6 +140,25 @@ export async function grantCollaboratorAccess(
         )
         if (result === null) {
             throw new Error('grantCollaboratorAccess: server does not support access control for this resource')
+        }
+    } catch (error) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        throw error
+    }
+}
+
+export async function grantPublicAccess(
+    session: Session,
+    fileUrl: string
+): Promise<void> {
+    try {
+        const result = await setPublicAccess(
+            fileUrl,
+            { read: true, write: true, append: true },
+            { fetch: session.fetch }
+        )
+        if (result === null) {
+            throw new Error('grantPublicAccess: server does not support access control for this resource')
         }
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
@@ -349,15 +368,16 @@ export interface SaveRdfToPodOptions<T> {
  * Loads an RDF dataset from a Pod URL and deserializes it via the provided function.
  */
 export async function loadRdfFromPod<T>(
-    session: Session,
+    session: Session | null,
     fileUrl: string,
     deserializer: (dataset: SolidDataset, datasetUrl: string) => T
 ): Promise<T> {
+    const fetchFn = session?.fetch ?? globalThis.fetch
     try {
-        const dataset = await getSolidDataset(fileUrl, { fetch: session.fetch })
+        const dataset = await getSolidDataset(fileUrl, { fetch: fetchFn })
         return deserializer(dataset, fileUrl)
     } catch (error: unknown) {
-        if (isAuthenticationError(error)) handlePodError(error)
+        if (session && isAuthenticationError(error)) handlePodError(error)
         throw error
     }
 }
