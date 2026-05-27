@@ -47,81 +47,42 @@ describe('AddItemModal', () => {
         expect(screen.getByText('Add Item')).toBeTruthy()
     })
 
-    it('renders "Always Needed Items" as an option', () => {
+    it('renders "Always Needed Items" as a button', () => {
         renderModal()
-        expect(screen.getByRole('option', { name: 'Always Needed Items' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Always Needed Items' })).toBeTruthy()
     })
 
-    it('renders question/option pairs as select options', () => {
+    it('renders question/option pairs as buttons', () => {
         renderModal()
-        expect(screen.getByRole('option', { name: 'Transport?: Car' })).toBeTruthy()
-        expect(screen.getByRole('option', { name: 'Transport?: Plane' })).toBeTruthy()
-        expect(screen.getByRole('option', { name: 'Climate?: Hot' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /Car/ })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /Plane/ })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /Hot/ })).toBeTruthy()
     })
 
-    it('defaults to "Always Needed Items" selected on open', () => {
-        renderModal()
-        const select = screen.getByRole('combobox')
-        expect((select as HTMLSelectElement).value).toBe('always')
-    })
-
-    it('calls onConfirm with { type: always } when confirmed with default selection', () => {
+    it('calls onConfirm with { type: always } when "Always Needed Items" clicked', () => {
         const onConfirm = vi.fn()
         renderModal({ onConfirm })
-        fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
         expect(onConfirm).toHaveBeenCalledWith({ type: 'always' })
     })
 
-    it('calls onConfirm with option destination when an option row is selected', () => {
+    it('calls onConfirm with option destination when an option button clicked', () => {
         const onConfirm = vi.fn()
         renderModal({ onConfirm })
-        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'q1::o2' } })
-        fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+        fireEvent.click(screen.getByRole('button', { name: /Plane/ }))
         expect(onConfirm).toHaveBeenCalledWith({ type: 'option', questionId: 'q1', optionId: 'o2' })
     })
 
-    it('calls onClose when Cancel is clicked', () => {
+    it('calls onClose when a destination button is clicked', () => {
         const onClose = vi.fn()
         renderModal({ onClose })
-        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
         expect(onClose).toHaveBeenCalled()
     })
 
-    it('calls onClose when Confirm is clicked', () => {
-        const onClose = vi.fn()
-        renderModal({ onClose })
-        fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
-        expect(onClose).toHaveBeenCalled()
-    })
-
-    it('resets to "always" when re-opened after changing selection', () => {
-        const { rerender } = renderModal({ isOpen: true })
-        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'q1::o1' } })
-        expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('q1::o1')
-
-        rerender(
-            <AddItemModal
-                isOpen={false}
-                onClose={vi.fn()}
-                onConfirm={vi.fn()}
-                questions={mockQuestions}
-            />
-        )
-        rerender(
-            <AddItemModal
-                isOpen={true}
-                onClose={vi.fn()}
-                onConfirm={vi.fn()}
-                questions={mockQuestions}
-            />
-        )
-        expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('always')
-    })
-
-    it('shows only "Always Needed Items" when questions array is empty', () => {
+    it('shows only "Always Needed Items" button when questions array is empty', () => {
         renderModal({ questions: [] })
-        const options = screen.getAllByRole('option')
-        expect(options).toHaveLength(1)
-        expect(options[0].textContent).toBe('Always Needed Items')
+        expect(screen.getByRole('button', { name: 'Always Needed Items' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Car|Plane|Hot/ })).toBeNull()
     })
 })

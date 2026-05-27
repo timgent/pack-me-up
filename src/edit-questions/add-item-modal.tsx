@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react'
 import { Modal } from '../components/Modal'
-import { Button } from '../components/Button'
 import { Question } from './types'
 
 export type AddItemDestination =
@@ -15,55 +13,40 @@ interface AddItemModalProps {
 }
 
 export function AddItemModal({ isOpen, onClose, questions, onConfirm }: AddItemModalProps) {
-    const [selectedValue, setSelectedValue] = useState('always')
-
-    useEffect(() => {
-        if (isOpen) setSelectedValue('always')
-    }, [isOpen])
-
-    function handleConfirm() {
-        let destination: AddItemDestination
-        if (selectedValue === 'always') {
-            destination = { type: 'always' }
-        } else {
-            const [questionId, optionId] = selectedValue.split('::')
-            destination = { type: 'option', questionId, optionId }
-        }
+    function pick(destination: AddItemDestination) {
         onConfirm(destination)
         onClose()
     }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Item">
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Add to
-                    </label>
-                    <select
-                        value={selectedValue}
-                        onChange={(e) => setSelectedValue(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    >
-                        <option value="always">Always Needed Items</option>
-                        {questions.flatMap((q) =>
-                            q.options.map((o) => (
-                                <option key={`${q.id}::${o.id}`} value={`${q.id}::${o.id}`}>
-                                    {q.text}: {o.text}
-                                </option>
-                            ))
-                        )}
-                    </select>
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                    <Button type="button" variant="secondary" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button type="button" onClick={handleConfirm}>
-                        Confirm
-                    </Button>
-                </div>
+            <div className="space-y-1 max-h-72 overflow-y-auto -mx-2">
+                <DestButton onClick={() => pick({ type: 'always' })}>
+                    Always Needed Items
+                </DestButton>
+                {questions.flatMap((q) =>
+                    q.options.map((o) => (
+                        <DestButton
+                            key={`${q.id}::${o.id}`}
+                            onClick={() => pick({ type: 'option', questionId: q.id, optionId: o.id })}
+                        >
+                            <span className="text-gray-500">{q.text}:</span> {o.text}
+                        </DestButton>
+                    ))
+                )}
             </div>
         </Modal>
+    )
+}
+
+function DestButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-800 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+        >
+            {children}
+        </button>
     )
 }

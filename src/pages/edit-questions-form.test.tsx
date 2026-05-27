@@ -154,7 +154,7 @@ describe('EditQuestionsForm', () => {
         expect(screen.getAllByText('Add Item').length).toBeGreaterThan(0)
     })
 
-    it('clicking Cancel in the Add Item modal closes it', async () => {
+    it('modal can be closed via the X button', async () => {
         render(
             <MemoryRouter>
                 <EditQuestionsForm />
@@ -164,7 +164,7 @@ describe('EditQuestionsForm', () => {
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
         fireEvent.click(screen.getAllByRole('button', { name: /^add item\.\.\.$/i })[0])
         expect(screen.getByRole('dialog')).toBeTruthy()
-        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+        fireEvent.click(screen.getByRole('button', { name: /close/i }))
         expect(screen.queryByRole('dialog')).toBeNull()
     })
 })

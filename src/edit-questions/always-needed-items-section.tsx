@@ -17,7 +17,6 @@ interface AlwaysNeededItemsSectionProps {
 
 export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerAddItem }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -48,13 +47,13 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                     input.focus();
                 }
             }
-            containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            selectRefs.current[itemFields.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
 
     return (
-        <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
