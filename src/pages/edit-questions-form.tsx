@@ -421,13 +421,8 @@ export function EditQuestionsForm() {
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">
-          {foreignPodCtx ? 'Questions & Items (Read-only)' : 'My Questions & Items'}
+          {foreignPodCtx ? 'Questions & Items' : 'My Questions & Items'}
         </h1>
-        {foreignPodCtx && (
-          <p className="mt-1 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-            You are viewing shared questions. Editing is not supported in shared view.
-          </p>
-        )}
         <p className="mt-2 text-gray-600">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
         <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
       </div>
