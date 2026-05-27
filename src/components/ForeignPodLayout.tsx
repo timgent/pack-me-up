@@ -47,14 +47,15 @@ export function ForeignPodLayout() {
                     list = { contexts: [], lastModified: new Date().toISOString() }
                 }
 
-                const alreadyStored = list.contexts.some(c => c.podUrl === foreignPodUrl)
-                if (alreadyStored) return
+                const existing = list.contexts.find(c => c.podUrl === foreignPodUrl)
+                if (existing && (existing.label || !name)) return
 
-                const newContext = name
-                    ? { podUrl: foreignPodUrl, addedAt: new Date().toISOString(), label: name }
-                    : { podUrl: foreignPodUrl, addedAt: new Date().toISOString() }
                 const updated: SharedWithMeList = {
-                    contexts: [...list.contexts, newContext],
+                    contexts: existing
+                        ? list.contexts.map(c => c.podUrl === foreignPodUrl ? { ...c, label: name! } : c)
+                        : [...list.contexts, name
+                            ? { podUrl: foreignPodUrl, addedAt: new Date().toISOString(), label: name }
+                            : { podUrl: foreignPodUrl, addedAt: new Date().toISOString() }],
                     lastModified: new Date().toISOString(),
                 }
                 await db.saveSharedWithMe(updated)
