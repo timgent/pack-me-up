@@ -490,14 +490,14 @@ export function EditQuestionsForm() {
               forceCollapsed={allQuestionsCollapsed}
               triggerAddItemForOptionIndex={
                 addItemTarget?.destination !== 'always' &&
-                (addItemTarget?.destination as { questionIndex: number; optionIndex: number })?.questionIndex === questionIndex
-                  ? (addItemTarget.destination as { questionIndex: number; optionIndex: number }).optionIndex
+                (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.questionIndex === questionIndex
+                  ? (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.optionIndex
                   : undefined
               }
               triggerAddItemVersion={
                 addItemTarget?.destination !== 'always' &&
-                (addItemTarget?.destination as { questionIndex: number; optionIndex: number })?.questionIndex === questionIndex
-                  ? addItemTarget.version
+                (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.questionIndex === questionIndex
+                  ? addItemTarget?.version
                   : undefined
               }
             />
