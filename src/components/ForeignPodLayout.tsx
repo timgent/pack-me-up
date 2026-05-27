@@ -8,6 +8,7 @@ import {
     saveRdfToPod,
     POD_CONTAINERS,
     getPrimaryPodUrl,
+    getPodOwnerName,
 } from '../services/solidPod'
 import { sharedWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedWithMeList } from '../services/rdfSerialization'
@@ -18,6 +19,7 @@ export function ForeignPodLayout() {
     const { isLoggedIn, session } = useSolidPod()
     const { db } = useDatabase()
     const [accessState, setAccessState] = useState<'pending' | 'ok' | 'denied'>('pending')
+    const [ownerName, setOwnerName] = useState<string | null>(null)
     const storedRef = useRef(false)
 
     useEffect(() => {
@@ -30,6 +32,9 @@ export function ForeignPodLayout() {
                 return
             }
             setAccessState('ok')
+
+            const name = await getPodOwnerName(session!, foreignPodUrl)
+            setOwnerName(name)
 
             if (storedRef.current) return
             storedRef.current = true
@@ -45,8 +50,11 @@ export function ForeignPodLayout() {
                 const alreadyStored = list.contexts.some(c => c.podUrl === foreignPodUrl)
                 if (alreadyStored) return
 
+                const newContext = name
+                    ? { podUrl: foreignPodUrl, addedAt: new Date().toISOString(), label: name }
+                    : { podUrl: foreignPodUrl, addedAt: new Date().toISOString() }
                 const updated: SharedWithMeList = {
-                    contexts: [...list.contexts, { podUrl: foreignPodUrl, addedAt: new Date().toISOString() }],
+                    contexts: [...list.contexts, newContext],
                     lastModified: new Date().toISOString(),
                 }
                 await db.saveSharedWithMe(updated)
@@ -100,7 +108,7 @@ export function ForeignPodLayout() {
     return (
         <ForeignPodContext.Provider value={{ foreignPodUrl }}>
             <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800 -mx-4 -mt-8 mb-6">
-                Viewing <span className="font-semibold">{foreignPodUrl}</span>'s data
+                Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? foreignPodUrl}</span>'s data
             </div>
             <Outlet />
         </ForeignPodContext.Provider>

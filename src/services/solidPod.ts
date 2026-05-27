@@ -1,5 +1,5 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt, acp_ess_2 } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt, acp_ess_2, getThing, getStringNoLocale } from '@inrupt/solid-client'
 import type { SolidDataset, Access } from '@inrupt/solid-client'
 const { getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
@@ -108,6 +108,19 @@ export function handlePodError(error: unknown): never {
 export function deriveWebIdFromPodUrl(podUrl: string): string {
     const base = podUrl.replace(/\/+$/, '')
     return `${base}/profile/card#me`
+}
+
+export async function getPodOwnerName(session: Session, podUrl: string): Promise<string | null> {
+    const webId = deriveWebIdFromPodUrl(podUrl)
+    const profileCardUrl = webId.replace(/#.*$/, '')
+    try {
+        const dataset = await getSolidDataset(profileCardUrl, { fetch: session.fetch })
+        const profile = getThing(dataset, webId)
+        if (!profile) return null
+        return getStringNoLocale(profile, 'http://xmlns.com/foaf/0.1/name') ?? null
+    } catch {
+        return null
+    }
 }
 
 export function derivePodUrlFromWebId(webId: string): string | null {

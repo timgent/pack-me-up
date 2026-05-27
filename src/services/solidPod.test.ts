@@ -14,6 +14,7 @@ import {
     grantPublicAccess,
     revokeCollaboratorAccess,
     getCollaborators,
+    getPodOwnerName,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import type { PackingAppDatabase } from './database'
@@ -903,5 +904,46 @@ describe('getCollaborators', () => {
         mockGetAgentAccessAll.mockRejectedValue(err)
 
         await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow('Network failure')
+    })
+})
+
+// ─── getPodOwnerName ─────────────────────────────────────────────────────────
+
+describe('getPodOwnerName', () => {
+    const POD = 'https://pod.example.com/'
+    const WEB_ID = 'https://pod.example.com/profile/card#me'
+    const PROFILE_CARD_URL = 'https://pod.example.com/profile/card'
+
+    it('returns the foaf:name from the profile card', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID })
+            .addStringNoLocale('http://xmlns.com/foaf/0.1/name', 'Alice Smith')
+            .build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBe('Alice Smith')
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(PROFILE_CARD_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+
+    it('returns null when profile card fetch fails', async () => {
+        mockGetSolidDataset.mockRejectedValueOnce(new Error('Not found'))
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBeNull()
+    })
+
+    it('returns null when profile card has no foaf:name', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID }).build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBeNull()
     })
 })
