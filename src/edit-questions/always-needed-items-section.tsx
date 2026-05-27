@@ -29,6 +29,8 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
     const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
     const shouldFocusRef = useRef(false);
+    const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
+    const newItemTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (triggerAddItem !== undefined && triggerAddItem > 0) {
@@ -41,13 +43,13 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
     useEffect(() => {
         // Only focus/scroll if Add Item was triggered
         if (shouldFocusRef.current) {
-            if (selectRefs.current[itemFields.length - 1]) {
-                const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
-                if (input) {
-                    input.focus();
-                }
-            }
-            selectRefs.current[itemFields.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const idx = itemFields.length - 1;
+            const el = selectRefs.current[idx];
+            el?.querySelector('input')?.focus();
+            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            setNewItemIndex(idx);
+            if (newItemTimerRef.current) clearTimeout(newItemTimerRef.current);
+            newItemTimerRef.current = setTimeout(() => setNewItemIndex(null), 1500);
             shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
@@ -76,7 +78,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
             {isExpanded && (
                 <div className="space-y-3">
                 {itemFields.map((_item: Item, itemIndex: number) => (
-                    <div key={itemIndex} className="flex items-start gap-2 sm:gap-3">
+                    <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
                                 control={control}
