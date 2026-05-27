@@ -690,12 +690,18 @@ describe('grantCollaboratorAccess', () => {
         )
     })
 
-    it('throws when WAC path has no resource ACL and no fallback ACL', async () => {
+    it('falls back to ACP path when hasAccessibleAcl is true but no WAC ACL files exist', async () => {
+        // This is the Inrupt PodSpaces scenario: Link rel="acl" header present (hasAccessibleAcl true)
+        // but the "ACL" is actually an ACP ACR, not a WAC file (hasResourceAcl/hasFallbackAcl false)
         mockHasResourceAcl.mockReturnValue(false)
         mockHasFallbackAcl.mockReturnValue(false)
+        vi.mocked(universalAccess.setAgentAccess).mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
 
-        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
-            'grantCollaboratorAccess: cannot determine WAC ACL for resource'
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
+        expect(vi.mocked(universalAccess.setAgentAccess)).toHaveBeenCalledWith(
+            FILE_URL, COLLAB_WEB_ID,
+            { read: true, write: true, append: true, control: false },
+            expect.objectContaining({ fetch: mockSession.fetch })
         )
     })
 
