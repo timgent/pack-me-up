@@ -12,10 +12,12 @@ interface AlwaysNeededItemsSectionProps {
     watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     people: Person[];
+    triggerAddItem?: number;
 }
 
-export function AlwaysNeededItemsSection({ control, register, watch, setValue, people }: AlwaysNeededItemsSectionProps) {
+export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerAddItem }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -30,7 +32,15 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
     const shouldFocusRef = useRef(false);
 
     useEffect(() => {
-        // Only focus if the user clicked "Add Item" button
+        if (triggerAddItem !== undefined && triggerAddItem > 0) {
+            setIsExpanded(true);
+            shouldFocusRef.current = true;
+            appendItem({ text: "", personSelections: [] });
+        }
+    }, [triggerAddItem]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        // Only focus/scroll if Add Item was triggered
         if (shouldFocusRef.current) {
             if (selectRefs.current[itemFields.length - 1]) {
                 const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
@@ -38,12 +48,13 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                     input.focus();
                 }
             }
+            containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { EditQuestionsForm } from './edit-questions-form'
@@ -127,5 +127,44 @@ describe('EditQuestionsForm', () => {
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
         expect(screen.queryByRole('button', { name: /JSON Editor/i })).toBeNull()
         expect(screen.queryByText('(Advanced)')).toBeNull()
+    })
+
+    it('renders "Add Item" button(s)', async () => {
+        render(
+            <MemoryRouter>
+                <EditQuestionsForm />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
+        const addItemButtons = screen.getAllByRole('button', { name: /^add item$/i })
+        expect(addItemButtons.length).toBeGreaterThan(0)
+    })
+
+    it('clicking "Add Item" opens the destination modal', async () => {
+        render(
+            <MemoryRouter>
+                <EditQuestionsForm />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
+        fireEvent.click(screen.getAllByRole('button', { name: /^add item$/i })[0])
+        expect(screen.getByRole('dialog')).toBeTruthy()
+        expect(screen.getAllByText('Add Item').length).toBeGreaterThan(0)
+    })
+
+    it('clicking Cancel in the Add Item modal closes it', async () => {
+        render(
+            <MemoryRouter>
+                <EditQuestionsForm />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
+        fireEvent.click(screen.getAllByRole('button', { name: /^add item$/i })[0])
+        expect(screen.getByRole('dialog')).toBeTruthy()
+        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+        expect(screen.queryByRole('dialog')).toBeNull()
     })
 })

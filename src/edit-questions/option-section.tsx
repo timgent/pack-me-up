@@ -16,10 +16,12 @@ interface OptionSectionProps {
     setValue: UseFormSetValue<PackingListQuestionSet>;
     removeOption: () => void;
     people: Person[];
+    triggerAddItem?: number;
 }
 
-export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
+export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people, triggerAddItem }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -32,7 +34,15 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
     const shouldFocusRef = useRef(false);
 
     useEffect(() => {
-        // Only focus if the user clicked "Add Item" button
+        if (triggerAddItem !== undefined && triggerAddItem > 0) {
+            setIsExpanded(true);
+            shouldFocusRef.current = true;
+            appendItem({ text: "", personSelections: [] });
+        }
+    }, [triggerAddItem]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        // Only focus/scroll if Add Item was triggered
         if (shouldFocusRef.current) {
             if (selectRefs.current[itemFields.length - 1]) {
                 const input = selectRefs.current[itemFields.length - 1]?.querySelector('input');
@@ -40,12 +50,13 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                     input.focus();
                 }
             }
+            containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
 
     return (
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div ref={containerRef} className="bg-gray-50 rounded-lg p-4">
             <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
                 <button
                     type="button"
