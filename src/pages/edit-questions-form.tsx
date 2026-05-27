@@ -597,7 +597,7 @@ export function EditQuestionsForm() {
               onClick={() => setIsAddItemModalOpen(true)}
               variant="secondary"
             >
-              Add Item
+              Add Item...
             </Button>
             <Button type="button" onClick={() => {
               const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
@@ -684,7 +684,7 @@ export function EditQuestionsForm() {
               onClick={() => setIsAddItemModalOpen(true)}
               variant="secondary"
             >
-              Add Item
+              Add Item...
             </Button>
             <Button type="button" onClick={() => {
               const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };

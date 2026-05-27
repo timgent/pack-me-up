@@ -137,7 +137,7 @@ describe('EditQuestionsForm', () => {
         )
 
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
-        const addItemButtons = screen.getAllByRole('button', { name: /^add item$/i })
+        const addItemButtons = screen.getAllByRole('button', { name: /^add item\.\.\.$/i })
         expect(addItemButtons.length).toBeGreaterThan(0)
     })
 
@@ -149,7 +149,7 @@ describe('EditQuestionsForm', () => {
         )
 
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
-        fireEvent.click(screen.getAllByRole('button', { name: /^add item$/i })[0])
+        fireEvent.click(screen.getAllByRole('button', { name: /^add item\.\.\.$/i })[0])
         expect(screen.getByRole('dialog')).toBeTruthy()
         expect(screen.getAllByText('Add Item').length).toBeGreaterThan(0)
     })
@@ -162,7 +162,7 @@ describe('EditQuestionsForm', () => {
         )
 
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
-        fireEvent.click(screen.getAllByRole('button', { name: /^add item$/i })[0])
+        fireEvent.click(screen.getAllByRole('button', { name: /^add item\.\.\.$/i })[0])
         expect(screen.getByRole('dialog')).toBeTruthy()
         fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
         expect(screen.queryByRole('dialog')).toBeNull()
