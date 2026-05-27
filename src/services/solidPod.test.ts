@@ -45,6 +45,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
             ...actual.universalAccess,
             getAgentAccessAll: vi.fn(),
             setPublicAccess: vi.fn(),
+            setAgentAccess: vi.fn(),
         },
     }
 })
@@ -677,20 +678,24 @@ describe('grantCollaboratorAccess', () => {
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow('Network failure')
     })
 
-    it('throws when ACL is not accessible', async () => {
+    it('falls back to ACP path when WAC ACL is not accessible', async () => {
         mockHasAccessibleAcl.mockReturnValue(false)
+        vi.mocked(universalAccess.setAgentAccess).mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
 
-        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
-            'grantCollaboratorAccess: cannot determine ACL for resource'
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
+        expect(vi.mocked(universalAccess.setAgentAccess)).toHaveBeenCalledWith(
+            FILE_URL, COLLAB_WEB_ID,
+            { read: true, write: true, append: true, control: false },
+            expect.objectContaining({ fetch: mockSession.fetch })
         )
     })
 
-    it('throws when no resource ACL and no fallback ACL', async () => {
+    it('throws when WAC path has no resource ACL and no fallback ACL', async () => {
         mockHasResourceAcl.mockReturnValue(false)
         mockHasFallbackAcl.mockReturnValue(false)
 
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
-            'grantCollaboratorAccess: cannot determine ACL for resource'
+            'grantCollaboratorAccess: cannot determine WAC ACL for resource'
         )
     })
 

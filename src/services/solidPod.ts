@@ -136,23 +136,29 @@ export async function grantCollaboratorAccess(
     const accessModes: Access = { read: true, write: true, append: true, control: false }
     try {
         const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
-        if (!hasAccessibleAcl(resourceWithOldAcl)) {
-            throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
-        }
-        let aclDataset: AclDataset
-        if (hasResourceAcl(resourceWithOldAcl)) {
-            aclDataset = getResourceAcl(resourceWithOldAcl)
-        } else if (hasFallbackAcl(resourceWithOldAcl)) {
-            aclDataset = createAclFromFallbackAcl(resourceWithOldAcl)
+        if (hasAccessibleAcl(resourceWithOldAcl)) {
+            // WAC path (CSS, NSS)
+            let aclDataset: AclDataset
+            if (hasResourceAcl(resourceWithOldAcl)) {
+                aclDataset = getResourceAcl(resourceWithOldAcl)
+            } else if (hasFallbackAcl(resourceWithOldAcl)) {
+                aclDataset = createAclFromFallbackAcl(resourceWithOldAcl)
+            } else {
+                throw new Error('grantCollaboratorAccess: cannot determine WAC ACL for resource')
+            }
+            aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, accessModes)
+            // For containers (URL ends with /), also set default access so contained resources inherit it
+            if (resourceUrl.endsWith('/')) {
+                aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, accessModes)
+            }
+            await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
         } else {
-            throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
+            // ACP path (Inrupt PodSpaces, ESS) — no WAC acl link header present
+            const result = await universalAccess.setAgentAccess(resourceUrl, collaboratorWebId, accessModes, { fetch: session.fetch })
+            if (result === null) {
+                throw new Error('grantCollaboratorAccess: server does not support access control for this resource')
+            }
         }
-        aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, accessModes)
-        // For containers (URL ends with /), also set default access so contained resources inherit it
-        if (resourceUrl.endsWith('/')) {
-            aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, accessModes)
-        }
-        await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
@@ -186,13 +192,19 @@ export async function revokeCollaboratorAccess(
     const noAccess: Access = { read: false, write: false, append: false, control: false }
     try {
         const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
-        if (!hasResourceAcl(resourceWithOldAcl) || !hasAccessibleAcl(resourceWithOldAcl)) return
-        let aclDataset = getResourceAcl(resourceWithOldAcl)
-        aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, noAccess)
-        if (resourceUrl.endsWith('/')) {
-            aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, noAccess)
+        if (hasAccessibleAcl(resourceWithOldAcl)) {
+            // WAC path (CSS, NSS) — only revoke if a resource-level ACL exists
+            if (!hasResourceAcl(resourceWithOldAcl)) return
+            let aclDataset = getResourceAcl(resourceWithOldAcl)
+            aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, noAccess)
+            if (resourceUrl.endsWith('/')) {
+                aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, noAccess)
+            }
+            await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
+        } else {
+            // ACP path (Inrupt PodSpaces, ESS)
+            await universalAccess.setAgentAccess(resourceUrl, collaboratorWebId, noAccess, { fetch: session.fetch })
         }
-        await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
@@ -223,12 +235,36 @@ export async function grantFullCollaboratorAccess(
     podUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
-    // Grant at pack-me-up/ container level so access works even when sub-resources
-    // (packing-lists/, question-set.ttl) don't yet exist on the pod.
-    // acl:default propagates to all contained resources automatically.
     const packMeUpUrl = `${podUrl}${POD_CONTAINERS.ROOT}`
     await ensureContainerExists(session, packMeUpUrl)
-    await grantCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
+
+    // WAC servers (CSS, NSS): one container-level grant with acl:default inheritance covers everything.
+    // ACP servers (Inrupt PodSpaces, ESS): no container inheritance via universalAccess.setAgentAccess,
+    // so we must grant each known resource individually.
+    const resourceInfo = await getResourceInfoWithAcl(packMeUpUrl, { fetch: session.fetch })
+    if (hasAccessibleAcl(resourceInfo)) {
+        await grantCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
+        return
+    }
+
+    // ACP path: grant each resource individually
+    const accessModes: Access = { read: true, write: true, append: true, control: false }
+    const grantIfExists = async (url: string) => {
+        try {
+            await universalAccess.setAgentAccess(url, collaboratorWebId, accessModes, { fetch: session.fetch })
+        } catch (err) {
+            if (getStatusCode(err) === 404) return
+            throw err
+        }
+    }
+    await grantIfExists(packMeUpUrl)
+    await grantIfExists(`${podUrl}${POD_CONTAINERS.QUESTIONS}`)
+    const packingListsUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    await grantIfExists(packingListsUrl)
+    try {
+        const container = await getSolidDataset(packingListsUrl, { fetch: session.fetch })
+        await Promise.all(getContainedResourceUrlAll(container).map(url => grantIfExists(url)))
+    } catch { /* packing-lists container doesn't exist yet */ }
 }
 
 export async function revokeFullCollaboratorAccess(
@@ -237,7 +273,39 @@ export async function revokeFullCollaboratorAccess(
     collaboratorWebId: string
 ): Promise<void> {
     const packMeUpUrl = `${podUrl}${POD_CONTAINERS.ROOT}`
-    await revokeCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
+
+    let isAcp = false
+    try {
+        const resourceInfo = await getResourceInfoWithAcl(packMeUpUrl, { fetch: session.fetch })
+        isAcp = !hasAccessibleAcl(resourceInfo)
+    } catch (err) {
+        if (getStatusCode(err) === 404) return // nothing to revoke
+        throw err
+    }
+
+    if (!isAcp) {
+        await revokeCollaboratorAccess(session, packMeUpUrl, collaboratorWebId)
+        return
+    }
+
+    // ACP path: revoke each resource individually
+    const noAccess: Access = { read: false, write: false, append: false, control: false }
+    const revokeIfExists = async (url: string) => {
+        try {
+            await universalAccess.setAgentAccess(url, collaboratorWebId, noAccess, { fetch: session.fetch })
+        } catch (err) {
+            if (getStatusCode(err) === 404) return
+            throw err
+        }
+    }
+    await revokeIfExists(packMeUpUrl)
+    await revokeIfExists(`${podUrl}${POD_CONTAINERS.QUESTIONS}`)
+    const packingListsUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    await revokeIfExists(packingListsUrl)
+    try {
+        const container = await getSolidDataset(packingListsUrl, { fetch: session.fetch })
+        await Promise.all(getContainedResourceUrlAll(container).map(url => revokeIfExists(url)))
+    } catch { /* packing-lists container doesn't exist */ }
 }
 
 export async function getFullCollaborators(

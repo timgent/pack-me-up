@@ -66,8 +66,9 @@ export function SharingSettingsPage() {
             await loadCollaborators()
             showToast('Access granted successfully', 'success')
         } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
             console.error('SharingSettingsPage: failed to grant access', err)
-            showToast('Failed to grant access. Please try again.', 'error')
+            showToast(`Failed to grant access: ${msg}`, 'error')
         } finally {
             setIsGranting(false)
         }
