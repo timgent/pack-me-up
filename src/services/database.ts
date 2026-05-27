@@ -1,8 +1,9 @@
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
+import type { SharedWithMeList } from './rdfSerialization'
 
-export type DocumentType = 'question-set' | 'packing-list'
+export type DocumentType = 'question-set' | 'packing-list' | 'shared-with-me'
 
 export interface BaseDocument {
     _id: string
@@ -22,7 +23,12 @@ export interface PackingListDocument extends BaseDocument {
     data: Omit<PackingList, 'id'>
 }
 
-export type AppDocument = QuestionSetDocument | PackingListDocument
+export interface SharedWithMeDocument extends BaseDocument {
+    docType: 'shared-with-me'
+    data: SharedWithMeList
+}
+
+export type AppDocument = QuestionSetDocument | PackingListDocument | SharedWithMeDocument
 
 /**
  * Namespace used when the user is not logged into a pod.
@@ -250,6 +256,62 @@ export class PackingAppDatabase {
             console.error('Error deleting packing list:', err)
             throw err
         }
+    }
+
+    public async getSharedWithMe(): Promise<SharedWithMeList> {
+        try {
+            const doc = await this.db.get('shared-with-me:1')
+            if (doc.docType !== 'shared-with-me') {
+                throw new Error('Invalid document type for shared-with-me')
+            }
+            return doc.data
+        } catch (err: unknown) {
+            if (hasName(err) && err.name === 'not_found') {
+                throw { name: 'not_found', message: 'SharedWithMe not found' }
+            }
+            throw err
+        }
+    }
+
+    public async saveSharedWithMe(list: SharedWithMeList): Promise<{ rev: string }> {
+        const docId = 'shared-with-me:1'
+        const now = new Date().toISOString()
+        const MAX_RETRIES = 3
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                let existingDoc: SharedWithMeDocument | undefined
+                try {
+                    const doc = await this.db.get(docId)
+                    if (doc.docType === 'shared-with-me') {
+                        existingDoc = doc
+                    }
+                } catch (err: unknown) {
+                    if (!hasName(err) || err.name !== 'not_found') {
+                        throw err
+                    }
+                }
+
+                const docToSave: SharedWithMeDocument = {
+                    _id: docId,
+                    _rev: existingDoc?._rev,
+                    docType: 'shared-with-me',
+                    createdAt: existingDoc?.createdAt || now,
+                    updatedAt: now,
+                    data: list,
+                }
+
+                const result = await this.db.put(docToSave)
+                return { rev: result.rev }
+            } catch (err) {
+                if (hasName(err) && err.name === 'conflict' && attempt < MAX_RETRIES) {
+                    continue
+                }
+                console.error('Error saving shared-with-me:', err)
+                throw err
+            }
+        }
+        throw new Error('saveSharedWithMe: max retries exceeded')
     }
 
     public async migrateFromLegacyDatabases(): Promise<{ migrated: boolean, questionSets: number, packingLists: number }> {

@@ -1,0 +1,195 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useSolidPod } from '../components/SolidPodContext'
+import { useDatabase } from '../components/DatabaseContext'
+import { useToast } from '../components/ToastContext'
+import {
+    grantFullCollaboratorAccess,
+    revokeFullCollaboratorAccess,
+    getFullCollaborators,
+    getPrimaryPodUrl,
+} from '../services/solidPod'
+import type { SharedContext } from '../services/rdfSerialization'
+
+export function SharingSettingsPage() {
+    const { session, isLoggedIn } = useSolidPod()
+    const { db } = useDatabase()
+    const { showToast } = useToast()
+    const navigate = useNavigate()
+
+    const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
+    const [collaboratorWebId, setCollaboratorWebId] = useState('')
+    const [isGranting, setIsGranting] = useState(false)
+    const [inviteLink, setInviteLink] = useState<string | null>(null)
+    const [collaborators, setCollaborators] = useState<string[]>([])
+    const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false)
+    const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
+    const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
+
+    useEffect(() => {
+        if (!isLoggedIn || !session) return
+        getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
+    }, [isLoggedIn, session])
+
+    const loadCollaborators = useCallback(async () => {
+        if (!session || !ownPodUrl) return
+        setIsLoadingCollaborators(true)
+        try {
+            const list = await getFullCollaborators(session, ownPodUrl)
+            setCollaborators(list)
+        } catch (err) {
+            console.error('SharingSettingsPage: failed to load collaborators', err)
+        } finally {
+            setIsLoadingCollaborators(false)
+        }
+    }, [session, ownPodUrl])
+
+    useEffect(() => {
+        if (ownPodUrl) loadCollaborators()
+    }, [ownPodUrl, loadCollaborators])
+
+    useEffect(() => {
+        db.getSharedWithMe()
+            .then(swm => setSharedContexts(swm.contexts))
+            .catch(() => setSharedContexts([]))
+    }, [db])
+
+    const handleGrantAccess = async () => {
+        if (!session || !ownPodUrl || !collaboratorWebId.trim()) return
+        setIsGranting(true)
+        setInviteLink(null)
+        try {
+            await grantFullCollaboratorAccess(session, ownPodUrl, collaboratorWebId.trim())
+            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists`
+            setInviteLink(link)
+            setCollaboratorWebId('')
+            await loadCollaborators()
+            showToast('Access granted successfully', 'success')
+        } catch (err) {
+            console.error('SharingSettingsPage: failed to grant access', err)
+            showToast('Failed to grant access. Please try again.', 'error')
+        } finally {
+            setIsGranting(false)
+        }
+    }
+
+    const handleRevoke = async (webId: string) => {
+        if (!session || !ownPodUrl) return
+        setRevokingWebId(webId)
+        try {
+            await revokeFullCollaboratorAccess(session, ownPodUrl, webId)
+            await loadCollaborators()
+            showToast('Access revoked', 'success')
+        } catch (err) {
+            console.error('SharingSettingsPage: failed to revoke access', err)
+            showToast('Failed to revoke access. Please try again.', 'error')
+        } finally {
+            setRevokingWebId(null)
+        }
+    }
+
+    if (!isLoggedIn) {
+        return (
+            <div className="max-w-2xl mx-auto py-8 px-4">
+                <p className="text-gray-700">Please log in to manage sharing settings.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto py-8 px-4 space-y-10">
+            <div>
+                <h1 className="text-3xl font-bold text-primary-900">Sharing Settings</h1>
+            </div>
+
+            {/* Section 1: Grant access to others */}
+            <section className="space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">People who can access my data</h2>
+                <p className="text-sm text-gray-600">
+                    Grant someone access to all your packing lists and questions. They'll be able to view
+                    and edit your data.
+                </p>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        value={collaboratorWebId}
+                        onChange={e => setCollaboratorWebId(e.target.value)}
+                        placeholder="Collaborator WebID (e.g. https://alice.solidcommunity.net/profile/card#me)"
+                        aria-label="Collaborator WebID"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <button
+                        onClick={handleGrantAccess}
+                        disabled={isGranting || !collaboratorWebId.trim()}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                    >
+                        {isGranting ? 'Granting…' : 'Grant access'}
+                    </button>
+                </div>
+
+                {inviteLink && (
+                    <div className="mt-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Invite link</label>
+                        <input
+                            type="text"
+                            readOnly
+                            value={inviteLink}
+                            aria-label="Invite link"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none"
+                            onClick={e => (e.target as HTMLInputElement).select()}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Share this link with your collaborator.</p>
+                    </div>
+                )}
+
+                {isLoadingCollaborators ? (
+                    <p className="text-sm text-gray-500">Loading collaborators…</p>
+                ) : collaborators.length > 0 ? (
+                    <ul className="space-y-2 mt-2">
+                        {collaborators.map(webId => (
+                            <li key={webId} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 truncate flex-1" title={webId}>{webId}</span>
+                                <button
+                                    onClick={() => handleRevoke(webId)}
+                                    disabled={revokingWebId === webId}
+                                    aria-label={`Revoke access for ${webId}`}
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                >
+                                    {revokingWebId === webId ? 'Revoking…' : 'Revoke'}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-gray-500">No collaborators yet.</p>
+                )}
+            </section>
+
+            {/* Section 2: Pods shared with me */}
+            <section className="space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Data shared with me</h2>
+                {sharedContexts.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                        No shared pods yet. Visit an invite link to add one.
+                    </p>
+                ) : (
+                    <ul className="space-y-2">
+                        {sharedContexts.map(ctx => (
+                            <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
+                                    {ctx.label ?? ctx.podUrl}
+                                </span>
+                                <button
+                                    onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
+                                >
+                                    Open
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+        </div>
+    )
+}

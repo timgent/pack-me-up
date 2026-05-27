@@ -16,6 +16,7 @@ import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
+import { useForeignPod } from '../components/ForeignPodContext'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
 
@@ -38,6 +39,8 @@ export function EditQuestionsForm() {
   const { showToast } = useToast();
   const { isLoggedIn } = useSolidPod();
   const { db, loginSyncInProgress } = useDatabase();
+  const foreignPodCtx = useForeignPod();
+  const foreignPodUrl = foreignPodCtx?.foreignPodUrl;
 
   // Watch all form values for auto-save
   const watchedFormValues = useWatch({ control });
@@ -67,6 +70,7 @@ export function EditQuestionsForm() {
     useSyncCoordinator<PackingListQuestionSet>({
       currentData: currentQuestionSet,
       saveToLocalDb: async (data) => {
+        if (foreignPodCtx) return { rev: '' }
         const docToWrite = {
           _id: "1",
           ...data,
@@ -101,11 +105,12 @@ export function EditQuestionsForm() {
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
     pathConfig: {
       container: POD_CONTAINERS.ROOT,
-      filename: 'packing-list-questions.ttl'
+      filename: 'packing-list-questions.ttl',
+      podUrl: foreignPodUrl,
     },
     rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
     pollInterval: 5000, // Poll every 5 seconds for faster sync
-    enabled: isLoggedIn, // Only sync when logged in
+    enabled: isLoggedIn || !!foreignPodUrl,
     onSyncSuccess: handleSyncSuccess,
     onSyncError: handleSyncError,
     onSaveSuccess: handleSaveSuccess,
@@ -415,7 +420,14 @@ export function EditQuestionsForm() {
   return (
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">My Questions & Items</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {foreignPodCtx ? 'Questions & Items (Read-only)' : 'My Questions & Items'}
+        </h1>
+        {foreignPodCtx && (
+          <p className="mt-1 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+            You are viewing shared questions. Editing is not supported in shared view.
+          </p>
+        )}
         <p className="mt-2 text-gray-600">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
         <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
       </div>

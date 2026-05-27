@@ -53,6 +53,17 @@ export const PMU = {
     selectionPersonId: `${PMU_NS}selectionPersonId`,
     selected: `${PMU_NS}selected`,
 
+    // SharedWithMe classes
+    SharedContext: `${PMU_NS}SharedContext`,
+    SharedWithMeList: `${PMU_NS}SharedWithMeList`,
+
+    // SharedWithMe predicates
+    hasSharedContext: `${PMU_NS}hasSharedContext`,
+    sharedPodUrl: `${PMU_NS}sharedPodUrl`,
+    sharedWebId: `${PMU_NS}sharedWebId`,
+    sharedLabel: `${PMU_NS}sharedLabel`,
+    sharedAddedAt: `${PMU_NS}sharedAddedAt`,
+
     // Shared
     name: 'https://schema.org/name',
 } as const

@@ -13,6 +13,7 @@ import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS, getPrimaryPodUrl } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
+import { useForeignPod } from '../components/ForeignPodContext'
 
 type FormData = {
     items: Record<string, boolean>
@@ -44,7 +45,12 @@ export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const foreignPodUrl = searchParams.get('pod') ?? undefined
+    const foreignPodCtx = useForeignPod()
+    // Prefer full-collaboration context over per-list query param (backward compat)
+    const foreignPodUrl = foreignPodCtx?.foreignPodUrl ?? searchParams.get('pod') ?? undefined
+    const backPath = foreignPodCtx
+        ? `/pod/${encodeURIComponent(foreignPodCtx.foreignPodUrl)}/view-lists`
+        : '/view-lists'
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
@@ -102,6 +108,7 @@ export function ViewPackingList() {
         useSyncCoordinator<PackingList>({
             currentData: packingList,
             saveToLocalDb: async (data) => {
+                if (foreignPodCtx) return { rev: '' }
                 return await db.savePackingList(data);
             },
             updateFormAndState: (data, newRev) => {
@@ -287,7 +294,7 @@ export function ViewPackingList() {
             if (savedPackingList) {
                 setPackingList(savedPackingList)
             }
-        } else {
+        } else if (!foreignPodCtx) {
             const dataWithTimestamp = { ...updatedPackingList, lastModified: new Date().toISOString() }
             const dbResult = await db.savePackingList(dataWithTimestamp)
             setPackingList({ ...dataWithTimestamp, _rev: dbResult.rev })
@@ -499,7 +506,7 @@ export function ViewPackingList() {
                                 <Button
                                     type="button"
                                     variant="secondary"
-                                    onClick={() => navigate('/view-lists')}
+                                    onClick={() => navigate(backPath)}
                                 >
                                     Back to Lists
                                 </Button>

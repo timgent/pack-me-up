@@ -5,7 +5,8 @@ const { setAgentAccess, getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
-import { packingListToDataset, datasetToPackingList, datasetToQuestionSet } from './rdfSerialization'
+import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe } from './rdfSerialization'
+import type { SharedWithMeList } from './rdfSerialization'
 
 /**
  * Pod container paths under the user's Pod root
@@ -17,6 +18,7 @@ export const POD_CONTAINERS = {
     MIGRATION_MARKER: 'pack-me-up/migrated-to-rdf.ttl',
     PACKING_LISTS: 'pack-me-up/packing-lists/',
     BACKUPS: 'pack-me-up/backups/',
+    SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',
 } as const
 
 /**
@@ -203,6 +205,55 @@ export async function getCollaborators(
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
+    }
+}
+
+export async function grantFullCollaboratorAccess(
+    session: Session,
+    podUrl: string,
+    collaboratorWebId: string
+): Promise<void> {
+    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    const questionsFileUrl = `${podUrl}${POD_CONTAINERS.QUESTIONS}`
+    await Promise.all([
+        grantCollaboratorAccess(session, packingListsContainerUrl, collaboratorWebId),
+        grantCollaboratorAccess(session, questionsFileUrl, collaboratorWebId),
+    ])
+}
+
+export async function revokeFullCollaboratorAccess(
+    session: Session,
+    podUrl: string,
+    collaboratorWebId: string
+): Promise<void> {
+    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    const questionsFileUrl = `${podUrl}${POD_CONTAINERS.QUESTIONS}`
+    await Promise.all([
+        revokeCollaboratorAccess(session, packingListsContainerUrl, collaboratorWebId),
+        revokeCollaboratorAccess(session, questionsFileUrl, collaboratorWebId),
+    ])
+}
+
+export async function getFullCollaborators(
+    session: Session,
+    podUrl: string
+): Promise<string[]> {
+    const packingListsContainerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    return getCollaborators(session, packingListsContainerUrl)
+}
+
+export async function verifyForeignPodAccess(
+    session: Session,
+    foreignPodUrl: string
+): Promise<boolean> {
+    try {
+        await getSolidDataset(`${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}`, { fetch: session.fetch })
+        return true
+    } catch (err: unknown) {
+        if (isAuthenticationError(err)) handlePodError(err)
+        const status = getStatusCode(err)
+        if (status === 403 || status === 401 || status === 404) return false
+        throw err
     }
 }
 
@@ -688,6 +739,8 @@ export interface SyncAllResult {
     packingListsSynced: number
     /** number of local-only packing lists uploaded to pod */
     packingListsUploaded: number
+    /** true if the shared-with-me list was synced from pod */
+    sharedWithMeSynced: boolean
 }
 
 /**
@@ -712,6 +765,7 @@ export async function syncAllDataFromPod(
     let questionSetSynced = false
     let packingListsSynced = 0
     let packingListsUploaded = 0
+    let sharedWithMeSynced = false
 
     const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
 
@@ -803,5 +857,27 @@ export async function syncAllDataFromPod(
         }
     }
 
-    return { questionSetSynced, packingListsSynced, packingListsUploaded }
+    // ── 3. SharedWithMe ──────────────────────────────────────────────────────
+    try {
+        const podSwm = await loadRdfFromPod<SharedWithMeList>(
+            session,
+            `${podUrl}${POD_CONTAINERS.SHARED_WITH_ME}`,
+            datasetToSharedWithMe,
+        )
+        let localSwm: SharedWithMeList | null = null
+        try { localSwm = await db.getSharedWithMe() } catch { /* not_found = ok */ }
+        const podTime = new Date(podSwm.lastModified).getTime()
+        const localTime = localSwm ? new Date(localSwm.lastModified).getTime() : 0
+        if (!localSwm || podTime > localTime) {
+            await db.saveSharedWithMe(podSwm)
+            sharedWithMeSynced = true
+        }
+    } catch (err: unknown) {
+        if (err instanceof AuthenticationError) throw err
+        const status = getStatusCode(err)
+        if (status !== 404) console.error('syncAllDataFromPod: error syncing shared-with-me', err)
+        // 404 = no shared-with-me yet → silently skip
+    }
+
+    return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced }
 }

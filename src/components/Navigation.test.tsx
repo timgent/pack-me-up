@@ -12,6 +12,14 @@ vi.mock('./SolidProviderSelector', () => ({
     SolidProviderSelector: () => null,
 }))
 
+vi.mock('./DatabaseContext', () => ({
+    useDatabase: vi.fn().mockReturnValue({
+        db: { getSharedWithMe: vi.fn().mockResolvedValue({ contexts: [], lastModified: '' }) },
+        loginSyncVersion: 0,
+        loginSyncInProgress: false,
+    }),
+}))
+
 import { useSolidPod } from './SolidPodContext'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)

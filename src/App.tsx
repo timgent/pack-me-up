@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { HashRouter } from 'react-router-dom'
 import { Route } from 'react-router-dom'
 import { Routes } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import './App.css'
 import { Navigation } from './components/Navigation'
 import { SessionExpiredBanner } from './components/SessionExpiredBanner'
@@ -16,6 +17,9 @@ import { DatabaseProvider } from './components/DatabaseContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 import { Wizard } from './pages/wizard'
 import { BackupsPage } from './pages/backups'
+import { ForeignPodLayout } from './components/ForeignPodLayout'
+import { ForeignPackingListsPage } from './pages/foreign-packing-lists'
+import { SharingSettingsPage } from './pages/sharing-settings'
 
 function App() {
   return (
@@ -37,6 +41,13 @@ function App() {
                 <Route path="/view-lists/:id" element={<ViewPackingList />} />
                 <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
                 <Route path="/backups" element={<BackupsPage />} />
+                <Route path="/sharing" element={<SharingSettingsPage />} />
+                <Route path="/pod/:encodedPodUrl" element={<ForeignPodLayout />}>
+                  <Route index element={<Navigate to="view-lists" replace />} />
+                  <Route path="view-lists" element={<ForeignPackingListsPage />} />
+                  <Route path="view-lists/:id" element={<ViewPackingList />} />
+                  <Route path="manage-questions" element={<EditQuestionsForm />} />
+                </Route>
               </Routes>
             </div>
           </div>

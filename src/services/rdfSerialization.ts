@@ -343,6 +343,68 @@ function questionItemToThings(
     return { itemThing: itemBuilder.build(), extras }
 }
 
+// ── SharedWithMe ──────────────────────────────────────────────────────────────
+
+export interface SharedContext {
+    podUrl: string
+    webId?: string
+    label?: string
+    addedAt: string
+}
+
+export interface SharedWithMeList {
+    contexts: SharedContext[]
+    lastModified: string
+}
+
+export function sharedWithMeToDataset(list: SharedWithMeList, datasetUrl: string): SolidDataset {
+    let ds = createSolidDataset()
+
+    let rootBuilder = buildThing({ url: datasetUrl })
+        .addUrl(RDF.type, PMU.SharedWithMeList)
+        .addDatetime(DCTERMS.modified, new Date(list.lastModified))
+
+    for (let i = 0; i < list.contexts.length; i++) {
+        const ctx = list.contexts[i]
+        const ctxUrl = `${datasetUrl}#ctx-${i}`
+        rootBuilder = rootBuilder.addUrl(PMU.hasSharedContext, ctxUrl)
+
+        let ctxBuilder = buildThing({ url: ctxUrl })
+            .addUrl(RDF.type, PMU.SharedContext)
+            .addStringNoLocale(PMU.sharedPodUrl, ctx.podUrl)
+            .addDatetime(PMU.sharedAddedAt, new Date(ctx.addedAt))
+
+        if (ctx.webId) ctxBuilder = ctxBuilder.addStringNoLocale(PMU.sharedWebId, ctx.webId)
+        if (ctx.label) ctxBuilder = ctxBuilder.addStringNoLocale(PMU.sharedLabel, ctx.label)
+
+        ds = setThing(ds, ctxBuilder.build())
+    }
+
+    return setThing(ds, rootBuilder.build())
+}
+
+export function datasetToSharedWithMe(dataset: SolidDataset, datasetUrl: string): SharedWithMeList {
+    const rootThing = getThing(dataset, datasetUrl)
+    if (!rootThing) throw new Error(`No root Thing at ${datasetUrl}`)
+
+    const lastModified = getDatetime(rootThing, DCTERMS.modified)?.toISOString() ?? new Date().toISOString()
+    const ctxUrls = getUrlAll(rootThing, PMU.hasSharedContext)
+
+    const contexts: SharedContext[] = ctxUrls
+        .map(url => {
+            const t = getThing(dataset, url)
+            if (!t) return null
+            const podUrl = getStringNoLocale(t, PMU.sharedPodUrl) ?? ''
+            const addedAt = getDatetime(t, PMU.sharedAddedAt)?.toISOString() ?? new Date().toISOString()
+            const webId = getStringNoLocale(t, PMU.sharedWebId) ?? undefined
+            const label = getStringNoLocale(t, PMU.sharedLabel) ?? undefined
+            return { podUrl, addedAt, webId, label }
+        })
+        .filter((c): c is SharedContext => c !== null)
+
+    return { contexts, lastModified }
+}
+
 function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     const thing = getThing(dataset, url)
     if (!thing) return null
