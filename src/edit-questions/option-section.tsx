@@ -30,28 +30,24 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
-    const shouldFocusRef = useRef(false);
+    const expectedNewLengthRef = useRef<number | null>(null);
     const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
-    const newItemTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (triggerAddItem !== undefined && triggerAddItem > 0) {
             setIsExpanded(true);
-            shouldFocusRef.current = true;
+            expectedNewLengthRef.current = itemFields.length + 1;
             appendItem({ text: "", personSelections: [] });
         }
     }, [triggerAddItem]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        // Only focus/scroll if Add Item was triggered
-        if (shouldFocusRef.current) {
+        if (expectedNewLengthRef.current === itemFields.length) {
+            expectedNewLengthRef.current = null;
             const idx = itemFields.length - 1;
             selectRefs.current[idx]?.querySelector('input')?.focus();
-            setTimeout(() => selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+            selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             setNewItemIndex(idx);
-            if (newItemTimerRef.current) clearTimeout(newItemTimerRef.current);
-            newItemTimerRef.current = setTimeout(() => setNewItemIndex(null), 1500);
-            shouldFocusRef.current = false;
         }
     }, [itemFields.length]);
 
@@ -127,7 +123,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 <Button
                     type="button"
                     onClick={() => {
-                        shouldFocusRef.current = true;
+                        expectedNewLengthRef.current = itemFields.length + 1;
                         appendItem({ text: "", personSelections: [] });
                     }}
                     variant="ghost"
