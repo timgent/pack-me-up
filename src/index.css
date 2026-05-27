@@ -91,6 +91,44 @@
   --box-shadow-glow-accent: 0 0 20px rgba(168, 85, 247, 0.4);
 }
 
+/* Celebration animations */
+@keyframes celebration-float {
+  0%, 100% { transform: translateY(0px) rotate(-5deg); }
+  50% { transform: translateY(-12px) rotate(5deg); }
+}
+
+@keyframes celebration-slide-in {
+  0% { transform: scale(0.9) translateY(-8px); opacity: 0; }
+  70% { transform: scale(1.02) translateY(2px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes celebration-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.celebration-banner {
+  animation: celebration-slide-in 0.4s ease-out forwards;
+}
+
+.celebration-bg {
+  background: linear-gradient(135deg, #10b981, #059669, #0d9488, #0891b2, #10b981);
+  background-size: 300% 300%;
+  animation: celebration-shimmer 6s ease infinite;
+}
+
+.celebration-emoji {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.75rem;
+  animation: celebration-float 3s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* JSON Editor Styles */
 .json-editor-container {
   display: flex;

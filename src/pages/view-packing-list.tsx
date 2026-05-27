@@ -421,6 +421,7 @@ export function ViewPackingList() {
     const totalCount = packingList.items.length
     const packedCount = packingList.items.filter(item => watchedItems[item.id]).length
     const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
+    const allPacked = totalCount > 0 && packedCount === totalCount
 
     const personStats = packingList.items.reduce((acc, item) => {
         if (!acc[item.personName]) acc[item.personName] = { packed: 0, total: 0 }
@@ -452,8 +453,8 @@ export function ViewPackingList() {
                                         Shared list
                                     </span>
                                 )}
-                                <span className="text-sm text-gray-600 font-medium">
-                                    {packedCount} / {totalCount} packed ({percentComplete}%)
+                                <span className={`text-sm font-medium ${allPacked ? 'text-emerald-600' : 'text-gray-600'}`}>
+                                    {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
                                 </span>
                                 {/* Always reserve space for auto-save status to prevent layout jump */}
                                 <div className={`flex items-center space-x-2 min-w-[120px] transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
@@ -507,6 +508,23 @@ export function ViewPackingList() {
                     </div>
                 </div>
             </div>
+
+            {/* All packed celebration banner */}
+            {allPacked && (
+                <div className="w-full max-w-screen-2xl mb-4 celebration-banner">
+                    <div className="relative overflow-hidden rounded-xl px-6 py-6 text-center shadow-lg celebration-bg">
+                        <span className="celebration-emoji" style={{ left: '4%', animationDelay: '0s' }}>🎊</span>
+                        <span className="celebration-emoji" style={{ left: '12%', animationDelay: '0.5s' }}>✈️</span>
+                        <span className="celebration-emoji" style={{ right: '12%', animationDelay: '0.8s' }}>🌍</span>
+                        <span className="celebration-emoji" style={{ right: '4%', animationDelay: '0.3s' }}>🎉</span>
+                        <div className="relative z-10">
+                            <div className="text-4xl mb-2">🧳</div>
+                            <p className="text-2xl font-bold text-white drop-shadow-sm">You're all packed!</p>
+                            <p className="text-emerald-100 mt-1 text-sm font-medium">Everything's ready — time for adventure!</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Hidden packed items banner */}
             {hiddenPackedCount > 0 && (
