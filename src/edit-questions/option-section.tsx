@@ -48,7 +48,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
             const idx = itemFields.length - 1;
             const el = selectRefs.current[idx];
             el?.querySelector('input')?.focus();
-            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
             setNewItemIndex(idx);
             if (newItemTimerRef.current) clearTimeout(newItemTimerRef.current);
             newItemTimerRef.current = setTimeout(() => setNewItemIndex(null), 1500);
