@@ -35,6 +35,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
         getResourceInfoWithAcl: vi.fn(),
         hasResourceAcl: vi.fn(),
         hasFallbackAcl: vi.fn(),
+        hasAccessibleAcl: vi.fn(),
         getResourceAcl: vi.fn(),
         createAclFromFallbackAcl: vi.fn(),
         saveAclFor: vi.fn(),
@@ -48,7 +49,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
@@ -59,6 +60,7 @@ const mockSetPublicAccess = vi.mocked(universalAccess.setPublicAccess)
 const mockGetResourceInfoWithAcl = vi.mocked(getResourceInfoWithAcl)
 const mockHasResourceAcl = vi.mocked(hasResourceAcl)
 const mockHasFallbackAcl = vi.mocked(hasFallbackAcl)
+const mockHasAccessibleAcl = vi.mocked(hasAccessibleAcl)
 const mockGetResourceAcl = vi.mocked(getResourceAcl)
 const mockCreateAclFromFallbackAcl = vi.mocked(createAclFromFallbackAcl)
 const mockSaveAclFor = vi.mocked(saveAclFor)
@@ -617,11 +619,13 @@ describe('grantCollaboratorAccess', () => {
     const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/questions.ttl'
     const CONTAINER_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/'
     const COLLAB_WEB_ID = 'https://bob.solidcommunity.net/profile/card#me'
+    const ACCESS_MODES = { read: true, write: true, append: true, control: false }
     const mockAcl = {} as never
     const mockResource = {} as never
 
     beforeEach(() => {
         mockGetResourceInfoWithAcl.mockResolvedValue(mockResource)
+        mockHasAccessibleAcl.mockReturnValue(true)
         mockHasResourceAcl.mockReturnValue(true)
         mockGetResourceAcl.mockReturnValue(mockAcl)
         mockSetAgentResourceAccess.mockImplementation((acl: unknown) => acl as never)
@@ -637,7 +641,7 @@ describe('grantCollaboratorAccess', () => {
         await grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
 
         expect(mockGetResourceInfoWithAcl).toHaveBeenCalledWith(FILE_URL, { fetch: mockSession.fetch })
-        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, ACCESS_MODES)
         expect(mockSetAgentDefaultAccess).not.toHaveBeenCalled()
         expect(mockSaveAclFor).toHaveBeenCalled()
     })
@@ -645,8 +649,8 @@ describe('grantCollaboratorAccess', () => {
     it('also calls setAgentDefaultAccess for container URLs (URL ends with /)', async () => {
         await grantCollaboratorAccess(mockSession, CONTAINER_URL, COLLAB_WEB_ID)
 
-        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
-        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, ACCESS_MODES)
+        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, ACCESS_MODES)
         expect(mockSaveAclFor).toHaveBeenCalled()
     })
 
@@ -673,7 +677,15 @@ describe('grantCollaboratorAccess', () => {
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow('Network failure')
     })
 
-    it('throws when no ACL is available (no resource ACL and no fallback ACL)', async () => {
+    it('throws when ACL is not accessible', async () => {
+        mockHasAccessibleAcl.mockReturnValue(false)
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
+            'grantCollaboratorAccess: cannot determine ACL for resource'
+        )
+    })
+
+    it('throws when no resource ACL and no fallback ACL', async () => {
         mockHasResourceAcl.mockReturnValue(false)
         mockHasFallbackAcl.mockReturnValue(false)
 
@@ -701,9 +713,12 @@ describe('revokeCollaboratorAccess', () => {
     const mockAcl = {} as never
     const mockResource = {} as never
 
+    const NO_ACCESS = { read: false, write: false, append: false, control: false }
+
     beforeEach(() => {
         mockGetResourceInfoWithAcl.mockResolvedValue(mockResource)
         mockHasResourceAcl.mockReturnValue(true)
+        mockHasAccessibleAcl.mockReturnValue(true)
         mockGetResourceAcl.mockReturnValue(mockAcl)
         mockSetAgentResourceAccess.mockImplementation((acl: unknown) => acl as never)
         mockSetAgentDefaultAccess.mockImplementation((acl: unknown) => acl as never)
@@ -717,7 +732,7 @@ describe('revokeCollaboratorAccess', () => {
     it('calls setAgentResourceAccess with all modes false for a file URL', async () => {
         await revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
 
-        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, NO_ACCESS)
         expect(mockSetAgentDefaultAccess).not.toHaveBeenCalled()
         expect(mockSaveAclFor).toHaveBeenCalled()
     })
@@ -725,8 +740,8 @@ describe('revokeCollaboratorAccess', () => {
     it('also calls setAgentDefaultAccess for container URLs', async () => {
         await revokeCollaboratorAccess(mockSession, CONTAINER_URL, COLLAB_WEB_ID)
 
-        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
-        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, NO_ACCESS)
+        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, NO_ACCESS)
     })
 
     it('is a no-op when there is no resource ACL', async () => {

@@ -65,7 +65,10 @@ export function ForeignPodLayout() {
             }
         }
 
-        verifyAndStore()
+        verifyAndStore().catch(err => {
+            console.error('ForeignPodLayout: unexpected error', err)
+            setAccessState('denied')
+        })
     }, [foreignPodUrl, isLoggedIn, session, db])
 
     if (!foreignPodUrl) return <Navigate to="/view-lists" replace />

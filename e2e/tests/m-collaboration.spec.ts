@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
+import { loginToExistingCssAccount, createCssClientCredentials, getCssBearerToken } from '../helpers/pod-seed'
 import {
     CSS_ISSUER,
     CSS_PORT,
@@ -138,6 +139,7 @@ test.describe('M – Full pod collaboration', () => {
 
     test('M6: Auto-store writes shared-with-me.ttl to collab pod', async ({ browser }) => {
         const collabPodUrl = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/`
+        const collabWebIdForAuth = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`
         const swmUrl = `${collabPodUrl}pack-me-up/shared-with-me.ttl`
 
         const ctxB = await browser.newContext()
@@ -151,11 +153,12 @@ test.describe('M – Full pod collaboration', () => {
             // Allow time for auto-store to complete
             await pageB.waitForTimeout(3000)
 
-            const status = await pageB.evaluate(async (url) => {
-                const res = await fetch(url, { method: 'HEAD' })
-                return res.status
-            }, swmUrl)
-            expect(status).toBe(200)
+            // Verify via authenticated server-side request (page.evaluate fetch is unauthenticated)
+            const accountToken = await loginToExistingCssAccount(CSS_PORT, COLLAB_EMAIL, COLLAB_PASSWORD)
+            const { id, secret } = await createCssClientCredentials(CSS_PORT, accountToken, collabWebIdForAuth)
+            const bearerToken = await getCssBearerToken(CSS_PORT, id, secret, collabWebIdForAuth)
+            const res = await fetch(swmUrl, { method: 'HEAD', headers: { Authorization: `Bearer ${bearerToken}` } })
+            expect(res.status).toBe(200)
         } finally {
             await ctxB.close()
         }
@@ -170,7 +173,9 @@ test.describe('M – Full pod collaboration', () => {
             await pageB.goto(inviteLink)
             await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-            await expect(pageB.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 5_000 })
+            // Context switcher appears after login sync loads shared-with-me.ttl from pod
+            // (loginSyncVersion in Navigation triggers re-read). Allow generous time for sync.
+            await expect(pageB.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
         } finally {
             await ctxB.close()
         }

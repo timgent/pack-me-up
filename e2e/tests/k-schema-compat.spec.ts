@@ -24,6 +24,9 @@ test.describe('K – JSON Schema Compatibility', () => {
   let ctx: import('@playwright/test').BrowserContext
 
   test.beforeAll(async ({ browser }) => {
+    // Migration from JSON→RDF involves ~10 pod requests; after 30+ preceding test
+    // logins CSS can be slow. Extend this hook's timeout to cover slow environments.
+    test.setTimeout(240_000)
     ctx = await browser.newContext()
     page = await ctx.newPage()
     await page.goto('/')
@@ -34,8 +37,8 @@ test.describe('K – JSON Schema Compatibility', () => {
     // resolves immediately while syncAllDataFromPod is still in flight.  Waiting for the
     // seeded list to appear guarantees syncAllDataFromPod has finished writing to local DB.
     await page.goto('/#/view-lists')
-    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 60_000 })
-    await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 60_000 })
+    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 180_000 })
+    await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 180_000 })
   })
 
   test.afterAll(async () => {

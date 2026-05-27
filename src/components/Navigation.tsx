@@ -9,7 +9,7 @@ export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { login, logout, isLoggedIn, webId } = useSolidPod()
-    const { db } = useDatabase()
+    const { db, loginSyncVersion } = useDatabase()
     const location = useLocation()
     const navigate = useNavigate()
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
@@ -18,7 +18,7 @@ export const Navigation = () => {
         db.getSharedWithMe()
             .then(swm => setSharedContexts(swm.contexts))
             .catch(() => {})
-    }, [db])
+    }, [db, loginSyncVersion])
 
     const podMatch = /^\/pod\/([^/]+)/.exec(location.pathname)
     const currentForeignEncoded = podMatch?.[1] ?? null

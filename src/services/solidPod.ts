@@ -1,6 +1,6 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
-import type { SolidDataset } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
+import type { SolidDataset, Access, AclDataset } from '@inrupt/solid-client'
 const { getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
@@ -133,15 +133,20 @@ export async function grantCollaboratorAccess(
     resourceUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
-    const accessModes = { read: true, write: true, append: true }
+    const accessModes: Access = { read: true, write: true, append: true, control: false }
     try {
         const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
-        let aclDataset = hasResourceAcl(resourceWithOldAcl)
-            ? getResourceAcl(resourceWithOldAcl)
-            : hasFallbackAcl(resourceWithOldAcl)
-                ? createAclFromFallbackAcl(resourceWithOldAcl)
-                : null
-        if (!aclDataset) throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
+        if (!hasAccessibleAcl(resourceWithOldAcl)) {
+            throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
+        }
+        let aclDataset: AclDataset
+        if (hasResourceAcl(resourceWithOldAcl)) {
+            aclDataset = getResourceAcl(resourceWithOldAcl)
+        } else if (hasFallbackAcl(resourceWithOldAcl)) {
+            aclDataset = createAclFromFallbackAcl(resourceWithOldAcl)
+        } else {
+            throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
+        }
         aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, accessModes)
         // For containers (URL ends with /), also set default access so contained resources inherit it
         if (resourceUrl.endsWith('/')) {
@@ -178,10 +183,10 @@ export async function revokeCollaboratorAccess(
     resourceUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
-    const noAccess = { read: false, write: false, append: false }
+    const noAccess: Access = { read: false, write: false, append: false, control: false }
     try {
         const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
-        if (!hasResourceAcl(resourceWithOldAcl)) return // No resource ACL to modify
+        if (!hasResourceAcl(resourceWithOldAcl) || !hasAccessibleAcl(resourceWithOldAcl)) return
         let aclDataset = getResourceAcl(resourceWithOldAcl)
         aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, noAccess)
         if (resourceUrl.endsWith('/')) {
@@ -255,7 +260,6 @@ export async function verifyForeignPodAccess(
         await getSolidDataset(`${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}`, { fetch: session.fetch })
         return true
     } catch (err: unknown) {
-        if (isAuthenticationError(err)) handlePodError(err)
         const status = getStatusCode(err)
         if (status === 403 || status === 401 || status === 404) return false
         throw err
