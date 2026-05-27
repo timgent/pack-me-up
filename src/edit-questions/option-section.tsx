@@ -46,9 +46,8 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
         // Only focus/scroll if Add Item was triggered
         if (shouldFocusRef.current) {
             const idx = itemFields.length - 1;
-            const el = selectRefs.current[idx];
-            el?.querySelector('input')?.focus();
-            requestAnimationFrame(() => el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            selectRefs.current[idx]?.querySelector('input')?.focus();
+            setTimeout(() => selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
             setNewItemIndex(idx);
             if (newItemTimerRef.current) clearTimeout(newItemTimerRef.current);
             newItemTimerRef.current = setTimeout(() => setNewItemIndex(null), 1500);
