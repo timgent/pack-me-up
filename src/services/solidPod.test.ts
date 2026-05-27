@@ -32,24 +32,38 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
         overwriteFile: vi.fn(),
         deleteFile: vi.fn(),
         saveSolidDatasetAt: vi.fn(),
+        getResourceInfoWithAcl: vi.fn(),
+        hasResourceAcl: vi.fn(),
+        hasFallbackAcl: vi.fn(),
+        getResourceAcl: vi.fn(),
+        createAclFromFallbackAcl: vi.fn(),
+        saveAclFor: vi.fn(),
+        setAgentResourceAccess: vi.fn((acl: unknown) => acl),
+        setAgentDefaultAccess: vi.fn((acl: unknown) => acl),
         universalAccess: {
             ...actual.universalAccess,
-            setAgentAccess: vi.fn(),
             getAgentAccessAll: vi.fn(),
             setPublicAccess: vi.fn(),
         },
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockOverwriteFile = vi.mocked(overwriteFile)
-const mockSetAgentAccess = vi.mocked(universalAccess.setAgentAccess)
 const mockGetAgentAccessAll = vi.mocked(universalAccess.getAgentAccessAll)
 const mockSetPublicAccess = vi.mocked(universalAccess.setPublicAccess)
+const mockGetResourceInfoWithAcl = vi.mocked(getResourceInfoWithAcl)
+const mockHasResourceAcl = vi.mocked(hasResourceAcl)
+const mockHasFallbackAcl = vi.mocked(hasFallbackAcl)
+const mockGetResourceAcl = vi.mocked(getResourceAcl)
+const mockCreateAclFromFallbackAcl = vi.mocked(createAclFromFallbackAcl)
+const mockSaveAclFor = vi.mocked(saveAclFor)
+const mockSetAgentResourceAccess = vi.mocked(setAgentResourceAccess)
+const mockSetAgentDefaultAccess = vi.mocked(setAgentDefaultAccess)
 
 const mockSession = {
     info: { isLoggedIn: true, webId: 'https://example.com/profile#me' },
@@ -600,101 +614,138 @@ describe('deriveWebIdFromPodUrl', () => {
 // ─── grantCollaboratorAccess ─────────────────────────────────────────────────
 
 describe('grantCollaboratorAccess', () => {
-    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json'
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/questions.ttl'
+    const CONTAINER_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/'
     const COLLAB_WEB_ID = 'https://bob.solidcommunity.net/profile/card#me'
+    const mockAcl = {} as never
+    const mockResource = {} as never
+
+    beforeEach(() => {
+        mockGetResourceInfoWithAcl.mockResolvedValue(mockResource)
+        mockHasResourceAcl.mockReturnValue(true)
+        mockGetResourceAcl.mockReturnValue(mockAcl)
+        mockSetAgentResourceAccess.mockImplementation((acl: unknown) => acl as never)
+        mockSetAgentDefaultAccess.mockImplementation((acl: unknown) => acl as never)
+        mockSaveAclFor.mockResolvedValue(mockAcl)
+    })
 
     afterEach(() => {
         vi.restoreAllMocks()
     })
 
-    it('calls setAgentAccess with read, write, and append true', async () => {
-        mockSetAgentAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
-
+    it('calls getResourceInfoWithAcl and saveAclFor for a file URL', async () => {
         await grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
 
-        expect(mockSetAgentAccess).toHaveBeenCalledWith(
-            FILE_URL,
-            COLLAB_WEB_ID,
-            { read: true, write: true, append: true },
-            { fetch: mockSession.fetch }
-        )
+        expect(mockGetResourceInfoWithAcl).toHaveBeenCalledWith(FILE_URL, { fetch: mockSession.fetch })
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
+        expect(mockSetAgentDefaultAccess).not.toHaveBeenCalled()
+        expect(mockSaveAclFor).toHaveBeenCalled()
     })
 
-    it('resolves successfully when setAgentAccess succeeds', async () => {
-        mockSetAgentAccess.mockResolvedValue({ read: true, write: true, append: true, controlRead: false, controlWrite: false })
+    it('also calls setAgentDefaultAccess for container URLs (URL ends with /)', async () => {
+        await grantCollaboratorAccess(mockSession, CONTAINER_URL, COLLAB_WEB_ID)
 
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
+        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: true, write: true, append: true })
+        expect(mockSaveAclFor).toHaveBeenCalled()
+    })
+
+    it('resolves successfully', async () => {
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
     })
 
     it('throws AuthenticationError on 401', async () => {
-        mockSetAgentAccess.mockRejectedValue({ statusCode: 401 })
+        mockGetResourceInfoWithAcl.mockRejectedValue({ statusCode: 401 })
 
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
     })
 
     it('throws AuthenticationError on 403', async () => {
-        mockSetAgentAccess.mockRejectedValue({ statusCode: 403 })
+        mockGetResourceInfoWithAcl.mockRejectedValue({ statusCode: 403 })
 
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
     })
 
     it('re-throws other errors unchanged', async () => {
         const err = new Error('Network failure')
-        mockSetAgentAccess.mockRejectedValue(err)
+        mockGetResourceInfoWithAcl.mockRejectedValue(err)
 
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow('Network failure')
     })
 
-    it('throws a descriptive error when setAgentAccess returns null', async () => {
-        mockSetAgentAccess.mockResolvedValue(null)
+    it('throws when no ACL is available (no resource ACL and no fallback ACL)', async () => {
+        mockHasResourceAcl.mockReturnValue(false)
+        mockHasFallbackAcl.mockReturnValue(false)
 
         await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
-            'grantCollaboratorAccess: server does not support access control for this resource'
+            'grantCollaboratorAccess: cannot determine ACL for resource'
         )
+    })
+
+    it('uses fallback ACL when no resource ACL exists', async () => {
+        mockHasResourceAcl.mockReturnValue(false)
+        mockHasFallbackAcl.mockReturnValue(true)
+        mockCreateAclFromFallbackAcl.mockReturnValue(mockAcl)
+
+        await expect(grantCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
+        expect(mockCreateAclFromFallbackAcl).toHaveBeenCalledWith(mockResource)
     })
 })
 
 // ─── revokeCollaboratorAccess ────────────────────────────────────────────────
 
 describe('revokeCollaboratorAccess', () => {
-    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/abc.json'
+    const FILE_URL = 'https://alice.solidcommunity.net/pack-me-up/questions.ttl'
+    const CONTAINER_URL = 'https://alice.solidcommunity.net/pack-me-up/packing-lists/'
     const COLLAB_WEB_ID = 'https://bob.solidcommunity.net/profile/card#me'
+    const mockAcl = {} as never
+    const mockResource = {} as never
+
+    beforeEach(() => {
+        mockGetResourceInfoWithAcl.mockResolvedValue(mockResource)
+        mockHasResourceAcl.mockReturnValue(true)
+        mockGetResourceAcl.mockReturnValue(mockAcl)
+        mockSetAgentResourceAccess.mockImplementation((acl: unknown) => acl as never)
+        mockSetAgentDefaultAccess.mockImplementation((acl: unknown) => acl as never)
+        mockSaveAclFor.mockResolvedValue(mockAcl)
+    })
 
     afterEach(() => {
         vi.restoreAllMocks()
     })
 
-    it('calls setAgentAccess with all modes false', async () => {
-        mockSetAgentAccess.mockResolvedValue({ read: false, write: false, append: false, controlRead: false, controlWrite: false })
-
+    it('calls setAgentResourceAccess with all modes false for a file URL', async () => {
         await revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)
 
-        expect(mockSetAgentAccess).toHaveBeenCalledWith(
-            FILE_URL,
-            COLLAB_WEB_ID,
-            { read: false, write: false, append: false, controlRead: false, controlWrite: false },
-            { fetch: mockSession.fetch }
-        )
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
+        expect(mockSetAgentDefaultAccess).not.toHaveBeenCalled()
+        expect(mockSaveAclFor).toHaveBeenCalled()
+    })
+
+    it('also calls setAgentDefaultAccess for container URLs', async () => {
+        await revokeCollaboratorAccess(mockSession, CONTAINER_URL, COLLAB_WEB_ID)
+
+        expect(mockSetAgentResourceAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
+        expect(mockSetAgentDefaultAccess).toHaveBeenCalledWith(mockAcl, COLLAB_WEB_ID, { read: false, write: false, append: false })
+    })
+
+    it('is a no-op when there is no resource ACL', async () => {
+        mockHasResourceAcl.mockReturnValue(false)
+
+        await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).resolves.toBeUndefined()
+        expect(mockSaveAclFor).not.toHaveBeenCalled()
     })
 
     it('throws AuthenticationError on 401', async () => {
-        mockSetAgentAccess.mockRejectedValue({ statusCode: 401 })
+        mockGetResourceInfoWithAcl.mockRejectedValue({ statusCode: 401 })
 
         await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
     })
 
     it('throws AuthenticationError on 403', async () => {
-        mockSetAgentAccess.mockRejectedValue({ statusCode: 403 })
+        mockGetResourceInfoWithAcl.mockRejectedValue({ statusCode: 403 })
 
         await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(AuthenticationError)
-    })
-
-    it('throws a descriptive error when setAgentAccess returns null', async () => {
-        mockSetAgentAccess.mockResolvedValue(null)
-
-        await expect(revokeCollaboratorAccess(mockSession, FILE_URL, COLLAB_WEB_ID)).rejects.toThrow(
-            'revokeCollaboratorAccess: server does not support access control for this resource'
-        )
     })
 })
 

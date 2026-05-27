@@ -398,7 +398,10 @@ export function datasetToSharedWithMe(dataset: SolidDataset, datasetUrl: string)
             const addedAt = getDatetime(t, PMU.sharedAddedAt)?.toISOString() ?? new Date().toISOString()
             const webId = getStringNoLocale(t, PMU.sharedWebId) ?? undefined
             const label = getStringNoLocale(t, PMU.sharedLabel) ?? undefined
-            return { podUrl, addedAt, webId, label }
+            const ctx: SharedContext = { podUrl, addedAt }
+            if (webId) ctx.webId = webId
+            if (label) ctx.label = label
+            return ctx
         })
         .filter((c): c is SharedContext => c !== null)
 

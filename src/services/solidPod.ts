@@ -1,7 +1,7 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
 import type { SolidDataset } from '@inrupt/solid-client'
-const { setAgentAccess, getAgentAccessAll, setPublicAccess } = universalAccess
+const { getAgentAccessAll, setPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
@@ -130,19 +130,24 @@ export function derivePodUrlFromWebId(webId: string): string | null {
 
 export async function grantCollaboratorAccess(
     session: Session,
-    fileUrl: string,
+    resourceUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
+    const accessModes = { read: true, write: true, append: true }
     try {
-        const result = await setAgentAccess(
-            fileUrl,
-            collaboratorWebId,
-            { read: true, write: true, append: true },
-            { fetch: session.fetch }
-        )
-        if (result === null) {
-            throw new Error('grantCollaboratorAccess: server does not support access control for this resource')
+        const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
+        let aclDataset = hasResourceAcl(resourceWithOldAcl)
+            ? getResourceAcl(resourceWithOldAcl)
+            : hasFallbackAcl(resourceWithOldAcl)
+                ? createAclFromFallbackAcl(resourceWithOldAcl)
+                : null
+        if (!aclDataset) throw new Error('grantCollaboratorAccess: cannot determine ACL for resource')
+        aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, accessModes)
+        // For containers (URL ends with /), also set default access so contained resources inherit it
+        if (resourceUrl.endsWith('/')) {
+            aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, accessModes)
         }
+        await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
@@ -170,19 +175,19 @@ export async function grantPublicAccess(
 
 export async function revokeCollaboratorAccess(
     session: Session,
-    fileUrl: string,
+    resourceUrl: string,
     collaboratorWebId: string
 ): Promise<void> {
+    const noAccess = { read: false, write: false, append: false }
     try {
-        const result = await setAgentAccess(
-            fileUrl,
-            collaboratorWebId,
-            { read: false, write: false, append: false, controlRead: false, controlWrite: false },
-            { fetch: session.fetch }
-        )
-        if (result === null) {
-            throw new Error('revokeCollaboratorAccess: server does not support access control for this resource')
+        const resourceWithOldAcl = await getResourceInfoWithAcl(resourceUrl, { fetch: session.fetch })
+        if (!hasResourceAcl(resourceWithOldAcl)) return // No resource ACL to modify
+        let aclDataset = getResourceAcl(resourceWithOldAcl)
+        aclDataset = setAgentResourceAccess(aclDataset, collaboratorWebId, noAccess)
+        if (resourceUrl.endsWith('/')) {
+            aclDataset = setAgentDefaultAccess(aclDataset, collaboratorWebId, noAccess)
         }
+        await saveAclFor(resourceWithOldAcl, aclDataset, { fetch: session.fetch })
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
         throw error
@@ -821,7 +826,7 @@ export async function syncAllDataFromPod(
         const err = podListsResult.reason
         if (err instanceof AuthenticationError) throw err
         console.error('syncAllDataFromPod: error loading packing lists', err)
-        return { questionSetSynced, packingListsSynced, packingListsUploaded }
+        return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced }
     }
 
     const { data: podLists } = podListsResult.value

@@ -24,20 +24,28 @@ test.describe('M – Full pod collaboration', () => {
     const ownerPodUrl = `http://localhost:${CSS_PORT}/${TEST_POD_NAME}/`
 
     test.beforeAll(async ({ browser }) => {
-        // Owner: log in, run wizard, create a packing list, sync to pod
+        // Owner: log in, ensure a question set exists, create a packing list, sync to pod
         ctxA = await browser.newContext()
         pageA = await ctxA.newPage()
         await pageA.goto('/')
         await loginToCss(pageA, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
 
-        await pageA.goto('/#/wizard')
-        await fillPersonRequiredFields(pageA)
-        await pageA.getByRole('button', { name: /Generate My Packing Questions/i }).click()
-        try { await pageA.getByRole('button', { name: 'Yes, Override' }).click({ timeout: 3_000 }) } catch { /* ok */ }
-        await expect(pageA.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 15_000 })
-        await pageA.getByRole('button', { name: /Create My First Packing List/i }).click()
-        try { await pageA.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
-        await pageA.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
+        // Try create-packing-list directly — if a question set already exists (e.g. from F/G
+        // running in parallel on the same pod), skip the wizard to avoid overwriting their data.
+        await pageA.goto('/#/create-packing-list')
+        const nameInput = pageA.getByPlaceholder('Enter a name for your packing list')
+        const isReady = await nameInput.isVisible({ timeout: 8_000 }).catch(() => false)
+        if (!isReady) {
+            // No question set yet — run wizard (this path taken when M is the first/only suite)
+            await pageA.goto('/#/wizard')
+            await fillPersonRequiredFields(pageA)
+            await pageA.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+            try { await pageA.getByRole('button', { name: 'Yes, Override' }).click({ timeout: 3_000 }) } catch { /* ok */ }
+            await expect(pageA.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 15_000 })
+            await pageA.getByRole('button', { name: /Create My First Packing List/i }).click()
+            try { await pageA.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
+            await pageA.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
+        }
 
         await pageA.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 15_000 })
         await pageA.getByPlaceholder('Enter a name for your packing list').fill(listName)
