@@ -69,6 +69,9 @@ export function ViewPackingList() {
     const [collapsedPersons, setCollapsedPersons] = useState<Set<string>>(new Set())
     const [showAddGuest, setShowAddGuest] = useState(false)
     const [newGuestName, setNewGuestName] = useState('')
+    const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
+    const [renamingGuestName, setRenamingGuestName] = useState('')
+    const [guestToRemove, setGuestToRemove] = useState<string | null>(null)
 
     const toggleCategory = (key: string) =>
         setCollapsedCategories(prev => {
@@ -419,6 +422,32 @@ export function ViewPackingList() {
         setShowAddGuest(false)
     }
 
+    const handleRenameGuest = async (guestId: string, newName: string) => {
+        if (!packingList) return
+        const trimmed = newName.trim()
+        setRenamingGuestId(null)
+        setRenamingGuestName('')
+        if (!trimmed) return
+        const oldGuest = (packingList.guests ?? []).find(g => g.id === guestId)
+        if (!oldGuest || trimmed === oldGuest.name) return
+        await persistPackingList({
+            ...packingList,
+            guests: (packingList.guests ?? []).map(g => g.id === guestId ? { ...g, name: trimmed } : g),
+            items: packingList.items.map(item => item.personId === guestId ? { ...item, personName: trimmed } : item),
+            deletedItems: (packingList.deletedItems ?? []).map(item => item.personId === guestId ? { ...item, personName: trimmed } : item),
+        })
+    }
+
+    const handleRemoveGuest = async (guestId: string) => {
+        if (!packingList) return
+        await persistPackingList({
+            ...packingList,
+            guests: (packingList.guests ?? []).filter(g => g.id !== guestId),
+            items: packingList.items.filter(item => item.personId !== guestId),
+            deletedItems: (packingList.deletedItems ?? []).filter(item => item.personId !== guestId),
+        })
+    }
+
     if (isLoading) {
         return <div className="max-w-4xl mx-auto py-8 px-4">Loading packing list...</div>
     }
@@ -453,16 +482,23 @@ export function ViewPackingList() {
     const guestPersonIdByName = new Map(
         (packingList.guests ?? []).map(g => [g.name, g.id])
     )
+    const guestNames = new Set((packingList.guests ?? []).map(g => g.name))
 
-    const personSectionsBase: Record<string, PackingListItem[]> = {}
-    for (const guest of (packingList.guests ?? [])) personSectionsBase[guest.name] = []
-    const personSections = Object.entries(
-        filteredItems.reduce((acc, item) => {
-            if (!acc[item.personName]) acc[item.personName] = []
-            acc[item.personName].push(item)
-            return acc
-        }, personSectionsBase)
-    ).sort(([a], [b]) => a.localeCompare(b))
+    // Build grouped item map, seeding guest names so their sections exist even when empty
+    const groupedItems: Record<string, PackingListItem[]> = {}
+    for (const guest of (packingList.guests ?? [])) groupedItems[guest.name] = []
+    for (const item of filteredItems) {
+        if (!groupedItems[item.personName]) groupedItems[item.personName] = []
+        groupedItems[item.personName].push(item)
+    }
+
+    // Regular people (from question set) alphabetically first, then guests in add-order
+    const regularSections = Object.entries(groupedItems)
+        .filter(([name]) => !guestNames.has(name))
+        .sort(([a], [b]) => a.localeCompare(b))
+    const guestSections = (packingList.guests ?? [])
+        .map(g => [g.name, groupedItems[g.name] ?? []] as [string, PackingListItem[]])
+    const personSections = [...regularSections, ...guestSections]
 
     return (
         <>
@@ -513,6 +549,15 @@ export function ViewPackingList() {
                                 </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
+                                {!foreignPodUrl && (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => { setShowAddGuest(v => !v); setNewGuestName('') }}
+                                    >
+                                        + Add Guest
+                                    </Button>
+                                )}
                                 <Button
                                     type="button"
                                     variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
@@ -573,24 +618,102 @@ export function ViewPackingList() {
 
             {/* Main content */}
             <div className="w-full">
+                {/* Add Guest inline form — appears just above the grid */}
+                {showAddGuest && (
+                    <div className="mb-4 flex gap-2 max-w-sm">
+                        <input
+                            type="text"
+                            value={newGuestName}
+                            onChange={(e) => setNewGuestName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() }
+                                if (e.key === 'Escape') { setShowAddGuest(false); setNewGuestName('') }
+                            }}
+                            placeholder="Guest name..."
+                            autoFocus
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleAddGuest}
+                            className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                            Add
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setShowAddGuest(false); setNewGuestName('') }}
+                            className="shrink-0 px-3 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md text-sm"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
                 <div>
                     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                         {personSections.map(([personName, items]) => {
                             const stats = personStats[personName] ?? { packed: 0, total: 0 }
+                            const guestId = guestPersonIdByName.get(personName)
+                            const isGuest = guestId !== undefined
                             return (
-                            <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                                <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                                    <button
-                                        type="button"
-                                        aria-label={`${collapsedPersons.has(personName) ? 'Expand' : 'Collapse'} ${personName}'s list`}
-                                        onClick={() => togglePerson(personName)}
-                                        className="flex items-center gap-2 w-full text-left"
-                                    >
-                                        <span className="text-sm text-gray-400">{collapsedPersons.has(personName) ? '▶' : '▼'}</span>
-                                        <span>{personName}'s Items</span>
-                                        <span className="ml-2 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
-                                    </button>
-                                </h2>
+                            <div key={personName} className={`border rounded-lg p-4 bg-white shadow-sm ${isGuest ? 'border-amber-200' : 'border-gray-200'}`}>
+                                <div className="mb-4 pb-2 border-b border-gray-200">
+                                    <div className="flex items-center gap-1 min-h-[2rem]">
+                                        {isGuest && renamingGuestId === guestId ? (
+                                            <>
+                                                <span className="text-sm text-gray-400 px-1" aria-hidden>▼</span>
+                                                <input
+                                                    type="text"
+                                                    value={renamingGuestName}
+                                                    onChange={(e) => setRenamingGuestName(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') { e.preventDefault(); handleRenameGuest(guestId, renamingGuestName) }
+                                                        if (e.key === 'Escape') { setRenamingGuestId(null); setRenamingGuestName('') }
+                                                    }}
+                                                    onBlur={() => handleRenameGuest(guestId, renamingGuestName)}
+                                                    autoFocus
+                                                    className="flex-1 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold text-gray-800"
+                                                />
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                aria-label={`${collapsedPersons.has(personName) ? 'Expand' : 'Collapse'} ${personName}'s list`}
+                                                onClick={() => togglePerson(personName)}
+                                                className="flex items-center gap-2 flex-1 text-left"
+                                            >
+                                                <span className="text-sm text-gray-400">{collapsedPersons.has(personName) ? '▶' : '▼'}</span>
+                                                <span className="text-xl font-semibold text-gray-800">{personName}'s Items</span>
+                                                <span className="ml-1 text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
+                                            </button>
+                                        )}
+                                        {isGuest && renamingGuestId !== guestId && (
+                                            <>
+                                                <span className="text-xs font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 shrink-0">Guest</span>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Rename ${personName}`}
+                                                    onClick={() => { setRenamingGuestId(guestId); setRenamingGuestName(personName) }}
+                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Remove ${personName}`}
+                                                    onClick={() => setGuestToRemove(guestId)}
+                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                                 {!collapsedPersons.has(personName) && <div>
                                     {groupByCategory(items).map(({ category, items: catItems }) => {
                                         const sectionKey = `${personName}::${category}`
@@ -717,48 +840,6 @@ export function ViewPackingList() {
                         )})}
                     </div>
                 </div>
-
-                {/* Add Guest */}
-                <div className="mt-6">
-                    {showAddGuest ? (
-                        <div className="flex gap-2 max-w-sm">
-                            <input
-                                type="text"
-                                value={newGuestName}
-                                onChange={(e) => setNewGuestName(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() }
-                                    if (e.key === 'Escape') { setShowAddGuest(false); setNewGuestName('') }
-                                }}
-                                placeholder="Guest name..."
-                                autoFocus
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                            <button
-                                type="button"
-                                onClick={handleAddGuest}
-                                className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                            >
-                                Add
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => { setShowAddGuest(false); setNewGuestName('') }}
-                                className="shrink-0 px-3 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md text-sm"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setShowAddGuest(true)}
-                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                        >
-                            <span className="text-lg leading-none">+</span> Add guest
-                        </button>
-                    )}
-                </div>
             </div>
         </div>
         <ConfirmationDialog
@@ -767,6 +848,15 @@ export function ViewPackingList() {
             onConfirm={() => { handleDeleteItem(itemToDelete!); setItemToDelete(null) }}
             title="Remove item"
             message="Are you sure you want to remove this item?"
+            confirmText="Remove"
+            confirmVariant="danger"
+        />
+        <ConfirmationDialog
+            isOpen={guestToRemove !== null}
+            onClose={() => setGuestToRemove(null)}
+            onConfirm={() => { handleRemoveGuest(guestToRemove!); setGuestToRemove(null) }}
+            title="Remove guest"
+            message="Remove this guest and all their items from this list?"
             confirmText="Remove"
             confirmVariant="danger"
         />
