@@ -125,8 +125,8 @@ export function deriveWebIdFromPodUrl(podUrl: string): string {
     return `${base}/profile/card#me`
 }
 
-export async function getPodOwnerName(session: Session, podUrl: string): Promise<string | null> {
-    const webId = deriveWebIdFromPodUrl(podUrl)
+export async function getPodOwnerName(session: Session, podUrl: string, explicitWebId?: string): Promise<string | null> {
+    const webId = explicitWebId ?? deriveWebIdFromPodUrl(podUrl)
     const profileCardUrl = webId.replace(/#.*$/, '')
     try {
         const dataset = await getSolidDataset(profileCardUrl, { fetch: session.fetch })

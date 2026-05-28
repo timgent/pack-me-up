@@ -947,6 +947,21 @@ describe('getPodOwnerName', () => {
 
         expect(result).toBeNull()
     })
+
+    it('uses an explicit WebID instead of deriving from the pod URL', async () => {
+        const EXPLICIT_WEB_ID = 'https://id.example.com/alice'
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: EXPLICIT_WEB_ID })
+            .addStringNoLocale('http://xmlns.com/foaf/0.1/name', 'Alice')
+            .build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD, EXPLICIT_WEB_ID)
+
+        expect(result).toBe('Alice')
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(EXPLICIT_WEB_ID, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
 })
 
 // ─── friendlyPodName ─────────────────────────────────────────────────────────

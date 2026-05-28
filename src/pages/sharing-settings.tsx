@@ -61,7 +61,7 @@ export function SharingSettingsPage() {
         if (!session || sharedContexts.length === 0) return
         const unlabeled = sharedContexts.filter(c => !c.label)
         if (unlabeled.length === 0) return
-        Promise.all(unlabeled.map(c => getPodOwnerName(session, c.podUrl).then(n => [c.podUrl, n] as const)))
+        Promise.all(unlabeled.map(c => getPodOwnerName(session, c.podUrl, c.webId).then(n => [c.podUrl, n] as const)))
             .then(results => {
                 const names: Record<string, string> = {}
                 for (const [podUrl, name] of results) {
@@ -77,7 +77,9 @@ export function SharingSettingsPage() {
         setInviteLink(null)
         try {
             await grantFullCollaboratorAccess(session, ownPodUrl, collaboratorWebId.trim())
-            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists`
+            const ownerWebId = session?.info.webId
+            const ownerParam = ownerWebId ? `?owner=${encodeURIComponent(ownerWebId)}` : ''
+            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists${ownerParam}`
             setInviteLink(link)
             setCollaboratorWebId('')
             await loadCollaborators()
@@ -195,7 +197,7 @@ export function SharingSettingsPage() {
                         {sharedContexts.map(ctx => (
                             <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                 <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? podNames[ctx.podUrl] ?? friendlyPodName(ctx.podUrl)}
+                                    {ctx.label ?? podNames[ctx.podUrl] ?? (ctx.webId ? friendlyPodName(ctx.webId) : undefined) ?? friendlyPodName(ctx.podUrl)}
                                 </span>
                                 <button
                                     onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
