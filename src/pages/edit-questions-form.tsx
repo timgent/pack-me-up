@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
@@ -20,6 +20,7 @@ import { useForeignPod } from '../components/ForeignPodContext'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
 import { AddItemModal, AddItemDestination } from '../edit-questions/add-item-modal'
+import { QuestionItemAddModal } from '../edit-questions/question-item-add-modal'
 
 export function EditQuestionsForm() {
 
@@ -49,11 +50,8 @@ export function EditQuestionsForm() {
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(true);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
-  const [addItemTarget, setAddItemTarget] = useState<{
-    destination: 'always' | { questionIndex: number; optionIndex: number };
-    version: number;
-  } | null>(null);
-  const addItemVersionRef = useRef(0);
+  const [pendingItemDestination, setPendingItemDestination] = useState<AddItemDestination | null>(null);
+  const [isItemTextModalOpen, setIsItemTextModalOpen] = useState(false);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -109,22 +107,28 @@ export function EditQuestionsForm() {
   }, [showToast]);
 
   const handleAddItemConfirm = useCallback((destination: AddItemDestination) => {
-    addItemVersionRef.current += 1;
-    const version = addItemVersionRef.current;
-    if (destination.type === 'always') {
-      setAddItemTarget({ destination: 'always', version });
+    setPendingItemDestination(destination);
+    setIsAddItemModalOpen(false);
+    setIsItemTextModalOpen(true);
+  }, []);
+
+  const handleItemTextConfirm = useCallback((text: string) => {
+    if (!pendingItemDestination) return;
+    if (pendingItemDestination.type === 'always') {
+      const current = getValues('alwaysNeededItems') ?? [];
+      setValue('alwaysNeededItems', [...current, { text, personSelections: [] }]);
     } else {
       const questions = getValues('questions');
-      const questionIndex = questions.findIndex((q) => q.id === destination.questionId);
-      const optionIndex = questionIndex >= 0
-        ? questions[questionIndex].options.findIndex((o) => o.id === destination.optionId)
-        : -1;
-      if (questionIndex >= 0 && optionIndex >= 0) {
-        setAddItemTarget({ destination: { questionIndex, optionIndex }, version });
+      const qi = questions.findIndex((q) => q.id === pendingItemDestination.questionId);
+      const oi = qi >= 0 ? questions[qi].options.findIndex((o) => o.id === pendingItemDestination.optionId) : -1;
+      if (qi >= 0 && oi >= 0) {
+        const path = `questions.${qi}.options.${oi}.items` as const;
+        const current = getValues(path) ?? [];
+        setValue(path, [...current, { text, personSelections: [] }]);
       }
     }
-    setIsAddItemModalOpen(false);
-  }, [getValues]);
+    setPendingItemDestination(null);
+  }, [pendingItemDestination, getValues, setValue]);
 
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
@@ -469,7 +473,6 @@ export function EditQuestionsForm() {
             watch={watch}
             setValue={setValue}
             people={people}
-            triggerAddItem={addItemTarget?.destination === 'always' ? addItemTarget.version : undefined}
           />
           {questionFields.length > 0 && (
             <div className="flex justify-end">
@@ -495,18 +498,6 @@ export function EditQuestionsForm() {
               moveUp={questionIndex > 0 ? () => moveQuestion(questionIndex, questionIndex - 1) : undefined}
               moveDown={questionIndex < questionFields.length - 1 ? () => moveQuestion(questionIndex, questionIndex + 1) : undefined}
               forceCollapsed={allQuestionsCollapsed}
-              triggerAddItemForOptionIndex={
-                addItemTarget?.destination !== 'always' &&
-                (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.questionIndex === questionIndex
-                  ? (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.optionIndex
-                  : undefined
-              }
-              triggerAddItemVersion={
-                addItemTarget?.destination !== 'always' &&
-                (addItemTarget?.destination as { questionIndex: number; optionIndex: number } | undefined)?.questionIndex === questionIndex
-                  ? addItemTarget?.version
-                  : undefined
-              }
             />
           ))}
           {/* Add Question button at bottom of form - only visible on large screens */}
@@ -708,6 +699,12 @@ export function EditQuestionsForm() {
         onClose={() => setIsAddItemModalOpen(false)}
         questions={watch('questions') ?? []}
         onConfirm={handleAddItemConfirm}
+      />
+      <QuestionItemAddModal
+        isOpen={isItemTextModalOpen}
+        onClose={() => setIsItemTextModalOpen(false)}
+        onConfirm={handleItemTextConfirm}
+        existingItemNames={(watch('questions') ?? []).flatMap((q) => q.options.flatMap((o) => o.items.map((i) => i.text)))}
       />
         </>
       ) : (

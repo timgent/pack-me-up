@@ -7,7 +7,7 @@ import { PackingListQuestionSet, Person } from './types'
 
 const mockPeople: Person[] = [{ id: '1', name: 'Me' }]
 
-function Wrapper({ defaultValues, triggerAddItem }: { defaultValues?: Partial<PackingListQuestionSet>; triggerAddItem?: number }) {
+function Wrapper({ defaultValues }: { defaultValues?: Partial<PackingListQuestionSet> }) {
     const { control, register, watch, setValue } = useForm<PackingListQuestionSet>({
         defaultValues: {
             questions: [],
@@ -23,7 +23,6 @@ function Wrapper({ defaultValues, triggerAddItem }: { defaultValues?: Partial<Pa
             watch={watch}
             setValue={setValue}
             people={mockPeople}
-            triggerAddItem={triggerAddItem}
         />
     )
 }
@@ -48,17 +47,14 @@ describe('AlwaysNeededItemsSection', () => {
         render(<Wrapper />)
         const header = screen.getByRole('button', { name: /always needed items/i })
         fireEvent.click(header)
-        expect(screen.getByText('Add Item')).toBeTruthy()
+        expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy()
     })
 
-    it('expands and appends an item when triggerAddItem increments from 0 to 1', () => {
-        const { rerender } = render(<Wrapper triggerAddItem={0} />)
-        // Collapsed — no Add Item button visible
-        expect(screen.queryByRole('button', { name: /^add item$/i })).toBeNull()
-
-        rerender(<Wrapper triggerAddItem={1} />)
-
-        // Should expand and show the Add Item button
-        expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy()
+    it('opens the add item modal when "Add Item" button is clicked', () => {
+        render(<Wrapper />)
+        const header = screen.getByRole('button', { name: /always needed items/i })
+        fireEvent.click(header)
+        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
+        expect(screen.getByRole('heading', { name: /add item/i })).toBeTruthy()
     })
 })

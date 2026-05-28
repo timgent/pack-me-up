@@ -17,11 +17,9 @@ interface QuestionSectionProps {
     moveUp?: () => void;
     moveDown?: () => void;
     forceCollapsed?: boolean | null;
-    triggerAddItemForOptionIndex?: number;
-    triggerAddItemVersion?: number;
 }
 
-export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed, triggerAddItemForOptionIndex, triggerAddItemVersion }: QuestionSectionProps) {
+export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed }: QuestionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
 
     // Sync with forceCollapsed when it changes
@@ -31,12 +29,6 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
         }
     }, [forceCollapsed]);
 
-    // Expand when a child option is targeted for item addition
-    useEffect(() => {
-        if (triggerAddItemForOptionIndex !== undefined && triggerAddItemVersion !== undefined && triggerAddItemVersion > 0) {
-            setIsExpanded(true);
-        }
-    }, [triggerAddItemVersion, triggerAddItemForOptionIndex]);
     const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options` as const
@@ -148,11 +140,6 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                                 setValue={setValue}
                                 removeOption={() => removeOption(optionIndex)}
                                 people={people}
-                                triggerAddItem={
-                                    triggerAddItemForOptionIndex === optionIndex
-                                        ? triggerAddItemVersion
-                                        : undefined
-                                }
                             />
                         ))}
                         <div className="mt-4">
