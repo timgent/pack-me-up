@@ -10,7 +10,10 @@ import {
     getPrimaryPodUrl,
     getPodOwnerName,
     friendlyPodName,
+    saveRdfToPod,
+    POD_CONTAINERS,
 } from '../services/solidPod'
+import { sharedWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedContext } from '../services/rdfSerialization'
 
 export function SharingSettingsPage() {
@@ -28,6 +31,7 @@ export function SharingSettingsPage() {
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
     const [podNames, setPodNames] = useState<Record<string, string>>({})
+    const [removingPodUrl, setRemovingPodUrl] = useState<string | null>(null)
 
     useEffect(() => {
         if (!isLoggedIn || !session) return
@@ -90,6 +94,34 @@ export function SharingSettingsPage() {
             showToast(`Failed to grant access: ${msg}`, 'error')
         } finally {
             setIsGranting(false)
+        }
+    }
+
+    const handleRemoveSharedContext = async (podUrl: string) => {
+        setRemovingPodUrl(podUrl)
+        try {
+            const list = await db.getSharedWithMe()
+            const updated = {
+                contexts: list.contexts.filter(c => c.podUrl !== podUrl),
+                lastModified: new Date().toISOString(),
+            }
+            await db.saveSharedWithMe(updated)
+            setSharedContexts(updated.contexts)
+            const ownPodUrl = await getPrimaryPodUrl(session!)
+            if (ownPodUrl) {
+                await saveRdfToPod({
+                    session: session!,
+                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_WITH_ME}`,
+                    data: updated,
+                    serializer: sharedWithMeToDataset,
+                })
+            }
+            showToast('Removed', 'success')
+        } catch (err) {
+            console.error('SharingSettingsPage: failed to remove shared context', err)
+            showToast('Failed to remove. Please try again.', 'error')
+        } finally {
+            setRemovingPodUrl(null)
         }
     }
 
@@ -204,6 +236,14 @@ export function SharingSettingsPage() {
                                     className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
                                 >
                                     Open
+                                </button>
+                                <button
+                                    onClick={() => handleRemoveSharedContext(ctx.podUrl)}
+                                    disabled={removingPodUrl === ctx.podUrl}
+                                    aria-label={`Remove shared pod`}
+                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                >
+                                    {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
                                 </button>
                             </li>
                         ))}
