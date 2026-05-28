@@ -607,47 +607,35 @@ export function EditQuestionsForm() {
               </div>
             )}
 
-            {/* Status indicators */}
-            <div className="flex items-center gap-3 shrink-0 text-xs">
-              {/* Auto-save */}
-              {autoSaveStatus === 'saving' && (
-                <span className="flex items-center gap-1 text-blue-600">
-                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                  Saving…
-                </span>
-              )}
-              {(autoSaveStatus === 'saved' || autoSaveStatus === 'idle') && (
-                <span className="flex items-center gap-1 text-gray-400">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                  Saved
-                </span>
-              )}
-              {autoSaveStatus === 'error' && (
-                <span className="flex items-center gap-1 text-red-600 font-medium">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                  Save error
-                </span>
-              )}
-              {/* Pod sync */}
-              {isLoggedIn && (
-                isSyncing ? (
+            {/* Status — shown only when noteworthy */}
+            {(autoSaveStatus === 'saving' || autoSaveStatus === 'error' || isSyncing || syncError) && (
+              <div className="flex items-center gap-2 shrink-0 text-xs">
+                {autoSaveStatus === 'saving' && (
+                  <span className="flex items-center gap-1 text-blue-600">
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    Saving…
+                  </span>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <span className="flex items-center gap-1 text-red-600 font-medium">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    Save error
+                  </span>
+                )}
+                {isLoggedIn && isSyncing && (
                   <span className="flex items-center gap-1 text-blue-600">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Syncing
                   </span>
-                ) : syncError ? (
+                )}
+                {isLoggedIn && syncError && (
                   <span className="flex items-center gap-1 text-red-600 font-medium">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
                     Pod error
                   </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-gray-400">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
-                    Pod
-                  </span>
-                )
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Action buttons */}
             <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
