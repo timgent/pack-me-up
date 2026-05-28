@@ -503,87 +503,70 @@ export function ViewPackingList() {
     return (
         <>
         <div className="w-full flex flex-col items-center py-8 px-4">
-            {/* Sticky top toolbar */}
-            <div className="sticky top-0 z-50 w-full mb-6 flex justify-center">
-                <div className="w-full max-w-screen-2xl">
-                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-lg rounded-xl px-4 py-3 relative">
-                        {/* Sync indicator - absolutely positioned to avoid layout shift */}
-                        {isLoggedIn && syncingFromPod && (
-                            <div className="absolute top-2 right-2 z-10 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 flex items-center gap-1.5 shadow-sm">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                <span className="text-xs text-blue-700 whitespace-nowrap">Syncing...</span>
-                            </div>
+            {/* Non-sticky header: name, actions */}
+            <div className="w-full max-w-screen-2xl mb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <h1 className="text-xl font-bold text-gray-900 truncate">{packingList.name}</h1>
+                        {foreignPodUrl && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-full px-2 py-0.5 shrink-0">
+                                Shared list
+                            </span>
                         )}
-
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-xl font-bold text-gray-900">{packingList.name}</h1>
-                                {foreignPodUrl && (
-                                    <span className="text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-full px-2 py-0.5">
-                                        Shared list
-                                    </span>
-                                )}
-                                <span className={`text-sm font-medium ${allPacked ? 'text-emerald-600' : 'text-gray-600'}`}>
-                                    {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
-                                </span>
-                                {/* Always reserve space for auto-save status to prevent layout jump */}
-                                <div className={`flex items-center space-x-2 min-w-[120px] transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
-                                    {autoSaveStatus === 'saving' && (
-                                        <>
-                                            <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                                            <span className="text-sm text-blue-600">Auto-saving...</span>
-                                        </>
-                                    )}
-                                    {autoSaveStatus === 'saved' && (
-                                        <>
-                                            <div className="h-4 w-4 text-green-500">✓</div>
-                                            <span className="text-sm text-green-600">Saved</span>
-                                        </>
-                                    )}
-                                    {autoSaveStatus === 'error' && (
-                                        <>
-                                            <div className="h-4 w-4 text-red-500">✗</div>
-                                            <span className="text-sm text-red-600">Error</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {!foreignPodUrl && (
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        onClick={() => { setShowAddGuest(v => !v); setNewGuestName('') }}
-                                    >
-                                        + Add Guest
-                                    </Button>
-                                )}
-                                <Button
-                                    type="button"
-                                    variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
-                                    onClick={() => setShowPacked(!showPacked)}
-                                >
-                                    {showPacked ? 'Hide Packed' : 'Show Packed'}
-                                </Button>
-                                {isLoggedIn && !foreignPodUrl && (
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        onClick={() => setShareModalOpen(true)}
-                                        disabled={!ownPodUrl}
-                                    >
-                                        Share
-                                    </Button>
-                                )}
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => navigate(backPath)}
-                                >
-                                    Back to Lists
-                                </Button>
-                            </div>
+                        {isLoggedIn && syncingFromPod && (
+                            <span className="text-xs text-blue-600 shrink-0">Syncing…</span>
+                        )}
+                        <div className={`flex items-center gap-1 transition-opacity duration-200 shrink-0 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
+                            {autoSaveStatus === 'saving' && <span className="text-xs text-blue-500">Saving…</span>}
+                            {autoSaveStatus === 'saved' && <span className="text-xs text-green-600">Saved</span>}
+                            {autoSaveStatus === 'error' && <span className="text-xs text-red-600">Error saving</span>}
                         </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {!foreignPodUrl && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => { setShowAddGuest(v => !v); setNewGuestName('') }}
+                            >
+                                + Add Guest
+                            </Button>
+                        )}
+                        {isLoggedIn && !foreignPodUrl && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setShareModalOpen(true)}
+                                disabled={!ownPodUrl}
+                            >
+                                Share
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => navigate(backPath)}
+                        >
+                            Back to Lists
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Slim sticky progress strip */}
+            <div className="sticky top-0 z-50 w-full mb-4 flex justify-center">
+                <div className="w-full max-w-screen-2xl">
+                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-sm rounded-lg px-4 py-2 flex items-center justify-between gap-3">
+                        <span className={`text-sm font-medium ${allPacked ? 'text-emerald-600' : 'text-gray-600'}`}>
+                            {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
+                        </span>
+                        <Button
+                            type="button"
+                            variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
+                            onClick={() => setShowPacked(!showPacked)}
+                        >
+                            {showPacked ? 'Hide Packed' : 'Show Packed'}
+                        </Button>
                     </div>
                 </div>
             </div>
