@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
-import { PackingListQuestionSet, newDraftQuestion } from '../edit-questions/types'
+import { PackingListQuestionSet, newDraftQuestion, Item } from '../edit-questions/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
 import { QuestionSection } from '../edit-questions/question-section'
@@ -20,7 +20,6 @@ import { useForeignPod } from '../components/ForeignPodContext'
 import { JsonEditor } from '../edit-questions/json-editor'
 import { validateQuestionSet } from '../edit-questions/validation'
 import { AddItemModal, AddItemDestination } from '../edit-questions/add-item-modal'
-import { QuestionItemAddModal } from '../edit-questions/question-item-add-modal'
 
 export function EditQuestionsForm() {
 
@@ -50,8 +49,6 @@ export function EditQuestionsForm() {
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(true);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
-  const [pendingItemDestination, setPendingItemDestination] = useState<AddItemDestination | null>(null);
-  const [isItemTextModalOpen, setIsItemTextModalOpen] = useState(false);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -106,29 +103,21 @@ export function EditQuestionsForm() {
     showToast(`Failed to save to Pod: ${error}`, 'error');
   }, [showToast]);
 
-  const handleAddItemConfirm = useCallback((destination: AddItemDestination) => {
-    setPendingItemDestination(destination);
-    setIsAddItemModalOpen(false);
-    setIsItemTextModalOpen(true);
-  }, []);
-
-  const handleItemTextConfirm = useCallback((text: string) => {
-    if (!pendingItemDestination) return;
-    if (pendingItemDestination.type === 'always') {
+  const handleAddItemConfirm = useCallback((destination: AddItemDestination, item: Item) => {
+    if (destination.type === 'always') {
       const current = getValues('alwaysNeededItems') ?? [];
-      setValue('alwaysNeededItems', [...current, { text, personSelections: [] }]);
+      setValue('alwaysNeededItems', [...current, item]);
     } else {
       const questions = getValues('questions');
-      const qi = questions.findIndex((q) => q.id === pendingItemDestination.questionId);
-      const oi = qi >= 0 ? questions[qi].options.findIndex((o) => o.id === pendingItemDestination.optionId) : -1;
+      const qi = questions.findIndex((q) => q.id === destination.questionId);
+      const oi = qi >= 0 ? questions[qi].options.findIndex((o) => o.id === destination.optionId) : -1;
       if (qi >= 0 && oi >= 0) {
         const path = `questions.${qi}.options.${oi}.items` as const;
         const current = getValues(path) ?? [];
-        setValue(path, [...current, { text, personSelections: [] }]);
+        setValue(path, [...current, item]);
       }
     }
-    setPendingItemDestination(null);
-  }, [pendingItemDestination, getValues, setValue]);
+  }, [getValues, setValue]);
 
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
@@ -698,13 +687,9 @@ export function EditQuestionsForm() {
         isOpen={isAddItemModalOpen}
         onClose={() => setIsAddItemModalOpen(false)}
         questions={watch('questions') ?? []}
-        onConfirm={handleAddItemConfirm}
-      />
-      <QuestionItemAddModal
-        isOpen={isItemTextModalOpen}
-        onClose={() => setIsItemTextModalOpen(false)}
-        onConfirm={handleItemTextConfirm}
+        people={people ?? []}
         existingItemNames={(watch('questions') ?? []).flatMap((q) => q.options.flatMap((o) => o.items.map((i) => i.text)))}
+        onConfirm={handleAddItemConfirm}
       />
         </>
       ) : (

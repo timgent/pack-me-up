@@ -112,8 +112,9 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
             <QuestionItemAddModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                onConfirm={(text) => appendItem({ text, personSelections: [] })}
+                onConfirm={(item) => appendItem(item)}
                 existingItemNames={allItemNames()}
+                people={people}
             />
         </div>
     );

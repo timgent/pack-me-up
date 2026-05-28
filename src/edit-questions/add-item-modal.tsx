@@ -1,4 +1,7 @@
-import { Question } from './types'
+import { useState, useEffect } from 'react'
+import { Question, Person, PersonSelection, Item } from './types'
+import { CustomCreatableSelect } from '../components/CreatableSelect'
+import { Button } from '../components/Button'
 
 export type AddItemDestination =
     | { type: 'always' }
@@ -8,16 +11,53 @@ interface AddItemModalProps {
     isOpen: boolean
     onClose: () => void
     questions: Question[]
-    onConfirm: (destination: AddItemDestination) => void
+    people: Person[]
+    existingItemNames: string[]
+    onConfirm: (destination: AddItemDestination, item: Item) => void
 }
 
-export function AddItemModal({ isOpen, onClose, questions, onConfirm }: AddItemModalProps) {
-    if (!isOpen) return null
+export function AddItemModal({ isOpen, onClose, questions, people, existingItemNames, onConfirm }: AddItemModalProps) {
+    const [step, setStep] = useState<'destination' | 'details'>('destination')
+    const [selectedDest, setSelectedDest] = useState<AddItemDestination | null>(null)
+    const [destLabel, setDestLabel] = useState('')
+    const [text, setText] = useState('')
+    const [personSelections, setPersonSelections] = useState<PersonSelection[]>([])
 
-    function pick(destination: AddItemDestination) {
-        onConfirm(destination)
+    useEffect(() => {
+        if (isOpen) {
+            setStep('destination')
+            setSelectedDest(null)
+            setDestLabel('')
+            setText('')
+            setPersonSelections(people.map(p => ({ personId: p.id, selected: false })))
+        }
+    }, [isOpen, people])
+
+    function pickDestination(dest: AddItemDestination, label: string) {
+        setSelectedDest(dest)
+        setDestLabel(label)
+        setStep('details')
+    }
+
+    const allSelected = personSelections.length > 0 && personSelections.every(s => s.selected)
+
+    function handleToggleAll() {
+        const next = !allSelected
+        setPersonSelections(personSelections.map(s => ({ ...s, selected: next })))
+    }
+
+    function handleTogglePerson(idx: number) {
+        setPersonSelections(personSelections.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s))
+    }
+
+    function handleConfirm() {
+        const trimmed = text.trim()
+        if (!trimmed || !selectedDest) return
+        onConfirm(selectedDest, { text: trimmed, personSelections })
         onClose()
     }
+
+    if (!isOpen) return null
 
     return (
         <div className="fixed inset-0 z-50 flex items-stretch sm:items-center sm:justify-center sm:p-8">
@@ -28,7 +68,21 @@ export function AddItemModal({ isOpen, onClose, questions, onConfirm }: AddItemM
                 className="relative flex flex-col w-full bg-white shadow-xl sm:rounded-lg sm:max-w-lg sm:h-[calc(100vh-8rem)]"
             >
                 <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 sm:px-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Add Item</h3>
+                    {step === 'details' && (
+                        <button
+                            type="button"
+                            onClick={() => setStep('destination')}
+                            className="mr-2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                            aria-label="Back"
+                        >
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                            </svg>
+                        </button>
+                    )}
+                    <h3 className="text-lg font-semibold text-gray-900 flex-1 truncate">
+                        {step === 'destination' ? 'Add Item — where?' : destLabel}
+                    </h3>
                     <button
                         type="button"
                         className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
@@ -40,21 +94,51 @@ export function AddItemModal({ isOpen, onClose, questions, onConfirm }: AddItemM
                         </svg>
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-                    <DestButton onClick={() => pick({ type: 'always' })}>
-                        Always Needed Items
-                    </DestButton>
-                    {questions.flatMap((q) =>
-                        q.options.map((o) => (
-                            <DestButton
-                                key={`${q.id}::${o.id}`}
-                                onClick={() => pick({ type: 'option', questionId: q.id, optionId: o.id })}
-                            >
-                                <span className="text-gray-500">{q.text}:</span> {o.text}
-                            </DestButton>
-                        ))
-                    )}
-                </div>
+
+                {step === 'destination' && (
+                    <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+                        <DestButton onClick={() => pickDestination({ type: 'always' }, 'Always Needed Items')}>
+                            Always Needed Items
+                        </DestButton>
+                        {questions.flatMap((q) =>
+                            q.options.map((o) => (
+                                <DestButton
+                                    key={`${q.id}::${o.id}`}
+                                    onClick={() => pickDestination(
+                                        { type: 'option', questionId: q.id, optionId: o.id },
+                                        `${q.text}: ${o.text}`
+                                    )}
+                                >
+                                    <span className="text-gray-500">{q.text}:</span> {o.text}
+                                </DestButton>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {step === 'details' && (
+                    <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
+                        <CustomCreatableSelect
+                            value={text}
+                            onChange={setText}
+                            options={existingItemNames}
+                            placeholder="Enter item name"
+                        />
+                        {people.length > 0 && (
+                            <PersonPicker
+                                people={people}
+                                personSelections={personSelections}
+                                allSelected={allSelected}
+                                onToggleAll={handleToggleAll}
+                                onTogglePerson={handleTogglePerson}
+                            />
+                        )}
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+                            <Button type="button" onClick={handleConfirm} disabled={!text.trim()}>Add Item</Button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -69,5 +153,53 @@ function DestButton({ onClick, children }: { onClick: () => void; children: Reac
         >
             {children}
         </button>
+    )
+}
+
+interface PersonPickerProps {
+    people: Person[]
+    personSelections: PersonSelection[]
+    allSelected: boolean
+    onToggleAll: () => void
+    onTogglePerson: (idx: number) => void
+}
+
+export function PersonPicker({ people, personSelections, allSelected, onToggleAll, onTogglePerson }: PersonPickerProps) {
+    return (
+        <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Who needs it?</div>
+            <div className="flex items-center gap-2 flex-wrap">
+                <button
+                    type="button"
+                    onClick={onToggleAll}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border-2 border-primary-200 text-primary-700 bg-white hover:bg-primary-50 hover:border-primary-300 transition-all duration-200 focus:outline-none"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        {allSelected
+                            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        }
+                    </svg>
+                    {allSelected ? 'Unselect All' : 'Select All'}
+                </button>
+                {people.map((person, i) => {
+                    const isSelected = personSelections[i]?.selected ?? false
+                    return (
+                        <button
+                            key={person.id}
+                            type="button"
+                            onClick={() => onTogglePerson(i)}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                                isSelected
+                                    ? 'bg-primary-50 border-primary-400 text-primary-900 shadow-sm'
+                                    : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                        >
+                            {person.name}
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
     )
 }

@@ -151,7 +151,7 @@ describe('EditQuestionsForm', () => {
         await waitFor(() => expect(screen.queryByText(/loading/i)).toBeNull())
         fireEvent.click(screen.getAllByRole('button', { name: /^add item\.\.\.$/i })[0])
         expect(screen.getByRole('dialog')).toBeTruthy()
-        expect(screen.getAllByText('Add Item').length).toBeGreaterThan(0)
+        expect(screen.getByRole('heading', { name: /add item/i })).toBeTruthy()
     })
 
     it('modal can be closed via the X button', async () => {
