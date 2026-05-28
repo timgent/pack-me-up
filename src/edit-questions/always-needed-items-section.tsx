@@ -12,9 +12,10 @@ interface AlwaysNeededItemsSectionProps {
     watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     people: Person[];
+    triggerScrollToLast?: number;
 }
 
-export function AlwaysNeededItemsSection({ control, register, watch, setValue, people }: AlwaysNeededItemsSectionProps) {
+export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerScrollToLast }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
@@ -39,6 +40,19 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
             setNewItemIndex(idx);
         }
     }, [itemFields.length]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (!triggerScrollToLast) return;
+        setIsExpanded(true);
+        requestAnimationFrame(() => {
+            const idx = itemFields.length - 1;
+            if (idx >= 0) {
+                selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setNewItemIndex(idx);
+            }
+        });
+    }, [triggerScrollToLast]);
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">

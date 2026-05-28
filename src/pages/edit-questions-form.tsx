@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
@@ -49,6 +49,13 @@ export function EditQuestionsForm() {
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(true);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+
+  type ScrollTarget =
+    | { type: 'always'; version: number }
+    | { type: 'option'; qi: number; oi: number; version: number }
+    | null;
+  const scrollVersionRef = useRef(0);
+  const [scrollTarget, setScrollTarget] = useState<ScrollTarget>(null);
 
   console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
@@ -104,9 +111,12 @@ export function EditQuestionsForm() {
   }, [showToast]);
 
   const handleAddItemConfirm = useCallback((destination: AddItemDestination, item: Item) => {
+    scrollVersionRef.current++;
+    const version = scrollVersionRef.current;
     if (destination.type === 'always') {
       const current = getValues('alwaysNeededItems') ?? [];
       setValue('alwaysNeededItems', [...current, item]);
+      setScrollTarget({ type: 'always', version });
     } else {
       const questions = getValues('questions');
       const qi = questions.findIndex((q) => q.id === destination.questionId);
@@ -115,9 +125,11 @@ export function EditQuestionsForm() {
         const path = `questions.${qi}.options.${oi}.items` as const;
         const current = getValues(path) ?? [];
         setValue(path, [...current, item]);
+        setScrollTarget({ type: 'option', qi, oi, version });
       }
     }
-  }, [getValues, setValue]);
+    showToast(`Added "${item.text}"`, 'success');
+  }, [getValues, setValue, showToast]);
 
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
@@ -479,6 +491,7 @@ export function EditQuestionsForm() {
             watch={watch}
             setValue={setValue}
             people={people}
+            triggerScrollToLast={scrollTarget?.type === 'always' ? scrollTarget.version : undefined}
           />
           {questionFields.length > 0 && (
             <div className="flex justify-end">
@@ -504,6 +517,8 @@ export function EditQuestionsForm() {
               moveUp={questionIndex > 0 ? () => moveQuestion(questionIndex, questionIndex - 1) : undefined}
               moveDown={questionIndex < questionFields.length - 1 ? () => moveQuestion(questionIndex, questionIndex + 1) : undefined}
               forceCollapsed={allQuestionsCollapsed}
+              triggerScrollToOptionIndex={scrollTarget?.type === 'option' && scrollTarget.qi === questionIndex ? scrollTarget.oi : undefined}
+              triggerScrollToLastVersion={scrollTarget?.type === 'option' && scrollTarget.qi === questionIndex ? scrollTarget.version : undefined}
             />
           ))}
           {/* Add Question button at bottom of form - only visible on large screens */}

@@ -16,9 +16,10 @@ interface OptionSectionProps {
     setValue: UseFormSetValue<PackingListQuestionSet>;
     removeOption: () => void;
     people: Person[];
+    triggerScrollToLast?: number;
 }
 
-export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
+export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people, triggerScrollToLast }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -41,6 +42,19 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
             setNewItemIndex(idx);
         }
     }, [itemFields.length]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (!triggerScrollToLast) return;
+        setIsExpanded(true);
+        requestAnimationFrame(() => {
+            const idx = itemFields.length - 1;
+            if (idx >= 0) {
+                selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setNewItemIndex(idx);
+            }
+        });
+    }, [triggerScrollToLast]);
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { useForm } from 'react-hook-form'
 import { AlwaysNeededItemsSection } from './always-needed-items-section'
@@ -7,7 +7,11 @@ import { PackingListQuestionSet, Person } from './types'
 
 const mockPeople: Person[] = [{ id: '1', name: 'Me' }]
 
-function Wrapper({ defaultValues }: { defaultValues?: Partial<PackingListQuestionSet> }) {
+beforeEach(() => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn()
+})
+
+function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Partial<PackingListQuestionSet>; triggerScrollToLast?: number }) {
     const { control, register, watch, setValue } = useForm<PackingListQuestionSet>({
         defaultValues: {
             questions: [],
@@ -23,6 +27,7 @@ function Wrapper({ defaultValues }: { defaultValues?: Partial<PackingListQuestio
             watch={watch}
             setValue={setValue}
             people={mockPeople}
+            triggerScrollToLast={triggerScrollToLast}
         />
     )
 }
@@ -48,5 +53,12 @@ describe('AlwaysNeededItemsSection', () => {
         const header = screen.getByRole('button', { name: /always needed items/i })
         fireEvent.click(header)
         expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy()
+    })
+
+    it('auto-expands when triggerScrollToLast becomes truthy', async () => {
+        const { rerender } = render(<Wrapper />)
+        expect(screen.queryByRole('button', { name: /^add item$/i })).toBeNull()
+        rerender(<Wrapper triggerScrollToLast={1} />)
+        await waitFor(() => expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy())
     })
 })
