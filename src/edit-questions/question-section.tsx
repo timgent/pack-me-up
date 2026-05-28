@@ -19,9 +19,10 @@ interface QuestionSectionProps {
     forceCollapsed?: boolean | null;
     triggerScrollToOptionIndex?: number;
     triggerScrollToLastVersion?: number;
+    getAllItemNames: () => string[];
 }
 
-export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed, triggerScrollToOptionIndex, triggerScrollToLastVersion }: QuestionSectionProps) {
+export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed, triggerScrollToOptionIndex, triggerScrollToLastVersion, getAllItemNames }: QuestionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
 
     // Sync with forceCollapsed when it changes
@@ -149,6 +150,7 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                                 removeOption={() => removeOption(optionIndex)}
                                 people={people}
                                 triggerScrollToLast={optionIndex === triggerScrollToOptionIndex ? triggerScrollToLastVersion : undefined}
+                                getAllItemNames={getAllItemNames}
                             />
                         ))}
                         <div className="mt-4">

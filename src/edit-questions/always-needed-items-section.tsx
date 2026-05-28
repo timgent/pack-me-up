@@ -13,9 +13,10 @@ interface AlwaysNeededItemsSectionProps {
     setValue: UseFormSetValue<PackingListQuestionSet>;
     people: Person[];
     triggerScrollToLast?: number;
+    getAllItemNames: () => string[];
 }
 
-export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerScrollToLast }: AlwaysNeededItemsSectionProps) {
+export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
@@ -23,10 +24,6 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
         name: "alwaysNeededItems"
     });
 
-    const allItems = [...new Set((watch('questions') ?? []).flatMap((q) =>
-        q.options.flatMap((o) => o.items)
-    ).filter(Boolean))] as Item[];
-    const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
     const expectedNewLengthRef = useRef<number | null>(null);
     const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
@@ -97,7 +94,7 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                                         onChange={(newValue) => {
                                             onChange({ ...value, text: newValue })
                                         }}
-                                        options={allItemNames()}
+                                        options={getAllItemNames()}
                                         placeholder="Enter item"
                                     />}
                             />

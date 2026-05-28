@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
-import { PackingListQuestionSet, newDraftQuestion, Item } from '../edit-questions/types'
+import { PackingListQuestionSet, newDraftQuestion, Item, Question } from '../edit-questions/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
 import { QuestionSection } from '../edit-questions/question-section'
@@ -43,12 +43,10 @@ export function EditQuestionsForm() {
   const foreignPodCtx = useForeignPod();
   const foreignPodUrl = foreignPodCtx?.foreignPodUrl;
 
-  // Watch all form values for auto-save
-  const watchedFormValues = useWatch({ control });
-
   const [currentQuestionSet, setCurrentQuestionSet] = useState<PackingListQuestionSet | null>(null);
   const [allQuestionsCollapsed, setAllQuestionsCollapsed] = useState<boolean | null>(true);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+  const [addItemModalData, setAddItemModalData] = useState<{ questions: Question[]; existingItemNames: string[] }>({ questions: [], existingItemNames: [] });
 
   type ScrollTarget =
     | { type: 'always'; version: number }
@@ -131,6 +129,20 @@ export function EditQuestionsForm() {
     showToast(`Added "${item.text}"`, 'success');
   }, [getValues, setValue, showToast]);
 
+  const getAllItemNames = useCallback((): string[] =>
+    (getValues('questions') ?? []).flatMap((q) =>
+      q.options.flatMap((o) => o.items.map((i: Item) => i.text))
+    ), [getValues]);
+
+  const handleOpenAddItemModal = useCallback(() => {
+    const qs = getValues('questions') ?? [];
+    setAddItemModalData({
+      questions: qs,
+      existingItemNames: getAllItemNames(),
+    });
+    setIsAddItemModalOpen(true);
+  }, [getValues, getAllItemNames]);
+
   // Set up automatic Pod sync with polling
   const { lastSync, isSyncing, error: syncError, saveToPod } = usePodSync<PackingListQuestionSet>({
     pathConfig: {
@@ -212,24 +224,11 @@ export function EditQuestionsForm() {
 
   // Trigger auto-save when form values change (but not in JSON mode)
   useEffect(() => {
-    console.log('=== AUTO-SAVE EFFECT TRIGGERED ===', {
-      hasCurrentQuestionSet: !!currentQuestionSet,
-      watchedFormValues: watchedFormValues,
-      editorMode: editorMode
+    const subscription = watch(() => {
+      if (editorMode !== 'json' && currentQuestionSet) handleAutoSave();
     });
-    // Skip auto-save in JSON mode - user will manually save
-    if (editorMode === 'json') {
-      console.log('Skipping handleAutoSave - in JSON editor mode');
-      return;
-    }
-    if (currentQuestionSet) {
-      console.log('Calling handleAutoSave...');
-      handleAutoSave();
-    } else {
-      console.log('Skipping handleAutoSave - currentQuestionSet is null');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentQuestionSet is used as a guard; adding it would trigger extra auto-saves on initial load
-  }, [watchedFormValues, handleAutoSave, editorMode]);
+    return () => subscription.unsubscribe();
+  }, [watch, handleAutoSave, editorMode, currentQuestionSet]);
 
   const removePerson = (removedIndex: number) => {
     // We need this wrapper for removing people to correctly removed the check boxes for that person
@@ -244,7 +243,7 @@ export function EditQuestionsForm() {
     removePeople(removedIndex)
   }
 
-  const people = watch("people")
+  const people = useWatch({ control, name: 'people' }) ?? [];
 
   useEffect(() => {
     const loadQuestionSet = async () => {
@@ -492,6 +491,7 @@ export function EditQuestionsForm() {
             setValue={setValue}
             people={people}
             triggerScrollToLast={scrollTarget?.type === 'always' ? scrollTarget.version : undefined}
+            getAllItemNames={getAllItemNames}
           />
           {questionFields.length > 0 && (
             <div className="flex justify-end">
@@ -519,6 +519,7 @@ export function EditQuestionsForm() {
               forceCollapsed={allQuestionsCollapsed}
               triggerScrollToOptionIndex={scrollTarget?.type === 'option' && scrollTarget.qi === questionIndex ? scrollTarget.oi : undefined}
               triggerScrollToLastVersion={scrollTarget?.type === 'option' && scrollTarget.qi === questionIndex ? scrollTarget.version : undefined}
+              getAllItemNames={getAllItemNames}
             />
           ))}
           {/* Add Question button at bottom of form - only visible on large screens */}
@@ -613,7 +614,7 @@ export function EditQuestionsForm() {
             </Button>
             <Button
               type="button"
-              onClick={() => setIsAddItemModalOpen(true)}
+              onClick={handleOpenAddItemModal}
               variant="secondary"
             >
               Add Item...
@@ -646,7 +647,7 @@ export function EditQuestionsForm() {
             </Button>
             <Button
               type="button"
-              onClick={() => setIsAddItemModalOpen(true)}
+              onClick={handleOpenAddItemModal}
               variant="secondary"
             >
               Add Item...
@@ -663,9 +664,9 @@ export function EditQuestionsForm() {
       <AddItemModal
         isOpen={isAddItemModalOpen}
         onClose={() => setIsAddItemModalOpen(false)}
-        questions={watch('questions') ?? []}
+        questions={addItemModalData.questions}
         people={people ?? []}
-        existingItemNames={(watch('questions') ?? []).flatMap((q) => q.options.flatMap((o) => o.items.map((i) => i.text)))}
+        existingItemNames={addItemModalData.existingItemNames}
         onConfirm={handleAddItemConfirm}
       />
         </>

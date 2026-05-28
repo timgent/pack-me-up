@@ -17,18 +17,15 @@ interface OptionSectionProps {
     removeOption: () => void;
     people: Person[];
     triggerScrollToLast?: number;
+    getAllItemNames: () => string[];
 }
 
-export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people, triggerScrollToLast }: OptionSectionProps) {
+export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
     })
-    const allItems = [...new Set((watch('questions') ?? []).flatMap((q) =>
-        q.options.flatMap((o) => o.items)
-    ).filter(Boolean))] as Item[];
-    const allItemNames = () => allItems.map((item) => item.text);
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
     const expectedNewLengthRef = useRef<number | null>(null);
     const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
@@ -110,7 +107,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                                         onChange={(newValue) => {
                                             onChange({ ...value, text: newValue })
                                         }}
-                                        options={allItemNames()}
+                                        options={getAllItemNames()}
                                         placeholder="Enter item"
                                     />}
                             >
