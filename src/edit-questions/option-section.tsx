@@ -4,9 +4,8 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
-import { useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { ItemPeopleSection } from './item-people-section'
-import { QuestionItemAddModal } from './question-item-add-modal'
 
 interface OptionSectionProps {
     control: Control<PackingListQuestionSet>;
@@ -21,7 +20,6 @@ interface OptionSectionProps {
 
 export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -30,6 +28,19 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
         q.options.flatMap((o) => o.items)
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
+    const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const expectedNewLengthRef = useRef<number | null>(null);
+    const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (expectedNewLengthRef.current === itemFields.length) {
+            expectedNewLengthRef.current = null;
+            const idx = itemFields.length - 1;
+            selectRefs.current[idx]?.querySelector('input')?.focus();
+            selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setNewItemIndex(idx);
+        }
+    }, [itemFields.length]);
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
@@ -66,8 +77,8 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
             {isExpanded && <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {itemFields.map((_item: Item, itemIndex: number) => (
-                    <div key={itemIndex} className="flex items-start gap-2 sm:gap-3 rounded-md">
-                        <div className="flex-1">
+                    <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
+                        <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
                                 control={control}
                                 basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
@@ -102,20 +113,16 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                 ))}
                 <Button
                     type="button"
-                    onClick={() => setIsAddModalOpen(true)}
+                    onClick={() => {
+                        expectedNewLengthRef.current = itemFields.length + 1;
+                        appendItem({ text: "", personSelections: [] });
+                    }}
                     variant="ghost"
                     className="mt-2"
                 >
                     Add Item
                 </Button>
             </div>}
-            <QuestionItemAddModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                onConfirm={(item) => appendItem(item)}
-                existingItemNames={allItemNames()}
-                people={people}
-            />
         </div>
     );
 }

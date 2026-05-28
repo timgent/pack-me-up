@@ -3,9 +3,8 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormWatch, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
-import { useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { ItemPeopleSection } from './item-people-section'
-import { QuestionItemAddModal } from './question-item-add-modal'
 
 interface AlwaysNeededItemsSectionProps {
     control: Control<PackingListQuestionSet>;
@@ -17,7 +16,6 @@ interface AlwaysNeededItemsSectionProps {
 
 export function AlwaysNeededItemsSection({ control, register, watch, setValue, people }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -28,6 +26,19 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
         q.options.flatMap((o) => o.items)
     ).filter(Boolean))] as Item[];
     const allItemNames = () => allItems.map((item) => item.text);
+    const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const expectedNewLengthRef = useRef<number | null>(null);
+    const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (expectedNewLengthRef.current === itemFields.length) {
+            expectedNewLengthRef.current = null;
+            const idx = itemFields.length - 1;
+            selectRefs.current[idx]?.querySelector('input')?.focus();
+            selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setNewItemIndex(idx);
+        }
+    }, [itemFields.length]);
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -53,8 +64,8 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
             {isExpanded && (
                 <div className="space-y-3">
                 {itemFields.map((_item: Item, itemIndex: number) => (
-                    <div key={itemIndex} className="flex items-start gap-2 sm:gap-3 rounded-md">
-                        <div className="flex-1">
+                    <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
+                        <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
                                 control={control}
                                 basePath={`alwaysNeededItems.${itemIndex}`}
@@ -88,7 +99,10 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                 ))}
                 <Button
                     type="button"
-                    onClick={() => setIsAddModalOpen(true)}
+                    onClick={() => {
+                        expectedNewLengthRef.current = itemFields.length + 1;
+                        appendItem({ text: "", personSelections: [] });
+                    }}
                     variant="ghost"
                     className="mt-2"
                 >
@@ -96,13 +110,6 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                 </Button>
             </div>
             )}
-            <QuestionItemAddModal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                onConfirm={(item) => appendItem(item)}
-                existingItemNames={allItemNames()}
-                people={people}
-            />
         </div>
     );
 }

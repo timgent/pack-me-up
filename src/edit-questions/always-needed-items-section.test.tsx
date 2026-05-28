@@ -49,12 +49,4 @@ describe('AlwaysNeededItemsSection', () => {
         fireEvent.click(header)
         expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy()
     })
-
-    it('opens the add item modal when "Add Item" button is clicked', () => {
-        render(<Wrapper />)
-        const header = screen.getByRole('button', { name: /always needed items/i })
-        fireEvent.click(header)
-        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
-        expect(screen.getByRole('heading', { name: /add item/i })).toBeTruthy()
-    })
 })
