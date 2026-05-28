@@ -29,6 +29,7 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
     const selectRefs = useRef<(HTMLDivElement | null)[]>([]);
     const expectedNewLengthRef = useRef<number | null>(null);
     const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
+    const pendingScrollRef = useRef(false);
 
     useEffect(() => {
         if (expectedNewLengthRef.current === itemFields.length) {
@@ -44,14 +45,21 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
     useEffect(() => {
         if (!triggerScrollToLast) return;
         setIsExpanded(true);
-        requestAnimationFrame(() => {
-            const idx = itemFields.length - 1;
-            if (idx >= 0) {
-                selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setNewItemIndex(idx);
-            }
-        });
+        pendingScrollRef.current = true;
     }, [triggerScrollToLast]);
+
+    useEffect(() => {
+        if (!pendingScrollRef.current || !isExpanded) return;
+        pendingScrollRef.current = false;
+        const idx = itemFields.length - 1;
+        if (idx >= 0) {
+            requestAnimationFrame(() => {
+                selectRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            setNewItemIndex(idx);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isExpanded, triggerScrollToLast]);
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
