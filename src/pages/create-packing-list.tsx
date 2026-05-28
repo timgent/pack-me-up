@@ -9,9 +9,10 @@ import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
-import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS, loadMultipleRdfFromPod } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
-import { questionSetToDataset, datasetToQuestionSet, packingListToDataset } from '../services/rdfSerialization'
+import { questionSetToDataset, datasetToQuestionSet, packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
+import { useForeignPod } from '../components/ForeignPodContext'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -304,6 +305,9 @@ export function CreatePackingList() {
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { db, loginSyncInProgress } = useDatabase()
     const navigate = useNavigate()
+    const foreignPodCtx = useForeignPod()
+    const foreignPodUrl = foreignPodCtx?.foreignPodUrl ?? null
+    const encodedForeignPodUrl = foreignPodUrl ? encodeURIComponent(foreignPodUrl) : null
 
     const { register, handleSubmit, setValue, watch } = useForm<PackingListFormData>({
         defaultValues: {
@@ -315,6 +319,13 @@ export function CreatePackingList() {
     // Sync question set from pod once on page load so the list is created from
     // the most up-to-date question set, even if another device updated it since login.
     const handleQuestionSetPodSync = useCallback((podData: PackingListQuestionSet) => {
+        if (foreignPodUrl) {
+            // Foreign pod: just set state, don't write to local DB
+            setQuestionSet(podData)
+            setSelectedPeopleIds(podData.people.map(p => p.id))
+            setIsLoading(false)
+            return
+        }
         const podTime = podData.lastModified ? new Date(podData.lastModified).getTime() : 0
         const localTime = questionSet?.lastModified ? new Date(questionSet.lastModified).getTime() : 0
         if (!questionSet || podTime > localTime) {
@@ -322,20 +333,30 @@ export function CreatePackingList() {
                 setQuestionSet({ ...podData, _rev: rev })
             }).catch(err => console.error('Failed to save synced question set:', err))
         }
-    }, [questionSet, db])
+    }, [questionSet, db, foreignPodUrl])
 
     const { saveToPod: saveQuestionSetToPod } = usePodSync<PackingListQuestionSet>({
         pathConfig: {
             container: POD_CONTAINERS.ROOT,
             filename: 'packing-list-questions.ttl',
+            podUrl: foreignPodUrl ?? undefined,
         },
         rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
         syncOnMount: true,
-        enabled: isLoggedIn,
+        enabled: isLoggedIn || !!foreignPodUrl,
         onSyncSuccess: handleQuestionSetPodSync,
     })
 
     useEffect(() => {
+        if (foreignPodUrl) {
+            // Questions come from usePodSync onSyncSuccess; just load past lists from the foreign pod.
+            if (!session) return
+            loadMultipleRdfFromPod(session, `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}`, datasetToPackingList)
+                .then(({ data }) => setAllPackingLists(data))
+                .catch(err => console.error('Error loading foreign packing lists for suggestions:', err))
+            return
+        }
+
         if (loginSyncInProgress) return
 
         const fetchQuestionSet = async () => {
@@ -368,7 +389,7 @@ export function CreatePackingList() {
             }
         }
         fetchQuestionSet()
-    }, [db, showToast, loginSyncInProgress])
+    }, [db, showToast, loginSyncInProgress, foreignPodUrl, session])
 
     const suggestions = useMemo(
         () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],
@@ -414,13 +435,15 @@ export function CreatePackingList() {
         // Stamp a lastModified so manage-questions' fallback-to-pod sync resolution
         // won't overwrite this save with stale pod data.
         const updatedQsWithTimestamp = { ...updatedQs, lastModified: new Date().toISOString() }
-        const { rev } = await db.saveQuestionSet(updatedQsWithTimestamp)
-        const savedQs = { ...updatedQsWithTimestamp, _rev: rev }
-        setQuestionSet(savedQs)
-
-        // Push to pod so the updated question set is available on any device and
-        // survives the next pod sync in manage-questions.
-        await saveQuestionSetToPod(savedQs)
+        if (foreignPodUrl) {
+            setQuestionSet(updatedQsWithTimestamp)
+            await saveQuestionSetToPod(updatedQsWithTimestamp)
+        } else {
+            const { rev } = await db.saveQuestionSet(updatedQsWithTimestamp)
+            const savedQs = { ...updatedQsWithTimestamp, _rev: rev }
+            setQuestionSet(savedQs)
+            await saveQuestionSetToPod(savedQs)
+        }
 
         await markReviewed(listId, item)
     }
@@ -431,7 +454,7 @@ export function CreatePackingList() {
 
     const pushListToPod = async (list: PackingList) => {
         if (!isLoggedIn || !session) return
-        const podUrl = await getPrimaryPodUrl(session)
+        const podUrl = foreignPodUrl ?? await getPrimaryPodUrl(session)
         if (!podUrl) return
         await saveRdfToPod({
             session,
@@ -448,10 +471,13 @@ export function CreatePackingList() {
             ...list,
             items: list.items.map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
-        const { rev } = await db.savePackingList(updatedList)
-        const savedList = { ...updatedList, _rev: rev }
-        setAllPackingLists(prev => prev.map(l => l.id === listId ? savedList : l))
-        await pushListToPod(savedList)
+        if (foreignPodUrl) {
+            setAllPackingLists(prev => prev.map(l => l.id === listId ? updatedList : l))
+        } else {
+            const { rev } = await db.savePackingList(updatedList)
+            setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+        }
+        await pushListToPod(updatedList)
     }
 
     const markDeletedReviewed = async (listId: string, item: PackingListItem) => {
@@ -461,10 +487,13 @@ export function CreatePackingList() {
             ...list,
             deletedItems: (list.deletedItems ?? []).map(i => i.id === item.id ? { ...i, reviewed: true } : i),
         }
-        const { rev } = await db.savePackingList(updatedList)
-        const savedList = { ...updatedList, _rev: rev }
-        setAllPackingLists(prev => prev.map(l => l.id === listId ? savedList : l))
-        await pushListToPod(savedList)
+        if (foreignPodUrl) {
+            setAllPackingLists(prev => prev.map(l => l.id === listId ? updatedList : l))
+        } else {
+            const { rev } = await db.savePackingList(updatedList)
+            setAllPackingLists(prev => prev.map(l => l.id === listId ? { ...updatedList, _rev: rev } : l))
+        }
+        await pushListToPod(updatedList)
     }
 
     const handleRemovePermanently = async (listId: string, item: PackingListItem) => {
@@ -496,8 +525,13 @@ export function CreatePackingList() {
                 ),
             }
         }
-        const { rev } = await db.saveQuestionSet(updatedQs)
-        setQuestionSet({ ...updatedQs, _rev: rev })
+        if (foreignPodUrl) {
+            setQuestionSet(updatedQs)
+            await saveQuestionSetToPod(updatedQs)
+        } else {
+            const { rev } = await db.saveQuestionSet(updatedQs)
+            setQuestionSet({ ...updatedQs, _rev: rev })
+        }
         await markDeletedReviewed(listId, item)
     }
 
@@ -570,21 +604,31 @@ export function CreatePackingList() {
             items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {
-            await db.savePackingList(packingList)
-            if (isLoggedIn) {
-                const podUrl = await getPrimaryPodUrl(session)
-                if (podUrl) {
-                    await saveRdfToPod({
-                        session: session!,
-                        fileUrl: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${packingList.id}.ttl`,
-                        data: packingList,
-                        serializer: packingListToDataset,
-                    })
+            if (foreignPodUrl) {
+                await saveRdfToPod({
+                    session: session!,
+                    fileUrl: `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${packingList.id}.ttl`,
+                    data: packingList,
+                    serializer: packingListToDataset,
+                })
+                showToast('Packing list created successfully!', 'success')
+                navigate(`/pod/${encodedForeignPodUrl}/view-lists/${packingList.id}`)
+            } else {
+                await db.savePackingList(packingList)
+                if (isLoggedIn) {
+                    const podUrl = await getPrimaryPodUrl(session)
+                    if (podUrl) {
+                        await saveRdfToPod({
+                            session: session!,
+                            fileUrl: `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${packingList.id}.ttl`,
+                            data: packingList,
+                            serializer: packingListToDataset,
+                        })
+                    }
                 }
+                showToast('Packing list created successfully!', 'success')
+                navigate(`/view-lists/${packingList.id}`)
             }
-            showToast('Packing list created successfully!', 'success')
-            // Navigate to the newly created packing list
-            navigate(`/view-lists/${packingList.id}`)
         } catch (err) {
             console.error('Error saving packing list:', err)
             showToast('Failed to create packing list. Please try again.', 'error')
@@ -603,7 +647,7 @@ export function CreatePackingList() {
         )
     }
 
-    if (noQuestionsFound) {
+    if (noQuestionsFound && !foreignPodUrl) {
         return (
             <>
                 <div className="max-w-4xl mx-auto py-8 px-4">
