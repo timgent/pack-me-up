@@ -607,26 +607,45 @@ export function EditQuestionsForm() {
               </div>
             )}
 
-            {/* Status dots */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Status indicators */}
+            <div className="flex items-center gap-3 shrink-0 text-xs">
+              {/* Auto-save */}
               {autoSaveStatus === 'saving' && (
-                <div className="w-2 h-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Saving…" />
+                <span className="flex items-center gap-1 text-blue-600">
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  Saving…
+                </span>
               )}
-              {autoSaveStatus === 'saved' && (
-                <div className="w-2 h-2 bg-green-500 rounded-full" title="Saved" />
+              {(autoSaveStatus === 'saved' || autoSaveStatus === 'idle') && (
+                <span className="flex items-center gap-1 text-gray-400">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  Saved
+                </span>
               )}
               {autoSaveStatus === 'error' && (
-                <div className="w-2 h-2 bg-red-500 rounded-full" title="Save error" />
+                <span className="flex items-center gap-1 text-red-600 font-medium">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                  Save error
+                </span>
               )}
-              {autoSaveStatus === 'idle' && (
-                <div className="w-2 h-2 bg-green-500 rounded-full opacity-50" title="All changes saved" />
-              )}
+              {/* Pod sync */}
               {isLoggedIn && (
-                isSyncing
-                  ? <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" title="Pod syncing…" />
-                  : syncError
-                    ? <div className="w-2 h-2 bg-red-500 rounded-full" title={`Pod sync error: ${syncError}`} />
-                    : <div className="w-2 h-2 bg-green-500 rounded-full opacity-50" title={`Pod synced ${formatLastSync(lastSync)}`} />
+                isSyncing ? (
+                  <span className="flex items-center gap-1 text-blue-600">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Syncing
+                  </span>
+                ) : syncError ? (
+                  <span className="flex items-center gap-1 text-red-600 font-medium">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
+                    Pod error
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-gray-400">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
+                    Pod
+                  </span>
+                )
               )}
             </div>
 
