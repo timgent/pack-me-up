@@ -105,6 +105,21 @@ export function handlePodError(error: unknown): never {
     throw error
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function friendlyPodName(podUrl: string): string {
+    try {
+        const url = new URL(podUrl)
+        const firstSegment = url.pathname.split('/').find(s => s.length > 0)
+        if (firstSegment && !UUID_RE.test(firstSegment)) {
+            return `${firstSegment} on ${url.hostname}`
+        }
+        return url.hostname
+    } catch {
+        return podUrl
+    }
+}
+
 export function deriveWebIdFromPodUrl(podUrl: string): string {
     const base = podUrl.replace(/\/+$/, '')
     return `${base}/profile/card#me`

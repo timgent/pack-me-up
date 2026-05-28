@@ -9,6 +9,7 @@ import {
     POD_CONTAINERS,
     getPrimaryPodUrl,
     getPodOwnerName,
+    friendlyPodName,
 } from '../services/solidPod'
 import { sharedWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedWithMeList } from '../services/rdfSerialization'
@@ -109,7 +110,7 @@ export function ForeignPodLayout() {
     return (
         <ForeignPodContext.Provider value={{ foreignPodUrl }}>
             <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800 -mx-4 -mt-8 mb-6">
-                Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? foreignPodUrl}</span>'s data
+                Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? friendlyPodName(foreignPodUrl)}</span>'s data
             </div>
             <Outlet />
         </ForeignPodContext.Provider>

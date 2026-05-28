@@ -8,6 +8,8 @@ import {
     revokeFullCollaboratorAccess,
     getFullCollaborators,
     getPrimaryPodUrl,
+    getPodOwnerName,
+    friendlyPodName,
 } from '../services/solidPod'
 import type { SharedContext } from '../services/rdfSerialization'
 
@@ -25,6 +27,7 @@ export function SharingSettingsPage() {
     const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false)
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
+    const [podNames, setPodNames] = useState<Record<string, string>>({})
 
     useEffect(() => {
         if (!isLoggedIn || !session) return
@@ -53,6 +56,20 @@ export function SharingSettingsPage() {
             .then(swm => setSharedContexts(swm.contexts))
             .catch(() => setSharedContexts([]))
     }, [db])
+
+    useEffect(() => {
+        if (!session || sharedContexts.length === 0) return
+        const unlabeled = sharedContexts.filter(c => !c.label)
+        if (unlabeled.length === 0) return
+        Promise.all(unlabeled.map(c => getPodOwnerName(session, c.podUrl).then(n => [c.podUrl, n] as const)))
+            .then(results => {
+                const names: Record<string, string> = {}
+                for (const [podUrl, name] of results) {
+                    if (name) names[podUrl] = name
+                }
+                setPodNames(names)
+            })
+    }, [sharedContexts, session])
 
     const handleGrantAccess = async () => {
         if (!session || !ownPodUrl || !collaboratorWebId.trim()) return
@@ -178,7 +195,7 @@ export function SharingSettingsPage() {
                         {sharedContexts.map(ctx => (
                             <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                 <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? ctx.podUrl}
+                                    {ctx.label ?? podNames[ctx.podUrl] ?? friendlyPodName(ctx.podUrl)}
                                 </span>
                                 <button
                                     onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}

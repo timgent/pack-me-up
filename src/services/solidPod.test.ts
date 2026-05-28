@@ -15,6 +15,7 @@ import {
     revokeCollaboratorAccess,
     getCollaborators,
     getPodOwnerName,
+    friendlyPodName,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import type { PackingAppDatabase } from './database'
@@ -945,5 +946,25 @@ describe('getPodOwnerName', () => {
         const result = await getPodOwnerName(mockSession, POD)
 
         expect(result).toBeNull()
+    })
+})
+
+// ─── friendlyPodName ─────────────────────────────────────────────────────────
+
+describe('friendlyPodName', () => {
+    it('returns hostname when path is a UUID', () => {
+        expect(friendlyPodName('https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/')).toBe('storage.inrupt.com')
+    })
+
+    it('returns "segment on hostname" for a meaningful path segment', () => {
+        expect(friendlyPodName('https://solidcommunity.net/alice/')).toBe('alice on solidcommunity.net')
+    })
+
+    it('returns hostname when there is no path segment', () => {
+        expect(friendlyPodName('https://alice.solidcommunity.net/')).toBe('alice.solidcommunity.net')
+    })
+
+    it('returns the input unchanged when the URL is invalid', () => {
+        expect(friendlyPodName('not-a-url')).toBe('not-a-url')
     })
 })
