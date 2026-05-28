@@ -22,6 +22,8 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
     const [destLabel, setDestLabel] = useState('')
     const [text, setText] = useState('')
     const [personSelections, setPersonSelections] = useState<PersonSelection[]>([])
+    const [textError, setTextError] = useState(false)
+    const [peopleError, setPeopleError] = useState(false)
 
     useEffect(() => {
         if (isOpen) {
@@ -30,6 +32,8 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
             setDestLabel('')
             setText('')
             setPersonSelections(people.map(p => ({ personId: p.id, selected: false })))
+            setTextError(false)
+            setPeopleError(false)
         }
     }, [isOpen, people])
 
@@ -40,19 +44,33 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
     }
 
     const allSelected = personSelections.length > 0 && personSelections.every(s => s.selected)
+    const anySelected = personSelections.some(s => s.selected)
 
     function handleToggleAll() {
         const next = !allSelected
         setPersonSelections(personSelections.map(s => ({ ...s, selected: next })))
+        if (next) setPeopleError(false)
     }
 
     function handleTogglePerson(idx: number) {
-        setPersonSelections(personSelections.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s))
+        const updated = personSelections.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s)
+        setPersonSelections(updated)
+        if (updated.some(s => s.selected)) setPeopleError(false)
+    }
+
+    function handleTextChange(value: string) {
+        setText(value)
+        if (value.trim()) setTextError(false)
     }
 
     function handleConfirm() {
+        if (!selectedDest) return
         const trimmed = text.trim()
-        if (!trimmed || !selectedDest) return
+        const missingText = !trimmed
+        const missingPeople = people.length > 0 && !anySelected
+        if (missingText) setTextError(true)
+        if (missingPeople) setPeopleError(true)
+        if (missingText || missingPeople) return
         onConfirm(selectedDest, { text: trimmed, personSelections })
         onClose()
     }
@@ -118,12 +136,17 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
 
                 {step === 'details' && (
                     <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
-                        <CustomCreatableSelect
-                            value={text}
-                            onChange={setText}
-                            options={existingItemNames}
-                            placeholder="Enter item name"
-                        />
+                        <div>
+                            <CustomCreatableSelect
+                                value={text}
+                                onChange={handleTextChange}
+                                options={existingItemNames}
+                                placeholder="Enter item name"
+                            />
+                            {textError && (
+                                <p className="text-sm text-red-600 mt-1">Please enter an item name.</p>
+                            )}
+                        </div>
                         {people.length > 0 && (
                             <PersonPicker
                                 people={people}
@@ -131,11 +154,12 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
                                 allSelected={allSelected}
                                 onToggleAll={handleToggleAll}
                                 onTogglePerson={handleTogglePerson}
+                                error={peopleError}
                             />
                         )}
                         <div className="flex justify-end gap-3 pt-2">
                             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                            <Button type="button" onClick={handleConfirm} disabled={!text.trim()}>Add Item</Button>
+                            <Button type="button" onClick={handleConfirm}>Add Item</Button>
                         </div>
                     </div>
                 )}
@@ -162,12 +186,16 @@ interface PersonPickerProps {
     allSelected: boolean
     onToggleAll: () => void
     onTogglePerson: (idx: number) => void
+    error?: boolean
 }
 
-export function PersonPicker({ people, personSelections, allSelected, onToggleAll, onTogglePerson }: PersonPickerProps) {
+export function PersonPicker({ people, personSelections, allSelected, onToggleAll, onTogglePerson, error }: PersonPickerProps) {
     return (
         <div>
             <div className="text-sm font-medium text-gray-700 mb-2">Who needs it?</div>
+            {error && (
+                <p className="text-sm text-red-600 mb-2">Please select at least one person.</p>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
                 <button
                     type="button"

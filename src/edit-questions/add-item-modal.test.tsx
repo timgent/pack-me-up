@@ -102,4 +102,34 @@ describe('AddItemModal — details step', () => {
         fireEvent.click(screen.getByRole('button', { name: /close/i }))
         expect(onClose).toHaveBeenCalled()
     })
+
+    it('shows people error when Add Item is clicked with no person selected', () => {
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
+        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
+        expect(screen.getByText(/please select at least one person/i)).toBeTruthy()
+    })
+
+    it('shows text error when Add Item is clicked with no text entered', () => {
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
+        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
+        expect(screen.getByText(/please enter an item name/i)).toBeTruthy()
+    })
+
+    it('clears people error once a person is selected', () => {
+        renderModal()
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
+        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
+        expect(screen.getByText(/please select at least one person/i)).toBeTruthy()
+        fireEvent.click(screen.getByRole('button', { name: /alice/i }))
+        expect(screen.queryByText(/please select at least one person/i)).toBeNull()
+    })
+
+    it('does not show people error when people array is empty', () => {
+        renderModal({ people: [] })
+        fireEvent.click(screen.getByRole('button', { name: 'Always Needed Items' }))
+        fireEvent.click(screen.getByRole('button', { name: /^add item$/i }))
+        expect(screen.queryByText(/please select at least one person/i)).toBeNull()
+    })
 })
