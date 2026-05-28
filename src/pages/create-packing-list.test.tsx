@@ -235,6 +235,18 @@ describe('getUnreviewedCustomItems', () => {
         expect(result[1].listId).toBe('list-2')
         expect(result[1].listName).toBe('London Trip')
     })
+
+    it('excludes custom items belonging to a guest (personId not in question set)', () => {
+        const guestItem = makeCustomItem({ itemText: 'Guest snacks', personId: 'guest-uuid-123', personName: 'Dave' })
+        const list = makePackingList({ items: [guestItem] })
+        expect(getUnreviewedCustomItems([list], makeQuestionSet())).toHaveLength(0)
+    })
+
+    it('still includes custom items with empty personId (regular manually-added items)', () => {
+        const item = makeCustomItem({ itemText: 'Sunscreen SPF50', personId: '' })
+        const list = makePackingList({ items: [item] })
+        expect(getUnreviewedCustomItems([list], makeQuestionSet())).toHaveLength(1)
+    })
 })
 
 // ─── CreatePackingList – suggestion card ──────────────────────────────────────
@@ -739,6 +751,20 @@ describe('getUnreviewedDeletedItems', () => {
         expect(result).toHaveLength(2)
         expect(result[0].listId).toBe('list-1')
         expect(result[1].listId).toBe('list-2')
+    })
+
+    it('excludes deleted items belonging to a guest (personId not in question set)', () => {
+        const guestItem = makeDeletedItem({ itemText: 'Passport', personId: 'guest-uuid-123' })
+        const list = makePackingList({ items: [], deletedItems: [guestItem] })
+        const qs = makeQsWithAlwaysNeeded('Passport')
+        expect(getUnreviewedDeletedItems([list], qs)).toHaveLength(0)
+    })
+
+    it('still includes deleted items with a personId that is in the question set', () => {
+        const item = makeDeletedItem({ itemText: 'Passport', personId: 'p1' })
+        const list = makePackingList({ items: [], deletedItems: [item] })
+        const qs = makeQsWithAlwaysNeeded('Passport')
+        expect(getUnreviewedDeletedItems([list], qs)).toHaveLength(1)
     })
 })
 

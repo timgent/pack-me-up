@@ -47,6 +47,7 @@ function App() {
                   <Route path="view-lists" element={<ForeignPackingListsPage />} />
                   <Route path="view-lists/:id" element={<ViewPackingList />} />
                   <Route path="manage-questions" element={<EditQuestionsForm />} />
+                  <Route path="create-packing-list" element={<CreatePackingList />} />
                 </Route>
               </Routes>
             </div>

@@ -6,6 +6,7 @@ export interface PackingList {
     lastModified?: string // ISO timestamp for conflict resolution
     items: PackingListItem[]
     deletedItems?: PackingListItem[]
+    guests?: Array<{ id: string; name: string }>
 }
 
 export interface PackingListItem {

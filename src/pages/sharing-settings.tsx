@@ -8,7 +8,12 @@ import {
     revokeFullCollaboratorAccess,
     getFullCollaborators,
     getPrimaryPodUrl,
+    getPodOwnerName,
+    friendlyPodName,
+    saveRdfToPod,
+    POD_CONTAINERS,
 } from '../services/solidPod'
+import { sharedWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedContext } from '../services/rdfSerialization'
 
 export function SharingSettingsPage() {
@@ -25,6 +30,8 @@ export function SharingSettingsPage() {
     const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false)
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
+    const [podNames, setPodNames] = useState<Record<string, string>>({})
+    const [removingPodUrl, setRemovingPodUrl] = useState<string | null>(null)
 
     useEffect(() => {
         if (!isLoggedIn || !session) return
@@ -54,13 +61,29 @@ export function SharingSettingsPage() {
             .catch(() => setSharedContexts([]))
     }, [db])
 
+    useEffect(() => {
+        if (!session || sharedContexts.length === 0) return
+        const unlabeled = sharedContexts.filter(c => !c.label)
+        if (unlabeled.length === 0) return
+        Promise.all(unlabeled.map(c => getPodOwnerName(session, c.podUrl, c.webId).then(n => [c.podUrl, n] as const)))
+            .then(results => {
+                const names: Record<string, string> = {}
+                for (const [podUrl, name] of results) {
+                    if (name) names[podUrl] = name
+                }
+                setPodNames(names)
+            })
+    }, [sharedContexts, session])
+
     const handleGrantAccess = async () => {
         if (!session || !ownPodUrl || !collaboratorWebId.trim()) return
         setIsGranting(true)
         setInviteLink(null)
         try {
             await grantFullCollaboratorAccess(session, ownPodUrl, collaboratorWebId.trim())
-            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists`
+            const ownerWebId = session?.info.webId
+            const ownerParam = ownerWebId ? `?owner=${encodeURIComponent(ownerWebId)}` : ''
+            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists${ownerParam}`
             setInviteLink(link)
             setCollaboratorWebId('')
             await loadCollaborators()
@@ -71,6 +94,34 @@ export function SharingSettingsPage() {
             showToast(`Failed to grant access: ${msg}`, 'error')
         } finally {
             setIsGranting(false)
+        }
+    }
+
+    const handleRemoveSharedContext = async (podUrl: string) => {
+        setRemovingPodUrl(podUrl)
+        try {
+            const list = await db.getSharedWithMe()
+            const updated = {
+                contexts: list.contexts.filter(c => c.podUrl !== podUrl),
+                lastModified: new Date().toISOString(),
+            }
+            await db.saveSharedWithMe(updated)
+            setSharedContexts(updated.contexts)
+            const ownPodUrl = await getPrimaryPodUrl(session!)
+            if (ownPodUrl) {
+                await saveRdfToPod({
+                    session: session!,
+                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_WITH_ME}`,
+                    data: updated,
+                    serializer: sharedWithMeToDataset,
+                })
+            }
+            showToast('Removed', 'success')
+        } catch (err) {
+            console.error('SharingSettingsPage: failed to remove shared context', err)
+            showToast('Failed to remove. Please try again.', 'error')
+        } finally {
+            setRemovingPodUrl(null)
         }
     }
 
@@ -178,13 +229,21 @@ export function SharingSettingsPage() {
                         {sharedContexts.map(ctx => (
                             <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                 <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? ctx.podUrl}
+                                    {ctx.label ?? podNames[ctx.podUrl] ?? (ctx.webId ? friendlyPodName(ctx.webId) : undefined) ?? friendlyPodName(ctx.podUrl)}
                                 </span>
                                 <button
                                     onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
                                     className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
                                 >
                                     Open
+                                </button>
+                                <button
+                                    onClick={() => handleRemoveSharedContext(ctx.podUrl)}
+                                    disabled={removingPodUrl === ctx.podUrl}
+                                    aria-label={`Remove shared pod`}
+                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                >
+                                    {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
                                 </button>
                             </li>
                         ))}

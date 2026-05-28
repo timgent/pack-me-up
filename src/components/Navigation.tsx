@@ -27,6 +27,7 @@ export const Navigation = () => {
     // When viewing a foreign pod, contextual links stay inside that pod's routes
     const viewListsPath = inForeignContext ? `/pod/${currentForeignEncoded}/view-lists` : '/view-lists'
     const manageQuestionsPath = inForeignContext ? `/pod/${currentForeignEncoded}/manage-questions` : '/manage-questions'
+    const createListPath = inForeignContext ? `/pod/${currentForeignEncoded}/create-packing-list` : '/create-packing-list'
 
     const handleSolidLogin = () => {
         setIsProviderSelectorOpen(true)
@@ -60,14 +61,12 @@ export const Navigation = () => {
                                     >
                                         {inForeignContext ? 'Questions & Items' : 'My Questions & Items'}
                                     </Link>
-                                    {!inForeignContext && (
-                                        <Link
-                                            to="/create-packing-list"
-                                            className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                                        >
-                                            Create List
-                                        </Link>
-                                    )}
+                                    <Link
+                                        to={createListPath}
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
+                                    >
+                                        Create List
+                                    </Link>
                                     <Link
                                         to={viewListsPath}
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
@@ -192,15 +191,13 @@ export const Navigation = () => {
                         >
                             {inForeignContext ? 'Questions & Items' : 'My Questions & Items'}
                         </Link>
-                        {!inForeignContext && (
-                            <Link
-                                to="/create-packing-list"
-                                className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Create List
-                            </Link>
-                        )}
+                        <Link
+                            to={createListPath}
+                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Create List
+                        </Link>
                         <Link
                             to={viewListsPath}
                             className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"

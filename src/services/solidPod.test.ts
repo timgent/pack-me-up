@@ -14,6 +14,8 @@ import {
     grantPublicAccess,
     revokeCollaboratorAccess,
     getCollaborators,
+    getPodOwnerName,
+    friendlyPodName,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import type { PackingAppDatabase } from './database'
@@ -903,5 +905,81 @@ describe('getCollaborators', () => {
         mockGetAgentAccessAll.mockRejectedValue(err)
 
         await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow('Network failure')
+    })
+})
+
+// ─── getPodOwnerName ─────────────────────────────────────────────────────────
+
+describe('getPodOwnerName', () => {
+    const POD = 'https://pod.example.com/'
+    const WEB_ID = 'https://pod.example.com/profile/card#me'
+    const PROFILE_CARD_URL = 'https://pod.example.com/profile/card'
+
+    it('returns the foaf:name from the profile card', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID })
+            .addStringNoLocale('http://xmlns.com/foaf/0.1/name', 'Alice Smith')
+            .build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBe('Alice Smith')
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(PROFILE_CARD_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+
+    it('returns null when profile card fetch fails', async () => {
+        mockGetSolidDataset.mockRejectedValueOnce(new Error('Not found'))
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBeNull()
+    })
+
+    it('returns null when profile card has no foaf:name', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID }).build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD)
+
+        expect(result).toBeNull()
+    })
+
+    it('uses an explicit WebID instead of deriving from the pod URL', async () => {
+        const EXPLICIT_WEB_ID = 'https://id.example.com/alice'
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: EXPLICIT_WEB_ID })
+            .addStringNoLocale('http://xmlns.com/foaf/0.1/name', 'Alice')
+            .build()
+        const dataset = setThing(createSolidDataset(), thing)
+        mockGetSolidDataset.mockResolvedValueOnce(dataset as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await getPodOwnerName(mockSession, POD, EXPLICIT_WEB_ID)
+
+        expect(result).toBe('Alice')
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(EXPLICIT_WEB_ID, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+})
+
+// ─── friendlyPodName ─────────────────────────────────────────────────────────
+
+describe('friendlyPodName', () => {
+    it('returns hostname when path is a UUID', () => {
+        expect(friendlyPodName('https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/')).toBe('storage.inrupt.com')
+    })
+
+    it('returns "segment on hostname" for a meaningful path segment', () => {
+        expect(friendlyPodName('https://solidcommunity.net/alice/')).toBe('alice on solidcommunity.net')
+    })
+
+    it('returns hostname when there is no path segment', () => {
+        expect(friendlyPodName('https://alice.solidcommunity.net/')).toBe('alice.solidcommunity.net')
+    })
+
+    it('returns the input unchanged when the URL is invalid', () => {
+        expect(friendlyPodName('not-a-url')).toBe('not-a-url')
     })
 })

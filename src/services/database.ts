@@ -199,6 +199,7 @@ export class PackingAppDatabase {
                         lastModified: packingList.lastModified,
                         items: packingList.items,
                         deletedItems: packingList.deletedItems,
+                        guests: packingList.guests,
                     }
                 }
 
@@ -236,6 +237,7 @@ export class PackingAppDatabase {
                         lastModified: row.doc.data.lastModified,
                         items: row.doc.data.items,
                         deletedItems: row.doc.data.deletedItems,
+                        guests: row.doc.data.guests,
                     }
                     packingLists.push(packingList)
                 }

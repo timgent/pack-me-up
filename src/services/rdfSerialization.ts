@@ -47,6 +47,14 @@ export function packingListToDataset(list: PackingList, datasetUrl: string): Sol
         ds = setThing(ds, packingListItemToThing(item, itemUrl))
     }
 
+    for (const guest of (list.guests ?? [])) {
+        const guestUrl = `${datasetUrl}#guest-${guest.id}`
+        rootBuilder = rootBuilder.addUrl(PMU.hasGuest, guestUrl)
+        ds = setThing(ds, buildThing({ url: guestUrl })
+            .addStringNoLocale(PMU.name, guest.name)
+            .build())
+    }
+
     return setThing(ds, rootBuilder.build())
 }
 
@@ -69,6 +77,16 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
         .map(url => thingToPackingListItem(getThing(dataset, url), url))
         .filter((item): item is PackingListItem => item !== null)
 
+    const guests = getUrlAll(rootThing, PMU.hasGuest)
+        .map(url => {
+            const thing = getThing(dataset, url)
+            if (!thing) return null
+            const id = (url.split('#')[1] ?? '').replace('guest-', '')
+            const name = getStringNoLocale(thing, PMU.name) ?? ''
+            return { id, name }
+        })
+        .filter((g): g is { id: string; name: string } => g !== null)
+
     return {
         id,
         name,
@@ -76,6 +94,7 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
         ...(lastModified !== undefined ? { lastModified } : {}),
         items,
         deletedItems,
+        ...(guests.length > 0 ? { guests } : {}),
     }
 }
 

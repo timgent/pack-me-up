@@ -18,6 +18,7 @@ export const PMU = {
     // PackingList predicates
     hasItem: `${PMU_NS}hasItem`,
     hasDeletedItem: `${PMU_NS}hasDeletedItem`,
+    hasGuest: `${PMU_NS}hasGuest`,
     itemText: `${PMU_NS}itemText`,
     personId: `${PMU_NS}personId`,
     personName: `${PMU_NS}personName`,
