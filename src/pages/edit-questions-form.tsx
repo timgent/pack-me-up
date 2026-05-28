@@ -598,7 +598,7 @@ export function EditQuestionsForm() {
       {/* Sticky bottom bar for small/medium screens */}
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
         <div className="max-w-4xl w-full px-4 pb-4">
-          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex flex-col gap-3 py-4 px-3 pointer-events-auto relative">
+          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex items-center gap-3 py-3 px-4 pointer-events-auto relative">
             {/* Sync from Pod indicator - absolutely positioned to avoid layout shift */}
             {isLoggedIn && syncingFromPod && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10 bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-1.5 shadow-md">
@@ -607,78 +607,51 @@ export function EditQuestionsForm() {
               </div>
             )}
 
-            {/* Auto-save Status */}
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-2 mx-2">
-              <div className="flex items-center justify-between">
-                <div className={`flex items-center gap-2 transition-opacity duration-200 ${autoSaveStatus === 'idle' ? 'opacity-60' : 'opacity-100'}`}>
-                  {autoSaveStatus === 'saving' && (
-                    <>
-                      <div className="animate-spin h-3 w-3 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                      <span className="text-xs text-blue-600">Auto-saving...</span>
-                    </>
-                  )}
-                  {autoSaveStatus === 'saved' && (
-                    <>
-                      <div className="h-3 w-3 flex items-center justify-center text-green-500">✓</div>
-                      <span className="text-xs text-green-600">Saved</span>
-                    </>
-                  )}
-                  {autoSaveStatus === 'error' && (
-                    <>
-                      <div className="h-3 w-3 flex items-center justify-center text-red-500">✗</div>
-                      <span className="text-xs text-red-600">Error</span>
-                    </>
-                  )}
-                  {autoSaveStatus === 'idle' && (
-                    <>
-                      <div className="h-3 w-3 flex items-center justify-center text-gray-500">✓</div>
-                      <span className="text-xs text-gray-600">All changes saved</span>
-                    </>
-                  )}
-                </div>
-              </div>
+            {/* Status dots */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {autoSaveStatus === 'saving' && (
+                <div className="w-2 h-2 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" title="Saving…" />
+              )}
+              {autoSaveStatus === 'saved' && (
+                <div className="w-2 h-2 bg-green-500 rounded-full" title="Saved" />
+              )}
+              {autoSaveStatus === 'error' && (
+                <div className="w-2 h-2 bg-red-500 rounded-full" title="Save error" />
+              )}
+              {autoSaveStatus === 'idle' && (
+                <div className="w-2 h-2 bg-green-500 rounded-full opacity-50" title="All changes saved" />
+              )}
+              {isLoggedIn && (
+                isSyncing
+                  ? <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" title="Pod syncing…" />
+                  : syncError
+                    ? <div className="w-2 h-2 bg-red-500 rounded-full" title={`Pod sync error: ${syncError}`} />
+                    : <div className="w-2 h-2 bg-green-500 rounded-full opacity-50" title={`Pod synced ${formatLastSync(lastSync)}`} />
+              )}
             </div>
 
-            {isLoggedIn && (
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-2 mx-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isSyncing ? (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    ) : syncError ? (
-                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    )}
-                    <p className="text-xs text-gray-600">
-                      {isSyncing ? 'Pod polling...' : `Pod synced ${formatLastSync(lastSync)}`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-3 justify-center">
-            <Button
-              type="button"
-              onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
-              variant="secondary"
-            >
-              Add Question
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setIsAddItemModalOpen(true)}
-              variant="secondary"
-            >
-              Add Item...
-            </Button>
-            <Button type="button" onClick={() => {
-              const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
-              reset(defaultData);
-              setCurrentQuestionSet(defaultData);
-              showToast('Form has been reset to default state', 'success');
-            }}>Reset form</Button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
+              <Button
+                type="button"
+                onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
+                variant="secondary"
+              >
+                Add Question
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setIsAddItemModalOpen(true)}
+                variant="secondary"
+              >
+                Add Item...
+              </Button>
+              <Button type="button" onClick={() => {
+                const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
+                reset(defaultData);
+                setCurrentQuestionSet(defaultData);
+                showToast('Form has been reset to default state', 'success');
+              }}>Reset</Button>
             </div>
           </div>
         </div>
