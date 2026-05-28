@@ -67,6 +67,8 @@ export function ViewPackingList() {
     const [editingItemText, setEditingItemText] = useState<string>('')
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
     const [collapsedPersons, setCollapsedPersons] = useState<Set<string>>(new Set())
+    const [showAddGuest, setShowAddGuest] = useState(false)
+    const [newGuestName, setNewGuestName] = useState('')
 
     const toggleCategory = (key: string) =>
         setCollapsedCategories(prev => {
@@ -373,7 +375,7 @@ export function ViewPackingList() {
         }
     }
 
-    const handleAddItem = async (personName: string) => {
+    const handleAddItem = async (personName: string, personId: string = '') => {
         if (!packingList) return
 
         const newItemText = newItemInputs[personName]?.trim()
@@ -386,7 +388,7 @@ export function ViewPackingList() {
                 id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 itemText: newItemText,
                 personName: personName,
-                personId: '',
+                personId: personId,
                 questionId: '',
                 optionId: '',
                 packed: false
@@ -404,6 +406,17 @@ export function ViewPackingList() {
             console.error('Error adding item:', err)
             setAutoSaveStatus('error')
         }
+    }
+
+    const handleAddGuest = async () => {
+        if (!packingList || !newGuestName.trim()) return
+        const guest = { id: crypto.randomUUID(), name: newGuestName.trim() }
+        await persistPackingList({
+            ...packingList,
+            guests: [...(packingList.guests ?? []), guest],
+        })
+        setNewGuestName('')
+        setShowAddGuest(false)
     }
 
     if (isLoading) {
@@ -436,6 +449,20 @@ export function ViewPackingList() {
         if (watchedItems[item.id]) acc[item.personName].packed++
         return acc
     }, {} as Record<string, { packed: number; total: number }>)
+
+    const guestPersonIdByName = new Map(
+        (packingList.guests ?? []).map(g => [g.name, g.id])
+    )
+
+    const personSectionsBase: Record<string, PackingListItem[]> = {}
+    for (const guest of (packingList.guests ?? [])) personSectionsBase[guest.name] = []
+    const personSections = Object.entries(
+        filteredItems.reduce((acc, item) => {
+            if (!acc[item.personName]) acc[item.personName] = []
+            acc[item.personName].push(item)
+            return acc
+        }, personSectionsBase)
+    ).sort(([a], [b]) => a.localeCompare(b))
 
     return (
         <>
@@ -548,15 +575,7 @@ export function ViewPackingList() {
             <div className="w-full">
                 <div>
                     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-                        {Object.entries(
-                            filteredItems.reduce((acc, item) => {
-                                if (!acc[item.personName]) {
-                                    acc[item.personName] = [];
-                                }
-                                acc[item.personName].push(item);
-                                return acc;
-                            }, {} as Record<string, typeof filteredItems>)
-                        ).sort(([nameA], [nameB]) => nameA.localeCompare(nameB)).map(([personName, items]) => {
+                        {personSections.map(([personName, items]) => {
                             const stats = personStats[personName] ?? { packed: 0, total: 0 }
                             return (
                             <div key={personName} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
@@ -678,7 +697,7 @@ export function ViewPackingList() {
                                                 onKeyPress={(e) => {
                                                     if (e.key === 'Enter') {
                                                         e.preventDefault()
-                                                        handleAddItem(personName)
+                                                        handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')
                                                     }
                                                 }}
                                                 placeholder="Add new item..."
@@ -686,7 +705,7 @@ export function ViewPackingList() {
                                             />
                                             <button
                                                 type="button"
-                                                onClick={() => handleAddItem(personName)}
+                                                onClick={() => handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')}
                                                 className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
                                             >
                                                 Add
@@ -697,6 +716,48 @@ export function ViewPackingList() {
                             </div>
                         )})}
                     </div>
+                </div>
+
+                {/* Add Guest */}
+                <div className="mt-6">
+                    {showAddGuest ? (
+                        <div className="flex gap-2 max-w-sm">
+                            <input
+                                type="text"
+                                value={newGuestName}
+                                onChange={(e) => setNewGuestName(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() }
+                                    if (e.key === 'Escape') { setShowAddGuest(false); setNewGuestName('') }
+                                }}
+                                placeholder="Guest name..."
+                                autoFocus
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleAddGuest}
+                                className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                            >
+                                Add
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setShowAddGuest(false); setNewGuestName('') }}
+                                className="shrink-0 px-3 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setShowAddGuest(true)}
+                            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                            <span className="text-lg leading-none">+</span> Add guest
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

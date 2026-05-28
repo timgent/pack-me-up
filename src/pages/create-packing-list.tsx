@@ -40,9 +40,12 @@ export function getUnreviewedDeletedItems(
         }
     }
 
+    const questionSetPersonIds = new Set(questionSet.people.map(p => p.id))
+
     const results: Array<{ listId: string; listName: string; item: PackingListItem }> = []
     for (const list of packingLists) {
         for (const item of (list.deletedItems ?? [])) {
+            if (item.personId !== '' && !questionSetPersonIds.has(item.personId)) continue
             if (item.reviewed === true) continue
             if (!existingTexts.has(item.itemText.trim().toLowerCase())) continue
             results.push({ listId: list.id, listName: list.name, item })
@@ -68,9 +71,12 @@ export function getUnreviewedCustomItems(
         }
     }
 
+    const questionSetPersonIds = new Set(questionSet.people.map(p => p.id))
+
     const results: Array<{ listId: string; listName: string; item: PackingListItem }> = []
     for (const list of packingLists) {
         for (const item of list.items) {
+            if (item.personId !== '' && !questionSetPersonIds.has(item.personId)) continue
             if (item.questionId !== '') continue
             if (item.reviewed === true) continue
             if (existingTexts.has(item.itemText.trim().toLowerCase())) continue
