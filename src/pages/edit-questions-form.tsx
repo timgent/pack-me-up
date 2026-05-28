@@ -443,6 +443,23 @@ export function EditQuestionsForm() {
         </h1>
         <p className="mt-2 text-gray-600">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
         <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
+        {/* Mobile-only status line */}
+        <div className="lg:hidden mt-2 flex items-center gap-3 text-xs text-gray-400">
+          {autoSaveStatus === 'saving' && (
+            <span className="flex items-center gap-1 text-blue-600">
+              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              Saving…
+            </span>
+          )}
+          {(autoSaveStatus === 'saved' || autoSaveStatus === 'idle') && <span>Saved</span>}
+          {isLoggedIn && !isSyncing && !syncError && <span>· Pod synced {formatLastSync(lastSync)}</span>}
+          {isLoggedIn && isSyncing && (
+            <span className="flex items-center gap-1 text-blue-600">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Syncing pod
+            </span>
+          )}
+        </div>
       </div>
       {editorMode === 'visual' ? (
         <>
@@ -598,68 +615,33 @@ export function EditQuestionsForm() {
       {/* Sticky bottom bar for small/medium screens */}
       <div className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none lg:hidden">
         <div className="max-w-4xl w-full px-4 pb-4">
-          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex items-center gap-3 py-3 px-4 pointer-events-auto relative">
-            {/* Sync from Pod indicator - absolutely positioned to avoid layout shift */}
+          <div className="backdrop-blur-md bg-white/80 border border-gray-200 shadow-xl rounded-xl flex items-center justify-center gap-3 py-3 px-4 pointer-events-auto relative">
             {isLoggedIn && syncingFromPod && (
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10 bg-blue-50 border border-blue-200 rounded-md px-3 py-1.5 flex items-center gap-1.5 shadow-md">
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                 <span className="text-xs text-blue-700 font-medium whitespace-nowrap">Syncing from Pod...</span>
               </div>
             )}
-
-            {/* Status — shown only when noteworthy */}
-            {(autoSaveStatus === 'saving' || autoSaveStatus === 'error' || isSyncing || syncError) && (
-              <div className="flex items-center gap-2 shrink-0 text-xs">
-                {autoSaveStatus === 'saving' && (
-                  <span className="flex items-center gap-1 text-blue-600">
-                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                    Saving…
-                  </span>
-                )}
-                {autoSaveStatus === 'error' && (
-                  <span className="flex items-center gap-1 text-red-600 font-medium">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                    Save error
-                  </span>
-                )}
-                {isLoggedIn && isSyncing && (
-                  <span className="flex items-center gap-1 text-blue-600">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Syncing
-                  </span>
-                )}
-                {isLoggedIn && syncError && (
-                  <span className="flex items-center gap-1 text-red-600 font-medium">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
-                    Pod error
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 flex-1 justify-end flex-wrap">
-              <Button
-                type="button"
-                onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
-                variant="secondary"
-              >
-                Add Question
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setIsAddItemModalOpen(true)}
-                variant="secondary"
-              >
-                Add Item...
-              </Button>
-              <Button type="button" onClick={() => {
-                const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
-                reset(defaultData);
-                setCurrentQuestionSet(defaultData);
-                showToast('Form has been reset to default state', 'success');
-              }}>Reset</Button>
-            </div>
+            <Button
+              type="button"
+              onClick={() => { setAllQuestionsCollapsed(null); appendQuestion(newDraftQuestion(questionFields.length)); }}
+              variant="secondary"
+            >
+              Add Question
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setIsAddItemModalOpen(true)}
+              variant="secondary"
+            >
+              Add Item...
+            </Button>
+            <Button type="button" onClick={() => {
+              const defaultData = { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] };
+              reset(defaultData);
+              setCurrentQuestionSet(defaultData);
+              showToast('Form has been reset to default state', 'success');
+            }}>Reset</Button>
           </div>
         </div>
       </div>
