@@ -40,6 +40,8 @@ vi.mock('../services/solidPod', () => ({
     grantCollaboratorAccess: vi.fn(),
     saveRdfToPod: vi.fn().mockResolvedValue(undefined),
     friendlyPodName: vi.fn((url: string) => url),
+    getPodOwnerName: vi.fn().mockResolvedValue(null),
+    deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/+$/, '')}/profile/card#me`),
 }))
 
 vi.mock('../components/SharePackingListModal', () => ({

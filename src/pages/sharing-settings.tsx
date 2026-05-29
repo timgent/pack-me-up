@@ -42,6 +42,7 @@ export function SharingSettingsPage() {
     // Section 3: individual lists shared with me
     const [sharedLists, setSharedLists] = useState<SharedListContext[]>([])
     const [removingListId, setRemovingListId] = useState<string | null>(null)
+    const [listOwnerNames, setListOwnerNames] = useState<Record<string, string>>({})
 
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
@@ -96,6 +97,18 @@ export function SharingSettingsPage() {
             .then(slwm => setSharedLists(slwm.lists))
             .catch(() => setSharedLists([]))
     }, [db])
+
+    // Resolve owner display names for shared lists (section 3)
+    useEffect(() => {
+        if (!session || sharedLists.length === 0) return
+        for (const ctx of sharedLists) {
+            getPodOwnerName(session, ctx.podUrl, ctx.ownerWebId ?? undefined)
+                .then(name => {
+                    if (name) setListOwnerNames(prev => ({ ...prev, [ctx.listId]: name }))
+                })
+                .catch(() => {})
+        }
+    }, [sharedLists, session])
 
     // Load own lists + sharing status for section 4
     // Re-runs when sharedLists is loaded so we can exclude foreign lists
@@ -354,7 +367,7 @@ export function SharingSettingsPage() {
                                         {ctx.label ?? ctx.listId}
                                     </span>
                                     <span className="text-xs text-gray-500 truncate" title={ctx.podUrl}>
-                                        {friendlyPodName(ctx.podUrl)}
+                                        {listOwnerNames[ctx.listId] ?? friendlyPodName(ctx.podUrl)}
                                     </span>
                                 </div>
                                 <button

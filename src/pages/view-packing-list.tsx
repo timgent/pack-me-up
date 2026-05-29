@@ -10,7 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName, getPodOwnerName, deriveWebIdFromPodUrl } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList, sharedListsWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedListsWithMe } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
@@ -56,6 +56,7 @@ export function ViewPackingList() {
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
+    const [ownerDisplayName, setOwnerDisplayName] = useState<string | null>(null)
     // Tracks whether initial data has been loaded (local DB or pod).
     // Used to surface a real error to the user instead of hanging on "Loading…"
     // when a foreign-pod fetch fails.
@@ -101,6 +102,13 @@ export function ViewPackingList() {
         }
     }, [isLoggedIn, session])
 
+    useEffect(() => {
+        if (!foreignPodUrl || !session) return
+        getPodOwnerName(session, foreignPodUrl, deriveWebIdFromPodUrl(foreignPodUrl))
+            .then(name => { if (name) setOwnerDisplayName(name) })
+            .catch(() => {})
+    }, [foreignPodUrl, session])
+
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
@@ -128,6 +136,7 @@ export function ViewPackingList() {
                                     listId: id!,
                                     listUrl: fileUrl,
                                     podUrl: foreignPodUrl,
+                                    ownerWebId: deriveWebIdFromPodUrl(foreignPodUrl),
                                     label: data.name,
                                     addedAt: new Date().toISOString(),
                                 }],
@@ -591,7 +600,7 @@ export function ViewPackingList() {
             {foreignPodUrl && !foreignPodCtx && (
                 <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
                     <p className="text-sm text-indigo-800 font-medium">
-                        👤 Viewing a list from <span className="font-semibold">{friendlyPodName(foreignPodUrl)}</span>
+                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? friendlyPodName(foreignPodUrl)}</span>
                     </p>
                 </div>
             )}

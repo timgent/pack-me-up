@@ -6,7 +6,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName, getPodOwnerName } from '../services/solidPod'
 import { packingListToDataset } from '../services/rdfSerialization'
 import type { SharedListContext } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
@@ -22,6 +22,7 @@ export function PackingLists() {
     const [renameValue, setRenameValue] = useState('')
     const [sharingStatus, setSharingStatus] = useState<Record<string, SharingStatus>>({})
     const [foreignListIndex, setForeignListIndex] = useState<Record<string, SharedListContext>>({})
+    const [ownerNames, setOwnerNames] = useState<Record<string, string>>({})
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { db, loginSyncVersion, loginSyncInProgress } = useDatabase()
@@ -137,6 +138,21 @@ export function PackingLists() {
             .catch(() => {})
     }, [db, loginSyncVersion])
 
+    // Resolve owner display names for foreign lists
+    useEffect(() => {
+        if (!session) return
+        const entries = Object.values(foreignListIndex)
+        if (entries.length === 0) return
+        for (const ctx of entries) {
+            const webId = ctx.ownerWebId ?? undefined
+            getPodOwnerName(session, ctx.podUrl, webId)
+                .then(name => {
+                    if (name) setOwnerNames(prev => ({ ...prev, [ctx.listId]: name }))
+                })
+                .catch(() => {})
+        }
+    }, [foreignListIndex, session])
+
     // Lazy-load sharing status badges for own lists only
     useEffect(() => {
         if (!isLoggedIn || !session || packingLists.length === 0) return
@@ -213,7 +229,7 @@ export function PackingLists() {
                                         ✈️ {list.name}
                                         {foreignListIndex[list.id] ? (
                                             <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                                👤 From {friendlyPodName(foreignListIndex[list.id].podUrl)}
+                                                👤 From {ownerNames[list.id] ?? friendlyPodName(foreignListIndex[list.id].podUrl)}
                                             </span>
                                         ) : (
                                             <>
