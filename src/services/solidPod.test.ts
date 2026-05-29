@@ -967,16 +967,24 @@ describe('getPodOwnerName', () => {
 // ─── friendlyPodName ─────────────────────────────────────────────────────────
 
 describe('friendlyPodName', () => {
-    it('returns hostname when path is a UUID', () => {
-        expect(friendlyPodName('https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/')).toBe('storage.inrupt.com')
+    it('strips known service subdomain (storage.) from Inrupt UUID-path pods', () => {
+        expect(friendlyPodName('https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/')).toBe('inrupt.com')
+    })
+
+    it('strips pod. service subdomain', () => {
+        expect(friendlyPodName('https://pod.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/')).toBe('inrupt.com')
     })
 
     it('returns "segment on hostname" for a meaningful path segment', () => {
         expect(friendlyPodName('https://solidcommunity.net/alice/')).toBe('alice on solidcommunity.net')
     })
 
-    it('returns hostname when there is no path segment', () => {
-        expect(friendlyPodName('https://alice.solidcommunity.net/')).toBe('alice.solidcommunity.net')
+    it('treats subdomain as username when it is not a service subdomain', () => {
+        expect(friendlyPodName('https://alice.solidcommunity.net/')).toBe('alice on solidcommunity.net')
+    })
+
+    it('returns base hostname when there is no path segment and no user subdomain', () => {
+        expect(friendlyPodName('https://inrupt.com/')).toBe('inrupt.com')
     })
 
     it('returns the input unchanged when the URL is invalid', () => {

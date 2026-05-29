@@ -108,14 +108,29 @@ export function handlePodError(error: unknown): never {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+const SERVICE_SUBDOMAINS = new Set(['storage', 'pod', 'pods', 'www', 'app'])
+
 export function friendlyPodName(podUrl: string): string {
     try {
         const url = new URL(podUrl)
+        const parts = url.hostname.split('.')
+        // Strip known service subdomain prefixes (storage.inrupt.com → inrupt.com)
+        const cleanHostname = parts.length >= 3 && SERVICE_SUBDOMAINS.has(parts[0])
+            ? parts.slice(1).join('.')
+            : url.hostname
+
         const firstSegment = url.pathname.split('/').find(s => s.length > 0)
         if (firstSegment && !UUID_RE.test(firstSegment)) {
-            return `${firstSegment} on ${url.hostname}`
+            return `${firstSegment} on ${cleanHostname}`
         }
-        return url.hostname
+
+        // Treat first subdomain as username when it isn't a service subdomain
+        // e.g. alice.solidcommunity.net → "alice on solidcommunity.net"
+        if (parts.length >= 3 && !SERVICE_SUBDOMAINS.has(parts[0])) {
+            return `${parts[0]} on ${parts.slice(1).join('.')}`
+        }
+
+        return cleanHostname
     } catch {
         return podUrl
     }
