@@ -10,7 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList, sharedListsWithMeToDataset } from '../services/rdfSerialization'
 import type { SharedListsWithMe } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
@@ -163,7 +163,7 @@ export function ViewPackingList() {
         useSyncCoordinator<PackingList>({
             currentData: packingList,
             saveToLocalDb: async (data) => {
-                if (foreignPodCtx) return { rev: '' }
+                if (foreignPodCtx || foreignPodUrl) return { rev: '' }
                 return await db.savePackingList(data);
             },
             updateFormAndState: (data, newRev) => {
@@ -603,30 +603,33 @@ export function ViewPackingList() {
                 </div>
             </div>
 
-            {/* Save to shared lists banner */}
-            {showSaveBanner && (
-                <div className="w-full max-w-screen-2xl mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                    <p className="text-sm text-blue-800">
-                        This list was shared with you — save it for easy access?
+            {/* Persistent "viewing someone else's list" indicator */}
+            {foreignPodUrl && !foreignPodCtx && (
+                <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                    <p className="text-sm text-indigo-800 font-medium">
+                        👤 Viewing a list from <span className="font-semibold">{friendlyPodName(foreignPodUrl)}</span>
                     </p>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                            type="button"
-                            onClick={handleSaveToSharedLists}
-                            disabled={isSavingToSharedLists}
-                            className="px-3 py-1 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                        >
-                            {isSavingToSharedLists ? 'Saving…' : 'Save'}
-                        </button>
-                        <button
-                            type="button"
-                            aria-label="Dismiss"
-                            onClick={() => setShowSaveBanner(false)}
-                            className="text-blue-500 hover:text-blue-700 text-lg font-bold leading-none"
-                        >
-                            ✕
-                        </button>
-                    </div>
+                    {showSaveBanner && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-sm text-indigo-700">Save for easy access?</span>
+                            <button
+                                type="button"
+                                onClick={handleSaveToSharedLists}
+                                disabled={isSavingToSharedLists}
+                                className="px-3 py-1 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            >
+                                {isSavingToSharedLists ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Dismiss"
+                                onClick={() => setShowSaveBanner(false)}
+                                className="text-indigo-400 hover:text-indigo-600 text-lg font-bold leading-none"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -6,8 +6,9 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName } from '../services/solidPod'
 import { packingListToDataset } from '../services/rdfSerialization'
+import type { SharedListContext } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
@@ -20,6 +21,7 @@ export function PackingLists() {
     const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
     const [renameValue, setRenameValue] = useState('')
     const [sharingStatus, setSharingStatus] = useState<Record<string, SharingStatus>>({})
+    const [foreignListIndex, setForeignListIndex] = useState<Record<string, SharedListContext>>({})
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
     const { db, loginSyncVersion, loginSyncInProgress } = useDatabase()
@@ -121,15 +123,27 @@ export function PackingLists() {
                 setIsLoading(false)
             }
         }
-
         fetchPackingLists()
     }, [db, isLoggedIn, loginSyncVersion])
 
+    // Build an index of which lists in the local DB came from someone else's pod
+    useEffect(() => {
+        db.getSharedListsWithMe()
+            .then(slwm => {
+                const index: Record<string, SharedListContext> = {}
+                for (const ctx of slwm.lists) index[ctx.listId] = ctx
+                setForeignListIndex(index)
+            })
+            .catch(() => {})
+    }, [db, loginSyncVersion])
+
+    // Lazy-load sharing status badges for own lists only
     useEffect(() => {
         if (!isLoggedIn || !session || packingLists.length === 0) return
         getPrimaryPodUrl(session).then(podUrl => {
             if (!podUrl) return
             for (const list of packingLists) {
+                if (foreignListIndex[list.id]) continue  // skip foreign lists
                 const fileUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`
                 Promise.all([
                     getCollaborators(session, fileUrl),
@@ -142,7 +156,7 @@ export function PackingLists() {
                     .catch(() => {})
             }
         }).catch(() => {})
-    }, [packingLists, isLoggedIn, session])
+    }, [packingLists, foreignListIndex, isLoggedIn, session])
 
     if (isLoading || loginSyncInProgress) {
         return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>
@@ -184,17 +198,32 @@ export function PackingLists() {
                         return (
                             <div
                                 key={list.id}
-                                onClick={() => navigate(`/view-lists/${list.id}`)}
+                                onClick={() => {
+                                    const foreign = foreignListIndex[list.id]
+                                    if (foreign) {
+                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(foreign.podUrl)}`)
+                                    } else {
+                                        navigate(`/view-lists/${list.id}`)
+                                    }
+                                }}
                                 className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-soft border-2 p-6 hover:shadow-glow-primary hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
                             >
                                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
-                                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
                                         ✈️ {list.name}
-                                        {sharingStatus[list.id] === 'public' && (
-                                            <span className="text-xs font-medium bg-white/60 text-blue-700 px-2 py-0.5 rounded-full">🌐 Public</span>
-                                        )}
-                                        {sharingStatus[list.id] === 'shared' && (
-                                            <span className="text-xs font-medium bg-white/60 text-indigo-700 px-2 py-0.5 rounded-full">👤 Shared</span>
+                                        {foreignListIndex[list.id] ? (
+                                            <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                                👤 From {friendlyPodName(foreignListIndex[list.id].podUrl)}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                {sharingStatus[list.id] === 'public' && (
+                                                    <span className="text-xs font-medium bg-white/60 text-blue-700 px-2 py-0.5 rounded-full">🌐 Public</span>
+                                                )}
+                                                {sharingStatus[list.id] === 'shared' && (
+                                                    <span className="text-xs font-medium bg-white/60 text-indigo-700 px-2 py-0.5 rounded-full">👤 Shared</span>
+                                                )}
+                                            </>
                                         )}
                                     </h3>
                                     <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">

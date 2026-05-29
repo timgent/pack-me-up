@@ -98,15 +98,18 @@ export function SharingSettingsPage() {
     }, [db])
 
     // Load own lists + sharing status for section 4
+    // Re-runs when sharedLists is loaded so we can exclude foreign lists
     useEffect(() => {
         if (!isLoggedIn || !ownPodUrl || !session) return
+        const sharedListIds = new Set(sharedLists.map(l => l.listId))
         db.getAllPackingLists().then(lists => {
-            setOwnLists(lists)
+            const ownOnly = lists.filter(l => !sharedListIds.has(l.id))
+            setOwnLists(ownOnly)
             const initialStatus: Record<string, ListSharingStatus> = {}
-            for (const list of lists) initialStatus[list.id] = 'loading'
+            for (const list of ownOnly) initialStatus[list.id] = 'loading'
             setSharingStatusByListId(initialStatus)
 
-            for (const list of lists) {
+            for (const list of ownOnly) {
                 const fileUrl = `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`
                 Promise.all([
                     getCollaborators(session, fileUrl),
@@ -123,7 +126,7 @@ export function SharingSettingsPage() {
                     })
             }
         }).catch(() => {})
-    }, [isLoggedIn, ownPodUrl, session, db])
+    }, [isLoggedIn, ownPodUrl, session, db, sharedLists])
 
     const handleGrantAccess = async () => {
         if (!session || !ownPodUrl || !collaboratorWebId.trim()) return

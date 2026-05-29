@@ -35,6 +35,9 @@ vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(),
     saveRdfToPod: vi.fn(),
     deleteFileFromPod: vi.fn(),
+    getCollaborators: vi.fn().mockResolvedValue([]),
+    isPubliclyAccessible: vi.fn().mockResolvedValue(false),
+    friendlyPodName: vi.fn((url: string) => url),
     POD_CONTAINERS: { PACKING_LISTS: '/packing-lists/' },
     POD_ERROR_MESSAGES: {
         NOT_LOGGED_IN: 'Not logged in',
@@ -74,6 +77,7 @@ function makeDb() {
     return {
         getAllPackingLists: vi.fn().mockResolvedValue([testList]),
         deletePackingList: vi.fn().mockResolvedValue(undefined),
+        getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
     }
 }
 
@@ -100,6 +104,7 @@ describe('PackingLists', () => {
                 getAllPackingLists: vi.fn().mockResolvedValue([testPackingList]),
                 deletePackingList: vi.fn(),
                 savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
             } as unknown as PackingAppDatabase,
         })
         localStorage.clear()
@@ -150,6 +155,7 @@ describe('PackingLists progress bar minimum width', () => {
                 }]),
                 deletePackingList: vi.fn(),
                 savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
             } as unknown as PackingAppDatabase,
         })
 
@@ -180,6 +186,7 @@ describe('PackingLists progress bar minimum width', () => {
                 }]),
                 deletePackingList: vi.fn(),
                 savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
             } as unknown as PackingAppDatabase,
         })
 
@@ -433,6 +440,7 @@ describe('PackingLists new list button', () => {
                 getAllPackingLists: vi.fn().mockResolvedValue([testList]),
                 deletePackingList: vi.fn(),
                 savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
             } as unknown as PackingAppDatabase,
         })
     })
@@ -459,6 +467,7 @@ describe('PackingLists pod sync on mutation', () => {
             getAllPackingLists: vi.fn().mockResolvedValue([testList]),
             deletePackingList: vi.fn().mockResolvedValue(undefined),
             savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+            getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
         }
     }
 

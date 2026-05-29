@@ -39,6 +39,7 @@ vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn().mockResolvedValue('https://own.solidcommunity.net/'),
     grantCollaboratorAccess: vi.fn(),
     saveRdfToPod: vi.fn().mockResolvedValue(undefined),
+    friendlyPodName: vi.fn((url: string) => url),
 }))
 
 vi.mock('../components/SharePackingListModal', () => ({
