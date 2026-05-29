@@ -124,7 +124,8 @@ export function ViewPackingList() {
         useSyncCoordinator<PackingList>({
             currentData: packingList,
             saveToLocalDb: async (data) => {
-                const result = await db.savePackingList(data)
+                const dataToSave = foreignPodUrl ? { ...data, sharedFromPodUrl: foreignPodUrl } : data
+                const result = await db.savePackingList(dataToSave)
                 if (foreignPodUrl) {
                     // Fire-and-forget: track this foreign list in sharedListsWithMe the first time
                     const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`

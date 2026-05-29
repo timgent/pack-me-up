@@ -4,6 +4,7 @@ export interface PackingList {
     name: string
     createdAt: string
     lastModified?: string // ISO timestamp for conflict resolution
+    sharedFromPodUrl?: string // set when this list was cached from a foreign pod; local-only, not serialized to RDF
     items: PackingListItem[]
     deletedItems?: PackingListItem[]
     guests?: Array<{ id: string; name: string }>

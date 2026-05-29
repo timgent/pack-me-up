@@ -8,7 +8,6 @@ import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
 import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName, getPodOwnerName } from '../services/solidPod'
 import { packingListToDataset } from '../services/rdfSerialization'
-import type { SharedListContext } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 
@@ -21,7 +20,6 @@ export function PackingLists() {
     const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
     const [renameValue, setRenameValue] = useState('')
     const [sharingStatus, setSharingStatus] = useState<Record<string, SharingStatus>>({})
-    const [foreignListIndex, setForeignListIndex] = useState<Record<string, SharedListContext>>({})
     const [ownerNames, setOwnerNames] = useState<Record<string, string>>({})
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
@@ -127,31 +125,18 @@ export function PackingLists() {
         fetchPackingLists()
     }, [db, isLoggedIn, loginSyncVersion])
 
-    // Build an index of which lists in the local DB came from someone else's pod
-    useEffect(() => {
-        db.getSharedListsWithMe()
-            .then(slwm => {
-                const index: Record<string, SharedListContext> = {}
-                for (const ctx of slwm.lists) index[ctx.listId] = ctx
-                setForeignListIndex(index)
-            })
-            .catch(() => {})
-    }, [db, loginSyncVersion])
-
     // Resolve owner display names for foreign lists
     useEffect(() => {
         if (!session) return
-        const entries = Object.values(foreignListIndex)
-        if (entries.length === 0) return
-        for (const ctx of entries) {
-            const webId = ctx.ownerWebId ?? undefined
-            getPodOwnerName(session, ctx.podUrl, webId)
+        for (const list of packingLists) {
+            if (!list.sharedFromPodUrl) continue
+            getPodOwnerName(session, list.sharedFromPodUrl)
                 .then(name => {
-                    if (name) setOwnerNames(prev => ({ ...prev, [ctx.listId]: name }))
+                    if (name) setOwnerNames(prev => ({ ...prev, [list.id]: name }))
                 })
                 .catch(() => {})
         }
-    }, [foreignListIndex, session])
+    }, [packingLists, session])
 
     // Lazy-load sharing status badges for own lists only
     useEffect(() => {
@@ -159,7 +144,7 @@ export function PackingLists() {
         getPrimaryPodUrl(session).then(podUrl => {
             if (!podUrl) return
             for (const list of packingLists) {
-                if (foreignListIndex[list.id]) continue  // skip foreign lists
+                if (list.sharedFromPodUrl) continue  // skip foreign lists
                 const fileUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`
                 Promise.all([
                     getCollaborators(session, fileUrl),
@@ -172,7 +157,7 @@ export function PackingLists() {
                     .catch(() => {})
             }
         }).catch(() => {})
-    }, [packingLists, foreignListIndex, isLoggedIn, session])
+    }, [packingLists, isLoggedIn, session])
 
     if (isLoading || loginSyncInProgress) {
         return <div className="max-w-4xl mx-auto py-8 px-4 text-center text-gray-700 font-semibold">Loading packing lists...</div>
@@ -215,9 +200,8 @@ export function PackingLists() {
                             <div
                                 key={list.id}
                                 onClick={() => {
-                                    const foreign = foreignListIndex[list.id]
-                                    if (foreign) {
-                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(foreign.podUrl)}`)
+                                    if (list.sharedFromPodUrl) {
+                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(list.sharedFromPodUrl)}`)
                                     } else {
                                         navigate(`/view-lists/${list.id}`)
                                     }
@@ -227,9 +211,9 @@ export function PackingLists() {
                                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                                     <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
                                         ✈️ {list.name}
-                                        {foreignListIndex[list.id] ? (
+                                        {list.sharedFromPodUrl ? (
                                             <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                                👤 From {ownerNames[list.id] ?? friendlyPodName(foreignListIndex[list.id].podUrl)}
+                                                👤 From {ownerNames[list.id] ?? friendlyPodName(list.sharedFromPodUrl)}
                                             </span>
                                         ) : (
                                             <>
