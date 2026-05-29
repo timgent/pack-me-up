@@ -5,9 +5,12 @@ import {
     datasetToPackingList,
     questionSetToDataset,
     datasetToQuestionSet,
+    sharedListsWithMeToDataset,
+    datasetToSharedListsWithMe,
 } from './rdfSerialization'
 import type { PackingList, PackingListItem } from '../create-packing-list/types'
 import type { PackingListQuestionSet, Person, Question, Option } from '../edit-questions/types'
+import type { SharedListsWithMe } from './rdfSerialization'
 
 const DATASET_URL = 'https://pod.example.com/pack-me-up/packing-lists/list-abc.ttl'
 const QS_DATASET_URL = 'https://pod.example.com/pack-me-up/packing-list-questions.ttl'
@@ -309,5 +312,85 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         expect(texts1).toContain('Item A')
         expect(texts1).toContain('Item B')
         expect(resOpt2.items[0].text).toBe('Item C')
+    })
+})
+
+// ── SharedListsWithMe round-trip ──────────────────────────────────────────────
+
+const SLW_DATASET_URL = 'https://pod.example.com/pack-me-up/shared-lists-with-me.ttl'
+
+function makeSharedListsWithMe(overrides: Partial<SharedListsWithMe> = {}): SharedListsWithMe {
+    return {
+        lists: [],
+        lastModified: '2026-01-01T00:00:00.000Z',
+        ...overrides,
+    }
+}
+
+function roundTripSlwm(data: SharedListsWithMe): SharedListsWithMe {
+    return datasetToSharedListsWithMe(sharedListsWithMeToDataset(data, SLW_DATASET_URL), SLW_DATASET_URL)
+}
+
+describe('sharedListsWithMeToDataset / datasetToSharedListsWithMe', () => {
+    it('round-trips an empty list', () => {
+        const result = roundTripSlwm(makeSharedListsWithMe())
+        expect(result.lists).toHaveLength(0)
+        expect(result.lastModified).toBe('2026-01-01T00:00:00.000Z')
+    })
+
+    it('round-trips a single shared list with all required fields', () => {
+        const data = makeSharedListsWithMe({
+            lists: [{
+                listId: 'list-abc',
+                listUrl: 'https://alice.solidcommunity.net/pack-me-up/packing-lists/list-abc.ttl',
+                podUrl: 'https://alice.solidcommunity.net/',
+                addedAt: '2026-02-01T12:00:00.000Z',
+            }],
+        })
+        const result = roundTripSlwm(data)
+        expect(result.lists).toHaveLength(1)
+        expect(result.lists[0].listId).toBe('list-abc')
+        expect(result.lists[0].listUrl).toBe('https://alice.solidcommunity.net/pack-me-up/packing-lists/list-abc.ttl')
+        expect(result.lists[0].podUrl).toBe('https://alice.solidcommunity.net/')
+        expect(result.lists[0].addedAt).toBe('2026-02-01T12:00:00.000Z')
+    })
+
+    it('round-trips optional ownerWebId and label', () => {
+        const data = makeSharedListsWithMe({
+            lists: [{
+                listId: 'list-xyz',
+                listUrl: 'https://alice.solidcommunity.net/pack-me-up/packing-lists/list-xyz.ttl',
+                podUrl: 'https://alice.solidcommunity.net/',
+                ownerWebId: 'https://alice.solidcommunity.net/profile/card#me',
+                label: 'Summer Trip',
+                addedAt: '2026-03-01T00:00:00.000Z',
+            }],
+        })
+        const result = roundTripSlwm(data)
+        expect(result.lists[0].ownerWebId).toBe('https://alice.solidcommunity.net/profile/card#me')
+        expect(result.lists[0].label).toBe('Summer Trip')
+    })
+
+    it('round-trips multiple shared lists preserving all entries', () => {
+        const data = makeSharedListsWithMe({
+            lists: [
+                { listId: 'list-1', listUrl: 'https://a.example/l/1.ttl', podUrl: 'https://a.example/', addedAt: '2026-01-01T00:00:00.000Z' },
+                { listId: 'list-2', listUrl: 'https://b.example/l/2.ttl', podUrl: 'https://b.example/', addedAt: '2026-01-02T00:00:00.000Z' },
+            ],
+        })
+        const result = roundTripSlwm(data)
+        expect(result.lists).toHaveLength(2)
+        const ids = result.lists.map(l => l.listId)
+        expect(ids).toContain('list-1')
+        expect(ids).toContain('list-2')
+    })
+
+    it('omits ownerWebId and label when not set', () => {
+        const data = makeSharedListsWithMe({
+            lists: [{ listId: 'l', listUrl: 'https://x.example/l.ttl', podUrl: 'https://x.example/', addedAt: '2026-01-01T00:00:00.000Z' }],
+        })
+        const result = roundTripSlwm(data)
+        expect(result.lists[0].ownerWebId).toBeUndefined()
+        expect(result.lists[0].label).toBeUndefined()
     })
 })

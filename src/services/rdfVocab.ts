@@ -65,6 +65,16 @@ export const PMU = {
     sharedLabel: `${PMU_NS}sharedLabel`,
     sharedAddedAt: `${PMU_NS}sharedAddedAt`,
 
+    // SharedListsWithMe classes
+    SharedListContext: `${PMU_NS}SharedListContext`,
+    SharedListsWithMe: `${PMU_NS}SharedListsWithMe`,
+
+    // SharedListsWithMe predicates
+    hasSharedList: `${PMU_NS}hasSharedList`,
+    sharedListId: `${PMU_NS}sharedListId`,
+    sharedListUrl: `${PMU_NS}sharedListUrl`,
+    sharedListLabel: `${PMU_NS}sharedListLabel`,
+
     // Shared
     name: 'https://schema.org/name',
 } as const

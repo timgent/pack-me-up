@@ -32,9 +32,13 @@ import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 
 vi.mock('../services/solidPod', () => ({
-    POD_CONTAINERS: { PACKING_LISTS: 'pack-me-up/packing-lists/' },
+    POD_CONTAINERS: {
+        PACKING_LISTS: 'pack-me-up/packing-lists/',
+        SHARED_LISTS_WITH_ME: 'pack-me-up/shared-lists-with-me.ttl',
+    },
     getPrimaryPodUrl: vi.fn().mockResolvedValue('https://own.solidcommunity.net/'),
     grantCollaboratorAccess: vi.fn(),
+    saveRdfToPod: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../components/SharePackingListModal', () => ({
@@ -67,6 +71,8 @@ function makeDb() {
     return {
         getPackingList: vi.fn().mockResolvedValue(testPackingList),
         savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
+        saveSharedListsWithMe: vi.fn().mockResolvedValue({ rev: '1' }),
     }
 }
 

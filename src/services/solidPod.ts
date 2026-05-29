@@ -1,12 +1,12 @@
 import { AppSession as Session } from '../types/AppSession'
 import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt, acp_ess_2, getThing, getStringNoLocale } from '@inrupt/solid-client'
 import type { SolidDataset, Access } from '@inrupt/solid-client'
-const { getAgentAccessAll, setPublicAccess } = universalAccess
+const { getAgentAccessAll, setPublicAccess, getPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
-import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe } from './rdfSerialization'
-import type { SharedWithMeList } from './rdfSerialization'
+import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe, datasetToSharedListsWithMe } from './rdfSerialization'
+import type { SharedWithMeList, SharedListsWithMe } from './rdfSerialization'
 
 /**
  * Pod container paths under the user's Pod root
@@ -19,6 +19,7 @@ export const POD_CONTAINERS = {
     PACKING_LISTS: 'pack-me-up/packing-lists/',
     BACKUPS: 'pack-me-up/backups/',
     SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',
+    SHARED_LISTS_WITH_ME: 'pack-me-up/shared-lists-with-me.ttl',
 } as const
 
 /**
@@ -208,6 +209,38 @@ export async function grantPublicAccess(
         )
         if (result === null) {
             throw new Error('grantPublicAccess: server does not support access control for this resource')
+        }
+    } catch (error) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        throw error
+    }
+}
+
+export async function isPubliclyAccessible(
+    session: Session,
+    fileUrl: string
+): Promise<boolean> {
+    try {
+        const result = await getPublicAccess(fileUrl, { fetch: session.fetch })
+        return result?.read === true
+    } catch (error) {
+        if (isAuthenticationError(error)) handlePodError(error)
+        throw error
+    }
+}
+
+export async function revokePublicAccess(
+    session: Session,
+    fileUrl: string
+): Promise<void> {
+    try {
+        const result = await setPublicAccess(
+            fileUrl,
+            { read: false, write: false, append: false },
+            { fetch: session.fetch }
+        )
+        if (result === null) {
+            throw new Error('revokePublicAccess: server does not support access control for this resource')
         }
     } catch (error) {
         if (isAuthenticationError(error)) handlePodError(error)
@@ -836,6 +869,8 @@ export interface SyncAllResult {
     packingListsUploaded: number
     /** true if the shared-with-me list was synced from pod */
     sharedWithMeSynced: boolean
+    /** true if the shared-lists-with-me list was synced from pod */
+    sharedListsWithMeSynced: boolean
 }
 
 /**
@@ -861,6 +896,7 @@ export async function syncAllDataFromPod(
     let packingListsSynced = 0
     let packingListsUploaded = 0
     let sharedWithMeSynced = false
+    let sharedListsWithMeSynced = false
 
     const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
 
@@ -974,5 +1010,27 @@ export async function syncAllDataFromPod(
         // 404 = no shared-with-me yet → silently skip
     }
 
-    return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced }
+    // ── 4. SharedListsWithMe ─────────────────────────────────────────────────
+    try {
+        const podSlwm = await loadRdfFromPod<SharedListsWithMe>(
+            session,
+            `${podUrl}${POD_CONTAINERS.SHARED_LISTS_WITH_ME}`,
+            datasetToSharedListsWithMe,
+        )
+        let localSlwm: SharedListsWithMe | null = null
+        try { localSlwm = await db.getSharedListsWithMe() } catch { /* not_found = ok */ }
+        const podTime = new Date(podSlwm.lastModified).getTime()
+        const localTime = localSlwm ? new Date(localSlwm.lastModified).getTime() : 0
+        if (!localSlwm || podTime > localTime) {
+            await db.saveSharedListsWithMe(podSlwm)
+            sharedListsWithMeSynced = true
+        }
+    } catch (err: unknown) {
+        if (err instanceof AuthenticationError) throw err
+        const status = getStatusCode(err)
+        if (status !== 404) console.error('syncAllDataFromPod: error syncing shared-lists-with-me', err)
+        // 404 = no shared-lists-with-me yet → silently skip
+    }
+
+    return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced, sharedListsWithMeSynced }
 }

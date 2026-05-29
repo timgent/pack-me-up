@@ -12,11 +12,17 @@ vi.mock('../services/solidPod', () => ({
     grantFullCollaboratorAccess: vi.fn(),
     revokeFullCollaboratorAccess: vi.fn(),
     getFullCollaborators: vi.fn(() => Promise.resolve([])),
+    getCollaborators: vi.fn(() => Promise.resolve([])),
+    isPubliclyAccessible: vi.fn(() => Promise.resolve(false)),
     getPrimaryPodUrl: vi.fn(() => Promise.resolve('https://pod.example.com/')),
     getPodOwnerName: vi.fn(() => Promise.resolve(null)),
     friendlyPodName: vi.fn((url: string) => url),
     saveRdfToPod: vi.fn(() => Promise.resolve()),
-    POD_CONTAINERS: { SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl' },
+    POD_CONTAINERS: {
+        SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',
+        SHARED_LISTS_WITH_ME: 'pack-me-up/shared-lists-with-me.ttl',
+        PACKING_LISTS: 'pack-me-up/packing-lists/',
+    },
 }))
 
 import { useDatabase } from '../components/DatabaseContext'
@@ -33,6 +39,9 @@ function renderPage(dbOverrides: Partial<PackingAppDatabase> = {}) {
     const db: Partial<PackingAppDatabase> = {
         getSharedWithMe: vi.fn(() => Promise.resolve({ contexts: [], lastModified: '' })),
         saveSharedWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+        getSharedListsWithMe: vi.fn(() => Promise.resolve({ lists: [], lastModified: '' })),
+        saveSharedListsWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+        getAllPackingLists: vi.fn(() => Promise.resolve([])),
         ...dbOverrides,
     }
     mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)

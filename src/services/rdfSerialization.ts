@@ -427,6 +427,77 @@ export function datasetToSharedWithMe(dataset: SolidDataset, datasetUrl: string)
     return { contexts, lastModified }
 }
 
+// ── SharedListsWithMe ─────────────────────────────────────────────────────────
+
+export interface SharedListContext {
+    listId: string
+    listUrl: string
+    podUrl: string
+    ownerWebId?: string
+    label?: string
+    addedAt: string
+}
+
+export interface SharedListsWithMe {
+    lists: SharedListContext[]
+    lastModified: string
+}
+
+export function sharedListsWithMeToDataset(data: SharedListsWithMe, datasetUrl: string): SolidDataset {
+    let ds = createSolidDataset()
+
+    let rootBuilder = buildThing({ url: datasetUrl })
+        .addUrl(RDF.type, PMU.SharedListsWithMe)
+        .addDatetime(DCTERMS.modified, new Date(data.lastModified))
+
+    for (let i = 0; i < data.lists.length; i++) {
+        const item = data.lists[i]
+        const itemUrl = `${datasetUrl}#list-${i}`
+        rootBuilder = rootBuilder.addUrl(PMU.hasSharedList, itemUrl)
+
+        let itemBuilder = buildThing({ url: itemUrl })
+            .addUrl(RDF.type, PMU.SharedListContext)
+            .addStringNoLocale(PMU.sharedListId, item.listId)
+            .addStringNoLocale(PMU.sharedListUrl, item.listUrl)
+            .addStringNoLocale(PMU.sharedPodUrl, item.podUrl)
+            .addDatetime(PMU.sharedAddedAt, new Date(item.addedAt))
+
+        if (item.ownerWebId) itemBuilder = itemBuilder.addStringNoLocale(PMU.sharedWebId, item.ownerWebId)
+        if (item.label) itemBuilder = itemBuilder.addStringNoLocale(PMU.sharedListLabel, item.label)
+
+        ds = setThing(ds, itemBuilder.build())
+    }
+
+    return setThing(ds, rootBuilder.build())
+}
+
+export function datasetToSharedListsWithMe(dataset: SolidDataset, datasetUrl: string): SharedListsWithMe {
+    const rootThing = getThing(dataset, datasetUrl)
+    if (!rootThing) throw new Error(`No root Thing at ${datasetUrl}`)
+
+    const lastModified = getDatetime(rootThing, DCTERMS.modified)?.toISOString() ?? new Date().toISOString()
+    const listUrls = getUrlAll(rootThing, PMU.hasSharedList)
+
+    const lists: SharedListContext[] = listUrls
+        .map(url => {
+            const t = getThing(dataset, url)
+            if (!t) return null
+            const listId = getStringNoLocale(t, PMU.sharedListId) ?? ''
+            const listUrl = getStringNoLocale(t, PMU.sharedListUrl) ?? ''
+            const podUrl = getStringNoLocale(t, PMU.sharedPodUrl) ?? ''
+            const addedAt = getDatetime(t, PMU.sharedAddedAt)?.toISOString() ?? new Date().toISOString()
+            const ownerWebId = getStringNoLocale(t, PMU.sharedWebId) ?? undefined
+            const label = getStringNoLocale(t, PMU.sharedListLabel) ?? undefined
+            const ctx: SharedListContext = { listId, listUrl, podUrl, addedAt }
+            if (ownerWebId) ctx.ownerWebId = ownerWebId
+            if (label) ctx.label = label
+            return ctx
+        })
+        .filter((c): c is SharedListContext => c !== null)
+
+    return { lists, lastModified }
+}
+
 function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     const thing = getThing(dataset, url)
     if (!thing) return null
