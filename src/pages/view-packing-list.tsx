@@ -11,10 +11,10 @@ import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName, getPodOwnerName, deriveWebIdFromPodUrl } from '../services/solidPod'
-import { packingListToDataset, datasetToPackingList, sharedListsWithMeToDataset } from '../services/rdfSerialization'
-import type { SharedListsWithMe } from '../services/rdfSerialization'
+import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import { useForeignPod } from '../components/ForeignPodContext'
+import { useSharedListsSync } from '../hooks/useSharedListsSync'
 
 type FormData = {
     items: Record<string, boolean>
@@ -95,6 +95,7 @@ export function ViewPackingList() {
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
+    const { sharedListsWithMe, saveSharedListsWithMe } = useSharedListsSync()
 
     useEffect(() => {
         if (isLoggedIn && session) {
@@ -108,6 +109,24 @@ export function ViewPackingList() {
             .then(name => { if (name) setOwnerDisplayName(name) })
             .catch(() => {})
     }, [foreignPodUrl, session])
+
+    useEffect(() => {
+        if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
+        if (sharedListsWithMe.lists.some(l => l.listId === id)) return
+        const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`
+        saveSharedListsWithMe({
+            lists: [...sharedListsWithMe.lists, {
+                listId: id,
+                listUrl: fileUrl,
+                podUrl: foreignPodUrl,
+                ownerWebId: deriveWebIdFromPodUrl(foreignPodUrl),
+                label: packingList.name,
+                addedAt: new Date().toISOString(),
+            }],
+            lastModified: new Date().toISOString(),
+        })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when list identity or registry loads
+    }, [packingList?.id, foreignPodUrl, sharedListsWithMe])
 
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
@@ -125,40 +144,7 @@ export function ViewPackingList() {
             currentData: packingList,
             saveToLocalDb: async (data) => {
                 const dataToSave = foreignPodUrl ? { ...data, sharedFromPodUrl: foreignPodUrl } : data
-                const result = await db.savePackingList(dataToSave)
-                if (foreignPodUrl) {
-                    // Fire-and-forget: track this foreign list in sharedListsWithMe the first time
-                    const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`
-                    db.getSharedListsWithMe()
-                        .then(existing => {
-                            if (existing.lists.some(l => l.listId === id)) return
-                            const updated: SharedListsWithMe = {
-                                lists: [...existing.lists, {
-                                    listId: id!,
-                                    listUrl: fileUrl,
-                                    podUrl: foreignPodUrl,
-                                    ownerWebId: deriveWebIdFromPodUrl(foreignPodUrl),
-                                    label: data.name,
-                                    addedAt: new Date().toISOString(),
-                                }],
-                                lastModified: new Date().toISOString(),
-                            }
-                            db.saveSharedListsWithMe(updated)
-                                .then(() => {
-                                    if (isLoggedIn && session && ownPodUrl) {
-                                        saveRdfToPod({
-                                            session,
-                                            fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_LISTS_WITH_ME}`,
-                                            data: updated,
-                                            serializer: sharedListsWithMeToDataset,
-                                        }).catch(() => {})
-                                    }
-                                })
-                                .catch(() => {})
-                        })
-                        .catch(() => {})
-                }
-                return result
+                return db.savePackingList(dataToSave)
             },
             updateFormAndState: (data, newRev) => {
                 hasLoadedRef.current = true;

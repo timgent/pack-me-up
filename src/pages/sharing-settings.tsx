@@ -10,15 +10,15 @@ import {
     getPrimaryPodUrl,
     getPodOwnerName,
     friendlyPodName,
-    saveRdfToPod,
     POD_CONTAINERS,
     getCollaborators,
     isPubliclyAccessible,
 } from '../services/solidPod'
-import { sharedWithMeToDataset, sharedListsWithMeToDataset } from '../services/rdfSerialization'
-import type { SharedContext, SharedListContext, SharedListsWithMe } from '../services/rdfSerialization'
+import type { SharedContext, SharedListContext } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
+import { useSharedListsSync } from '../hooks/useSharedListsSync'
+import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
 
 type ListSharingStatus = { collaborators: string[]; isPublic: boolean } | 'loading' | 'error'
 
@@ -27,6 +27,8 @@ export function SharingSettingsPage() {
     const { db } = useDatabase()
     const { showToast } = useToast()
     const navigate = useNavigate()
+    const { sharedWithMe, saveSharedWithMe } = useSharedWithMeSync()
+    const { sharedListsWithMe: sharedListsWithMeData, saveSharedListsWithMe } = useSharedListsSync()
 
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
@@ -72,10 +74,8 @@ export function SharingSettingsPage() {
     }, [ownPodUrl, loadCollaborators])
 
     useEffect(() => {
-        db.getSharedWithMe()
-            .then(swm => setSharedContexts(swm.contexts))
-            .catch(() => setSharedContexts([]))
-    }, [db])
+        if (sharedWithMe) setSharedContexts(sharedWithMe.contexts)
+    }, [sharedWithMe])
 
     useEffect(() => {
         if (!session || sharedContexts.length === 0) return
@@ -91,12 +91,9 @@ export function SharingSettingsPage() {
             })
     }, [sharedContexts, session])
 
-    // Load "lists shared with me"
     useEffect(() => {
-        db.getSharedListsWithMe()
-            .then(slwm => setSharedLists(slwm.lists))
-            .catch(() => setSharedLists([]))
-    }, [db])
+        if (sharedListsWithMeData) setSharedLists(sharedListsWithMeData.lists)
+    }, [sharedListsWithMeData])
 
     // Resolve owner display names for shared lists (section 3)
     useEffect(() => {
@@ -164,22 +161,11 @@ export function SharingSettingsPage() {
     const handleRemoveSharedContext = async (podUrl: string) => {
         setRemovingPodUrl(podUrl)
         try {
-            const list = await db.getSharedWithMe()
-            const updated = {
-                contexts: list.contexts.filter(c => c.podUrl !== podUrl),
+            const existing = sharedWithMe ?? { contexts: [], lastModified: new Date().toISOString() }
+            await saveSharedWithMe({
+                contexts: existing.contexts.filter(c => c.podUrl !== podUrl),
                 lastModified: new Date().toISOString(),
-            }
-            await db.saveSharedWithMe(updated)
-            setSharedContexts(updated.contexts)
-            const ownPodUrl = await getPrimaryPodUrl(session!)
-            if (ownPodUrl) {
-                await saveRdfToPod({
-                    session: session!,
-                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_WITH_ME}`,
-                    data: updated,
-                    serializer: sharedWithMeToDataset,
-                })
-            }
+            })
             showToast('Removed', 'success')
         } catch (err) {
             console.error('SharingSettingsPage: failed to remove shared context', err)
@@ -207,22 +193,11 @@ export function SharingSettingsPage() {
     const handleRemoveSharedList = async (listId: string) => {
         setRemovingListId(listId)
         try {
-            let existing: SharedListsWithMe = { lists: [], lastModified: new Date().toISOString() }
-            try { existing = await db.getSharedListsWithMe() } catch { /* not_found = ok */ }
-            const updated: SharedListsWithMe = {
+            const existing = sharedListsWithMeData ?? { lists: [], lastModified: new Date().toISOString() }
+            await saveSharedListsWithMe({
                 lists: existing.lists.filter(l => l.listId !== listId),
                 lastModified: new Date().toISOString(),
-            }
-            await db.saveSharedListsWithMe(updated)
-            setSharedLists(updated.lists)
-            if (session && ownPodUrl) {
-                await saveRdfToPod({
-                    session,
-                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_LISTS_WITH_ME}`,
-                    data: updated,
-                    serializer: sharedListsWithMeToDataset,
-                })
-            }
+            })
             showToast('Removed', 'success')
         } catch (err) {
             console.error('SharingSettingsPage: failed to remove shared list', err)

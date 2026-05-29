@@ -48,6 +48,13 @@ vi.mock('../components/SharePackingListModal', () => ({
     SharePackingListModal: vi.fn(() => null),
 }))
 
+vi.mock('../hooks/useSharedListsSync', () => ({
+    useSharedListsSync: vi.fn(() => ({
+        sharedListsWithMe: { lists: [], lastModified: '' },
+        saveSharedListsWithMe: vi.fn().mockResolvedValue(null),
+    })),
+}))
+
 const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockUsePodSync = vi.mocked(usePodSync)

@@ -42,7 +42,7 @@ export function PackingLists() {
         try {
             const list = packingLists.find(l => l.id === listToRename.id)
             if (!list) return
-            const updatedList = { ...list, name: renameValue }
+            const updatedList = { ...list, name: renameValue, lastModified: new Date().toISOString() }
             await db.savePackingList(updatedList)
             setPackingLists(packingLists.map(l => l.id === listToRename.id ? updatedList : l))
             await syncListToPod(updatedList)
@@ -60,6 +60,7 @@ export function PackingLists() {
                 id: generateUUID(),
                 name: `Copy of ${list.name}`,
                 createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString(),
                 items: list.items.map(item => ({ ...item, id: generateUUID(), packed: false })),
             }
             await db.savePackingList(newList)

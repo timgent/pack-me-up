@@ -41,29 +41,23 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
 
         // ── 3. Navigate to the list ──────────────────────────────────────────
         await page.goto(`/#/view-lists/${listId}`)
-        await page.waitForTimeout(1500)
         const shareBtn = page.getByRole('button', { name: /^share$/i })
         await expect(shareBtn).toBeVisible({ timeout: 10_000 })
         await shareBtn.click()
-        await page.waitForTimeout(800)
 
         // ── 4. Check current access loaded cleanly (not frozen on "Loading…") ─
         await expect(page.getByText('Loading…')).not.toBeVisible({ timeout: 5_000 })
 
         // ── 5. Switch to public mode and share ──────────────────────────────
         await page.getByRole('button', { name: /anyone with the link/i }).click()
-        await page.waitForTimeout(300)
         await page.getByRole('button', { name: /share publicly/i }).click()
-
-        // Wait for saveListToPod + grantPublicAccess
-        await page.waitForTimeout(6_000)
 
         // ── 6. Assert: no error shown, link is present ─────────────────────
         const errorText = await page.locator('.text-red-600').first().textContent().catch(() => '')
         expect(errorText.trim(), 'No error should appear in the modal').toBe('')
 
         const linkInput = page.getByRole('textbox', { name: /shareable link/i })
-        await expect(linkInput).toBeVisible({ timeout: 5_000 })
+        await expect(linkInput).toBeVisible({ timeout: 12_000 })
         const linkValue = await linkInput.inputValue()
         expect(linkValue).toContain('/view-lists/')
         expect(linkValue).toContain('pod=')
@@ -73,17 +67,15 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         // Use onClose button (×) rather than Escape to ensure overlay is gone
         const closeBtn = page.getByRole('button', { name: /close/i }).or(page.locator('button[aria-label="Close"]'))
         await closeBtn.click({ timeout: 3_000 }).catch(() => page.keyboard.press('Escape'))
-        // Wait for modal overlay to be fully gone before clicking Share again
-        await expect(page.locator('.fixed.inset-0.bg-gray-500')).not.toBeVisible({ timeout: 5_000 })
+        // Wait for modal to be fully gone before clicking Share again
+        await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 })
         await shareBtn.click()
-        await page.waitForTimeout(2_000)
-        await expect(page.getByText('🌐 Anyone with the link')).toBeVisible({ timeout: 5_000 })
+        await expect(page.getByText('🌐 Anyone with the link')).toBeVisible({ timeout: 8_000 })
         console.log('"Anyone with the link" row visible ✓')
 
         // ── 8. Probe: revoke ────────────────────────────────────────────────
         await page.getByRole('button', { name: /revoke public access/i }).click()
-        await page.waitForTimeout(3_000)
-        await expect(page.getByText('🌐 Anyone with the link')).not.toBeVisible({ timeout: 5_000 })
+        await expect(page.getByText('🌐 Anyone with the link')).not.toBeVisible({ timeout: 8_000 })
         console.log('Public row gone after revoke ✓')
 
         // 404s on pack-me resources are expected: pod polling before first sync + ACL probing during grant
