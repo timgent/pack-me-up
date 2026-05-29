@@ -21,6 +21,7 @@ interface SharePackingListModalProps {
     fileUrl: string
     listId: string
     sharerPodUrl: string
+    saveListToPod?: () => Promise<void>
 }
 
 export function SharePackingListModal({
@@ -30,6 +31,7 @@ export function SharePackingListModal({
     fileUrl,
     listId,
     sharerPodUrl,
+    saveListToPod,
 }: SharePackingListModalProps) {
     const [shareMode, setShareMode] = useState<ShareMode>('person')
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
@@ -75,6 +77,7 @@ export function SharePackingListModal({
         setIsGranting(true)
         setError(null)
         try {
+            if (saveListToPod) await saveListToPod()
             await grantCollaboratorAccess(session, fileUrl, collaboratorWebId.trim())
             setGeneratedLink(buildLink())
             setCollaboratorWebId('')
@@ -90,6 +93,7 @@ export function SharePackingListModal({
         setIsGranting(true)
         setError(null)
         try {
+            if (saveListToPod) await saveListToPod()
             await grantPublicAccess(session, fileUrl)
             setGeneratedLink(buildLink())
             await loadCurrentAccess()

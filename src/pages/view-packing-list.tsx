@@ -894,6 +894,14 @@ export function ViewPackingList() {
                 fileUrl={`${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`}
                 listId={id}
                 sharerPodUrl={ownPodUrl}
+                saveListToPod={packingList ? async () => {
+                    await saveRdfToPod({
+                        session,
+                        fileUrl: `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`,
+                        data: packingList,
+                        serializer: packingListToDataset,
+                    })
+                } : undefined}
             />
         )}
         </>

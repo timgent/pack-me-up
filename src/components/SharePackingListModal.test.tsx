@@ -49,6 +49,7 @@ function renderModal(props = {}) {
 
 describe('SharePackingListModal', () => {
     beforeEach(() => {
+        vi.clearAllMocks()
         vi.spyOn(console, 'error').mockImplementation(() => {})
         Object.defineProperty(navigator, 'clipboard', {
             value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -177,6 +178,36 @@ describe('SharePackingListModal', () => {
     })
 
     describe('granting access', () => {
+        it('calls saveListToPod before grantCollaboratorAccess when provided', async () => {
+            const callOrder: string[] = []
+            const mockSaveListToPod = vi.fn().mockImplementation(async () => { callOrder.push('save') })
+            mockGrantCollaboratorAccess.mockImplementation(async () => { callOrder.push('grant') })
+            renderModal({ saveListToPod: mockSaveListToPod })
+
+            await waitFor(() => screen.getByPlaceholderText(/profile\/card#me/i))
+            fireEvent.change(screen.getByPlaceholderText(/profile\/card#me/i), {
+                target: { value: 'https://bob.solidcommunity.net/profile/card#me' },
+            })
+            fireEvent.click(screen.getByRole('button', { name: /^share$/i }))
+
+            await waitFor(() => expect(callOrder).toHaveLength(2))
+            expect(callOrder).toEqual(['save', 'grant'])
+        })
+
+        it('calls saveListToPod before grantPublicAccess when provided', async () => {
+            const callOrder: string[] = []
+            const mockSaveListToPod = vi.fn().mockImplementation(async () => { callOrder.push('save') })
+            mockGrantPublicAccess.mockImplementation(async () => { callOrder.push('grant') })
+            renderModal({ saveListToPod: mockSaveListToPod })
+
+            await waitFor(() => screen.getByRole('button', { name: /anyone with the link/i }))
+            fireEvent.click(screen.getByRole('button', { name: /anyone with the link/i }))
+            fireEvent.click(screen.getByRole('button', { name: /share publicly/i }))
+
+            await waitFor(() => expect(callOrder).toHaveLength(2))
+            expect(callOrder).toEqual(['save', 'grant'])
+        })
+
         it('does not call grantCollaboratorAccess when WebID input is empty', async () => {
             renderModal()
             await waitFor(() => screen.getByRole('button', { name: /^share$/i }))
