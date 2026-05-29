@@ -198,6 +198,7 @@ export function SharingSettingsPage() {
                 lists: existing.lists.filter(l => l.listId !== listId),
                 lastModified: new Date().toISOString(),
             })
+            await db.deletePackingList(listId).catch(() => {})
             showToast('Removed', 'success')
         } catch (err) {
             console.error('SharingSettingsPage: failed to remove shared list', err)
