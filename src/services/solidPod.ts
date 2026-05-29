@@ -276,6 +276,13 @@ export async function revokeCollaboratorAccess(
     }
 }
 
+// Special agent URIs that represent public/authenticated access rather than named people
+const SYSTEM_AGENT_URIS = new Set([
+    'http://www.w3.org/ns/solid/acp#PublicAgent',       // ACP public agent
+    'http://xmlns.com/foaf/0.1/Agent',                  // WAC foaf:Agent (public)
+    'http://www.w3.org/ns/auth/acl#AuthenticatedAgent', // WAC authenticated-user wildcard
+])
+
 export async function getCollaborators(
     session: Session,
     fileUrl: string
@@ -286,6 +293,7 @@ export async function getCollaborators(
         return Object.entries(accessMap)
             .filter(([webId, modes]) =>
                 webId !== session.info.webId &&
+                !SYSTEM_AGENT_URIS.has(webId) &&
                 modes.read === true
             )
             .map(([webId]) => webId)
