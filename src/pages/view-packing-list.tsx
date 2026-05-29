@@ -73,8 +73,7 @@ export function ViewPackingList() {
     const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
     const [renamingGuestName, setRenamingGuestName] = useState('')
     const [guestToRemove, setGuestToRemove] = useState<string | null>(null)
-    const [showSaveBanner, setShowSaveBanner] = useState(false)
-    const [isSavingToSharedLists, setIsSavingToSharedLists] = useState(false)
+
 
     const toggleCategory = (key: string) =>
         setCollapsedCategories(prev => {
@@ -97,57 +96,11 @@ export function ViewPackingList() {
     const { db } = useDatabase()
 
     useEffect(() => {
-        if (isLoggedIn && session && !foreignPodUrl) {
+        if (isLoggedIn && session) {
             getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
         }
-    }, [isLoggedIn, session, foreignPodUrl])
+    }, [isLoggedIn, session])
 
-    // Show "save to shared lists" banner when viewing a list via ?pod= query param
-    // (not full-pod collaboration context) and it hasn't been saved yet
-    useEffect(() => {
-        if (!isLoggedIn || !id || foreignPodCtx || !foreignPodUrl || !packingList) return
-        db.getSharedListsWithMe()
-            .then(slwm => {
-                const alreadySaved = slwm.lists.some(l => l.listId === id && l.podUrl === foreignPodUrl)
-                if (!alreadySaved) setShowSaveBanner(true)
-            })
-            .catch(() => setShowSaveBanner(true))
-    }, [isLoggedIn, id, foreignPodCtx, foreignPodUrl, packingList, db])
-
-    const handleSaveToSharedLists = async () => {
-        if (!id || !foreignPodUrl || !packingList) return
-        setIsSavingToSharedLists(true)
-        try {
-            let existing: SharedListsWithMe = { lists: [], lastModified: new Date().toISOString() }
-            try { existing = await db.getSharedListsWithMe() } catch { /* not_found = ok */ }
-            const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`
-            const updated: SharedListsWithMe = {
-                lists: [...existing.lists, {
-                    listId: id,
-                    listUrl: fileUrl,
-                    podUrl: foreignPodUrl,
-                    label: packingList.name,
-                    addedAt: new Date().toISOString(),
-                }],
-                lastModified: new Date().toISOString(),
-            }
-            await db.saveSharedListsWithMe(updated)
-            if (isLoggedIn && session && ownPodUrl) {
-                await saveRdfToPod({
-                    session,
-                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_LISTS_WITH_ME}`,
-                    data: updated,
-                    serializer: sharedListsWithMeToDataset,
-                })
-            }
-            setShowSaveBanner(false)
-            showToast('Saved to your shared lists', 'success')
-        } catch {
-            showToast('Failed to save. Please try again.', 'error')
-        } finally {
-            setIsSavingToSharedLists(false)
-        }
-    }
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
@@ -163,8 +116,39 @@ export function ViewPackingList() {
         useSyncCoordinator<PackingList>({
             currentData: packingList,
             saveToLocalDb: async (data) => {
-                if (foreignPodCtx || foreignPodUrl) return { rev: '' }
-                return await db.savePackingList(data);
+                const result = await db.savePackingList(data)
+                if (foreignPodUrl) {
+                    // Fire-and-forget: track this foreign list in sharedListsWithMe the first time
+                    const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`
+                    db.getSharedListsWithMe()
+                        .then(existing => {
+                            if (existing.lists.some(l => l.listId === id)) return
+                            const updated: SharedListsWithMe = {
+                                lists: [...existing.lists, {
+                                    listId: id!,
+                                    listUrl: fileUrl,
+                                    podUrl: foreignPodUrl,
+                                    label: data.name,
+                                    addedAt: new Date().toISOString(),
+                                }],
+                                lastModified: new Date().toISOString(),
+                            }
+                            db.saveSharedListsWithMe(updated)
+                                .then(() => {
+                                    if (isLoggedIn && session && ownPodUrl) {
+                                        saveRdfToPod({
+                                            session,
+                                            fileUrl: `${ownPodUrl}${POD_CONTAINERS.SHARED_LISTS_WITH_ME}`,
+                                            data: updated,
+                                            serializer: sharedListsWithMeToDataset,
+                                        }).catch(() => {})
+                                    }
+                                })
+                                .catch(() => {})
+                        })
+                        .catch(() => {})
+                }
+                return result
             },
             updateFormAndState: (data, newRev) => {
                 hasLoadedRef.current = true;
@@ -605,31 +589,10 @@ export function ViewPackingList() {
 
             {/* Persistent "viewing someone else's list" indicator */}
             {foreignPodUrl && !foreignPodCtx && (
-                <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
                     <p className="text-sm text-indigo-800 font-medium">
                         👤 Viewing a list from <span className="font-semibold">{friendlyPodName(foreignPodUrl)}</span>
                     </p>
-                    {showSaveBanner && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-sm text-indigo-700">Save for easy access?</span>
-                            <button
-                                type="button"
-                                onClick={handleSaveToSharedLists}
-                                disabled={isSavingToSharedLists}
-                                className="px-3 py-1 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                            >
-                                {isSavingToSharedLists ? 'Saving…' : 'Save'}
-                            </button>
-                            <button
-                                type="button"
-                                aria-label="Dismiss"
-                                onClick={() => setShowSaveBanner(false)}
-                                className="text-indigo-400 hover:text-indigo-600 text-lg font-bold leading-none"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    )}
                 </div>
             )}
 
