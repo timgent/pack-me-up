@@ -952,7 +952,7 @@ export async function syncAllDataFromPod(
         const err = podListsResult.reason
         if (err instanceof AuthenticationError) throw err
         console.error('syncAllDataFromPod: error loading packing lists', err)
-        return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced }
+        return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced, sharedListsWithMeSynced }
     }
 
     const { data: podLists } = podListsResult.value
