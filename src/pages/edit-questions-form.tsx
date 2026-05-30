@@ -96,10 +96,7 @@ export function EditQuestionsForm() {
       conflictStrategy: 'fallback-to-pod', // Pod wins if local has no timestamp (handles fresh loads)
     });
 
-  // Callback when save to Pod succeeds
-  const handleSaveSuccess = useCallback(() => {
-    console.log('Saved to Pod successfully');
-  }, []);
+  const handleSaveSuccess = useCallback(() => {}, []);
 
   // Callback when save to Pod fails
   const handleSaveError = useCallback((error: string) => {
@@ -162,42 +159,29 @@ export function EditQuestionsForm() {
   const handleAutoSave = useDebouncedCallback(async () => {
     const currentData = getValues();
 
-    // Skip if there's no data yet or we're syncing from Pod
-    if (!currentQuestionSet) {
-      console.log('handleAutoSave: currentQuestionSet is null, skipping');
-      return;
-    }
+    if (!currentQuestionSet) return;
 
     try {
-      // Check if data has actually changed
       const currentDataString = JSON.stringify(currentData);
       const lastDataString = JSON.stringify(currentQuestionSet);
 
-      if (currentDataString === lastDataString) {
-        console.log('handleAutoSave: No changes detected, skipping save');
-        return;
-      }
+      if (currentDataString === lastDataString) return;
 
-      console.log('handleAutoSave: Changes detected, auto-saving...');
       setAutoSaveStatus('saving');
 
-      // Prepare data with ID
       const dataToSave = {
         _id: "1",
         ...currentData,
         _rev: rev,
       };
 
-      // If logged in, use saveWithSyncPrevention (handles local + Pod save)
       if (isLoggedIn) {
         const savedData = await saveWithSyncPrevention(dataToSave, saveToPod);
         if (savedData) {
           setRev(savedData._rev);
           setCurrentQuestionSet(savedData);
-          console.log('handleAutoSave: Saved to local DB and Pod');
         }
       } else {
-        // Not logged in, just save locally
         const dataWithTimestamp = {
           ...dataToSave,
           lastModified: new Date().toISOString()
@@ -209,7 +193,6 @@ export function EditQuestionsForm() {
         };
         setRev(result.rev);
         setCurrentQuestionSet(savedData);
-        console.log('handleAutoSave: Saved to local DB');
       }
 
       setAutoSaveStatus('saved');

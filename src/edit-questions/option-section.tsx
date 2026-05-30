@@ -94,7 +94,9 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
 
             {isExpanded && <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {itemFields.map((_item: Item, itemIndex: number) => (
+                {(() => {
+                    const allItemNames = getAllItemNames();
+                    return itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
@@ -113,7 +115,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                                         onChange={(newValue) => {
                                             onChange({ ...value, text: newValue })
                                         }}
-                                        options={getAllItemNames()}
+                                        options={allItemNames}
                                         placeholder="Enter item"
                                     />}
                             >
@@ -127,7 +129,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                             label={`Remove item ${itemIndex + 1}`}
                         />
                     </div>
-                ))}
+                ))})()}
                 <Button
                     type="button"
                     onClick={() => {
