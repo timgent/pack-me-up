@@ -109,60 +109,58 @@ export const QuestionSection = memo(function QuestionSection({ questionIndex, co
                     />
                 </div>
 
-                {isExpanded && (
-                    <>
-                        <div className="mb-4 pb-4 border-b border-gray-200">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Question Type
+                <div className={isExpanded ? '' : 'hidden'}>
+                    <div className="mb-4 pb-4 border-b border-gray-200">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Question Type
+                        </label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    value="single-choice"
+                                    {...register(`questions.${questionIndex}.questionType`)}
+                                    className="mr-2"
+                                />
+                                <span className="text-sm text-gray-700">Single Choice</span>
                             </label>
-                            <div className="flex gap-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        value="single-choice"
-                                        {...register(`questions.${questionIndex}.questionType`)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm text-gray-700">Single Choice</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        value="multiple-choice"
-                                        {...register(`questions.${questionIndex}.questionType`)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm text-gray-700">Multiple Choice</span>
-                                </label>
-                            </div>
+                            <label className="flex items-center">
+                                <input
+                                    type="radio"
+                                    value="multiple-choice"
+                                    {...register(`questions.${questionIndex}.questionType`)}
+                                    className="mr-2"
+                                />
+                                <span className="text-sm text-gray-700">Multiple Choice</span>
+                            </label>
                         </div>
-                        <div className="space-y-4">
-                            {optionFields.map((option, optionIndex) => (
-                            <OptionSection
-                                control={control}
-                                key={option.id}
-                                questionIndex={questionIndex}
-                                optionIndex={optionIndex}
-                                register={register}
-                                setValue={setValue}
-                                removeOption={() => removeOption(optionIndex)}
-                                people={people}
-                                triggerScrollToLast={optionIndex === triggerScrollToOptionIndex ? triggerScrollToLastVersion : undefined}
-                                getAllItemNames={getAllItemNames}
-                            />
-                        ))}
-                        <div className="mt-4">
-                            <Button
-                                type="button"
-                                onClick={() => appendOption(newOption(optionFields.length))}
-                                variant="secondary"
-                            >
-                                Add Option
-                            </Button>
-                        </div>
-                        </div>
-                    </>
-                )}
+                    </div>
+                    <div className="space-y-4">
+                        {optionFields.map((option, optionIndex) => (
+                        <OptionSection
+                            control={control}
+                            key={option.id}
+                            questionIndex={questionIndex}
+                            optionIndex={optionIndex}
+                            register={register}
+                            setValue={setValue}
+                            removeOption={() => removeOption(optionIndex)}
+                            people={people}
+                            triggerScrollToLast={optionIndex === triggerScrollToOptionIndex ? triggerScrollToLastVersion : undefined}
+                            getAllItemNames={getAllItemNames}
+                        />
+                    ))}
+                    <div className="mt-4">
+                        <Button
+                            type="button"
+                            onClick={() => appendOption(newOption(optionFields.length))}
+                            variant="secondary"
+                        >
+                            Add Option
+                        </Button>
+                    </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -21,6 +21,7 @@ interface OptionSectionProps {
 
 export const OptionSection = memo(function OptionSection({ control, questionIndex, optionIndex, register, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -44,6 +45,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
     useEffect(() => {
         if (!triggerScrollToLast) return;
         setIsExpanded(true);
+        setHasBeenExpanded(true);
         pendingScrollRef.current = true;
     }, [triggerScrollToLast]);
 
@@ -67,7 +69,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
             <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
                 <button
                     type="button"
-                    onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
+                    onClick={() => startTransition(() => { setIsExpanded(e => { if (!e) setHasBeenExpanded(true); return !e; }); })}
                     className="text-gray-400 hover:text-gray-600 transition-colors duration-200 mt-7"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                 >
@@ -94,7 +96,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                 />
             </div>
 
-            {isExpanded && <div className="ml-0 sm:ml-4 space-y-3">
+            {hasBeenExpanded && <div className={`ml-0 sm:ml-4 space-y-3${isExpanded ? '' : ' hidden'}`}>
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>

@@ -17,6 +17,7 @@ interface AlwaysNeededItemsSectionProps {
 
 export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -42,6 +43,7 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
     useEffect(() => {
         if (!triggerScrollToLast) return;
         setIsExpanded(true);
+        setHasBeenExpanded(true);
         pendingScrollRef.current = true;
     }, [triggerScrollToLast]);
 
@@ -64,7 +66,7 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
-                onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
+                onClick={() => startTransition(() => { setIsExpanded(e => { if (!e) setHasBeenExpanded(true); return !e; }); })}
                 className="flex items-center gap-2 mb-4 w-full text-left hover:bg-gray-50 -mx-4 -mt-4 px-4 pt-4 rounded-t-lg transition-colors duration-200"
             >
                 <svg
@@ -81,8 +83,8 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                 </div>
             </button>
 
-            {isExpanded && (
-                <div className="space-y-3">
+            {hasBeenExpanded && (
+                <div className={`space-y-3${isExpanded ? '' : ' hidden'}`}>
                 {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
