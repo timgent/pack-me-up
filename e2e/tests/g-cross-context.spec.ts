@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
-import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
+import { CSS_ISSUER, GUSER_EMAIL, GUSER_PASSWORD } from '../../playwright.config'
 
 // G tests share the same pod user. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -15,7 +15,7 @@ test.describe('G – Cross-context Pod Sync', () => {
     ctx = await browser.newContext()
     page = await ctx.newPage()
     await page.goto('/')
-    await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(page, CSS_ISSUER, GUSER_EMAIL, GUSER_PASSWORD)
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
@@ -34,7 +34,7 @@ test.describe('G – Cross-context Pod Sync', () => {
     const freshCtx = await browser.newContext()
     const pg = await freshCtx.newPage()
     await pg.goto('/')
-    await loginToCss(pg, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(pg, CSS_ISSUER, GUSER_EMAIL, GUSER_PASSWORD)
     return { ctx: freshCtx, pg }
   }
 
@@ -78,6 +78,11 @@ test.describe('G – Cross-context Pod Sync', () => {
     // Wait for the list to appear — confirms local DB is populated and no pod write is in flight.
     // packing-lists.tsx has no background pod polling; the only sync is loginSyncVersion (done on login).
     await expect(page.getByText(originalName)).toBeVisible({ timeout: 15_000 })
+    // Set up response listener before clicking Save so we don't miss the PUT.
+    const renamePodWrite = page.waitForResponse(
+      r => r.url().includes('/pack-me-up/packing-lists/') && r.request().method() === 'PUT',
+      { timeout: 15_000 }
+    )
     await page.locator('.rounded-2xl').filter({ hasText: originalName }).getByRole('button', { name: /Rename/i }).click()
     const renameInput = page.locator('[role="dialog"] input[type="text"]')
     await renameInput.clear()
@@ -85,13 +90,10 @@ test.describe('G – Cross-context Pod Sync', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
     // Verify the rename is visible on this page before checking context B
     await expect(page.getByText(renamedName)).toBeVisible({ timeout: 5_000 })
-    // confirmRenamePackingList is async; wait for all in-flight network requests
-    // (including syncListToPod's GET + PUT) to settle before reloading.
-    // networkidle is more reliable than a fixed timeout.
-    await page.waitForLoadState('networkidle', { timeout: 15_000 })
-    // Reload page A to confirm pod has the rename (loadFromPod overwrites local from pod)
+    // Wait for the pod PUT to complete before reloading (loadFromPod overwrites local from pod).
+    await renamePodWrite
+    // Reload page A to confirm pod has the rename
     await page.reload()
-    await page.waitForLoadState('networkidle')
     await expect(page.getByText(renamedName)).toBeVisible({ timeout: 10_000 })
 
     const { ctx: ctxB, pg: pageB } = await freshLogin(browser)

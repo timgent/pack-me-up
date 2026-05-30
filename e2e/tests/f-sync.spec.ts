@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
-import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
+import { CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD } from '../../playwright.config'
 
 // All F tests share the same pod user and write to overlapping resources.
 // Serial mode gives each test exclusive pod access.
@@ -19,7 +19,7 @@ test.describe('F – Solid Pod Sync', () => {
     ctx = await browser.newContext()
     page = await ctx.newPage()
     await page.goto('/')
-    await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(page, CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD)
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
@@ -39,7 +39,7 @@ test.describe('F – Solid Pod Sync', () => {
     const freshCtx = await browser.newContext()
     const pg = await freshCtx.newPage()
     await pg.goto('/')
-    await loginToCss(pg, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(pg, CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD)
     return { ctx: freshCtx, pg }
   }
 
@@ -173,14 +173,18 @@ test.describe('F – Solid Pod Sync', () => {
     await page.getByRole('button', { name: 'Add' }).first().click()
     await expect(page.getByText(/On past trips you added items/)).not.toBeVisible({ timeout: 10_000 })
 
+    // Wait for a pod sync GET to complete after navigating to manage-questions.
+    // This proves the sync loop fired and did not overwrite the locally-saved custom item.
+    const syncCycleRead = page.waitForResponse(
+      r => r.url().includes('/pack-me-up/') && r.request().method() === 'GET',
+      { timeout: 15_000 }
+    )
     await page.goto('/#/manage-questions')
+    await syncCycleRead
     // Wait for the section button to be ready before clicking
     await expect(page.getByRole('button', { name: /Always Needed Items/i }).first()).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
     await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
-    // Wait a full pod-poll cycle (5s) + buffer so the sync fires.
-    // Without the fix the pod would overwrite the local change and the item disappears.
-    await page.waitForTimeout(7_000)
     await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
   })
 

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
-import { CSS_ISSUER, CSS_PORT, TEST_EMAIL, TEST_PASSWORD, COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME } from '../../playwright.config'
+import { CSS_ISSUER, CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME, COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME } from '../../playwright.config'
 
 // L tests use two pod users. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -17,7 +17,7 @@ test.describe('L – Sharing a packing list', () => {
         ctxA = await browser.newContext()
         pageA = await ctxA.newPage()
         await pageA.goto('/')
-        await loginToCss(pageA, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+        await loginToCss(pageA, CSS_ISSUER, LUSER_EMAIL, LUSER_PASSWORD)
 
         await pageA.goto('/#/wizard')
         await fillPersonRequiredFields(pageA)
@@ -73,7 +73,7 @@ test.describe('L – Sharing a packing list', () => {
 
         expect(shareLink).toContain('/view-lists/')
         expect(shareLink).toContain('pod=')
-        expect(shareLink).toContain(encodeURIComponent(`http://localhost:${CSS_PORT}/testuser/`))
+        expect(shareLink).toContain(encodeURIComponent(`http://localhost:${CSS_PORT}/${LUSER_POD_NAME}/`))
 
         // Close modal
         await pageA.keyboard.press('Escape')

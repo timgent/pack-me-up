@@ -5,9 +5,9 @@ import { loginToExistingCssAccount, createCssClientCredentials, getCssBearerToke
 import {
     CSS_ISSUER,
     CSS_PORT,
-    TEST_EMAIL,
-    TEST_PASSWORD,
-    TEST_POD_NAME,
+    MUSER_EMAIL,
+    MUSER_PASSWORD,
+    MUSER_POD_NAME,
     COLLAB_EMAIL,
     COLLAB_PASSWORD,
     COLLAB_POD_NAME,
@@ -19,25 +19,25 @@ test.describe.configure({ mode: 'serial' })
 test.describe('M – Full pod collaboration', () => {
     let pageA: import('@playwright/test').Page
     let ctxA: import('@playwright/test').BrowserContext
+    let pageB: import('@playwright/test').Page
+    let ctxB: import('@playwright/test').BrowserContext
     let inviteLink: string
     const listName = `Collab Trip ${Date.now()}`
     const collabWebId = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`
-    const ownerPodUrl = `http://localhost:${CSS_PORT}/${TEST_POD_NAME}/`
+    const ownerPodUrl = `http://localhost:${CSS_PORT}/${MUSER_POD_NAME}/`
 
     test.beforeAll(async ({ browser }) => {
         // Owner: log in, ensure a question set exists, create a packing list, sync to pod
         ctxA = await browser.newContext()
         pageA = await ctxA.newPage()
         await pageA.goto('/')
-        await loginToCss(pageA, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+        await loginToCss(pageA, CSS_ISSUER, MUSER_EMAIL, MUSER_PASSWORD)
 
-        // Try create-packing-list directly — if a question set already exists (e.g. from F/G
-        // running in parallel on the same pod), skip the wizard to avoid overwriting their data.
+        // Try create-packing-list directly — if a question set already exists skip the wizard.
         await pageA.goto('/#/create-packing-list')
         const nameInput = pageA.getByPlaceholder('Enter a name for your packing list')
         const isReady = await nameInput.isVisible({ timeout: 8_000 }).catch(() => false)
         if (!isReady) {
-            // No question set yet — run wizard (this path taken when M is the first/only suite)
             await pageA.goto('/#/wizard')
             await fillPersonRequiredFields(pageA)
             await pageA.getByRole('button', { name: /Generate My Packing Questions/i }).click()
@@ -64,10 +64,17 @@ test.describe('M – Full pod collaboration', () => {
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
         await expect(pageA.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
         await pageA.getByRole('button', { name: /hide packed/i }).click()
+
+        // Collaborator: log in once; each test navigates to inviteLink on the shared page.
+        ctxB = await browser.newContext()
+        pageB = await ctxB.newPage()
+        await pageB.goto('/')
+        await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
     })
 
     test.afterAll(async () => {
         await ctxA.close()
+        await ctxB.close()
     })
 
     test('M1: Owner navigates to sharing settings', async () => {
@@ -91,130 +98,70 @@ test.describe('M – Full pod collaboration', () => {
         await expect(pageA.getByText(collabWebId)).toBeVisible({ timeout: 10_000 })
     })
 
-    test('M3: Collab visits invite link and sees foreign context banner', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
-        } finally {
-            await ctxB.close()
-        }
+    test('M3: Collab visits invite link and sees foreign context banner', async () => {
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
     })
 
-    test('M4: Collab sees owner packing lists in foreign context', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
-            await expect(pageB.getByText(listName)).toBeVisible({ timeout: 15_000 })
-        } finally {
-            await ctxB.close()
-        }
+    test('M4: Collab sees owner packing lists in foreign context', async () => {
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+        await expect(pageB.getByText(listName)).toBeVisible({ timeout: 15_000 })
     })
 
-    test('M5: Collab navigates to a specific list in foreign context', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
-            await pageB.getByText(listName).click()
-            await pageB.waitForURL(/\/pod\/.+\/view-lists\/.+/, { timeout: 10_000 })
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible()
-        } finally {
-            await ctxB.close()
-        }
+    test('M5: Collab navigates to a specific list in foreign context', async () => {
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+        await pageB.getByText(listName).click()
+        await pageB.waitForURL(/\/pod\/.+\/view-lists\/.+/, { timeout: 10_000 })
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible()
     })
 
-    test('M6: Auto-store writes shared-with-me.ttl to collab pod', async ({ browser }) => {
+    test('M6: Auto-store writes shared-with-me.ttl to collab pod', async () => {
         const collabPodUrl = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/`
         const collabWebIdForAuth = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`
         const swmUrl = `${collabPodUrl}pack-me-up/shared-with-me.ttl`
 
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-            // Allow time for auto-store to complete
-            await pageB.waitForTimeout(3000)
-
-            // Verify via authenticated server-side request (page.evaluate fetch is unauthenticated)
-            const accountToken = await loginToExistingCssAccount(CSS_PORT, COLLAB_EMAIL, COLLAB_PASSWORD)
-            const { id, secret } = await createCssClientCredentials(CSS_PORT, accountToken, collabWebIdForAuth)
-            const bearerToken = await getCssBearerToken(CSS_PORT, id, secret, collabWebIdForAuth)
+        // Poll via authenticated server-side request rather than sleeping.
+        const accountToken = await loginToExistingCssAccount(CSS_PORT, COLLAB_EMAIL, COLLAB_PASSWORD)
+        const { id, secret } = await createCssClientCredentials(CSS_PORT, accountToken, collabWebIdForAuth)
+        const bearerToken = await getCssBearerToken(CSS_PORT, id, secret, collabWebIdForAuth)
+        await expect(async () => {
             const res = await fetch(swmUrl, { method: 'HEAD', headers: { Authorization: `Bearer ${bearerToken}` } })
             expect(res.status).toBe(200)
-        } finally {
-            await ctxB.close()
-        }
+        }).toPass({ intervals: [1_000, 2_000, 3_000, 5_000], timeout: 15_000 })
     })
 
-    test('M7: Context switcher appears after visiting shared pod', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+    test('M7: Context switcher appears after visiting shared pod', async () => {
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-            // Context switcher appears after login sync loads shared-with-me.ttl from pod
-            // (loginSyncVersion in Navigation triggers re-read). Allow generous time for sync.
-            await expect(pageB.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
-        } finally {
-            await ctxB.close()
-        }
+        // Context switcher appears after login sync loads shared-with-me.ttl from pod
+        // (loginSyncVersion in Navigation triggers re-read). Allow generous time for sync.
+        await expect(pageB.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
     })
 
-    test('M8: Collab switches back to own context via context switcher', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-            await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+    test('M8: Collab switches back to own context via context switcher', async () => {
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-            await pageB.getByRole('combobox', { name: /switch context/i }).selectOption('__own__')
-            await pageB.waitForURL(/#\/view-lists/, { timeout: 10_000 })
-            await expect(pageB.getByText(/viewing.*data/i)).not.toBeVisible()
-        } finally {
-            await ctxB.close()
-        }
+        await pageB.getByRole('combobox', { name: /switch context/i }).selectOption('__own__')
+        await pageB.waitForURL(/#\/view-lists/, { timeout: 10_000 })
+        await expect(pageB.getByText(/viewing.*data/i)).not.toBeVisible()
     })
 
-    test('M9: Owner revokes access; collab sees access denied', async ({ browser }) => {
+    test('M9: Owner revokes access; collab sees access denied', async () => {
         // Owner revokes
         await pageA.goto('/#/sharing')
         await expect(pageA.getByText(collabWebId)).toBeVisible({ timeout: 10_000 })
         await pageA.getByRole('button', { name: /revoke/i }).first().click()
         await expect(pageA.getByText(collabWebId)).not.toBeVisible({ timeout: 10_000 })
 
-        // Collab tries to access invite link — should get access denied
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
-            await pageB.goto(inviteLink)
-            await expect(pageB.getByText(/access denied/i)).toBeVisible({ timeout: 20_000 })
-        } finally {
-            await ctxB.close()
-        }
+        // Collab navigates to invite link — full page load re-fetches from pod, should get access denied
+        await pageB.goto(inviteLink)
+        await expect(pageB.getByText(/access denied/i)).toBeVisible({ timeout: 20_000 })
     })
 })

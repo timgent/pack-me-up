@@ -1,33 +1,48 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
+import { loginToCss } from '../helpers/login'
+import { CSS_ISSUER, HUSER_EMAIL, HUSER_PASSWORD } from '../../playwright.config'
 
 // H tests share the same user's backups pod resource; running them in parallel causes
 // concurrent creates/deletes to make counts non-deterministic.
 test.describe.configure({ mode: 'serial' })
 
 test.describe('H – Backups', () => {
-  async function setupWithList(page: import('@playwright/test').Page) {
-    // Run wizard and create a list while logged in
+  let page: import('@playwright/test').Page
+  let ctx: import('@playwright/test').BrowserContext
+
+  // Run wizard and create a list once for the entire suite — avoids 3 separate wizard runs
+  // (one per authedPage) and 2 duplicate pod writes.
+  test.beforeAll(async ({ browser }) => {
+    ctx = await browser.newContext()
+    page = await ctx.newPage()
+    await page.goto('/')
+    await loginToCss(page, CSS_ISSUER, HUSER_EMAIL, HUSER_PASSWORD)
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
     try { await page.getByRole('button', { name: 'Yes, Override' }).click({ timeout: 3_000 }) } catch { /* ok */ }
-    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()
     try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
-    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
-    await page.waitForLoadState('networkidle')
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
+    await page.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 15_000 })
     await page.getByPlaceholder('Enter a name for your packing list').fill('Backup Test List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
-    await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
-    // Give pod sync time
-    await page.waitForTimeout(3_000)
-  }
+    await page.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
+    // Sync to pod via green-indicator cycle (same pattern as F/G/L/M).
+    await page.locator('input[type="checkbox"]').first().click()
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
+  })
 
-  test('H1: create a backup appears in the backups list', async ({ authedPage: page }) => {
-    await setupWithList(page)
+  test.afterAll(async () => {
+    await ctx.close()
+  })
+
+  test('H1: create a backup appears in the backups list', async () => {
     await page.goto('/#/backups')
-    await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Create Backup' }).click()
     // Toast success
     await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
@@ -36,9 +51,9 @@ test.describe('H – Backups', () => {
     await expect(page.locator('text=/packing list/').first()).toBeVisible()
   })
 
-  test('H2: restore from backup replaces current data', async ({ authedPage: page }) => {
-    await setupWithList(page)
+  test('H2: restore from backup replaces current data', async () => {
     await page.goto('/#/backups')
+    await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Create Backup' }).click()
     await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
     // Handle window.confirm for restore
@@ -47,10 +62,10 @@ test.describe('H – Backups', () => {
     await expect(page.getByText(/backup restored/i)).toBeVisible({ timeout: 10_000 })
   })
 
-  test('H3: delete a backup removes it from the list', async ({ authedPage: page }) => {
+  test('H3: delete a backup removes it from the list', async () => {
     await page.goto('/#/backups')
-    // Wait for any existing backups to load from Pod
-    await page.waitForLoadState('networkidle')
+    // Wait for the backups UI to be ready
+    await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     // Create a fresh backup to guarantee at least one exists
     await page.getByRole('button', { name: 'Create Backup' }).click()
     await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })

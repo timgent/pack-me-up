@@ -1,5 +1,5 @@
 import { test as base, BrowserContext, Page } from '@playwright/test'
-import { AUTH_STATE_FILE, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../playwright.config'
+import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../playwright.config'
 import { loginToCss } from './helpers/login'
 
 type MyFixtures = {
@@ -28,7 +28,6 @@ export const test = base.extend<MyFixtures>({
     const page = await context.newPage()
     await page.goto('/')
     await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
-    await context.storageState({ path: AUTH_STATE_FILE })
     await page.close()
     await use(context)
     await context.close()
