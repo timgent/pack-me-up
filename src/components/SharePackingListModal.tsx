@@ -45,8 +45,12 @@ export function SharePackingListModal({
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [isRevokingPublic, setIsRevokingPublic] = useState(false)
 
-    const buildLink = () =>
-        `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(sharerPodUrl)}`
+    const buildLink = () => {
+        const base = `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(sharerPodUrl)}`
+        return session.info.webId
+            ? `${base}&owner=${encodeURIComponent(session.info.webId)}`
+            : base
+    }
 
     const loadCurrentAccess = async () => {
         setIsLoadingAccess(true)

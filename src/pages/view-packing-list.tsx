@@ -49,6 +49,7 @@ export function ViewPackingList() {
     const foreignPodCtx = useForeignPod()
     // Prefer full-collaboration context over per-list query param (backward compat)
     const foreignPodUrl = foreignPodCtx?.foreignPodUrl ?? searchParams.get('pod') ?? undefined
+    const ownerWebIdFromUrl = searchParams.get('owner') ?? undefined
     const backPath = foreignPodCtx
         ? `/pod/${encodeURIComponent(foreignPodCtx.foreignPodUrl)}/view-lists`
         : '/view-lists'
@@ -105,10 +106,10 @@ export function ViewPackingList() {
 
     useEffect(() => {
         if (!foreignPodUrl || !session) return
-        getPodOwnerName(session, foreignPodUrl, deriveWebIdFromPodUrl(foreignPodUrl))
+        getPodOwnerName(session, foreignPodUrl, ownerWebIdFromUrl ?? deriveWebIdFromPodUrl(foreignPodUrl))
             .then(name => { if (name) setOwnerDisplayName(name) })
             .catch(() => {})
-    }, [foreignPodUrl, session])
+    }, [foreignPodUrl, session, ownerWebIdFromUrl])
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
@@ -119,7 +120,7 @@ export function ViewPackingList() {
                 listId: id,
                 listUrl: fileUrl,
                 podUrl: foreignPodUrl,
-                ownerWebId: deriveWebIdFromPodUrl(foreignPodUrl),
+                ownerWebId: ownerWebIdFromUrl ?? deriveWebIdFromPodUrl(foreignPodUrl),
                 label: packingList.name,
                 addedAt: new Date().toISOString(),
             }],
@@ -127,6 +128,14 @@ export function ViewPackingList() {
         })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when list identity or registry loads
     }, [packingList?.id, foreignPodUrl, sharedListsWithMe])
+
+    useEffect(() => {
+        if (!packingList || !foreignPodUrl) return
+        if (packingList.sharedFromPodUrl === foreignPodUrl) return
+        db.savePackingList({ ...packingList, sharedFromPodUrl: foreignPodUrl })
+            .then(result => setPackingList(prev => prev ? { ...prev, sharedFromPodUrl: foreignPodUrl, _rev: result.rev } : prev))
+            .catch(() => {})
+    }, [packingList?.id, foreignPodUrl, db])
 
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
