@@ -158,10 +158,14 @@ test.describe('F – Solid Pod Sync', () => {
 
   test('F6: custom item added via suggestion card persists in question set after pod sync', async () => {
     await createList(`Suggestion Save Trip ${Date.now()}`)
+    // Confirm list content is loaded before interacting (waitForURL fires on URL match, not content render)
+    await expect(page.locator('input[type="checkbox"]').first()).toBeVisible({ timeout: 15_000 })
 
     const customItemName = 'super special sunscreen'
-    await page.getByPlaceholder('Add new item...').first().fill(customItemName)
-    await page.getByRole('button', { name: 'Add' }).first().click()
+    const addItemInput = page.getByPlaceholder('Add new item...').first()
+    await addItemInput.fill(customItemName)
+    // Use Enter to submit — avoids ambiguity with the "+ Add Guest" button which also matches 'Add'
+    await addItemInput.press('Enter')
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
 

@@ -60,7 +60,7 @@ test.describe('L – Sharing a packing list', () => {
 
         // Open share modal
         await pageA.getByRole('button', { name: 'Share' }).click()
-        await expect(pageA.getByText('Share packing list')).toBeVisible({ timeout: 5_000 })
+        await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
 
         // Enter User B's WebID then submit via the dialog's Share button (not the toolbar one)
         const collabWebId = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`

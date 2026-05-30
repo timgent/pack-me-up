@@ -28,7 +28,7 @@ async function expandAlwaysNeededSection(page: import('@playwright/test').Page) 
   const alwaysToggle = page.getByRole('button', { name: /Always Needed Items/i }).first()
   await alwaysToggle.click()
   // Wait for the section to be expanded (Add Item button becomes visible)
-  await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
+  await expect(page.getByRole('button', { name: 'Add Item', exact: true })).toBeVisible({ timeout: 3_000 })
 }
 
 /** Wait for the green "Saved" auto-save indicator (not "All changes saved" which is the idle default). */
@@ -105,7 +105,7 @@ test.describe('B – Editing Questions', () => {
     // Expand "Always Needed Items" section (collapsed by default)
     await expandAlwaysNeededSection(page)
     // Click "Add Item" to add a new empty item row
-    await page.getByRole('button', { name: 'Add Item' }).click()
+    await page.getByRole('button', { name: 'Add Item', exact: true }).click()
     // The new item uses react-select. Find the last react-select container.
     const newItemSelect = page.locator('.react-select-container').last()
     await expect(newItemSelect).toBeVisible({ timeout: 3_000 })

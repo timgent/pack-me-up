@@ -135,33 +135,58 @@ test.describe('M – Full pod collaboration', () => {
         }).toPass({ intervals: [1_000, 2_000, 3_000, 5_000], timeout: 15_000 })
     })
 
-    test('M7: Context switcher appears after visiting shared pod', async () => {
-        await pageB.goto(inviteLink)
-        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
-
-        // Context switcher appears after login sync loads shared-with-me.ttl from pod
-        // (loginSyncVersion in Navigation triggers re-read). Allow generous time for sync.
-        await expect(pageB.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
+    test('M7: Context switcher appears after visiting shared pod', async ({ browser }) => {
+        // A fresh login is required: loginSyncVersion only increments on login, which triggers
+        // the Navigation component to re-read shared-with-me.ttl and populate the switcher.
+        const ctxC = await browser.newContext()
+        const pageC = await ctxC.newPage()
+        try {
+            await pageC.goto('/')
+            await loginToCss(pageC, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
+            await pageC.goto(inviteLink)
+            await expect(pageC.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+            await expect(pageC.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
+        } finally {
+            await ctxC.close()
+        }
     })
 
-    test('M8: Collab switches back to own context via context switcher', async () => {
-        await pageB.goto(inviteLink)
-        await expect(pageB.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
+    test('M8: Collab switches back to own context via context switcher', async ({ browser }) => {
+        // Fresh login for the same reason as M7 — loginSyncVersion must trigger shared-with-me.ttl re-read.
+        const ctxC = await browser.newContext()
+        const pageC = await ctxC.newPage()
+        try {
+            await pageC.goto('/')
+            await loginToCss(pageC, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
+            await pageC.goto(inviteLink)
+            await expect(pageC.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-        await pageB.getByRole('combobox', { name: /switch context/i }).selectOption('__own__')
-        await pageB.waitForURL(/#\/view-lists/, { timeout: 10_000 })
-        await expect(pageB.getByText(/viewing.*data/i)).not.toBeVisible()
+            await pageC.getByRole('combobox', { name: /switch context/i }).selectOption('__own__')
+            await pageC.waitForURL(/#\/view-lists/, { timeout: 10_000 })
+            await expect(pageC.getByText(/viewing.*data/i)).not.toBeVisible()
+        } finally {
+            await ctxC.close()
+        }
     })
 
-    test('M9: Owner revokes access; collab sees access denied', async () => {
+    test('M9: Owner revokes access; collab sees access denied', async ({ browser }) => {
         // Owner revokes
         await pageA.goto('/#/sharing')
         await expect(pageA.getByText(collabWebId)).toBeVisible({ timeout: 10_000 })
         await pageA.getByRole('button', { name: /revoke/i }).first().click()
         await expect(pageA.getByText(collabWebId)).not.toBeVisible({ timeout: 10_000 })
 
-        // Collab navigates to invite link — full page load re-fetches from pod, should get access denied
-        await pageB.goto(inviteLink)
-        await expect(pageB.getByText(/access denied/i)).toBeVisible({ timeout: 20_000 })
+        // Fresh context required: pageB has stale PouchDB cache from M3-M6, so the app serves
+        // cached data rather than detecting the 403. A fresh login has no local cache.
+        const ctxC = await browser.newContext()
+        const pageC = await ctxC.newPage()
+        try {
+            await pageC.goto('/')
+            await loginToCss(pageC, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
+            await pageC.goto(inviteLink)
+            await expect(pageC.getByText(/access denied/i)).toBeVisible({ timeout: 20_000 })
+        } finally {
+            await ctxC.close()
+        }
     })
 })
