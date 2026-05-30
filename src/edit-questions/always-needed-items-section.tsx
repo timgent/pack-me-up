@@ -66,7 +66,13 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
-                onClick={() => startTransition(() => { setIsExpanded(e => { if (!e) setHasBeenExpanded(true); return !e; }); })}
+                onClick={() => {
+                    if (hasBeenExpanded) {
+                        setIsExpanded(e => !e);
+                    } else {
+                        startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
+                    }
+                }}
                 className="flex items-center gap-2 mb-4 w-full text-left hover:bg-gray-50 -mx-4 -mt-4 px-4 pt-4 rounded-t-lg transition-colors duration-200"
             >
                 <svg

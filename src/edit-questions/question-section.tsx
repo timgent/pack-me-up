@@ -48,7 +48,7 @@ export const QuestionSection = memo(function QuestionSection({ questionIndex, co
                 <div className="flex items-center gap-2 sm:gap-4 mb-6">
                     <button
                         type="button"
-                        onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
+                        onClick={() => setIsExpanded(e => !e)}
                         className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
                         title={isExpanded ? 'Collapse' : 'Expand'}
                     >

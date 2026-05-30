@@ -69,7 +69,13 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
             <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
                 <button
                     type="button"
-                    onClick={() => startTransition(() => { setIsExpanded(e => { if (!e) setHasBeenExpanded(true); return !e; }); })}
+                    onClick={() => {
+                        if (hasBeenExpanded) {
+                            setIsExpanded(e => !e);
+                        } else {
+                            startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
+                        }
+                    }}
                     className="text-gray-400 hover:text-gray-600 transition-colors duration-200 mt-7"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                 >
