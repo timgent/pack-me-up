@@ -2,8 +2,10 @@ import { spawn } from 'child_process'
 import { existsSync, writeFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { solidDatasetAsTurtle, createSolidDataset } from '@inrupt/solid-client'
 import { createCssAccount } from './helpers/css-api'
 import { loginToExistingCssAccount, createCssClientCredentials, getCssBearerToken, seedPodWithJsonFixtures } from './helpers/pod-seed'
+import { questionSetToDataset, packingListToDataset } from '../src/services/rdfSerialization'
 import {
   CSS_PORT, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, TEST_POD_NAME,
   CSS_PID_FILE, APP_URL,
@@ -86,6 +88,27 @@ export default async function globalSetup() {
     packingLists: [v1PackingList],
   })
   console.log('[setup] Schema-compat pod seeded with v1 JSON fixtures')
+
+  // 2b. Also write pre-migrated RDF files + migration marker so K-suite login sync
+  //     can skip the JSON→RDF migration entirely. Under 4-worker CSS load the migration
+  //     takes >5 minutes; with RDF already present detectPodDataFormat returns 'rdf' and
+  //     syncAllDataFromPod just reads the .ttl files (< 5 seconds).
+  const rdfHeaders = { 'Content-Type': 'text/turtle', Authorization: `Bearer ${bearerToken}` }
+  const qsRdfUrl = `${podUrl}pack-me-up/packing-list-questions.ttl`
+  const listRdfUrl = `${podUrl}pack-me-up/packing-lists/${(v1PackingList as { id: string }).id}.ttl`
+  const markerUrl = `${podUrl}pack-me-up/migrated-to-rdf.ttl`
+
+  const [qsTurtle, listTurtle, markerTurtle] = await Promise.all([
+    solidDatasetAsTurtle(questionSetToDataset(v1QuestionSet, qsRdfUrl)),
+    solidDatasetAsTurtle(packingListToDataset(v1PackingList, listRdfUrl)),
+    solidDatasetAsTurtle(createSolidDataset()),
+  ])
+  await Promise.all([
+    fetch(qsRdfUrl, { method: 'PUT', headers: rdfHeaders, body: qsTurtle }),
+    fetch(listRdfUrl, { method: 'PUT', headers: rdfHeaders, body: listTurtle }),
+    fetch(markerUrl, { method: 'PUT', headers: rdfHeaders, body: markerTurtle }),
+  ])
+  console.log('[setup] Schema-compat pod seeded with pre-migrated RDF + migration marker')
 
   // 3. Wait for app
   console.log('[setup] Waiting for app...')
