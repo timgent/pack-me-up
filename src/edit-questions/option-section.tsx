@@ -4,7 +4,7 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
-import { useRef, useEffect, useState, memo } from 'react'
+import { useRef, useEffect, useState, memo, startTransition } from 'react'
 import { ItemPeopleSection } from './item-people-section'
 
 interface OptionSectionProps {
@@ -60,12 +60,14 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
+    const allItemNames = getAllItemNames();
+
     return (
         <div className="bg-gray-50 rounded-lg p-4">
             <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
                 <button
                     type="button"
-                    onClick={() => setIsExpanded(!isExpanded)}
+                    onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
                     className="text-gray-400 hover:text-gray-600 transition-colors duration-200 mt-7"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                 >
@@ -94,9 +96,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
 
             {isExpanded && <div className="ml-0 sm:ml-4 space-y-3">
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {(() => {
-                    const allItemNames = getAllItemNames();
-                    return itemFields.map((_item: Item, itemIndex: number) => (
+                {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
@@ -129,7 +129,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                             label={`Remove item ${itemIndex + 1}`}
                         />
                     </div>
-                ))})()}
+                ))}
                 <Button
                     type="button"
                     onClick={() => {

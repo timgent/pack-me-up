@@ -4,7 +4,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { OptionSection } from './option-section'
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, startTransition } from 'react'
 
 interface QuestionSectionProps {
     questionIndex: number;
@@ -48,7 +48,7 @@ export const QuestionSection = memo(function QuestionSection({ questionIndex, co
                 <div className="flex items-center gap-2 sm:gap-4 mb-6">
                     <button
                         type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
                         className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
                         title={isExpanded ? 'Collapse' : 'Expand'}
                     >

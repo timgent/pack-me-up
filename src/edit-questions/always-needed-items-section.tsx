@@ -3,7 +3,7 @@ import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { UseFormRegister, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, startTransition, memo } from 'react'
 import { ItemPeopleSection } from './item-people-section'
 
 interface AlwaysNeededItemsSectionProps {
@@ -15,7 +15,7 @@ interface AlwaysNeededItemsSectionProps {
     getAllItemNames: () => string[];
 }
 
-export function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
+export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
@@ -58,11 +58,13 @@ export function AlwaysNeededItemsSection({ control, register, setValue, people, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
+    const allItemNames = getAllItemNames();
+
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
+                onClick={() => startTransition(() => setIsExpanded(!isExpanded))}
                 className="flex items-center gap-2 mb-4 w-full text-left hover:bg-gray-50 -mx-4 -mt-4 px-4 pt-4 rounded-t-lg transition-colors duration-200"
             >
                 <svg
@@ -81,9 +83,7 @@ export function AlwaysNeededItemsSection({ control, register, setValue, people, 
 
             {isExpanded && (
                 <div className="space-y-3">
-                {(() => {
-                    const allItemNames = getAllItemNames();
-                    return itemFields.map((_item: Item, itemIndex: number) => (
+                {itemFields.map((_item: Item, itemIndex: number) => (
                     <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
                         <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
                             <ItemPeopleSection
@@ -115,7 +115,7 @@ export function AlwaysNeededItemsSection({ control, register, setValue, people, 
                             label={`Remove item ${itemIndex + 1}`}
                         />
                     </div>
-                ))})()}
+                ))}
                 <Button
                     type="button"
                     onClick={() => {
@@ -131,4 +131,4 @@ export function AlwaysNeededItemsSection({ control, register, setValue, people, 
             )}
         </div>
     );
-}
+});
