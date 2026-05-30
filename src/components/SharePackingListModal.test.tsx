@@ -11,6 +11,10 @@ vi.mock('../services/solidPod', () => ({
     revokePublicAccess: vi.fn(),
     getCollaborators: vi.fn(),
     isPubliclyAccessible: vi.fn(),
+    buildSharedListUrl: vi.fn((listId: string, podUrl: string, ownerWebId?: string) => {
+        const base = `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(podUrl)}`
+        return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
+    }),
 }))
 
 import {

@@ -151,6 +151,23 @@ export function friendlyWebIdName(webId: string): string {
     }
 }
 
+export function resolveOwnerDisplayName(
+    foafName: string | null | undefined,
+    ownerWebId: string | null | undefined,
+    podUrl: string,
+): string {
+    return foafName ?? (ownerWebId ? friendlyWebIdName(ownerWebId) : null) ?? friendlyPodName(podUrl)
+}
+
+export function buildSharedListPath(listId: string, podUrl: string, ownerWebId?: string): string {
+    const base = `/view-lists/${listId}?pod=${encodeURIComponent(podUrl)}`
+    return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
+}
+
+export function buildSharedListUrl(listId: string, podUrl: string, ownerWebId?: string): string {
+    return `${window.location.origin}/#${buildSharedListPath(listId, podUrl, ownerWebId)}`
+}
+
 export function deriveWebIdFromPodUrl(podUrl: string): string {
     const base = podUrl.replace(/\/+$/, '')
     return `${base}/profile/card#me`

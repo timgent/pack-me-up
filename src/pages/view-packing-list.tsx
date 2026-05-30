@@ -10,7 +10,8 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName, friendlyWebIdName, getPodOwnerName, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -57,7 +58,6 @@ export function ViewPackingList() {
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
-    const [ownerDisplayName, setOwnerDisplayName] = useState<string | null>(null)
     // Tracks whether initial data has been loaded (local DB or pod).
     // Used to surface a real error to the user instead of hanging on "Loading…"
     // when a foreign-pod fetch fails.
@@ -98,19 +98,13 @@ export function ViewPackingList() {
     const { db } = useDatabase()
     const { sharedListsWithMe, saveSharedListsWithMe } = useSharedListsSync()
     const effectiveOwnerWebId = ownerWebIdFromUrl ?? packingList?.ownerWebId
+    const ownerDisplayName = useOwnerDisplayName(foreignPodUrl, effectiveOwnerWebId, session)
 
     useEffect(() => {
         if (isLoggedIn && session) {
             getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
         }
     }, [isLoggedIn, session])
-
-    useEffect(() => {
-        if (!foreignPodUrl || !session || !effectiveOwnerWebId) return
-        getPodOwnerName(session, foreignPodUrl, effectiveOwnerWebId)
-            .then(name => { if (name) setOwnerDisplayName(name) })
-            .catch(() => {})
-    }, [foreignPodUrl, session, effectiveOwnerWebId])
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
@@ -600,7 +594,7 @@ export function ViewPackingList() {
             {foreignPodUrl && !foreignPodCtx && (
                 <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
                     <p className="text-sm text-indigo-800 font-medium">
-                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? (effectiveOwnerWebId ? friendlyWebIdName(effectiveOwnerWebId) : null) ?? friendlyPodName(foreignPodUrl)}</span>
+                        👤 Viewing a list from <span className="font-semibold">{resolveOwnerDisplayName(ownerDisplayName, effectiveOwnerWebId, foreignPodUrl)}</span>
                     </p>
                 </div>
             )}

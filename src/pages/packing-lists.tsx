@@ -6,7 +6,8 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName, friendlyWebIdName, getPodOwnerName } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, resolveOwnerDisplayName, buildSharedListPath } from '../services/solidPod'
+import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
@@ -20,9 +21,14 @@ export function PackingLists() {
     const [listToRename, setListToRename] = useState<{ id: string; name: string } | null>(null)
     const [renameValue, setRenameValue] = useState('')
     const [sharingStatus, setSharingStatus] = useState<Record<string, SharingStatus>>({})
-    const [ownerNames, setOwnerNames] = useState<Record<string, string>>({})
     const navigate = useNavigate()
     const { isLoggedIn, session } = useSolidPod()
+    const ownerNames = useOwnerDisplayNames(
+        packingLists
+            .filter(l => !!l.sharedFromPodUrl)
+            .map(l => ({ id: l.id, podUrl: l.sharedFromPodUrl!, ownerWebId: l.ownerWebId })),
+        session
+    )
     const { db, loginSyncVersion, loginSyncInProgress } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
@@ -126,19 +132,6 @@ export function PackingLists() {
         fetchPackingLists()
     }, [db, isLoggedIn, loginSyncVersion])
 
-    // Resolve owner display names for foreign lists
-    useEffect(() => {
-        if (!session) return
-        for (const list of packingLists) {
-            if (!list.sharedFromPodUrl) continue
-            getPodOwnerName(session, list.sharedFromPodUrl, list.ownerWebId)
-                .then(name => {
-                    if (name) setOwnerNames(prev => ({ ...prev, [list.id]: name }))
-                })
-                .catch(() => {})
-        }
-    }, [packingLists, session])
-
     // Lazy-load sharing status badges for own lists only
     useEffect(() => {
         if (!isLoggedIn || !session || packingLists.length === 0) return
@@ -202,8 +195,7 @@ export function PackingLists() {
                                 key={list.id}
                                 onClick={() => {
                                     if (list.sharedFromPodUrl) {
-                                        const ownerParam = list.ownerWebId ? `&owner=${encodeURIComponent(list.ownerWebId)}` : ''
-                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(list.sharedFromPodUrl)}${ownerParam}`)
+                                        navigate(buildSharedListPath(list.id, list.sharedFromPodUrl, list.ownerWebId))
                                     } else {
                                         navigate(`/view-lists/${list.id}`)
                                     }
@@ -215,7 +207,7 @@ export function PackingLists() {
                                         ✈️ {list.name}
                                         {list.sharedFromPodUrl ? (
                                             <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                                👤 From {ownerNames[list.id] ?? (list.ownerWebId ? friendlyWebIdName(list.ownerWebId) : null) ?? friendlyPodName(list.sharedFromPodUrl)}
+                                                👤 From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
                                             </span>
                                         ) : (
                                             <>

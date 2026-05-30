@@ -9,12 +9,13 @@ import {
     getFullCollaborators,
     getPrimaryPodUrl,
     getPodOwnerName,
-    friendlyPodName,
-    friendlyWebIdName,
+    resolveOwnerDisplayName,
+    buildSharedListPath,
     POD_CONTAINERS,
     getCollaborators,
     isPubliclyAccessible,
 } from '../services/solidPod'
+import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
 import type { SharedContext, SharedListContext } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
@@ -45,7 +46,10 @@ export function SharingSettingsPage() {
     // Section 3: individual lists shared with me
     const [sharedLists, setSharedLists] = useState<SharedListContext[]>([])
     const [removingListId, setRemovingListId] = useState<string | null>(null)
-    const [listOwnerNames, setListOwnerNames] = useState<Record<string, string>>({})
+    const listOwnerNames = useOwnerDisplayNames(
+        sharedLists.map(ctx => ({ id: ctx.listId, podUrl: ctx.podUrl, ownerWebId: ctx.ownerWebId ?? null })),
+        session
+    )
 
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
@@ -95,18 +99,6 @@ export function SharingSettingsPage() {
     useEffect(() => {
         if (sharedListsWithMeData) setSharedLists(sharedListsWithMeData.lists)
     }, [sharedListsWithMeData])
-
-    // Resolve owner display names for shared lists (section 3)
-    useEffect(() => {
-        if (!session || sharedLists.length === 0) return
-        for (const ctx of sharedLists) {
-            getPodOwnerName(session, ctx.podUrl, ctx.ownerWebId ?? undefined)
-                .then(name => {
-                    if (name) setListOwnerNames(prev => ({ ...prev, [ctx.listId]: name }))
-                })
-                .catch(() => {})
-        }
-    }, [sharedLists, session])
 
     // Load own lists + sharing status for section 4
     useEffect(() => {
@@ -304,7 +296,7 @@ export function SharingSettingsPage() {
                         {sharedContexts.map(ctx => (
                             <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                                 <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? podNames[ctx.podUrl] ?? (ctx.webId ? friendlyPodName(ctx.webId) : undefined) ?? friendlyPodName(ctx.podUrl)}
+                                    {ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)}
                                 </span>
                                 <button
                                     onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
@@ -342,11 +334,11 @@ export function SharingSettingsPage() {
                                         {ctx.label ?? ctx.listId}
                                     </span>
                                     <span className="text-xs text-gray-500 truncate" title={ctx.podUrl}>
-                                        {listOwnerNames[ctx.listId] ?? (ctx.ownerWebId ? friendlyWebIdName(ctx.ownerWebId) : null) ?? friendlyPodName(ctx.podUrl)}
+                                        {resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)}
                                     </span>
                                 </div>
                                 <button
-                                    onClick={() => navigate(`/view-lists/${ctx.listId}?pod=${encodeURIComponent(ctx.podUrl)}`)}
+                                    onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
                                     className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
                                 >
                                     Open

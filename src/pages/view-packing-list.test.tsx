@@ -41,6 +41,7 @@ vi.mock('../services/solidPod', () => ({
     saveRdfToPod: vi.fn().mockResolvedValue(undefined),
     friendlyPodName: vi.fn((url: string) => url),
     friendlyWebIdName: vi.fn((url: string) => url),
+    resolveOwnerDisplayName: vi.fn((foafName: string | null | undefined, ownerWebId: string | null | undefined, podUrl: string) => foafName ?? ownerWebId ?? podUrl),
     getPodOwnerName: vi.fn().mockResolvedValue(null),
     deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/+$/, '')}/profile/card#me`),
 }))

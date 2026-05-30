@@ -17,6 +17,11 @@ vi.mock('../services/solidPod', () => ({
     getPrimaryPodUrl: vi.fn(() => Promise.resolve('https://pod.example.com/')),
     getPodOwnerName: vi.fn(() => Promise.resolve(null)),
     friendlyPodName: vi.fn((url: string) => url),
+    resolveOwnerDisplayName: vi.fn((foafName: string | null | undefined, ownerWebId: string | null | undefined, podUrl: string) => foafName ?? ownerWebId ?? podUrl),
+    buildSharedListPath: vi.fn((listId: string, podUrl: string, ownerWebId?: string) => {
+        const base = `/view-lists/${listId}?pod=${encodeURIComponent(podUrl)}`
+        return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
+    }),
     saveRdfToPod: vi.fn(() => Promise.resolve()),
     POD_CONTAINERS: {
         SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',

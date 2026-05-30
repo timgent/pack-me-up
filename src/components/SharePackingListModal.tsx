@@ -7,6 +7,7 @@ import {
     revokePublicAccess,
     getCollaborators,
     isPubliclyAccessible,
+    buildSharedListUrl,
 } from '../services/solidPod'
 import { Modal } from './Modal'
 import { Button } from './Button'
@@ -45,12 +46,7 @@ export function SharePackingListModal({
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [isRevokingPublic, setIsRevokingPublic] = useState(false)
 
-    const buildLink = () => {
-        const base = `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(sharerPodUrl)}`
-        return session.info.webId
-            ? `${base}&owner=${encodeURIComponent(session.info.webId)}`
-            : base
-    }
+    const buildLink = () => buildSharedListUrl(listId, sharerPodUrl, session.info.webId ?? undefined)
 
     const loadCurrentAccess = async () => {
         setIsLoadingAccess(true)
