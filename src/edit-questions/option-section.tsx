@@ -12,7 +12,7 @@ interface OptionSectionProps {
     optionIndex: number;
     register: UseFormRegister<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
-    removeOption: () => void;
+    removeOption: (index: number) => void;
     people: Person[];
     triggerScrollToLast?: number;
     getAllItemNames: () => string[];
@@ -21,6 +21,7 @@ interface OptionSectionProps {
 export const OptionSection = memo(function OptionSection({ control, questionIndex, optionIndex, register, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
+    const [collapseVersion, setCollapseVersion] = useState(0);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -70,7 +71,10 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                     type="button"
                     onClick={() => {
                         if (hasBeenExpanded) {
-                            setIsExpanded(e => !e);
+                            setIsExpanded(e => {
+                                if (e) setCollapseVersion(v => v + 1);
+                                return !e;
+                            });
                         } else {
                             startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
                         }
@@ -95,7 +99,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                     />
                 </div>
                 <CloseButton
-                    onClick={removeOption}
+                    onClick={() => removeOption(optionIndex)}
                     label={`Remove option ${optionIndex + 1}`}
                     className="mt-6"
                 />
@@ -119,6 +123,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                         }}
                         refCallback={el => { selectRefs.current[itemIndex] = el; }}
                         autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
+                        resetKey={collapseVersion}
                     />
                 ))}
                 <Button

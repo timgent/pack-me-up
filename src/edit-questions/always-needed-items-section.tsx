@@ -16,6 +16,7 @@ interface AlwaysNeededItemsSectionProps {
 export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
+    const [collapseVersion, setCollapseVersion] = useState(0);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -66,7 +67,10 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                 type="button"
                 onClick={() => {
                     if (hasBeenExpanded) {
-                        setIsExpanded(e => !e);
+                        setIsExpanded(e => {
+                            if (e) setCollapseVersion(v => v + 1);
+                            return !e;
+                        });
                     } else {
                         startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
                     }
@@ -105,6 +109,7 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                         }}
                         refCallback={el => { selectRefs.current[itemIndex] = el; }}
                         autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
+                        resetKey={collapseVersion}
                     />
                 ))}
                 <Button

@@ -4,7 +4,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { OptionSection } from './option-section'
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, useCallback } from 'react'
 
 interface QuestionSectionProps {
     questionIndex: number;
@@ -41,6 +41,7 @@ export const QuestionSection = memo(function QuestionSection({ questionIndex, co
         control,
         name: `questions.${questionIndex}.options` as const
     });
+    const stableRemoveOption = useCallback((index: number) => removeOption(index), [removeOption]);
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -144,7 +145,7 @@ export const QuestionSection = memo(function QuestionSection({ questionIndex, co
                             optionIndex={optionIndex}
                             register={register}
                             setValue={setValue}
-                            removeOption={() => removeOption(optionIndex)}
+                            removeOption={stableRemoveOption}
                             people={people}
                             triggerScrollToLast={optionIndex === triggerScrollToOptionIndex ? triggerScrollToLastVersion : undefined}
                             getAllItemNames={getAllItemNames}
