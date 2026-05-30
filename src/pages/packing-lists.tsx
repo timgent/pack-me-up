@@ -6,7 +6,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { Modal } from '../components/Modal'
-import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName, getPodOwnerName } from '../services/solidPod'
+import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, friendlyPodName, friendlyWebIdName, getPodOwnerName } from '../services/solidPod'
 import { packingListToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
@@ -131,7 +131,7 @@ export function PackingLists() {
         if (!session) return
         for (const list of packingLists) {
             if (!list.sharedFromPodUrl) continue
-            getPodOwnerName(session, list.sharedFromPodUrl)
+            getPodOwnerName(session, list.sharedFromPodUrl, list.ownerWebId)
                 .then(name => {
                     if (name) setOwnerNames(prev => ({ ...prev, [list.id]: name }))
                 })
@@ -214,7 +214,7 @@ export function PackingLists() {
                                         ✈️ {list.name}
                                         {list.sharedFromPodUrl ? (
                                             <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                                👤 From {ownerNames[list.id] ?? friendlyPodName(list.sharedFromPodUrl)}
+                                                👤 From {ownerNames[list.id] ?? (list.ownerWebId ? friendlyWebIdName(list.ownerWebId) : null) ?? friendlyPodName(list.sharedFromPodUrl)}
                                             </span>
                                         ) : (
                                             <>

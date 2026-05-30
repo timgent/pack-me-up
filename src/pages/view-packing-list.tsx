@@ -10,7 +10,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName, getPodOwnerName, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, friendlyPodName, friendlyWebIdName, getPodOwnerName, deriveWebIdFromPodUrl } from '../services/solidPod'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -131,11 +131,12 @@ export function ViewPackingList() {
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl) return
-        if (packingList.sharedFromPodUrl === foreignPodUrl) return
-        db.savePackingList({ ...packingList, sharedFromPodUrl: foreignPodUrl })
-            .then(result => setPackingList(prev => prev ? { ...prev, sharedFromPodUrl: foreignPodUrl, _rev: result.rev } : prev))
+        const resolvedOwnerWebId = ownerWebIdFromUrl ?? deriveWebIdFromPodUrl(foreignPodUrl)
+        if (packingList.sharedFromPodUrl === foreignPodUrl && packingList.ownerWebId === resolvedOwnerWebId) return
+        db.savePackingList({ ...packingList, sharedFromPodUrl: foreignPodUrl, ownerWebId: resolvedOwnerWebId })
+            .then(result => setPackingList(prev => prev ? { ...prev, sharedFromPodUrl: foreignPodUrl, ownerWebId: resolvedOwnerWebId, _rev: result.rev } : prev))
             .catch(() => {})
-    }, [packingList?.id, foreignPodUrl, db])
+    }, [packingList?.id, foreignPodUrl, ownerWebIdFromUrl, db])
 
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
@@ -596,7 +597,7 @@ export function ViewPackingList() {
             {foreignPodUrl && !foreignPodCtx && (
                 <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
                     <p className="text-sm text-indigo-800 font-medium">
-                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? friendlyPodName(foreignPodUrl)}</span>
+                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? (ownerWebIdFromUrl ? friendlyWebIdName(ownerWebIdFromUrl) : null) ?? friendlyPodName(foreignPodUrl)}</span>
                     </p>
                 </div>
             )}

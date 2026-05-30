@@ -136,6 +136,15 @@ export function friendlyPodName(podUrl: string): string {
     }
 }
 
+export function friendlyWebIdName(webId: string): string {
+    try {
+        const url = new URL(webId)
+        return friendlyPodName(`${url.protocol}//${url.hostname}/`)
+    } catch {
+        return webId
+    }
+}
+
 export function deriveWebIdFromPodUrl(podUrl: string): string {
     const base = podUrl.replace(/\/+$/, '')
     return `${base}/profile/card#me`

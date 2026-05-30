@@ -10,6 +10,7 @@ import {
     getPrimaryPodUrl,
     getPodOwnerName,
     friendlyPodName,
+    friendlyWebIdName,
     POD_CONTAINERS,
     getCollaborators,
     isPubliclyAccessible,
@@ -341,7 +342,7 @@ export function SharingSettingsPage() {
                                         {ctx.label ?? ctx.listId}
                                     </span>
                                     <span className="text-xs text-gray-500 truncate" title={ctx.podUrl}>
-                                        {listOwnerNames[ctx.listId] ?? friendlyPodName(ctx.podUrl)}
+                                        {listOwnerNames[ctx.listId] ?? (ctx.ownerWebId ? friendlyWebIdName(ctx.ownerWebId) : null) ?? friendlyPodName(ctx.podUrl)}
                                     </span>
                                 </div>
                                 <button
