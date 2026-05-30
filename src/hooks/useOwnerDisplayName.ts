@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Session } from '@inrupt/solid-client-authn-browser'
+import type { AppSession } from '../types/AppSession'
 import { getPodOwnerName } from '../services/solidPod'
 
 export function useOwnerDisplayName(
     podUrl: string | undefined,
     ownerWebId: string | undefined,
-    session: Session | null | undefined,
+    session: AppSession | null | undefined,
 ): string | null {
     const [name, setName] = useState<string | null>(null)
     useEffect(() => {
@@ -21,7 +21,7 @@ export function useOwnerDisplayName(
 
 export function useOwnerDisplayNames(
     items: Array<{ id: string; podUrl: string; ownerWebId?: string | null }>,
-    session: Session | null | undefined,
+    session: AppSession | null | undefined,
 ): Record<string, string> {
     const [names, setNames] = useState<Record<string, string>>({})
     const itemsRef = useRef(items)
