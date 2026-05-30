@@ -202,7 +202,8 @@ export function PackingLists() {
                                 key={list.id}
                                 onClick={() => {
                                     if (list.sharedFromPodUrl) {
-                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(list.sharedFromPodUrl)}`)
+                                        const ownerParam = list.ownerWebId ? `&owner=${encodeURIComponent(list.ownerWebId)}` : ''
+                                        navigate(`/view-lists/${list.id}?pod=${encodeURIComponent(list.sharedFromPodUrl)}${ownerParam}`)
                                     } else {
                                         navigate(`/view-lists/${list.id}`)
                                     }

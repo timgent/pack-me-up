@@ -97,6 +97,7 @@ export function ViewPackingList() {
     const { showToast } = useToast()
     const { db } = useDatabase()
     const { sharedListsWithMe, saveSharedListsWithMe } = useSharedListsSync()
+    const effectiveOwnerWebId = ownerWebIdFromUrl ?? packingList?.ownerWebId
 
     useEffect(() => {
         if (isLoggedIn && session) {
@@ -105,11 +106,11 @@ export function ViewPackingList() {
     }, [isLoggedIn, session])
 
     useEffect(() => {
-        if (!foreignPodUrl || !session) return
-        getPodOwnerName(session, foreignPodUrl, ownerWebIdFromUrl ?? deriveWebIdFromPodUrl(foreignPodUrl))
+        if (!foreignPodUrl || !session || !effectiveOwnerWebId) return
+        getPodOwnerName(session, foreignPodUrl, effectiveOwnerWebId)
             .then(name => { if (name) setOwnerDisplayName(name) })
             .catch(() => {})
-    }, [foreignPodUrl, session, ownerWebIdFromUrl])
+    }, [foreignPodUrl, session, effectiveOwnerWebId])
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
@@ -131,7 +132,9 @@ export function ViewPackingList() {
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl) return
-        const resolvedOwnerWebId = ownerWebIdFromUrl ?? deriveWebIdFromPodUrl(foreignPodUrl)
+        // Prefer the URL param, then the value already stored, then derive as last resort.
+        // Never overwrite a correct ownerWebId with a derived guess.
+        const resolvedOwnerWebId = ownerWebIdFromUrl ?? packingList.ownerWebId ?? deriveWebIdFromPodUrl(foreignPodUrl)
         if (packingList.sharedFromPodUrl === foreignPodUrl && packingList.ownerWebId === resolvedOwnerWebId) return
         db.savePackingList({ ...packingList, sharedFromPodUrl: foreignPodUrl, ownerWebId: resolvedOwnerWebId })
             .then(result => setPackingList(prev => prev ? { ...prev, sharedFromPodUrl: foreignPodUrl, ownerWebId: resolvedOwnerWebId, _rev: result.rev } : prev))
@@ -597,7 +600,7 @@ export function ViewPackingList() {
             {foreignPodUrl && !foreignPodCtx && (
                 <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
                     <p className="text-sm text-indigo-800 font-medium">
-                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? (ownerWebIdFromUrl ? friendlyWebIdName(ownerWebIdFromUrl) : null) ?? friendlyPodName(foreignPodUrl)}</span>
+                        👤 Viewing a list from <span className="font-semibold">{ownerDisplayName ?? (effectiveOwnerWebId ? friendlyWebIdName(effectiveOwnerWebId) : null) ?? friendlyPodName(foreignPodUrl)}</span>
                     </p>
                 </div>
             )}
