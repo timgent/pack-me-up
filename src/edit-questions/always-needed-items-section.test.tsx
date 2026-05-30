@@ -12,7 +12,7 @@ beforeEach(() => {
 })
 
 function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Partial<PackingListQuestionSet>; triggerScrollToLast?: number }) {
-    const { control, register, watch, setValue } = useForm<PackingListQuestionSet>({
+    const { control, register, setValue } = useForm<PackingListQuestionSet>({
         defaultValues: {
             questions: [],
             people: mockPeople,
@@ -24,10 +24,10 @@ function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Parti
         <AlwaysNeededItemsSection
             control={control}
             register={register}
-            watch={watch}
             setValue={setValue}
             people={mockPeople}
             triggerScrollToLast={triggerScrollToLast}
+            getAllItemNames={() => []}
         />
     )
 }

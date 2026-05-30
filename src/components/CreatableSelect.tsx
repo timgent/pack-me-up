@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import CreatableSelect from 'react-select/creatable';
 import { ActionMeta, OnChangeValue } from 'react-select';
 
@@ -18,10 +18,10 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
     const [inputValue, setInputValue] = useState('');
     const [menuIsOpen, setMenuIsOpen] = useState(false);
 
-    const selectOptions = options.map(option => ({
+    const selectOptions = useMemo(() => options.map(option => ({
         label: option,
         value: option
-    }));
+    })), [options]);
 
     const handleChange = (
         newValue: OnChangeValue<Option, false>,

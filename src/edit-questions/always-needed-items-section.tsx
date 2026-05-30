@@ -1,7 +1,7 @@
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
-import { UseFormRegister, UseFormWatch, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
 import { useRef, useEffect, useState } from 'react'
 import { ItemPeopleSection } from './item-people-section'
@@ -9,14 +9,13 @@ import { ItemPeopleSection } from './item-people-section'
 interface AlwaysNeededItemsSectionProps {
     control: Control<PackingListQuestionSet>;
     register: UseFormRegister<PackingListQuestionSet>;
-    watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     people: Person[];
     triggerScrollToLast?: number;
     getAllItemNames: () => string[];
 }
 
-export function AlwaysNeededItemsSection({ control, register, watch, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
+export function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
@@ -89,7 +88,6 @@ export function AlwaysNeededItemsSection({ control, register, watch, setValue, p
                                 control={control}
                                 basePath={`alwaysNeededItems.${itemIndex}`}
                                 register={register}
-                                watch={watch}
                                 setValue={setValue}
                                 allPeople={people}
                             />

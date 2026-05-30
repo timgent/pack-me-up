@@ -1,16 +1,15 @@
-import { useFieldArray, Control, UseFormRegister, UseFormWatch, UseFormSetValue } from 'react-hook-form'
+import { useFieldArray, Control, UseFormRegister, UseFormSetValue } from 'react-hook-form'
 import { PackingListQuestionSet, Person, newOption } from './types'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { OptionSection } from './option-section'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 
 interface QuestionSectionProps {
     questionIndex: number;
     control: Control<PackingListQuestionSet>;
     register: UseFormRegister<PackingListQuestionSet>;
-    watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     removeQuestion: () => void;
     people: Person[];
@@ -22,7 +21,7 @@ interface QuestionSectionProps {
     getAllItemNames: () => string[];
 }
 
-export function QuestionSection({ questionIndex, control, register, watch, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed, triggerScrollToOptionIndex, triggerScrollToLastVersion, getAllItemNames }: QuestionSectionProps) {
+export const QuestionSection = memo(function QuestionSection({ questionIndex, control, register, setValue, removeQuestion, people, moveUp, moveDown, forceCollapsed, triggerScrollToOptionIndex, triggerScrollToLastVersion, getAllItemNames }: QuestionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
 
     // Sync with forceCollapsed when it changes
@@ -145,7 +144,6 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
                                 questionIndex={questionIndex}
                                 optionIndex={optionIndex}
                                 register={register}
-                                watch={watch}
                                 setValue={setValue}
                                 removeOption={() => removeOption(optionIndex)}
                                 people={people}
@@ -168,4 +166,4 @@ export function QuestionSection({ questionIndex, control, register, watch, setVa
             </div>
         </div>
     );
-} 
+});

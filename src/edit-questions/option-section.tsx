@@ -2,9 +2,9 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
-import { UseFormRegister, UseFormWatch, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, memo } from 'react'
 import { ItemPeopleSection } from './item-people-section'
 
 interface OptionSectionProps {
@@ -12,7 +12,6 @@ interface OptionSectionProps {
     questionIndex: number;
     optionIndex: number;
     register: UseFormRegister<PackingListQuestionSet>;
-    watch: UseFormWatch<PackingListQuestionSet>;
     setValue: UseFormSetValue<PackingListQuestionSet>;
     removeOption: () => void;
     people: Person[];
@@ -20,7 +19,7 @@ interface OptionSectionProps {
     getAllItemNames: () => string[];
 }
 
-export function OptionSection({ control, questionIndex, optionIndex, register, watch, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
+export const OptionSection = memo(function OptionSection({ control, questionIndex, optionIndex, register, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -102,7 +101,6 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
                                 control={control}
                                 basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
                                 register={register}
-                                watch={watch}
                                 setValue={setValue}
                                 allPeople={people}
                             />
@@ -144,4 +142,4 @@ export function OptionSection({ control, questionIndex, optionIndex, register, w
             </div>}
         </div>
     );
-}
+});

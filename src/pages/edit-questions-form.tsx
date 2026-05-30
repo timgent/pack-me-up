@@ -55,7 +55,6 @@ export function EditQuestionsForm() {
   const scrollVersionRef = useRef(0);
   const [scrollTarget, setScrollTarget] = useState<ScrollTarget>(null);
 
-  console.log("EditQuestionsForm - isLoggedIn:", isLoggedIn);
 
   // Scroll to top on initial mount
   useEffect(() => {
@@ -487,7 +486,6 @@ export function EditQuestionsForm() {
           <AlwaysNeededItemsSection
             control={control}
             register={register}
-            watch={watch}
             setValue={setValue}
             people={people}
             triggerScrollToLast={scrollTarget?.type === 'always' ? scrollTarget.version : undefined}
@@ -510,7 +508,6 @@ export function EditQuestionsForm() {
               questionIndex={questionIndex}
               control={control}
               register={register}
-              watch={watch}
               setValue={setValue}
               removeQuestion={() => removeQuestion(questionIndex)}
               people={people}
