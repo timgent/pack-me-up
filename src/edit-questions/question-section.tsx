@@ -4,7 +4,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { OptionSection } from './option-section'
-import { useState, useEffect, memo, startTransition } from 'react'
+import { useState, useEffect, memo } from 'react'
 
 interface QuestionSectionProps {
     questionIndex: number;
