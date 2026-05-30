@@ -188,7 +188,7 @@ test.describe('F – Solid Pod Sync', () => {
     // Wait for the section button to be ready before clicking
     await expect(page.getByRole('button', { name: /Always Needed Items/i }).first()).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
-    await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByRole('button', { name: 'Add Item', exact: true })).toBeVisible({ timeout: 3_000 })
     await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
   })
 
