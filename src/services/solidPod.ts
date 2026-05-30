@@ -139,7 +139,13 @@ export function friendlyPodName(podUrl: string): string {
 export function friendlyWebIdName(webId: string): string {
     try {
         const url = new URL(webId)
-        return friendlyPodName(`${url.protocol}//${url.hostname}/`)
+        url.hash = ''
+        // Strip well-known profile path suffixes so the identity root is used,
+        // but preserve meaningful path segments (e.g. /timgent on id.inrupt.com)
+        url.pathname = url.pathname
+            .replace(/\/profile\/card\/?$/, '/')
+            .replace(/\/profile\/?$/, '/')
+        return friendlyPodName(url.toString())
     } catch {
         return webId
     }
