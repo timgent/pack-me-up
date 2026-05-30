@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useForm, SubmitHandler, useFieldArray, useWatch } from "react-hook-form"
+import { useForm, SubmitHandler, useFieldArray, useWatch, FormProvider } from "react-hook-form"
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingListQuestionSet, newDraftQuestion, Item, Question } from '../edit-questions/types'
 import { useDatabase } from '../components/DatabaseContext'
@@ -23,9 +23,10 @@ import { AddItemModal, AddItemDestination } from '../edit-questions/add-item-mod
 
 export function EditQuestionsForm() {
 
-  const { register, control, handleSubmit, setValue, watch, reset, getValues } = useForm<PackingListQuestionSet>({
+  const methods = useForm<PackingListQuestionSet>({
     defaultValues: { questions: [], people: [{ id: crypto.randomUUID(), name: "Me" }], alwaysNeededItems: [] }
   });
+  const { register, control, handleSubmit, setValue, watch, reset, getValues } = methods;
   const [rev, setRev] = useState<string | undefined>(undefined)
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -429,6 +430,7 @@ export function EditQuestionsForm() {
   };
 
   return (
+    <FormProvider {...methods}>
     <div className="w-full flex flex-col items-center py-8 px-4">
       <div className="mb-8 w-full max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">
@@ -670,5 +672,6 @@ export function EditQuestionsForm() {
       )}
 
     </div>
+    </FormProvider>
   )
 } 

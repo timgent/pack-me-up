@@ -1,10 +1,8 @@
 import { Button } from '../components/Button'
-import { CloseButton } from '../components/CloseButton'
-import { CustomCreatableSelect } from '../components/CreatableSelect'
-import { UseFormRegister, UseFormSetValue, Control, Controller, useFieldArray } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, Control, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
 import { useRef, useEffect, useState, startTransition, memo } from 'react'
-import { ItemPeopleSection } from './item-people-section'
+import { LazyItem } from './lazy-item'
 
 interface AlwaysNeededItemsSectionProps {
     control: Control<PackingListQuestionSet>;
@@ -92,37 +90,22 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
             {hasBeenExpanded && (
                 <div className={`space-y-3${isExpanded ? '' : ' hidden'}`}>
                 {itemFields.map((_item: Item, itemIndex: number) => (
-                    <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
-                        <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
-                            <ItemPeopleSection
-                                control={control}
-                                basePath={`alwaysNeededItems.${itemIndex}`}
-                                register={register}
-                                setValue={setValue}
-                                allPeople={people}
-                            />
-                            <Controller
-                                control={control}
-                                name={`alwaysNeededItems.${itemIndex}`}
-                                render={({ field: { value, onChange } }) =>
-                                    <CustomCreatableSelect
-                                        value={value.text}
-                                        onChange={(newValue) => {
-                                            onChange({ ...value, text: newValue })
-                                        }}
-                                        options={allItemNames}
-                                        placeholder="Enter item"
-                                    />}
-                            />
-                        </div>
-                        <CloseButton
-                            onClick={() => {
-                                const newItems = itemFields.filter((_: Item, i: number) => i !== itemIndex);
-                                setValue("alwaysNeededItems", newItems);
-                            }}
-                            label={`Remove item ${itemIndex + 1}`}
-                        />
-                    </div>
+                    <LazyItem
+                        key={itemIndex}
+                        control={control}
+                        basePath={`alwaysNeededItems.${itemIndex}`}
+                        register={register}
+                        setValue={setValue}
+                        allPeople={people}
+                        allItemNames={allItemNames}
+                        isHighlighted={itemIndex === newItemIndex}
+                        onRemove={() => {
+                            const newItems = itemFields.filter((_: Item, i: number) => i !== itemIndex);
+                            setValue("alwaysNeededItems", newItems);
+                        }}
+                        refCallback={el => { selectRefs.current[itemIndex] = el; }}
+                        autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
+                    />
                 ))}
                 <Button
                     type="button"

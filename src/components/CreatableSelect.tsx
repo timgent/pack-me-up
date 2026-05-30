@@ -37,7 +37,7 @@ const selectStyles = {
 };
 
 // The full react-select — only mounts when the user actually interacts with this item.
-function ActiveSelect({ value, onChange, options, placeholder }: CreatableSelectProps) {
+export function ActiveSelect({ value, onChange, options, placeholder }: CreatableSelectProps) {
     const [inputValue, setInputValue] = useState('');
     const [menuIsOpen, setMenuIsOpen] = useState(false);
 

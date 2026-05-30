@@ -1,11 +1,10 @@
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
-import { CustomCreatableSelect } from '../components/CreatableSelect'
-import { UseFormRegister, UseFormSetValue, useFieldArray, Control, Controller } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, useFieldArray, Control } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
 import { useRef, useEffect, useState, memo, startTransition } from 'react'
-import { ItemPeopleSection } from './item-people-section'
+import { LazyItem } from './lazy-item'
 
 interface OptionSectionProps {
     control: Control<PackingListQuestionSet>;
@@ -105,38 +104,22 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
             {hasBeenExpanded && <div className={`ml-0 sm:ml-4 space-y-3${isExpanded ? '' : ' hidden'}`}>
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {itemFields.map((_item: Item, itemIndex: number) => (
-                    <div key={itemIndex} className={`flex items-start gap-2 sm:gap-3 rounded-md ${itemIndex === newItemIndex ? 'ring-2 ring-primary-300' : ''}`}>
-                        <div className="flex-1" ref={el => { selectRefs.current[itemIndex] = el; }}>
-                            <ItemPeopleSection
-                                control={control}
-                                basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
-                                register={register}
-                                setValue={setValue}
-                                allPeople={people}
-                            />
-                            <Controller
-                                control={control}
-                                name={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
-                                render={({ field: { value, onChange } }) =>
-                                    <CustomCreatableSelect
-                                        value={value.text}
-                                        onChange={(newValue) => {
-                                            onChange({ ...value, text: newValue })
-                                        }}
-                                        options={allItemNames}
-                                        placeholder="Enter item"
-                                    />}
-                            >
-                            </Controller>
-                        </div>
-                        <CloseButton
-                            onClick={() => {
-                                const newItems = itemFields.filter((_: Item, i: number) => i !== itemIndex);
-                                setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
-                            }}
-                            label={`Remove item ${itemIndex + 1}`}
-                        />
-                    </div>
+                    <LazyItem
+                        key={itemIndex}
+                        control={control}
+                        basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
+                        register={register}
+                        setValue={setValue}
+                        allPeople={people}
+                        allItemNames={allItemNames}
+                        isHighlighted={itemIndex === newItemIndex}
+                        onRemove={() => {
+                            const newItems = itemFields.filter((_: Item, i: number) => i !== itemIndex);
+                            setValue(`questions.${questionIndex}.options.${optionIndex}.items`, newItems);
+                        }}
+                        refCallback={el => { selectRefs.current[itemIndex] = el; }}
+                        autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
+                    />
                 ))}
                 <Button
                     type="button"

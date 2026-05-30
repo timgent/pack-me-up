@@ -2,7 +2,7 @@ import { Control, UseFormRegister, UseFormSetValue, useWatch } from "react-hook-
 import { memo } from "react";
 import { PackingListQuestionSet, Person } from "./types";
 
-type ItemPath =
+export type ItemPath =
     | `alwaysNeededItems.${number}`
     | `questions.${number}.options.${number}.items.${number}`;
 
