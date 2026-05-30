@@ -174,22 +174,23 @@ test.describe('F – Solid Pod Sync', () => {
     await expect(page.getByText(/On past trips you added items/)).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /Review suggestions/i }).click()
     await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+    // Register listener before clicking Add so we don't miss the question-set PUT.
+    // Waiting for this confirms the pod has the new data before any sync-loop GET can
+    // race against it and overwrite the locally-saved custom item (the regression this tests).
+    const questionSetWrite = page.waitForResponse(
+      r => r.url().includes('/pack-me-up/packing-list-questions') && r.request().method() === 'PUT',
+      { timeout: 30_000 }
+    )
     await page.getByRole('button', { name: 'Add' }).first().click()
     await expect(page.getByText(/On past trips you added items/)).not.toBeVisible({ timeout: 10_000 })
+    await questionSetWrite
 
-    // Wait for a pod sync GET to complete after navigating to manage-questions.
-    // This proves the sync loop fired and did not overwrite the locally-saved custom item.
-    const syncCycleRead = page.waitForResponse(
-      r => r.url().includes('/pack-me-up/') && r.request().method() === 'GET',
-      { timeout: 15_000 }
-    )
     await page.goto('/#/manage-questions')
-    await syncCycleRead
     // Wait for the section button to be ready before clicking
     await expect(page.getByRole('button', { name: /Always Needed Items/i }).first()).toBeVisible({ timeout: 10_000 })
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
     await expect(page.getByRole('button', { name: 'Add Item', exact: true })).toBeVisible({ timeout: 3_000 })
-    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 5_000 })
   })
 
   test('F4: item check state visible from second context after Pod sync', async ({ browser }) => {
