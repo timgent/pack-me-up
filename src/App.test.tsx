@@ -28,7 +28,7 @@ vi.mock('./components/SessionExpiredBanner', () => ({
 }))
 
 vi.mock('./pages/landing-page', () => ({ LandingPage: () => null }))
-vi.mock('./pages/edit-questions-form', () => ({ EditQuestionsForm: () => null }))
+vi.mock('./pages/questions-page', () => ({ QuestionsPage: () => null }))
 vi.mock('./pages/create-packing-list', () => ({ CreatePackingList: () => null }))
 vi.mock('./pages/packing-lists', () => ({ PackingLists: () => null }))
 vi.mock('./pages/view-packing-list', () => ({ ViewPackingList: () => null }))
