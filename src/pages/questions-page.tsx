@@ -64,7 +64,7 @@ function PersonLegend({ people, onEdit }: { people: Person[]; onEdit?: () => voi
     )
 }
 
-function ROItem({ item, people }: { item: Item; people: Person[] }) {
+function ItemRow({ item, people }: { item: Item; people: Person[] }) {
     const showDots = people.length > 1
     return (
         <div className="flex items-center gap-2 py-0.5 px-2 text-sm">
@@ -87,7 +87,7 @@ function ROItem({ item, people }: { item: Item; people: Person[] }) {
     )
 }
 
-function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
+function OptionSection({ option, optionIndex, people, onEdit, onDelete }: {
     option: Option
     optionIndex: number
     people: Person[]
@@ -162,14 +162,14 @@ function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
             </div>
             <div className={`space-y-0.5${isExpanded ? '' : ' hidden'}`}>
                 {option.items.map((item, i) => (
-                    <ROItem key={i} item={item} people={people} />
+                    <ItemRow key={i} item={item} people={people} />
                 ))}
             </div>
         </div>
     )
 }
 
-function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMoveUp, onMoveDown }: {
+function QuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMoveUp, onMoveDown }: {
     question: Question
     people: Person[]
     onEdit: () => void
@@ -270,7 +270,7 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
             </div>
             <div className={isExpanded ? 'px-4 sm:px-6 pb-4 sm:pb-6 space-y-2' : 'hidden'}>
                 {question.options.map((option, oi) => (
-                    <ROOptionSection
+                    <OptionSection
                         key={option.id}
                         option={option}
                         optionIndex={oi}
@@ -291,7 +291,7 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
     )
 }
 
-function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Person[]; onEdit: () => void }) {
+function AlwaysSection({ items, people, onEdit }: { items: Item[]; people: Person[]; onEdit: () => void }) {
     const [isExpanded, setIsExpanded] = useState(false)
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -324,7 +324,7 @@ function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Per
             </div>
             <div className={`mt-3 space-y-1${isExpanded ? '' : ' hidden'}`}>
                 {items.map((item, i) => (
-                    <ROItem key={i} item={item} people={people} />
+                    <ItemRow key={i} item={item} people={people} />
                 ))}
             </div>
         </div>
@@ -717,7 +717,7 @@ function QuestionModal({ question, onSave, onClose }: {
     )
 }
 
-export function ReadonlyQuestionsPage() {
+export function QuestionsPage() {
     const { db, loginSyncInProgress } = useDatabase()
     const { isLoggedIn } = useSolidPod()
     const foreignPodCtx = useForeignPod()
@@ -884,9 +884,9 @@ export function ReadonlyQuestionsPage() {
                     {!isForeign && <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
                 </div>
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
-                <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
+                <AlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
                 {data.questions.map((q, qi) => (
-                    <ROQuestionSection
+                    <QuestionSection
                         key={q.id}
                         question={q}
                         people={people}
