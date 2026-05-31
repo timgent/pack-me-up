@@ -15,27 +15,16 @@ async function setupWizardAndGoToQuestions(page: import('@playwright/test').Page
   await page.waitForURL(/#\/manage-questions/, { timeout: 8_000 })
 }
 
-/** Expand the People section (collapsed by default). */
-async function expandPeopleSection(page: import('@playwright/test').Page) {
-  const peopleToggle = page.getByRole('button', { name: /People/i }).first()
-  await peopleToggle.click()
-  // Wait for the section to be expanded (Add Person button becomes visible)
-  await expect(page.getByRole('button', { name: 'Add Person' })).toBeVisible({ timeout: 3_000 })
+/** Open the People editing modal via the pencil icon in the legend. */
+async function openPeopleModal(page: import('@playwright/test').Page) {
+  await page.locator('button[title="Edit people"]').click()
+  await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 3_000 })
 }
 
-/** Expand the Always Needed Items section (collapsed by default). */
-async function expandAlwaysNeededSection(page: import('@playwright/test').Page) {
-  const alwaysToggle = page.getByRole('button', { name: /Always Needed Items/i }).first()
-  await alwaysToggle.click()
-  // Wait for the section to be expanded (Add Item button becomes visible)
-  await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
-}
-
-/** Wait for the green "Saved" auto-save indicator (not "All changes saved" which is the idle default). */
-async function waitForSaved(page: import('@playwright/test').Page) {
-  // The green "Saved" indicator has class text-green-600 and appears after an actual save.
-  // Use .first() to avoid strict mode if multiple instances appear (mobile + desktop nav).
-  await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+/** Open the Always Needed Items editing modal via the pencil icon in the section header. */
+async function openAlwaysNeededModal(page: import('@playwright/test').Page) {
+  await page.locator('button[title="Edit always needed items"]').click()
+  await expect(page.getByRole('heading', { name: 'Always Needed Items' })).toBeVisible({ timeout: 3_000 })
 }
 
 test.describe('B – Editing Questions', () => {
@@ -43,31 +32,33 @@ test.describe('B – Editing Questions', () => {
     await setupWizardAndGoToQuestions(page)
     // Use role heading to avoid strict mode (nav links also contain "My Questions & Items")
     await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible()
-    // People section header is visible (collapsed) — it's a toggle button
-    await expect(page.getByRole('button', { name: /People/i }).first()).toBeVisible()
-    // Always Needed Items section is visible (collapsed)
-    await expect(page.getByRole('button', { name: /Always Needed Items/i }).first()).toBeVisible()
+    // People edit button is visible in the legend
+    await expect(page.locator('button[title="Edit people"]')).toBeVisible()
+    // Always Needed Items section is visible
+    await expect(page.getByText(/Always Needed Items/i).first()).toBeVisible()
+    // Always Needed Items pencil button is visible
+    await expect(page.locator('button[title="Edit always needed items"]')).toBeVisible()
   })
 
   test('B2: add a person to the question set', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
-    // Expand People section (collapsed by default)
-    await expandPeopleSection(page)
-    // Count existing name inputs
-    const nameInputs = page.locator('input[placeholder="Enter person name"]')
-    const initialCount = await nameInputs.count()
+    // Open People modal
+    await openPeopleModal(page)
+    // Count existing person name inputs
+    const personInputs = page.locator('input[placeholder^="Person "]')
+    const initialCount = await personInputs.count()
     // Click Add Person
-    await page.getByRole('button', { name: 'Add Person' }).click()
-    // New input should appear
-    await expect(nameInputs).toHaveCount(initialCount + 1)
+    await page.getByRole('button', { name: '+ Add Person' }).click()
+    await expect(personInputs).toHaveCount(initialCount + 1)
     // Fill in the new person's name
-    await nameInputs.nth(initialCount).fill('Charlie')
-    // Wait for the green auto-save indicator to appear
-    await waitForSaved(page)
+    await personInputs.last().fill('Charlie')
+    // Save
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).not.toBeVisible({ timeout: 3_000 })
     // Reload to confirm persistence
     await page.reload()
-    await expandPeopleSection(page)
-    await expect(page.locator('input[placeholder="Enter person name"]').last()).toHaveValue('Charlie')
+    await openPeopleModal(page)
+    await expect(personInputs.last()).toHaveValue('Charlie', { timeout: 5_000 })
   })
 
   test('B3: remove a person from the question set', async ({ freshPage: page }) => {
@@ -84,42 +75,50 @@ test.describe('B – Editing Questions', () => {
     await page.getByRole('button', { name: /Refine My Packing List Questions/i }).click()
     try { await page.getByRole('button', { name: 'Maybe Later' }).click({ timeout: 3_000 }) } catch { /* ok */ }
     await page.waitForURL(/#\/manage-questions/, { timeout: 8_000 })
-    // Expand People section
-    await expandPeopleSection(page)
-    const personInputs = page.locator('input[placeholder="Enter person name"]')
+    // Open People modal
+    await openPeopleModal(page)
+    const personInputs = page.locator('input[placeholder^="Person "]')
     // Verify both people are there
     await expect(personInputs).toHaveCount(2)
+    await expect(personInputs.nth(0)).toHaveValue('PersonA')
     await expect(personInputs.nth(1)).toHaveValue('PersonB')
-    // Click the remove button for Person 2
-    await page.getByRole('button', { name: /Remove person 2/i }).click()
-    // Wait for the green auto-save indicator
-    await waitForSaved(page)
+    // Remove person 2 (PersonB) via its × button
+    const removeButtons = page.locator('button[title="Remove person"]')
+    await removeButtons.nth(1).click()
+    await expect(personInputs).toHaveCount(1)
+    // Save
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).not.toBeVisible({ timeout: 3_000 })
+    // Reload and verify only PersonA remains
     await page.reload()
-    await expandPeopleSection(page)
+    await openPeopleModal(page)
     await expect(personInputs).toHaveCount(1)
     await expect(personInputs.first()).toHaveValue('PersonA')
   })
 
   test('B4: add an always-needed item', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
-    // Expand "Always Needed Items" section (collapsed by default)
-    await expandAlwaysNeededSection(page)
-    // Click "Add Item" to add a new empty item row
-    await page.getByRole('button', { name: 'Add Item' }).click()
-    // The new item uses react-select. Find the last react-select container.
-    const newItemSelect = page.locator('.react-select-container').last()
-    await expect(newItemSelect).toBeVisible({ timeout: 3_000 })
-    // Click to focus, type the item name, then press Enter to create the option
-    await newItemSelect.click()
+    // Open Always Needed Items modal
+    await openAlwaysNeededModal(page)
+    // Click "+ Add Item" to append a new empty item row
+    await page.getByRole('button', { name: '+ Add Item' }).click()
+    // The new item row uses CustomCreatableSelect in inactive mode (.cursor-text).
+    // Clicking it switches to the full react-select with autoFocus.
+    await page.locator('.cursor-text').last().click()
+    // Type the item name — react-select opens the "Create" option on input
     await page.keyboard.type('Passport')
     await page.keyboard.press('Enter')
-    // Wait for the green auto-save indicator
-    await waitForSaved(page)
+    // Save changes
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
+    // Expand the Always Needed Items section to verify the item appears
+    await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
+    await expect(page.getByText('Passport')).toBeVisible({ timeout: 5_000 })
   })
 
   test('B5: JSON editor mode toggle is not available (editor is always visual)', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
-    // The JSON editor toggle does not exist in the current UI (editorMode has no setter)
+    // The JSON editor toggle does not exist in the current UI
     await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible()
     // No JSON toggle button should be present
     await expect(page.getByRole('button', { name: /^json$|edit.*json/i })).not.toBeVisible()

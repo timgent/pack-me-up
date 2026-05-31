@@ -49,17 +49,17 @@ test.describe('K – JSON Schema Compatibility', () => {
     await page.goto('/#/manage-questions')
     await page.waitForLoadState('networkidle')
 
-    // Expand People section (collapsed by default)
-    await page.getByRole('button', { name: /People/i }).first().click()
-    await expect(page.getByRole('button', { name: 'Add Person' })).toBeVisible({ timeout: 5_000 })
+    // Open People modal via pencil icon in the legend
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 5_000 })
 
-    // "Alice" from the fixture should be in the name input (pattern from f-sync tests)
-    const personInputs = page.locator('input[placeholder="Enter person name"]')
+    // "Alice" from the fixture should be in the first person name input
+    const personInputs = page.locator('input[placeholder^="Person "]')
     await expect(personInputs.first()).toHaveValue('Alice', { timeout: 20_000 })
+    await page.getByRole('button', { name: 'Cancel' }).click()
 
-    // The question from the fixture should be in the question text input
-    const questionInputs = page.locator('input[placeholder="Enter your question"]')
-    await expect(questionInputs.first()).toHaveValue('Will you be staying overnight?', { timeout: 10_000 })
+    // The question from the fixture should be visible as text in the questions list
+    await expect(page.getByText('Will you be staying overnight?')).toBeVisible({ timeout: 10_000 })
   })
 
   test('K2: individual packing list loads items from v1 JSON', async () => {

@@ -470,7 +470,6 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                         {option ? 'Edit Option' : 'Add Option'}
                     </h2>
                     <input
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
                         type="text"
                         value={text}
@@ -595,7 +594,6 @@ function PeopleModal({ people, onSave, onClose }: {
                                     {person.name.charAt(0).toUpperCase() || '?'}
                                 </span>
                                 <input
-                                    // eslint-disable-next-line jsx-a11y/no-autofocus
                                     autoFocus={i === 0}
                                     type="text"
                                     value={person.name}
@@ -672,7 +670,6 @@ function QuestionModal({ question, onSave, onClose }: {
                     </h2>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Question text</label>
                     <input
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
                         type="text"
                         value={text}

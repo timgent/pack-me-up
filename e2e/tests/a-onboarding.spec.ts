@@ -51,11 +51,13 @@ test.describe('A – Onboarding & Wizard', () => {
     await page.getByRole('button', { name: 'Maybe Later' }).click()
     // On manage-questions page, expand People section and verify both names
     await expect(page).toHaveURL(/#\/manage-questions/, { timeout: 5_000 })
-    // Expand People section (collapsed by default)
-    await page.getByRole('button', { name: /People/i }).first().click()
-    const personInputs = page.locator('input[placeholder="Enter person name"]')
+    // Open People modal via pencil icon in the legend
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 3_000 })
+    const personInputs = page.locator('input[placeholder^="Person "]')
     await expect(personInputs.first()).toHaveValue('Alice')
     await expect(personInputs.nth(1)).toHaveValue('Bob')
+    await page.getByRole('button', { name: 'Cancel' }).click()
   })
 
   test('A4: wizard shows warning when questions already exist and confirmation on submit', async ({ freshPage: page }) => {

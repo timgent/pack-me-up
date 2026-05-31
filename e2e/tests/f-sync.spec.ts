@@ -63,22 +63,23 @@ test.describe('F – Solid Pod Sync', () => {
 
   test('F1: questions sync to Pod after manage-questions edit', async ({ browser }) => {
     await page.goto('/#/manage-questions')
-    await page.getByRole('button', { name: /People/i }).click()
-    await expect(page.getByRole('button', { name: 'Add Person' })).toBeVisible({ timeout: 5_000 })
-    await page.getByRole('button', { name: 'Add Person' }).click()
-    await page.locator('input[placeholder="Enter person name"]').last().fill('Sync Test Person')
-    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
-    await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
+    // Open People modal via pencil icon
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 5_000 })
+    await page.getByRole('button', { name: '+ Add Person' }).click()
+    await page.locator('input[placeholder^="Person "]').last().fill('Sync Test Person')
+    // Wait for the pod PUT to complete — set up the promise before clicking Save
+    const putDone = page.waitForResponse(
+      resp => resp.url().includes('packing-list-questions') && resp.request().method() === 'PUT',
+      { timeout: 15_000 }
+    )
+    await page.getByRole('button', { name: 'Save' }).click()
+    await putDone
 
     const { ctx: context2, pg: page2 } = await freshLogin(browser)
     await page2.goto('/#/manage-questions')
-    // Expand People section if collapsed (default state after fresh navigation)
-    const addPersonBtn = page2.getByRole('button', { name: 'Add Person' })
-    if (!await addPersonBtn.isVisible()) {
-      await page2.getByRole('button', { name: /People/i }).first().click()
-    }
-    // usePodSync polls every 5s; wait up to 30s for the form to reflect the Pod update
-    await expect(page2.locator('input[placeholder="Enter person name"]').last()).toHaveValue('Sync Test Person', { timeout: 30_000 })
+    // PersonLegend shows person names — wait up to 30s for the pod poll to reflect the update
+    await expect(page2.getByText('Sync Test Person')).toBeVisible({ timeout: 30_000 })
     await context2.close()
   })
 
@@ -174,10 +175,10 @@ test.describe('F – Solid Pod Sync', () => {
     await expect(page.getByText(/On past trips you added items/)).not.toBeVisible({ timeout: 10_000 })
 
     await page.goto('/#/manage-questions')
-    // Wait for the section button to be ready before clicking
-    await expect(page.getByRole('button', { name: /Always Needed Items/i }).first()).toBeVisible({ timeout: 10_000 })
+    // Wait for the page to load
+    await expect(page.getByRole('heading', { name: /My Questions & Items/i })).toBeVisible({ timeout: 10_000 })
+    // Expand the Always Needed Items section to see its items
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
-    await expect(page.getByRole('button', { name: 'Add Item' })).toBeVisible({ timeout: 3_000 })
     // Wait a full pod-poll cycle (5s) + buffer so the sync fires.
     // Without the fix the pod would overwrite the local change and the item disappears.
     await page.waitForTimeout(7_000)
