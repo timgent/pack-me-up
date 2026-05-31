@@ -265,30 +265,149 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
     )
 }
 
-function ROAlwaysSection({ items, people }: { items: Item[]; people: Person[] }) {
+function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Person[]; onEdit: () => void }) {
     const [isExpanded, setIsExpanded] = useState(false)
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-            <button
-                type="button"
-                onClick={() => setIsExpanded(e => !e)}
-                className="flex items-center gap-2 w-full text-left"
-            >
-                <svg
-                    className={`w-5 h-5 text-gray-400 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            <div className="flex items-center">
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded(e => !e)}
+                    className="flex items-center gap-2 flex-1 text-left min-w-0"
                 >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-                <span className="font-medium text-gray-900">
-                    Always Needed Items <span className="text-sm font-normal text-gray-500">({items.length} items)</span>
-                </span>
-            </button>
+                    <svg
+                        className={`w-5 h-5 text-gray-400 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    <span className="font-medium text-gray-900">
+                        Always Needed Items <span className="text-sm font-normal text-gray-500">({items.length} items)</span>
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    onClick={onEdit}
+                    className="p-1.5 text-gray-300 hover:text-gray-600 rounded flex-shrink-0"
+                    title="Edit always needed items"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </button>
+            </div>
             <div className={`mt-3 space-y-1${isExpanded ? '' : ' hidden'}`}>
                 {items.map((item, i) => (
                     <ROItem key={i} item={item} people={people} />
                 ))}
             </div>
+        </div>
+    )
+}
+
+function useItemListState(initialItems: Item[], people: Person[]) {
+    const [items, setItems] = useState<Item[]>(initialItems)
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const prevCountRef = useRef(initialItems.length)
+
+    useEffect(() => {
+        if (items.length > prevCountRef.current) {
+            requestAnimationFrame(() => {
+                scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+            })
+        }
+        prevCountRef.current = items.length
+    }, [items.length])
+
+    const updateItemText = (idx: number, text: string) =>
+        setItems(prev => prev.map((item, i) => i === idx ? { ...item, text } : item))
+
+    const togglePerson = (itemIdx: number, personIdx: number) =>
+        setItems(prev => prev.map((item, i) => {
+            if (i !== itemIdx) return item
+            const selections = people.map((p, pi) => ({
+                personId: p.id,
+                selected: item.personSelections?.[pi]?.selected ?? false,
+            }))
+            selections[personIdx] = { ...selections[personIdx], selected: !selections[personIdx].selected }
+            return { ...item, personSelections: selections }
+        }))
+
+    const removeItem = (idx: number) =>
+        setItems(prev => prev.filter((_, i) => i !== idx))
+
+    const addItem = () =>
+        setItems(prev => [...prev, {
+            text: '',
+            personSelections: people.map(p => ({ personId: p.id, selected: true })),
+        }])
+
+    return { items, scrollRef, updateItemText, togglePerson, removeItem, addItem }
+}
+
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, removeItem, addItem }: {
+    items: Item[]
+    people: Person[]
+    allItemNames: string[]
+    scrollRef: React.RefObject<HTMLDivElement | null>
+    updateItemText: (idx: number, text: string) => void
+    togglePerson: (itemIdx: number, personIdx: number) => void
+    removeItem: (idx: number) => void
+    addItem: () => void
+}) {
+    return (
+        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
+            {items.length > 0 && (
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Items</div>
+            )}
+            <div className="space-y-2">
+                {items.map((item, itemIdx) => (
+                    <div key={itemIdx} className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                            <CustomCreatableSelect
+                                value={item.text}
+                                onChange={val => updateItemText(itemIdx, val)}
+                                options={allItemNames}
+                                placeholder="Item name"
+                                menuPortalTarget={document.body}
+                            />
+                        </div>
+                        {people.length > 1 && (
+                            <div className="flex gap-0.5 shrink-0">
+                                {people.map((person, personIdx) => {
+                                    const selected = item.personSelections?.[personIdx]?.selected ?? false
+                                    return (
+                                        <button
+                                            key={person.id}
+                                            type="button"
+                                            onClick={() => togglePerson(itemIdx, personIdx)}
+                                            title={person.name}
+                                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
+                                        >
+                                            {person.name.charAt(0).toUpperCase()}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => removeItem(itemIdx)}
+                            className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
+                            title="Remove item"
+                        >
+                            ×
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <button
+                type="button"
+                onClick={addItem}
+                className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            >
+                + Add Item
+            </button>
         </div>
     )
 }
@@ -301,54 +420,14 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const [items, setItems] = useState<Item[]>(option?.items ?? [])
-    const itemsScrollRef = useRef<HTMLDivElement>(null)
-    const prevItemCountRef = useRef(items.length)
+    const { items, scrollRef, updateItemText, togglePerson, removeItem, addItem } = useItemListState(option?.items ?? [], people)
 
-    useEffect(() => {
-        if (items.length > prevItemCountRef.current) {
-            requestAnimationFrame(() => {
-                itemsScrollRef.current?.scrollTo({ top: itemsScrollRef.current.scrollHeight, behavior: 'smooth' })
-            })
-        }
-        prevItemCountRef.current = items.length
-    }, [items.length])
-
-    const updateItemText = (idx: number, newText: string) => {
-        setItems(prev => prev.map((item, i) => i === idx ? { ...item, text: newText } : item))
-    }
-
-    const togglePerson = (itemIdx: number, personIdx: number) => {
-        setItems(prev => prev.map((item, i) => {
-            if (i !== itemIdx) return item
-            const selections = people.map((p, pi) => ({
-                personId: p.id,
-                selected: item.personSelections?.[pi]?.selected ?? false,
-            }))
-            selections[personIdx] = { ...selections[personIdx], selected: !selections[personIdx].selected }
-            return { ...item, personSelections: selections }
-        }))
-    }
-
-    const removeItem = (idx: number) => {
-        setItems(prev => prev.filter((_, i) => i !== idx))
-    }
-
-    const addItem = () => {
-        setItems(prev => [...prev, {
-            text: '',
-            personSelections: people.map(p => ({ personId: p.id, selected: true })),
-        }])
-    }
-
-    const handleSave = () => {
-        onSave({
-            id: option?.id ?? crypto.randomUUID(),
-            order: option?.order ?? 0,
-            text: text.trim(),
-            items,
-        })
-    }
+    const handleSave = () => onSave({
+        id: option?.id ?? crypto.randomUUID(),
+        order: option?.order ?? 0,
+        text: text.trim(),
+        items,
+    })
 
     return (
         <div
@@ -387,77 +466,69 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                         </div>
                     )}
                 </div>
-
-                <div ref={itemsScrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
-                    {items.length > 0 && (
-                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-                            Items
-                        </div>
-                    )}
-                    <div className="space-y-2">
-                        {items.map((item, itemIdx) => (
-                            <div key={itemIdx} className="flex items-center gap-2">
-                                <div className="flex-1 min-w-0">
-                                    <CustomCreatableSelect
-                                        value={item.text}
-                                        onChange={val => updateItemText(itemIdx, val)}
-                                        options={allItemNames}
-                                        placeholder="Item name"
-                                        menuPortalTarget={document.body}
-                                    />
-                                </div>
-                                {people.length > 1 && (
-                                    <div className="flex gap-0.5 shrink-0">
-                                        {people.map((person, personIdx) => {
-                                            const selected = item.personSelections?.[personIdx]?.selected ?? false
-                                            return (
-                                                <button
-                                                    key={person.id}
-                                                    type="button"
-                                                    onClick={() => togglePerson(itemIdx, personIdx)}
-                                                    title={person.name}
-                                                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
-                                                >
-                                                    {person.name.charAt(0).toUpperCase()}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => removeItem(itemIdx)}
-                                    className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
-                                    title="Remove item"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={addItem}
-                        className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                    >
-                        + Add Item
-                    </button>
-                </div>
-
+                <ItemListEditor
+                    items={items} people={people} allItemNames={allItemNames}
+                    scrollRef={scrollRef} updateItemText={updateItemText}
+                    togglePerson={togglePerson} removeItem={removeItem} addItem={addItem}
+                />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
-                    >
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
                         Cancel
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                    >
+                    <button type="button" onClick={handleSave} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                         {option ? 'Save changes' : 'Add option'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose }: {
+    initialItems: Item[]
+    people: Person[]
+    allItemNames: string[]
+    onSave: (items: Item[]) => void
+    onClose: () => void
+}) {
+    const { items, scrollRef, updateItemText, togglePerson, removeItem, addItem } = useItemListState(initialItems, people)
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+            onClick={onClose}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+        >
+            <div
+                className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="p-5 border-b border-gray-100 flex-shrink-0">
+                    <h2 className="text-lg font-semibold text-gray-900">Always Needed Items</h2>
+                    {people.length > 1 && (
+                        <div className="flex items-center gap-3 flex-wrap mt-2">
+                            {people.map((person, i) => (
+                                <span key={person.id} className="flex items-center gap-1 text-xs text-gray-400">
+                                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${AVATAR_ON[i % AVATAR_ON.length]}`}>
+                                        {person.name.charAt(0).toUpperCase()}
+                                    </span>
+                                    {person.name}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <ItemListEditor
+                    items={items} people={people} allItemNames={allItemNames}
+                    scrollRef={scrollRef} updateItemText={updateItemText}
+                    togglePerson={togglePerson} removeItem={removeItem} addItem={addItem}
+                />
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+                        Cancel
+                    </button>
+                    <button type="button" onClick={() => onSave(items)} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                        Save changes
                     </button>
                 </div>
             </div>
@@ -629,6 +700,7 @@ export function ReadonlyQuestionsPage() {
     const [questionModal, setQuestionModal] = useState<{ question: Question | null } | null>(null)
     const [optionModal, setOptionModal] = useState<{ questionId: string; option: Option | null } | null>(null)
     const [peopleModal, setPeopleModal] = useState(false)
+    const [alwaysModal, setAlwaysModal] = useState(false)
 
     const { saveWithSyncPrevention } = useSyncCoordinator<PackingListQuestionSet>({
         currentData: data,
@@ -701,6 +773,12 @@ export function ReadonlyQuestionsPage() {
         await saveData({ ...data, questions: newQuestions })
     }, [data, optionModal, saveData])
 
+    const handleAlwaysSave = useCallback(async (newItems: Item[]) => {
+        if (!data) return
+        setAlwaysModal(false)
+        await saveData({ ...data, alwaysNeededItems: newItems })
+    }, [data, saveData])
+
     const handlePeopleSave = useCallback(async (newPeople: Person[]) => {
         if (!data) return
         const oldPeople = data.people ?? []
@@ -750,7 +828,7 @@ export function ReadonlyQuestionsPage() {
                     </Link>
                 </div>
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
-                <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} />
+                <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
                 {data.questions.map((q) => (
                     <ROQuestionSection
                         key={q.id}
@@ -785,6 +863,15 @@ export function ReadonlyQuestionsPage() {
                     allItemNames={allItemNames}
                     onSave={handleOptionModalSave}
                     onClose={() => setOptionModal(null)}
+                />
+            )}
+            {alwaysModal && (
+                <AlwaysNeededModal
+                    initialItems={data.alwaysNeededItems ?? []}
+                    people={people}
+                    allItemNames={allItemNames}
+                    onSave={handleAlwaysSave}
+                    onClose={() => setAlwaysModal(false)}
                 />
             )}
             {peopleModal && (
