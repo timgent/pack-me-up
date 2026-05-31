@@ -8,26 +8,63 @@ import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 import { useSolidPod } from '../components/SolidPodContext'
 
-function ROItem({ item, people }: { item: Item; people: Person[] }) {
-    const selectedPeople = people.filter((_, i) => item.personSelections?.[i]?.selected ?? false)
-    const isSubset = people.length > 0 && selectedPeople.length > 0 && selectedPeople.length < people.length
+// One distinct colour per person slot (by index). Tailwind classes must be literal strings.
+const AVATAR_ON = [
+    'bg-blue-500 text-white',
+    'bg-violet-500 text-white',
+    'bg-emerald-500 text-white',
+    'bg-amber-500 text-white',
+    'bg-rose-500 text-white',
+    'bg-cyan-500 text-white',
+]
+const AVATAR_OFF = 'bg-gray-100 text-gray-300'
+
+function PersonDot({ person, index, selected }: { person: Person; index: number; selected: boolean }) {
     return (
-        <div className="flex items-center gap-2 py-1 px-2 text-sm">
-            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
-                {item.text || 'no text'}
-            </span>
-            {isSubset && (
-                <div className="flex gap-1 flex-wrap justify-end shrink-0">
-                    {selectedPeople.map(person => (
-                        <span
+        <span
+            title={person.name}
+            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold select-none shrink-0 ${selected ? AVATAR_ON[index % AVATAR_ON.length] : AVATAR_OFF}`}
+        >
+            {person.name.charAt(0).toUpperCase()}
+        </span>
+    )
+}
+
+function PersonLegend({ people }: { people: Person[] }) {
+    if (people.length < 2) return null
+    return (
+        <div className="flex items-center gap-2 flex-wrap mb-2 ml-7">
+            {people.map((person, i) => (
+                <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500">
+                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${AVATAR_ON[i % AVATAR_ON.length]}`}>
+                        {person.name.charAt(0).toUpperCase()}
+                    </span>
+                    {person.name}
+                </span>
+            ))}
+        </div>
+    )
+}
+
+function ROItem({ item, people }: { item: Item; people: Person[] }) {
+    const showDots = people.length > 1
+    return (
+        <div className="flex items-center gap-2 py-0.5 px-2 text-sm">
+            {showDots && (
+                <div className="flex gap-0.5 shrink-0">
+                    {people.map((person, i) => (
+                        <PersonDot
                             key={person.id}
-                            className="inline-flex items-center px-1.5 py-0.5 text-xs rounded border select-none bg-primary-50 border-primary-300 text-primary-700"
-                        >
-                            {person.name}
-                        </span>
+                            person={person}
+                            index={i}
+                            selected={item.personSelections?.[i]?.selected ?? false}
+                        />
                     ))}
                 </div>
             )}
+            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                {item.text || 'no text'}
+            </span>
         </div>
     )
 }
@@ -52,10 +89,13 @@ function ROOptionSection({ option, optionIndex, people }: { option: Option; opti
                 </span>
                 <span className="text-xs text-gray-400 flex-shrink-0">{option.items.length} items</span>
             </button>
-            <div className={`ml-7 space-y-0.5${isExpanded ? '' : ' hidden'}`}>
-                {option.items.map((item, i) => (
-                    <ROItem key={i} item={item} people={people} />
-                ))}
+            <div className={isExpanded ? '' : 'hidden'}>
+                <PersonLegend people={people} />
+                <div className="space-y-0.5">
+                    {option.items.map((item, i) => (
+                        <ROItem key={i} item={item} people={people} />
+                    ))}
+                </div>
             </div>
         </div>
     )
