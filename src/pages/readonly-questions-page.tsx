@@ -10,23 +10,24 @@ import { useSolidPod } from '../components/SolidPodContext'
 
 function ROItem({ item, people }: { item: Item; people: Person[] }) {
     const selectedPeople = people.filter((_, i) => item.personSelections?.[i]?.selected ?? false)
+    const isSubset = people.length > 0 && selectedPeople.length > 0 && selectedPeople.length < people.length
     return (
         <div className="flex items-center gap-2 py-1 px-2 text-sm">
-            {selectedPeople.length > 0 && (
-                <div className="flex gap-1 flex-wrap shrink-0">
+            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                {item.text || 'no text'}
+            </span>
+            {isSubset && (
+                <div className="flex gap-1 flex-wrap justify-end shrink-0">
                     {selectedPeople.map(person => (
                         <span
                             key={person.id}
-                            className="inline-flex items-center px-2 py-0.5 text-xs rounded-lg border-2 select-none bg-primary-50 border-primary-400 text-primary-900"
+                            className="inline-flex items-center px-1.5 py-0.5 text-xs rounded border select-none bg-primary-50 border-primary-300 text-primary-700"
                         >
                             {person.name}
                         </span>
                     ))}
                 </div>
             )}
-            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
-                {item.text || 'no text'}
-            </span>
         </div>
     )
 }
