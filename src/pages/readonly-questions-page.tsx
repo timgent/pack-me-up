@@ -755,7 +755,6 @@ export function ReadonlyQuestionsPage() {
     })
 
     useEffect(() => {
-        if (isForeign) return  // foreign pod: data arrives via pod polling, no local load
         if (loginSyncInProgress) return
         const load = async () => {
             try {
@@ -774,7 +773,7 @@ export function ReadonlyQuestionsPage() {
         }
         load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loginSyncInProgress, isForeign])
+    }, [loginSyncInProgress])
 
     const saveData = useCallback(async (updated: PackingListQuestionSet) => {
         setData(updated)
