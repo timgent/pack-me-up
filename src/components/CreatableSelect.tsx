@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import CreatableSelect from 'react-select/creatable';
 import { ActionMeta, OnChangeValue } from 'react-select';
 
@@ -41,6 +41,7 @@ const selectStyles = {
 export function ActiveSelect({ value, onChange, options, placeholder, menuPortalTarget }: CreatableSelectProps) {
     const [inputValue, setInputValue] = useState('');
     const [menuIsOpen, setMenuIsOpen] = useState(false);
+    const justSelectedRef = useRef(false);
 
     const selectOptions = useMemo(() => options.map(option => ({
         label: option,
@@ -48,10 +49,12 @@ export function ActiveSelect({ value, onChange, options, placeholder, menuPortal
     })), [options]);
 
     const handleChange = (newValue: OnChangeValue<Option, false>, _: ActionMeta<Option>) => {
+        justSelectedRef.current = true;
         onChange(newValue?.value || '');
     };
 
     const handleBlur = () => {
+        if (justSelectedRef.current) { justSelectedRef.current = false; return; }
         if (inputValue.trim()) onChange(inputValue.trim());
     };
 
