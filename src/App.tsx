@@ -20,6 +20,7 @@ import { BackupsPage } from './pages/backups'
 import { ForeignPodLayout } from './components/ForeignPodLayout'
 import { ForeignPackingListsPage } from './pages/foreign-packing-lists'
 import { SharingSettingsPage } from './pages/sharing-settings'
+import { ReadonlyQuestionsPage } from './pages/readonly-questions-page'
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
                 <Route path="/backups" element={<BackupsPage />} />
                 <Route path="/sharing" element={<SharingSettingsPage />} />
+                <Route path="/view-questions" element={<ReadonlyQuestionsPage />} />
                 <Route path="/pod/:encodedPodUrl" element={<ForeignPodLayout />}>
                   <Route index element={<Navigate to="view-lists" replace />} />
                   <Route path="view-lists" element={<ForeignPackingListsPage />} />
