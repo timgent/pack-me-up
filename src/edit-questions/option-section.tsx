@@ -3,7 +3,7 @@ import { Button } from '../components/Button'
 import { CloseButton } from '../components/CloseButton'
 import { UseFormRegister, UseFormSetValue, useFieldArray, Control } from 'react-hook-form'
 import { Item, PackingListQuestionSet, Person } from './types'
-import { useRef, useEffect, useState, memo, startTransition } from 'react'
+import { useRef, useEffect, useState, memo } from 'react'
 import { LazyItem } from './lazy-item'
 
 interface OptionSectionProps {
@@ -20,8 +20,6 @@ interface OptionSectionProps {
 
 export const OptionSection = memo(function OptionSection({ control, questionIndex, optionIndex, register, setValue, removeOption, people, triggerScrollToLast, getAllItemNames }: OptionSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
-    const [collapseVersion, setCollapseVersion] = useState(0);
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
         name: `questions.${questionIndex}.options.${optionIndex}.items`
@@ -45,7 +43,6 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
     useEffect(() => {
         if (!triggerScrollToLast) return;
         setIsExpanded(true);
-        setHasBeenExpanded(true);
         pendingScrollRef.current = true;
     }, [triggerScrollToLast]);
 
@@ -62,23 +59,14 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
-    const allItemNames = hasBeenExpanded ? getAllItemNames() : [];
+    const allItemNames = isExpanded ? getAllItemNames() : [];
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
             <div className={`flex items-start gap-2 sm:gap-4 ${isExpanded ? 'mb-4' : ''}`}>
                 <button
                     type="button"
-                    onClick={() => {
-                        if (hasBeenExpanded) {
-                            setIsExpanded(e => {
-                                if (e) setCollapseVersion(v => v + 1);
-                                return !e;
-                            });
-                        } else {
-                            startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
-                        }
-                    }}
+                    onClick={() => setIsExpanded(e => !e)}
                     className="text-gray-400 hover:text-gray-600 transition-colors duration-200 mt-7"
                     title={isExpanded ? 'Collapse' : 'Expand'}
                 >
@@ -105,7 +93,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                 />
             </div>
 
-            {hasBeenExpanded && <div className={`ml-0 sm:ml-4 space-y-3${isExpanded ? '' : ' hidden'}`}>
+            <div className={`ml-0 sm:ml-4 space-y-3${isExpanded ? '' : ' hidden'}`}>
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
                 {itemFields.map((item, itemIndex: number) => (
                     <LazyItem
@@ -123,7 +111,6 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                         }}
                         refCallback={el => { selectRefs.current[itemIndex] = el; }}
                         autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
-                        resetKey={collapseVersion}
                     />
                 ))}
                 <Button
@@ -137,7 +124,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
                 >
                     Add Item
                 </Button>
-            </div>}
+            </div>
         </div>
     );
 });

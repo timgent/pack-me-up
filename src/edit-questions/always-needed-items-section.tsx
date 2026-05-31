@@ -1,7 +1,7 @@
 import { Button } from '../components/Button'
 import { UseFormRegister, UseFormSetValue, Control, useFieldArray } from 'react-hook-form'
 import { PackingListQuestionSet, Person, Item } from './types'
-import { useRef, useEffect, useState, startTransition, memo } from 'react'
+import { useRef, useEffect, useState, memo } from 'react'
 import { LazyItem } from './lazy-item'
 
 interface AlwaysNeededItemsSectionProps {
@@ -15,8 +15,6 @@ interface AlwaysNeededItemsSectionProps {
 
 export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({ control, register, setValue, people, triggerScrollToLast, getAllItemNames }: AlwaysNeededItemsSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
-    const [collapseVersion, setCollapseVersion] = useState(0);
 
     const { fields: itemFields, append: appendItem } = useFieldArray({
         control,
@@ -42,7 +40,6 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
     useEffect(() => {
         if (!triggerScrollToLast) return;
         setIsExpanded(true);
-        setHasBeenExpanded(true);
         pendingScrollRef.current = true;
     }, [triggerScrollToLast]);
 
@@ -59,22 +56,13 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
-    const allItemNames = hasBeenExpanded ? getAllItemNames() : [];
+    const allItemNames = isExpanded ? getAllItemNames() : [];
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
             <button
                 type="button"
-                onClick={() => {
-                    if (hasBeenExpanded) {
-                        setIsExpanded(e => {
-                            if (e) setCollapseVersion(v => v + 1);
-                            return !e;
-                        });
-                    } else {
-                        startTransition(() => { setIsExpanded(true); setHasBeenExpanded(true); });
-                    }
-                }}
+                onClick={() => setIsExpanded(e => !e)}
                 className="flex items-center gap-2 mb-4 w-full text-left hover:bg-gray-50 -mx-4 -mt-4 px-4 pt-4 rounded-t-lg transition-colors duration-200"
             >
                 <svg
@@ -91,8 +79,7 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                 </div>
             </button>
 
-            {hasBeenExpanded && (
-                <div className={`space-y-3${isExpanded ? '' : ' hidden'}`}>
+            <div className={`space-y-3${isExpanded ? '' : ' hidden'}`}>
                 {itemFields.map((item, itemIndex: number) => (
                     <LazyItem
                         key={item.id}
@@ -109,7 +96,6 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                         }}
                         refCallback={el => { selectRefs.current[itemIndex] = el; }}
                         autoActivate={expectedNewLengthRef.current !== null && itemIndex === expectedNewLengthRef.current - 1}
-                        resetKey={collapseVersion}
                     />
                 ))}
                 <Button
@@ -124,7 +110,6 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
                     Add Item
                 </Button>
             </div>
-            )}
         </div>
     );
 });

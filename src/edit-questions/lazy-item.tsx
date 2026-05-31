@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useFormContext, Control, UseFormRegister, UseFormSetValue, Controller } from 'react-hook-form';
 import { PackingListQuestionSet, Person } from './types';
 import { ItemPeopleSection } from './item-people-section';
@@ -17,19 +17,11 @@ interface LazyItemProps {
     onRemove: () => void;
     refCallback: (el: HTMLDivElement | null) => void;
     autoActivate?: boolean;
-    resetKey?: number;
 }
 
-export function LazyItem({ control, basePath, register, setValue, allPeople, allItemNames, isHighlighted, onRemove, refCallback, autoActivate = false, resetKey = 0 }: LazyItemProps) {
+export function LazyItem({ control, basePath, register, setValue, allPeople, allItemNames, isHighlighted, onRemove, refCallback, autoActivate = false }: LazyItemProps) {
     const [isActive, setIsActive] = useState(autoActivate);
     const { getValues } = useFormContext<PackingListQuestionSet>();
-    const prevResetKey = useRef(resetKey);
-    useEffect(() => {
-        if (resetKey !== prevResetKey.current) {
-            prevResetKey.current = resetKey;
-            setIsActive(false);
-        }
-    }, [resetKey]);
 
     const outerClass = `flex items-start gap-2 sm:gap-3 rounded-md${isHighlighted ? ' ring-2 ring-primary-300' : ''}`;
 

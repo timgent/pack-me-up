@@ -38,7 +38,7 @@ function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Parti
 describe('AlwaysNeededItemsSection', () => {
     it('starts collapsed by default', () => {
         render(<Wrapper />)
-        expect(screen.queryByText('Add Item')).toBeNull()
+        expect(screen.getByRole('button', { name: /^add item$/i }).closest('.hidden')).toBeTruthy()
     })
 
     it('shows item count in header when there are items', () => {
@@ -60,8 +60,9 @@ describe('AlwaysNeededItemsSection', () => {
 
     it('auto-expands when triggerScrollToLast becomes truthy', async () => {
         const { rerender } = render(<Wrapper />)
-        expect(screen.queryByRole('button', { name: /^add item$/i })).toBeNull()
+        const addItemBtn = screen.getByRole('button', { name: /^add item$/i })
+        expect(addItemBtn.closest('.hidden')).toBeTruthy()
         rerender(<Wrapper triggerScrollToLast={1} />)
-        await waitFor(() => expect(screen.getByRole('button', { name: /^add item$/i })).toBeTruthy())
+        await waitFor(() => expect(addItemBtn.closest('.hidden')).toBeNull())
     })
 })
