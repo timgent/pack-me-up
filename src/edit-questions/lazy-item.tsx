@@ -66,6 +66,7 @@ export function LazyItem({ control, basePath, register, setValue, allPeople, all
                                     e.stopPropagation();
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     (setValue as any)(basePath, { ...item, text: '' });
+                                    setIsActive(true);
                                 }}
                                 className="text-gray-300 hover:text-gray-500 text-lg leading-none ml-1"
                                 aria-label="Clear"

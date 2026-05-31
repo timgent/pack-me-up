@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Question, Person, PersonSelection, Item } from './types'
-import { CustomCreatableSelect } from '../components/CreatableSelect'
+import { ActiveSelect } from '../components/CreatableSelect'
 import { Button } from '../components/Button'
 
 export type AddItemDestination =
@@ -137,7 +137,7 @@ export function AddItemModal({ isOpen, onClose, questions, people, existingItemN
                 {step === 'details' && (
                     <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
                         <div>
-                            <CustomCreatableSelect
+                            <ActiveSelect
                                 value={text}
                                 onChange={handleTextChange}
                                 options={existingItemNames}

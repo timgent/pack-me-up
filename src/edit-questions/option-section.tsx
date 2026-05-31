@@ -62,7 +62,7 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
-    const allItemNames = getAllItemNames();
+    const allItemNames = hasBeenExpanded ? getAllItemNames() : [];
 
     return (
         <div className="bg-gray-50 rounded-lg p-4">
@@ -107,9 +107,9 @@ export const OptionSection = memo(function OptionSection({ control, questionInde
 
             {hasBeenExpanded && <div className={`ml-0 sm:ml-4 space-y-3${isExpanded ? '' : ' hidden'}`}>
                 <div className="text-sm font-medium text-gray-700 mb-2">Items:</div>
-                {itemFields.map((_item: Item, itemIndex: number) => (
+                {itemFields.map((item, itemIndex: number) => (
                     <LazyItem
-                        key={itemIndex}
+                        key={item.id}
                         control={control}
                         basePath={`questions.${questionIndex}.options.${optionIndex}.items.${itemIndex}`}
                         register={register}

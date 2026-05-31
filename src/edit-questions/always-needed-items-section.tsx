@@ -59,7 +59,7 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isExpanded, triggerScrollToLast]);
 
-    const allItemNames = getAllItemNames();
+    const allItemNames = hasBeenExpanded ? getAllItemNames() : [];
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -93,9 +93,9 @@ export const AlwaysNeededItemsSection = memo(function AlwaysNeededItemsSection({
 
             {hasBeenExpanded && (
                 <div className={`space-y-3${isExpanded ? '' : ' hidden'}`}>
-                {itemFields.map((_item: Item, itemIndex: number) => (
+                {itemFields.map((item, itemIndex: number) => (
                     <LazyItem
-                        key={itemIndex}
+                        key={item.id}
                         control={control}
                         basePath={`alwaysNeededItems.${itemIndex}`}
                         register={register}

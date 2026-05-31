@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, FormProvider } from 'react-hook-form'
 import { AlwaysNeededItemsSection } from './always-needed-items-section'
 import { PackingListQuestionSet, Person } from './types'
 
@@ -12,7 +12,7 @@ beforeEach(() => {
 })
 
 function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Partial<PackingListQuestionSet>; triggerScrollToLast?: number }) {
-    const { control, register, setValue } = useForm<PackingListQuestionSet>({
+    const methods = useForm<PackingListQuestionSet>({
         defaultValues: {
             questions: [],
             people: mockPeople,
@@ -20,15 +20,18 @@ function Wrapper({ defaultValues, triggerScrollToLast }: { defaultValues?: Parti
             ...defaultValues,
         },
     })
+    const { control, register, setValue } = methods;
     return (
-        <AlwaysNeededItemsSection
-            control={control}
-            register={register}
-            setValue={setValue}
-            people={mockPeople}
-            triggerScrollToLast={triggerScrollToLast}
-            getAllItemNames={() => []}
-        />
+        <FormProvider {...methods}>
+            <AlwaysNeededItemsSection
+                control={control}
+                register={register}
+                setValue={setValue}
+                people={mockPeople}
+                triggerScrollToLast={triggerScrollToLast}
+                getAllItemNames={() => []}
+            />
+        </FormProvider>
     )
 }
 
