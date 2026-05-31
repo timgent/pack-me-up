@@ -873,11 +873,10 @@ export function ReadonlyQuestionsPage() {
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="w-full max-w-3xl space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                    <h1 className="text-2xl font-bold text-gray-900">My Questions</h1>
-                    <Link to="/manage-questions" className="text-sm text-primary-600 hover:underline">
-                        Edit questions
-                    </Link>
+                <div className="mb-2">
+                    <h1 className="text-2xl font-bold text-gray-900">My Questions & Items</h1>
+                    <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
+                    <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
                 </div>
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
                 <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />

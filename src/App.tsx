@@ -36,14 +36,13 @@ function App() {
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/wizard" element={<Wizard />} />
-                <Route path="/manage-questions" element={<EditQuestionsForm />} />
+                <Route path="/manage-questions" element={<ReadonlyQuestionsPage />} />
                 <Route path="/create-packing-list" element={<CreatePackingList />} />
                 <Route path="/view-lists" element={<PackingLists />} />
                 <Route path="/view-lists/:id" element={<ViewPackingList />} />
                 <Route path="/solid-pod-handle-redirect" element={<SolidPodHandleRedirectPage />} />
                 <Route path="/backups" element={<BackupsPage />} />
                 <Route path="/sharing" element={<SharingSettingsPage />} />
-                <Route path="/view-questions" element={<ReadonlyQuestionsPage />} />
                 <Route path="/pod/:encodedPodUrl" element={<ForeignPodLayout />}>
                   <Route index element={<Navigate to="view-lists" replace />} />
                   <Route path="view-lists" element={<ForeignPackingListsPage />} />
