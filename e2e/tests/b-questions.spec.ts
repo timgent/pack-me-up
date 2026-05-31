@@ -55,6 +55,9 @@ test.describe('B – Editing Questions', () => {
     // Save
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('heading', { name: 'Edit People' })).not.toBeVisible({ timeout: 3_000 })
+    // The save triggers an async IndexedDB write. Give it time to commit before reload
+    // (navigating while the transaction is open aborts it).
+    await page.waitForTimeout(800)
     // Reload to confirm persistence
     await page.reload()
     await openPeopleModal(page)
@@ -89,6 +92,8 @@ test.describe('B – Editing Questions', () => {
     // Save
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('heading', { name: 'Edit People' })).not.toBeVisible({ timeout: 3_000 })
+    // Give the async IndexedDB write time to commit before reload
+    await page.waitForTimeout(800)
     // Reload and verify only PersonA remains
     await page.reload()
     await openPeopleModal(page)
@@ -102,10 +107,13 @@ test.describe('B – Editing Questions', () => {
     await openAlwaysNeededModal(page)
     // Click "+ Add Item" to append a new empty item row
     await page.getByRole('button', { name: '+ Add Item' }).click()
-    // The new item row uses CustomCreatableSelect in inactive mode (.cursor-text).
-    // Clicking it switches to the full react-select with autoFocus.
+    // The new item uses CustomCreatableSelect in inactive mode (.cursor-text).
+    // Clicking it transitions to the full react-select (ActiveSelect with autoFocus).
     await page.locator('.cursor-text').last().click()
-    // Type the item name — react-select opens the "Create" option on input
+    // Wait for the react-select to mount after lazy activation, then click it for reliable focus
+    const newItemSelect = page.locator('.react-select-container').last()
+    await expect(newItemSelect).toBeVisible({ timeout: 3_000 })
+    await newItemSelect.click()
     await page.keyboard.type('Passport')
     await page.keyboard.press('Enter')
     // Save changes
