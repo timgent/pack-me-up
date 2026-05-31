@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useDatabase } from '../components/DatabaseContext'
 import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion } from '../edit-questions/types'
 import { Link } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { usePodSync } from '../hooks/usePodSync'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 import { useSolidPod } from '../components/SolidPodContext'
+import { CustomCreatableSelect } from '../components/CreatableSelect'
 
 // One distinct colour per person slot (by index). Tailwind classes must be literal strings.
 const AVATAR_ON = [
@@ -277,9 +278,10 @@ function ROAlwaysSection({ items, people }: { items: Item[]; people: Person[] })
     )
 }
 
-function OptionEditModal({ option, people, onSave, onClose }: {
+function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     option: Option | null
     people: Person[]
+    allItemNames: string[]
     onSave: (updated: Option) => void
     onClose: () => void
 }) {
@@ -357,7 +359,18 @@ function OptionEditModal({ option, people, onSave, onClose }: {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         onKeyDown={e => { if (e.key === 'Enter') addItem() }}
                     />
-                    <p className="mt-1.5 text-xs text-gray-400">Press Enter to jump to adding items</p>
+                    {people.length > 1 && (
+                        <div className="flex items-center gap-3 flex-wrap mt-3">
+                            {people.map((person, i) => (
+                                <span key={person.id} className="flex items-center gap-1 text-xs text-gray-400">
+                                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${AVATAR_ON[i % AVATAR_ON.length]}`}>
+                                        {person.name.charAt(0).toUpperCase()}
+                                    </span>
+                                    {person.name}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div ref={itemsScrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
@@ -369,14 +382,15 @@ function OptionEditModal({ option, people, onSave, onClose }: {
                     <div className="space-y-2">
                         {items.map((item, itemIdx) => (
                             <div key={itemIdx} className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    value={item.text}
-                                    onChange={e => updateItemText(itemIdx, e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') addItem() }}
-                                    placeholder="Item name"
-                                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-400 hover:border-gray-300"
-                                />
+                                <div className="flex-1 min-w-0">
+                                    <CustomCreatableSelect
+                                        value={item.text}
+                                        onChange={val => updateItemText(itemIdx, val)}
+                                        options={allItemNames}
+                                        placeholder="Item name"
+                                        menuPortalTarget={document.body}
+                                    />
+                                </div>
                                 {people.length > 1 && (
                                     <div className="flex gap-0.5 shrink-0">
                                         {people.map((person, personIdx) => {
@@ -590,6 +604,15 @@ export function ReadonlyQuestionsPage() {
         await saveData({ ...data, questions: newQuestions })
     }, [data, saveData])
 
+    const allItemNames = useMemo(() => {
+        if (!data) return []
+        const names = [
+            ...(data.alwaysNeededItems ?? []).map(i => i.text),
+            ...data.questions.flatMap(q => q.options.flatMap(o => o.items.map(i => i.text))),
+        ].filter(Boolean)
+        return [...new Set(names)]
+    }, [data])
+
     if (error) return <div className="p-8 text-red-600">Error: {error}</div>
     if (!data) return <div className="p-8 text-gray-500">Loading…</div>
 
@@ -637,6 +660,7 @@ export function ReadonlyQuestionsPage() {
                 <OptionEditModal
                     option={optionModal.option}
                     people={people}
+                    allItemNames={allItemNames}
                     onSave={handleOptionModalSave}
                     onClose={() => setOptionModal(null)}
                 />

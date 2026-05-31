@@ -12,6 +12,7 @@ interface CreatableSelectProps {
     onChange: (value: string) => void;
     options: string[];
     placeholder?: string;
+    menuPortalTarget?: HTMLElement | null;
 }
 
 const selectStyles = {
@@ -37,7 +38,7 @@ const selectStyles = {
 };
 
 // The full react-select — only mounts when the user actually interacts with this item.
-export function ActiveSelect({ value, onChange, options, placeholder }: CreatableSelectProps) {
+export function ActiveSelect({ value, onChange, options, placeholder, menuPortalTarget }: CreatableSelectProps) {
     const [inputValue, setInputValue] = useState('');
     const [menuIsOpen, setMenuIsOpen] = useState(false);
 
@@ -73,14 +74,19 @@ export function ActiveSelect({ value, onChange, options, placeholder }: Creatabl
             onKeyDown={(e) => {
                 if (e.key === 'Enter' && !menuIsOpen) setMenuIsOpen(true);
             }}
-            styles={selectStyles}
+            menuPortalTarget={menuPortalTarget}
+            menuPosition={menuPortalTarget ? 'fixed' : undefined}
+            styles={{
+                ...selectStyles,
+                menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+            }}
         />
     );
 }
 
 // Lightweight placeholder rendered for every item on section expand.
 // Activates the full react-select only when the user clicks or focuses this item.
-export function CustomCreatableSelect({ value, onChange, options, placeholder = 'Enter item' }: CreatableSelectProps) {
+export function CustomCreatableSelect({ value, onChange, options, placeholder = 'Enter item', menuPortalTarget }: CreatableSelectProps) {
     const [isActive, setIsActive] = useState(false);
 
     if (!isActive) {
@@ -113,5 +119,5 @@ export function CustomCreatableSelect({ value, onChange, options, placeholder = 
         );
     }
 
-    return <ActiveSelect value={value} onChange={onChange} options={options} placeholder={placeholder} />;
+    return <ActiveSelect value={value} onChange={onChange} options={options} placeholder={placeholder} menuPortalTarget={menuPortalTarget} />;
 }
