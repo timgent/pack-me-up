@@ -306,9 +306,11 @@ export function ReadonlyQuestionsPage() {
     }, [db])
 
     const saveData = useCallback(async (updated: PackingListQuestionSet) => {
+        setData(updated)
         const saved = await saveWithSyncPrevention(updated, saveToPod)
         if (saved) setData(saved)
-    }, [saveWithSyncPrevention, saveToPod])
+        else setData(data)
+    }, [data, saveWithSyncPrevention, saveToPod])
 
     const handleModalSave = useCallback(async (text: string, type: QuestionType) => {
         if (!data || modal === null) return
@@ -322,8 +324,8 @@ export function ReadonlyQuestionsPage() {
             const maxOrder = questions.reduce((max, q) => Math.max(max, q.order), -1)
             newQuestions = [...questions, { ...newDraftQuestion(maxOrder + 1), text, questionType: type }]
         }
-        await saveData({ ...data, questions: newQuestions })
         setModal(null)
+        await saveData({ ...data, questions: newQuestions })
     }, [data, modal, saveData])
 
     const handleDelete = useCallback(async (id: string) => {
