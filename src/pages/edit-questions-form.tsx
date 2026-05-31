@@ -437,7 +437,7 @@ export function EditQuestionsForm() {
           {foreignPodCtx ? 'Questions & Items' : 'My Questions & Items'}
         </h1>
         <p className="mt-2 text-gray-600">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
-        <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions. · <Link to="/view-questions" className="text-primary-600 hover:underline">Read-only view (perf test)</Link></p>
+        <p className="mt-1 text-sm text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions. · <Link to="/view-questions" className="text-primary-600 hover:underline">View questions</Link></p>
         {/* Mobile-only status line */}
         <div className="lg:hidden mt-2 flex items-center gap-3 text-xs text-gray-400">
           {autoSaveStatus === 'saving' && (
