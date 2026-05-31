@@ -8,6 +8,7 @@ import { usePodSync } from '../hooks/usePodSync'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 import { useSolidPod } from '../components/SolidPodContext'
+import { useForeignPod } from '../components/ForeignPodContext'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 
 // One distinct colour per person slot (by index). Tailwind classes must be literal strings.
@@ -90,8 +91,8 @@ function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
     option: Option
     optionIndex: number
     people: Person[]
-    onEdit: () => void
-    onDelete: () => void
+    onEdit?: () => void
+    onDelete?: () => void
 }) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
@@ -120,7 +121,7 @@ function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
                             <span className="text-xs text-gray-500">Delete?</span>
                             <button
                                 type="button"
-                                onClick={() => { onDelete(); setConfirmDelete(false) }}
+                                onClick={() => { onDelete?.(); setConfirmDelete(false) }}
                                 className="px-2 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                             >
                                 Yes
@@ -171,11 +172,11 @@ function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
 function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMoveUp, onMoveDown }: {
     question: Question
     people: Person[]
-    onEdit: () => void
-    onDelete: () => void
-    onAddOption: () => void
-    onEditOption: (option: Option) => void
-    onDeleteOption: (optionId: string) => void
+    onEdit?: () => void
+    onDelete?: () => void
+    onAddOption?: () => void
+    onEditOption?: (option: Option) => void
+    onDeleteOption?: (optionId: string) => void
     onMoveUp?: () => void
     onMoveDown?: () => void
 }) {
@@ -200,13 +201,14 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                     </span>
                     <span className="text-xs text-gray-400 flex-shrink-0 mr-2">{question.options.length} options</span>
                 </button>
+                {(onEdit || onDelete || onMoveUp !== undefined || onMoveDown !== undefined) && (
                 <div className="flex items-center gap-0.5 pr-3 flex-shrink-0">
                     {confirmDelete ? (
                         <div className="flex items-center gap-1.5">
                             <span className="text-xs text-gray-500">Delete?</span>
                             <button
                                 type="button"
-                                onClick={() => { onDelete(); setConfirmDelete(false) }}
+                                onClick={() => { onDelete?.(); setConfirmDelete(false) }}
                                 className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                             >
                                 Yes
@@ -243,7 +245,7 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
-                            <button
+                            {onEdit && <button
                                 type="button"
                                 onClick={onEdit}
                                 className="p-1.5 text-gray-300 hover:text-gray-600 rounded"
@@ -252,8 +254,8 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
-                            </button>
-                            <button
+                            </button>}
+                            {onDelete && <button
                                 type="button"
                                 onClick={() => setConfirmDelete(true)}
                                 className="p-1.5 text-gray-300 hover:text-red-400 rounded"
@@ -262,10 +264,10 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                            </button>
+                            </button>}
                         </>
                     )}
-                </div>
+                </div>)}
             </div>
             <div className={isExpanded ? 'px-4 sm:px-6 pb-4 sm:pb-6 space-y-2' : 'hidden'}>
                 {question.options.map((option, oi) => (
@@ -274,23 +276,25 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                         option={option}
                         optionIndex={oi}
                         people={people}
-                        onEdit={() => onEditOption(option)}
-                        onDelete={() => onDeleteOption(option.id)}
+                        onEdit={onEditOption ? () => onEditOption(option) : undefined}
+                        onDelete={onDeleteOption ? () => onDeleteOption(option.id) : undefined}
                     />
                 ))}
-                <button
-                    type="button"
-                    onClick={onAddOption}
-                    className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                >
-                    + Add Option
-                </button>
+                {onAddOption && (
+                    <button
+                        type="button"
+                        onClick={onAddOption}
+                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                    >
+                        + Add Option
+                    </button>
+                )}
             </div>
         </div>
     )
 }
 
-function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Person[]; onEdit: () => void }) {
+function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Person[]; onEdit?: () => void }) {
     const [isExpanded, setIsExpanded] = useState(false)
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -310,7 +314,7 @@ function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Per
                         Always Needed Items <span className="text-sm font-normal text-gray-500">({items.length} items)</span>
                     </span>
                 </button>
-                <button
+                {onEdit && <button
                     type="button"
                     onClick={onEdit}
                     className="p-1.5 text-gray-300 hover:text-gray-600 rounded flex-shrink-0"
@@ -319,7 +323,7 @@ function ROAlwaysSection({ items, people, onEdit }: { items: Item[]; people: Per
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
-                </button>
+                </button>}
             </div>
             <div className={`mt-3 space-y-1${isExpanded ? '' : ' hidden'}`}>
                 {items.map((item, i) => (
@@ -719,6 +723,10 @@ function QuestionModal({ question, onSave, onClose }: {
 export function ReadonlyQuestionsPage() {
     const { db, loginSyncInProgress } = useDatabase()
     const { isLoggedIn } = useSolidPod()
+    const foreignPodCtx = useForeignPod()
+    const foreignPodUrl = foreignPodCtx?.foreignPodUrl
+    const isForeign = !!foreignPodUrl
+
     const [data, setData] = useState<PackingListQuestionSet | null>(null)
     const [rev, setRev] = useState<string | undefined>(undefined)
     const [error, setError] = useState<string | null>(null)
@@ -738,15 +746,16 @@ export function ReadonlyQuestionsPage() {
     })
 
     const { saveToPod } = usePodSync<PackingListQuestionSet>({
-        pathConfig: { container: POD_CONTAINERS.ROOT, filename: 'packing-list-questions.ttl' },
+        pathConfig: { container: POD_CONTAINERS.ROOT, filename: 'packing-list-questions.ttl', podUrl: foreignPodUrl },
         rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
         pollInterval: 5000,
-        enabled: isLoggedIn,
+        enabled: isLoggedIn || isForeign,
         onSyncSuccess: handleSyncSuccess,
         onSyncError: handleSyncError,
     })
 
     useEffect(() => {
+        if (isForeign) return  // foreign pod: data arrives via pod polling, no local load
         if (loginSyncInProgress) return
         const load = async () => {
             try {
@@ -765,7 +774,7 @@ export function ReadonlyQuestionsPage() {
         }
         load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loginSyncInProgress])
+    }, [loginSyncInProgress, isForeign])
 
     const saveData = useCallback(async (updated: PackingListQuestionSet) => {
         setData(updated)
@@ -874,33 +883,37 @@ export function ReadonlyQuestionsPage() {
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="w-full max-w-3xl space-y-4">
                 <div className="mb-2">
-                    <h1 className="text-2xl font-bold text-gray-900">My Questions & Items</h1>
-                    <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
-                    <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">{isForeign ? 'Questions & Items' : 'My Questions & Items'}</h1>
+                    {!isForeign && <>
+                        <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
+                        <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>
+                    </>}
                 </div>
-                <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
-                <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
+                <PersonLegend people={people} onEdit={isForeign ? undefined : () => setPeopleModal(true)} />
+                <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={isForeign ? undefined : () => setAlwaysModal(true)} />
                 {data.questions.map((q, qi) => (
                     <ROQuestionSection
                         key={q.id}
                         question={q}
                         people={people}
-                        onEdit={() => setQuestionModal({ question: q })}
-                        onDelete={() => handleDeleteQuestion(q.id)}
-                        onAddOption={() => setOptionModal({ questionId: q.id, option: null })}
-                        onEditOption={(option) => setOptionModal({ questionId: q.id, option })}
-                        onDeleteOption={(optionId) => handleDeleteOption(q.id, optionId)}
-                        onMoveUp={qi > 0 ? () => handleMoveQuestion(q.id, 'up') : undefined}
-                        onMoveDown={qi < data.questions.length - 1 ? () => handleMoveQuestion(q.id, 'down') : undefined}
+                        onEdit={isForeign ? undefined : () => setQuestionModal({ question: q })}
+                        onDelete={isForeign ? undefined : () => handleDeleteQuestion(q.id)}
+                        onAddOption={isForeign ? undefined : () => setOptionModal({ questionId: q.id, option: null })}
+                        onEditOption={isForeign ? undefined : (option) => setOptionModal({ questionId: q.id, option })}
+                        onDeleteOption={isForeign ? undefined : (optionId) => handleDeleteOption(q.id, optionId)}
+                        onMoveUp={isForeign || qi === 0 ? undefined : () => handleMoveQuestion(q.id, 'up')}
+                        onMoveDown={isForeign || qi === data.questions.length - 1 ? undefined : () => handleMoveQuestion(q.id, 'down')}
                     />
                 ))}
-                <button
-                    type="button"
-                    onClick={() => setQuestionModal({ question: null })}
-                    className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                >
-                    + Add Question
-                </button>
+                {!isForeign && (
+                    <button
+                        type="button"
+                        onClick={() => setQuestionModal({ question: null })}
+                        className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                    >
+                        + Add Question
+                    </button>
+                )}
             </div>
             {questionModal !== null && (
                 <QuestionModal
