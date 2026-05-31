@@ -31,10 +31,13 @@ function PersonDot({ person, index, selected }: { person: Person; index: number;
     )
 }
 
-function PersonLegend({ people }: { people: Person[] }) {
-    if (people.length < 2) return null
+function PersonLegend({ people, onEdit }: { people: Person[]; onEdit?: () => void }) {
+    if (people.length < 2 && !onEdit) return null
     return (
         <div className="flex items-center gap-2 flex-wrap mb-4">
+            {people.length === 0 && onEdit && (
+                <span className="text-xs text-gray-400">No people added</span>
+            )}
             {people.map((person, i) => (
                 <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500">
                     <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${AVATAR_ON[i % AVATAR_ON.length]}`}>
@@ -43,6 +46,18 @@ function PersonLegend({ people }: { people: Person[] }) {
                     {person.name}
                 </span>
             ))}
+            {onEdit && (
+                <button
+                    type="button"
+                    onClick={onEdit}
+                    className="p-1 text-gray-300 hover:text-gray-600 rounded"
+                    title="Edit people"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </button>
+            )}
         </div>
     )
 }
@@ -450,6 +465,95 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     )
 }
 
+function PeopleModal({ people, onSave, onClose }: {
+    people: Person[]
+    onSave: (newPeople: Person[]) => void
+    onClose: () => void
+}) {
+    const [localPeople, setLocalPeople] = useState<Person[]>(
+        people.length > 0 ? people : [{ id: crypto.randomUUID(), name: '' }]
+    )
+
+    const addPerson = () => setLocalPeople(prev => [...prev, { id: crypto.randomUUID(), name: '' }])
+    const removePerson = (idx: number) => {
+        if (localPeople.length <= 1) return
+        setLocalPeople(prev => prev.filter((_, i) => i !== idx))
+    }
+    const updateName = (idx: number, name: string) =>
+        setLocalPeople(prev => prev.map((p, i) => i === idx ? { ...p, name } : p))
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+            onClick={onClose}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+        >
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                <div className="p-5">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit People</h2>
+                    <div className="space-y-2 mb-3">
+                        {localPeople.map((person, i) => (
+                            <div key={person.id} className="flex items-center gap-2">
+                                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${AVATAR_ON[i % AVATAR_ON.length]}`}>
+                                    {person.name.charAt(0).toUpperCase() || '?'}
+                                </span>
+                                <input
+                                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                                    autoFocus={i === 0}
+                                    type="text"
+                                    value={person.name}
+                                    onChange={e => updateName(i, e.target.value)}
+                                    placeholder={`Person ${i + 1}`}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    onKeyDown={e => { if (e.key === 'Enter') addPerson() }}
+                                />
+                                {localPeople.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => removePerson(i)}
+                                        className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0"
+                                        title="Remove person"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={addPerson}
+                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors mb-4"
+                    >
+                        + Add Person
+                    </button>
+                    <div className="flex gap-2 justify-end">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+                            Cancel
+                        </button>
+                        <button type="button" onClick={() => onSave(localPeople)} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function reconcileItems(items: Item[], oldPeople: Person[], newPeople: Person[]): Item[] {
+    return items.map(item => ({
+        ...item,
+        personSelections: newPeople.map(person => {
+            const oldIdx = oldPeople.findIndex(p => p.id === person.id)
+            const selected = oldIdx >= 0
+                ? (item.personSelections?.[oldIdx]?.selected ?? true)
+                : true
+            return { personId: person.id, selected }
+        }),
+    }))
+}
+
 function QuestionModal({ question, onSave, onClose }: {
     question: Question | null
     onSave: (text: string, type: QuestionType) => void
@@ -524,6 +628,7 @@ export function ReadonlyQuestionsPage() {
     const [error, setError] = useState<string | null>(null)
     const [questionModal, setQuestionModal] = useState<{ question: Question | null } | null>(null)
     const [optionModal, setOptionModal] = useState<{ questionId: string; option: Option | null } | null>(null)
+    const [peopleModal, setPeopleModal] = useState(false)
 
     const { saveWithSyncPrevention } = useSyncCoordinator<PackingListQuestionSet>({
         currentData: data,
@@ -596,6 +701,23 @@ export function ReadonlyQuestionsPage() {
         await saveData({ ...data, questions: newQuestions })
     }, [data, optionModal, saveData])
 
+    const handlePeopleSave = useCallback(async (newPeople: Person[]) => {
+        if (!data) return
+        const oldPeople = data.people ?? []
+        const reconcile = (items: Item[]) => reconcileItems(items, oldPeople, newPeople)
+        const newData: PackingListQuestionSet = {
+            ...data,
+            people: newPeople,
+            alwaysNeededItems: reconcile(data.alwaysNeededItems ?? []),
+            questions: data.questions.map(q => ({
+                ...q,
+                options: q.options.map(o => ({ ...o, items: reconcile(o.items) }))
+            }))
+        }
+        setPeopleModal(false)
+        await saveData(newData)
+    }, [data, saveData])
+
     const handleDeleteOption = useCallback(async (questionId: string, optionId: string) => {
         if (!data) return
         const newQuestions = data.questions.map(q =>
@@ -627,7 +749,7 @@ export function ReadonlyQuestionsPage() {
                         Edit questions
                     </Link>
                 </div>
-                <PersonLegend people={people} />
+                <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
                 <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} />
                 {data.questions.map((q) => (
                     <ROQuestionSection
@@ -663,6 +785,13 @@ export function ReadonlyQuestionsPage() {
                     allItemNames={allItemNames}
                     onSave={handleOptionModalSave}
                     onClose={() => setOptionModal(null)}
+                />
+            )}
+            {peopleModal && (
+                <PeopleModal
+                    people={people}
+                    onSave={handlePeopleSave}
+                    onClose={() => setPeopleModal(false)}
                 />
             )}
         </div>
