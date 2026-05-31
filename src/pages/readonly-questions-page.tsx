@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDatabase } from '../components/DatabaseContext'
-import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion, newOption } from '../edit-questions/types'
+import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion } from '../edit-questions/types'
 import { Link } from 'react-router-dom'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { usePodSync } from '../hooks/usePodSync'
@@ -277,47 +277,159 @@ function ROAlwaysSection({ items, people }: { items: Item[]; people: Person[] })
     )
 }
 
-function TextModal({ title, initialText, placeholder, saveLabel, onSave, onClose }: {
-    title: string
-    initialText: string
-    placeholder: string
-    saveLabel: string
-    onSave: (text: string) => void
+function OptionEditModal({ option, people, onSave, onClose }: {
+    option: Option | null
+    people: Person[]
+    onSave: (updated: Option) => void
     onClose: () => void
 }) {
-    const [text, setText] = useState(initialText)
+    const [text, setText] = useState(option?.text ?? '')
+    const [items, setItems] = useState<Item[]>(option?.items ?? [])
+    const itemsScrollRef = useRef<HTMLDivElement>(null)
+    const prevItemCountRef = useRef(items.length)
+
+    useEffect(() => {
+        if (items.length > prevItemCountRef.current) {
+            requestAnimationFrame(() => {
+                itemsScrollRef.current?.scrollTo({ top: itemsScrollRef.current.scrollHeight, behavior: 'smooth' })
+            })
+        }
+        prevItemCountRef.current = items.length
+    }, [items.length])
+
+    const updateItemText = (idx: number, newText: string) => {
+        setItems(prev => prev.map((item, i) => i === idx ? { ...item, text: newText } : item))
+    }
+
+    const togglePerson = (itemIdx: number, personIdx: number) => {
+        setItems(prev => prev.map((item, i) => {
+            if (i !== itemIdx) return item
+            const selections = people.map((p, pi) => ({
+                personId: p.id,
+                selected: item.personSelections?.[pi]?.selected ?? false,
+            }))
+            selections[personIdx] = { ...selections[personIdx], selected: !selections[personIdx].selected }
+            return { ...item, personSelections: selections }
+        }))
+    }
+
+    const removeItem = (idx: number) => {
+        setItems(prev => prev.filter((_, i) => i !== idx))
+    }
+
+    const addItem = () => {
+        setItems(prev => [...prev, {
+            text: '',
+            personSelections: people.map(p => ({ personId: p.id, selected: true })),
+        }])
+    }
+
+    const handleSave = () => {
+        onSave({
+            id: option?.id ?? crypto.randomUUID(),
+            order: option?.order ?? 0,
+            text: text.trim(),
+            items,
+        })
+    }
+
     return (
         <div
             className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
             onClick={onClose}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
+            <div
+                className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="p-5 border-b border-gray-100 flex-shrink-0">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                        {option ? 'Edit Option' : 'Add Option'}
+                    </h2>
                     <input
                         // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
                         type="text"
                         value={text}
                         onChange={e => setText(e.target.value)}
-                        placeholder={placeholder}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
-                        onKeyDown={e => { if (e.key === 'Enter' && text.trim()) onSave(text.trim()) }}
+                        placeholder="Option text (e.g. Yes)"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        onKeyDown={e => { if (e.key === 'Enter') addItem() }}
                     />
-                    <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onSave(text.trim())}
-                            disabled={!text.trim()}
-                            className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {saveLabel}
-                        </button>
+                    <p className="mt-1.5 text-xs text-gray-400">Press Enter to jump to adding items</p>
+                </div>
+
+                <div ref={itemsScrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
+                    {items.length > 0 && (
+                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                            Items
+                        </div>
+                    )}
+                    <div className="space-y-2">
+                        {items.map((item, itemIdx) => (
+                            <div key={itemIdx} className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={item.text}
+                                    onChange={e => updateItemText(itemIdx, e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') addItem() }}
+                                    placeholder="Item name"
+                                    className="flex-1 min-w-0 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary-400 hover:border-gray-300"
+                                />
+                                {people.length > 1 && (
+                                    <div className="flex gap-0.5 shrink-0">
+                                        {people.map((person, personIdx) => {
+                                            const selected = item.personSelections?.[personIdx]?.selected ?? false
+                                            return (
+                                                <button
+                                                    key={person.id}
+                                                    type="button"
+                                                    onClick={() => togglePerson(itemIdx, personIdx)}
+                                                    title={person.name}
+                                                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
+                                                >
+                                                    {person.name.charAt(0).toUpperCase()}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => removeItem(itemIdx)}
+                                    className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
+                                    title="Remove item"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        ))}
                     </div>
+                    <button
+                        type="button"
+                        onClick={addItem}
+                        className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                    >
+                        + Add Item
+                    </button>
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                    >
+                        {option ? 'Save changes' : 'Add option'}
+                    </button>
                 </div>
             </div>
         </div>
@@ -451,18 +563,18 @@ export function ReadonlyQuestionsPage() {
         await saveData({ ...data, questions: data.questions.filter(q => q.id !== id) })
     }, [data, saveData])
 
-    const handleOptionModalSave = useCallback(async (text: string) => {
+    const handleOptionModalSave = useCallback(async (updatedOption: Option) => {
         if (!data || optionModal === null) return
         const newQuestions = data.questions.map(q => {
             if (q.id !== optionModal.questionId) return q
             let newOptions: Option[]
             if (optionModal.option) {
                 newOptions = q.options.map(o =>
-                    o.id === optionModal.option!.id ? { ...o, text } : o
+                    o.id === optionModal.option!.id ? updatedOption : o
                 )
             } else {
                 const maxOrder = q.options.reduce((max, o) => Math.max(max, o.order), -1)
-                newOptions = [...q.options, { ...newOption(maxOrder + 1), text }]
+                newOptions = [...q.options, { ...updatedOption, order: maxOrder + 1 }]
             }
             return { ...q, options: newOptions }
         })
@@ -522,11 +634,9 @@ export function ReadonlyQuestionsPage() {
                 />
             )}
             {optionModal !== null && (
-                <TextModal
-                    title={optionModal.option ? 'Edit Option' : 'Add Option'}
-                    initialText={optionModal.option?.text ?? ''}
-                    placeholder="e.g. Yes"
-                    saveLabel={optionModal.option ? 'Save changes' : 'Add option'}
+                <OptionEditModal
+                    option={optionModal.option}
+                    people={people}
                     onSave={handleOptionModalSave}
                     onClose={() => setOptionModal(null)}
                 />
