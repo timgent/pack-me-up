@@ -33,7 +33,7 @@ function PersonDot({ person, index, selected }: { person: Person; index: number;
 function PersonLegend({ people }: { people: Person[] }) {
     if (people.length < 2) return null
     return (
-        <div className="flex items-center gap-2 flex-wrap mb-2 ml-7">
+        <div className="flex items-center gap-2 flex-wrap mb-4">
             {people.map((person, i) => (
                 <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500">
                     <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${AVATAR_ON[i % AVATAR_ON.length]}`}>
@@ -50,6 +50,9 @@ function ROItem({ item, people }: { item: Item; people: Person[] }) {
     const showDots = people.length > 1
     return (
         <div className="flex items-center gap-2 py-0.5 px-2 text-sm">
+            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                {item.text || 'no text'}
+            </span>
             {showDots && (
                 <div className="flex gap-0.5 shrink-0">
                     {people.map((person, i) => (
@@ -62,9 +65,6 @@ function ROItem({ item, people }: { item: Item; people: Person[] }) {
                     ))}
                 </div>
             )}
-            <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
-                {item.text || 'no text'}
-            </span>
         </div>
     )
 }
@@ -89,13 +89,10 @@ function ROOptionSection({ option, optionIndex, people }: { option: Option; opti
                 </span>
                 <span className="text-xs text-gray-400 flex-shrink-0">{option.items.length} items</span>
             </button>
-            <div className={isExpanded ? '' : 'hidden'}>
-                <PersonLegend people={people} />
-                <div className="space-y-0.5">
-                    {option.items.map((item, i) => (
-                        <ROItem key={i} item={item} people={people} />
-                    ))}
-                </div>
+            <div className={`space-y-0.5${isExpanded ? '' : ' hidden'}`}>
+                {option.items.map((item, i) => (
+                    <ROItem key={i} item={item} people={people} />
+                ))}
             </div>
         </div>
     )
@@ -342,12 +339,13 @@ export function ReadonlyQuestionsPage() {
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="w-full max-w-3xl space-y-4">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-2">
                     <h1 className="text-2xl font-bold text-gray-900">My Questions</h1>
                     <Link to="/manage-questions" className="text-sm text-primary-600 hover:underline">
                         Edit questions
                     </Link>
                 </div>
+                <PersonLegend people={people} />
                 <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} />
                 {data.questions.map((q) => (
                     <ROQuestionSection
