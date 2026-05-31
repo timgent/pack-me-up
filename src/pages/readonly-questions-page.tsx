@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useDatabase } from '../components/DatabaseContext'
+import { DatabaseMigration } from '../services/migration'
 import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion } from '../edit-questions/types'
 import { Link } from 'react-router-dom'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
@@ -167,7 +168,7 @@ function ROOptionSection({ option, optionIndex, people, onEdit, onDelete }: {
     )
 }
 
-function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption }: {
+function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMoveUp, onMoveDown }: {
     question: Question
     people: Person[]
     onEdit: () => void
@@ -175,6 +176,8 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
     onAddOption: () => void
     onEditOption: (option: Option) => void
     onDeleteOption: (optionId: string) => void
+    onMoveUp?: () => void
+    onMoveDown?: () => void
 }) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [confirmDelete, setConfirmDelete] = useState(false)
@@ -218,6 +221,28 @@ function ROQuestionSection({ question, people, onEdit, onDelete, onAddOption, on
                         </div>
                     ) : (
                         <>
+                            <button
+                                type="button"
+                                onClick={onMoveUp}
+                                disabled={!onMoveUp}
+                                className={`p-1.5 rounded ${onMoveUp ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                                title="Move up"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onMoveDown}
+                                disabled={!onMoveDown}
+                                className={`p-1.5 rounded ${onMoveDown ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                                title="Move down"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
                             <button
                                 type="button"
                                 onClick={onEdit}
@@ -692,7 +717,7 @@ function QuestionModal({ question, onSave, onClose }: {
 }
 
 export function ReadonlyQuestionsPage() {
-    const { db } = useDatabase()
+    const { db, loginSyncInProgress } = useDatabase()
     const { isLoggedIn } = useSolidPod()
     const [data, setData] = useState<PackingListQuestionSet | null>(null)
     const [rev, setRev] = useState<string | undefined>(undefined)
@@ -702,29 +727,45 @@ export function ReadonlyQuestionsPage() {
     const [peopleModal, setPeopleModal] = useState(false)
     const [alwaysModal, setAlwaysModal] = useState(false)
 
-    const { saveWithSyncPrevention } = useSyncCoordinator<PackingListQuestionSet>({
+    const { saveWithSyncPrevention, handleSyncSuccess, handleSyncError } = useSyncCoordinator<PackingListQuestionSet>({
         currentData: data,
         saveToLocalDb: async (d) => db.saveQuestionSet({ _id: '1', ...d, _rev: rev }),
         updateFormAndState: (d, newRev) => {
             setRev(newRev)
             setData({ ...d, _rev: newRev })
         },
+        conflictStrategy: 'fallback-to-pod',
     })
 
     const { saveToPod } = usePodSync<PackingListQuestionSet>({
         pathConfig: { container: POD_CONTAINERS.ROOT, filename: 'packing-list-questions.ttl' },
         rdf: { serialize: questionSetToDataset, deserialize: datasetToQuestionSet },
+        pollInterval: 5000,
         enabled: isLoggedIn,
+        onSyncSuccess: handleSyncSuccess,
+        onSyncError: handleSyncError,
     })
 
     useEffect(() => {
-        db.getQuestionSet()
-            .then(d => { setData(d); setRev(d._rev) })
-            .catch((err) => {
-                if (err?.name === 'not_found') setData({ _id: '1', questions: [], people: [], alwaysNeededItems: [] })
-                else setError(String(err))
-            })
-    }, [db])
+        if (loginSyncInProgress) return
+        const load = async () => {
+            try {
+                const migration = await DatabaseMigration.checkMigrationNeeded(db)
+                if (migration.needed) await DatabaseMigration.performMigration(db)
+                const d = await db.getQuestionSet()
+                setData(d)
+                setRev(d._rev)
+            } catch (err: unknown) {
+                if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'not_found') {
+                    setData({ _id: '1', questions: [], people: [], alwaysNeededItems: [] })
+                } else {
+                    setError(String(err))
+                }
+            }
+        }
+        load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loginSyncInProgress])
 
     const saveData = useCallback(async (updated: PackingListQuestionSet) => {
         setData(updated)
@@ -752,6 +793,17 @@ export function ReadonlyQuestionsPage() {
     const handleDeleteQuestion = useCallback(async (id: string) => {
         if (!data) return
         await saveData({ ...data, questions: data.questions.filter(q => q.id !== id) })
+    }, [data, saveData])
+
+    const handleMoveQuestion = useCallback(async (id: string, direction: 'up' | 'down') => {
+        if (!data) return
+        const idx = data.questions.findIndex(q => q.id === id)
+        if (idx < 0) return
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+        if (swapIdx < 0 || swapIdx >= data.questions.length) return
+        const newQuestions = [...data.questions]
+        ;[newQuestions[idx], newQuestions[swapIdx]] = [newQuestions[swapIdx], newQuestions[idx]]
+        await saveData({ ...data, questions: newQuestions })
     }, [data, saveData])
 
     const handleOptionModalSave = useCallback(async (updatedOption: Option) => {
@@ -829,7 +881,7 @@ export function ReadonlyQuestionsPage() {
                 </div>
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
                 <ROAlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
-                {data.questions.map((q) => (
+                {data.questions.map((q, qi) => (
                     <ROQuestionSection
                         key={q.id}
                         question={q}
@@ -839,6 +891,8 @@ export function ReadonlyQuestionsPage() {
                         onAddOption={() => setOptionModal({ questionId: q.id, option: null })}
                         onEditOption={(option) => setOptionModal({ questionId: q.id, option })}
                         onDeleteOption={(optionId) => handleDeleteOption(q.id, optionId)}
+                        onMoveUp={qi > 0 ? () => handleMoveQuestion(q.id, 'up') : undefined}
+                        onMoveDown={qi < data.questions.length - 1 ? () => handleMoveQuestion(q.id, 'down') : undefined}
                     />
                 ))}
                 <button
