@@ -5,6 +5,21 @@
 Use TDD (red-green-refactor) when implementing new features.
 Run tests: `npm test`
 
+### E2E pod isolation
+
+Each serial suite that writes to a Solid pod **must use its own dedicated pod user** — never share `testuser` (or any other pod) between suites that run concurrently. Add new user constants to `playwright.config.ts` and create the account in `e2e/global-setup.ts`.
+
+| Suite | Pod user |
+|-------|----------|
+| E, J, Z | `testuser` |
+| F | `fuser` |
+| G | `guser` |
+| H | `huser` |
+| K | `schemacompat` |
+| L (User A) | `luser` |
+| M (User A) | `muser` |
+| L/M (User B) | `collabuser` |
+
 ## Data Access
 
 Never call `db.*` (local PouchDB) and pod storage functions directly in the same place. Use the established intermediate layers:

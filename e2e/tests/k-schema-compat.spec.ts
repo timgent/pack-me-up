@@ -24,21 +24,17 @@ test.describe('K – JSON Schema Compatibility', () => {
   let ctx: import('@playwright/test').BrowserContext
 
   test.beforeAll(async ({ browser }) => {
-    // Migration from JSON→RDF involves ~10 pod requests; after 30+ preceding test
-    // logins CSS can be slow. Extend this hook's timeout to cover slow environments.
-    test.setTimeout(240_000)
+    // The schema-compat pod is pre-seeded with BOTH JSON fixtures and pre-migrated RDF
+    // (including the migration marker) in globalSetup. detectPodDataFormat finds the marker
+    // and returns 'rdf', so syncAllDataFromPod just reads the .ttl files — no migration needed.
+    // Login sync therefore completes in seconds even under 4-worker CSS load.
+    test.setTimeout(120_000)
     ctx = await browser.newContext()
     page = await ctx.newPage()
     await page.goto('/')
     await loginToCss(page, CSS_ISSUER, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD)
-    // Wait for the login sync to fully complete so local DB is populated before tests run.
-    // Waiting only for the loading indicator to hide is insufficient — if loginSyncInProgress
-    // becomes true after the first render, the indicator may never appear and the selector
-    // resolves immediately while syncAllDataFromPod is still in flight.  Waiting for the
-    // seeded list to appear guarantees syncAllDataFromPod has finished writing to local DB.
     await page.goto('/#/view-lists')
-    await page.waitForSelector('text=Loading packing lists...', { state: 'hidden', timeout: 180_000 })
-    await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 180_000 })
+    await expect(page.getByText('Schema Compat Test Trip')).toBeVisible({ timeout: 60_000 })
   })
 
   test.afterAll(async () => {

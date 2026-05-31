@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
-import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
+import { CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD } from '../../playwright.config'
 
 // All F tests share the same pod user and write to overlapping resources.
 // Serial mode gives each test exclusive pod access.
@@ -19,7 +19,7 @@ test.describe('F – Solid Pod Sync', () => {
     ctx = await browser.newContext()
     page = await ctx.newPage()
     await page.goto('/')
-    await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(page, CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD)
     await page.goto('/#/wizard')
     await fillPersonRequiredFields(page)
     await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
@@ -39,7 +39,7 @@ test.describe('F – Solid Pod Sync', () => {
     const freshCtx = await browser.newContext()
     const pg = await freshCtx.newPage()
     await pg.goto('/')
-    await loginToCss(pg, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
+    await loginToCss(pg, CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD)
     return { ctx: freshCtx, pg }
   }
 
@@ -159,10 +159,14 @@ test.describe('F – Solid Pod Sync', () => {
 
   test('F6: custom item added via suggestion card persists in question set after pod sync', async () => {
     await createList(`Suggestion Save Trip ${Date.now()}`)
+    // Confirm list content is loaded before interacting (waitForURL fires on URL match, not content render)
+    await expect(page.locator('input[type="checkbox"]').first()).toBeVisible({ timeout: 15_000 })
 
     const customItemName = 'super special sunscreen'
-    await page.getByPlaceholder('Add new item...').first().fill(customItemName)
-    await page.getByRole('button', { name: 'Add' }).first().click()
+    const addItemInput = page.getByPlaceholder('Add new item...').first()
+    await addItemInput.fill(customItemName)
+    // Use Enter to submit — avoids ambiguity with the "+ Add Guest" button which also matches 'Add'
+    await addItemInput.press('Enter')
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
 
@@ -171,18 +175,23 @@ test.describe('F – Solid Pod Sync', () => {
     await expect(page.getByText(/On past trips you added items/)).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /Review suggestions/i }).click()
     await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+    // Register listener before clicking Add so we don't miss the question-set PUT.
+    // Waiting for this confirms the pod has the new data before any sync-loop GET can
+    // race against it and overwrite the locally-saved custom item (the regression this tests).
+    const questionSetWrite = page.waitForResponse(
+      r => r.url().includes('/pack-me-up/packing-list-questions') && r.request().method() === 'PUT',
+      { timeout: 30_000 }
+    )
     await page.getByRole('button', { name: 'Add' }).first().click()
     await expect(page.getByText(/On past trips you added items/)).not.toBeVisible({ timeout: 10_000 })
+    await questionSetWrite
 
     await page.goto('/#/manage-questions')
     // Wait for the page to load
     await expect(page.getByRole('heading', { name: /My Questions & Items/i })).toBeVisible({ timeout: 10_000 })
     // Expand the Always Needed Items section to see its items
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
-    // Wait a full pod-poll cycle (5s) + buffer so the sync fires.
-    // Without the fix the pod would overwrite the local change and the item disappears.
-    await page.waitForTimeout(7_000)
-    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 3_000 })
+    await expect(page.getByText(customItemName)).toBeVisible({ timeout: 5_000 })
   })
 
   test('F4: item check state visible from second context after Pod sync', async ({ browser }) => {
