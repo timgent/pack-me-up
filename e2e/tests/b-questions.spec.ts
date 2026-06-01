@@ -110,12 +110,17 @@ test.describe('B – Editing Questions', () => {
     // The new item uses CustomCreatableSelect in inactive mode (.cursor-text).
     // Clicking it transitions to the full react-select (ActiveSelect with autoFocus).
     await page.locator('.cursor-text').last().click()
-    // Wait for the react-select to mount after lazy activation, then click it for reliable focus
-    const newItemSelect = page.locator('.react-select-container').last()
-    await expect(newItemSelect).toBeVisible({ timeout: 3_000 })
-    await newItemSelect.click()
+    // Wait for the actual input inside the react-select control, then focus it explicitly.
+    const reactSelectInput = page.locator('.react-select__control').last().locator('input')
+    await expect(reactSelectInput).toBeVisible({ timeout: 3_000 })
+    await reactSelectInput.click()
     await page.keyboard.type('Passport')
-    await page.keyboard.press('Enter')
+    // Click the first dropdown option containing 'Passport'. Handles both the case where
+    // 'Passport' is already a known suggestion (no Create option shown) and where it is new.
+    // Menu is portaled to document.body so page.locator searches the whole page.
+    const passportOption = page.locator('.react-select__option').filter({ hasText: /Passport/i }).first()
+    await expect(passportOption).toBeVisible({ timeout: 5_000 })
+    await passportOption.click()
     // Save changes
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
