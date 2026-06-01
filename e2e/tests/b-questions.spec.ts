@@ -116,19 +116,18 @@ test.describe('B – Editing Questions', () => {
     // Click the control — this is the canonical react-select interaction that reliably
     // opens the dropdown (fires onControlMouseDown → onMenuOpen → setMenuIsOpen(true)).
     await reactSelectControl.click()
-    await page.keyboard.type('Passport')
-    // Click the first dropdown option containing 'Passport'. Handles both the case where
-    // 'Passport' is already a known suggestion and where it is a new create-option.
-    // Menu is portaled to document.body so page.locator searches the whole page.
-    const passportOption = page.locator('.react-select__option').filter({ hasText: /Passport/i }).first()
-    await expect(passportOption).toBeVisible({ timeout: 5_000 })
-    await passportOption.click()
+    await page.keyboard.type('WaterBottleTest')
+    // Click the first dropdown option — should be 'Create "WaterBottleTest"' since this name
+    // is not in any wizard-generated suggestion. Menu is portaled to document.body.
+    const newItemOption = page.locator('.react-select__option').filter({ hasText: /WaterBottleTest/i }).first()
+    await expect(newItemOption).toBeVisible({ timeout: 5_000 })
+    await newItemOption.click()
     // Save changes
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
     // Expand the Always Needed Items section to verify the item appears
     await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
-    await expect(page.getByText('Passport')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('WaterBottleTest')).toBeVisible({ timeout: 5_000 })
   })
 
   test('B5: JSON editor mode toggle is not available (editor is always visual)', async ({ freshPage: page }) => {
