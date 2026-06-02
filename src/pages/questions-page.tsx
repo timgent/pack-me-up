@@ -447,7 +447,7 @@ function AlwaysSection({ items, people, onEdit }: { items: Item[]; people: Perso
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="p-2 text-gray-300 hover:text-gray-600 rounded flex-shrink-0"
+                    className="p-4 -m-2 text-gray-300 hover:text-gray-600 rounded flex-shrink-0"
                     title="Edit always needed items"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
