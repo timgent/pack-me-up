@@ -88,9 +88,8 @@ function ItemRow({ item, people }: { item: Item; people: Person[] }) {
     )
 }
 
-function OptionSection({ option, optionIndex, people, onEdit, onDelete }: {
+function OptionSection({ option, people, onEdit, onDelete }: {
     option: Option
-    optionIndex: number
     people: Person[]
     onEdit: () => void
     onDelete: () => void
@@ -112,7 +111,7 @@ function OptionSection({ option, optionIndex, people, onEdit, onDelete }: {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                     <span className="text-sm font-medium text-gray-800 flex-1 min-w-0">
-                        Option {optionIndex + 1}{option.text ? `: ${option.text}` : ''}
+                        {option.text || <em className="text-gray-400 font-normal">Untitled option</em>}
                     </span>
                     <span className="text-xs text-gray-400 flex-shrink-0 mr-1">{option.items.length} items</span>
                 </button>
@@ -363,11 +362,10 @@ function QuestionSection({ question, people, onEdit, onDelete, onAddOption, onEd
                 </div>
             </div>
             <div className={isExpanded ? 'px-4 sm:px-6 pb-4 sm:pb-6 space-y-2' : 'hidden'}>
-                {question.options.map((option, oi) => (
+                {question.options.map((option) => (
                     <OptionSection
                         key={option.id}
                         option={option}
-                        optionIndex={oi}
                         people={people}
                         onEdit={() => onEditOption(option)}
                         onDelete={() => onDeleteOption(option.id)}
