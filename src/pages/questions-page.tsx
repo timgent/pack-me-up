@@ -88,6 +88,46 @@ function ItemRow({ item, people }: { item: Item; people: Person[] }) {
     )
 }
 
+function OptionContextMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+    return (
+        <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+                <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-gray-700 rounded"
+                    title="More actions"
+                >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
+                    </svg>
+                </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                    align="end"
+                    sideOffset={4}
+                    className="w-32 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50"
+                >
+                    <DropdownMenu.Item
+                        onSelect={onEdit}
+                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none"
+                    >
+                        Edit
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                        onSelect={onDelete}
+                        className="px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 cursor-default outline-none"
+                    >
+                        Delete
+                    </DropdownMenu.Item>
+                </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+    )
+}
+
 function OptionSection({ option, people, onEdit, onDelete }: {
     option: Option
     people: Person[]
@@ -95,7 +135,7 @@ function OptionSection({ option, people, onEdit, onDelete }: {
     onDelete: () => void
 }) {
     const [isExpanded, setIsExpanded] = useState(false)
-    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
     return (
         <div className="bg-gray-50 rounded-lg p-3">
             <div className={`flex items-center${isExpanded ? ' mb-2' : ''}`}>
@@ -113,51 +153,39 @@ function OptionSection({ option, people, onEdit, onDelete }: {
                     <span className="text-sm font-medium text-gray-800 flex-1 min-w-0">
                         {option.text || <em className="text-gray-400 font-normal">Untitled option</em>}
                     </span>
-                    <span className="text-xs text-gray-400 flex-shrink-0 mr-1">{option.items.length} items</span>
+                    <span className="hidden sm:inline text-xs text-gray-400 flex-shrink-0 mr-1">{option.items.length} items</span>
                 </button>
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                    {confirmDelete ? (
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-gray-500">Delete?</span>
-                            <button
-                                type="button"
-                                onClick={() => { onDelete?.(); setConfirmDelete(false) }}
-                                className="px-2 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                            >
-                                Yes
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(false)}
-                                className="px-2 py-0.5 text-xs text-gray-500 rounded hover:bg-gray-100"
-                            >
-                                No
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            <button
-                                type="button"
-                                onClick={onEdit}
-                                className="p-1 text-gray-300 hover:text-gray-600 rounded"
-                                title="Edit option"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(true)}
-                                className="p-1 text-gray-300 hover:text-red-400 rounded"
-                                title="Delete option"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </>
-                    )}
+                <div className="flex items-center flex-shrink-0">
+                    {/* Mobile: context menu */}
+                    <div className="sm:hidden">
+                        <OptionContextMenu
+                            onEdit={onEdit}
+                            onDelete={() => setShowDeleteModal(true)}
+                        />
+                    </div>
+                    {/* Desktop: inline buttons */}
+                    <div className="hidden sm:flex items-center gap-0.5">
+                        <button
+                            type="button"
+                            onClick={onEdit}
+                            className="p-1 text-gray-300 hover:text-gray-600 rounded"
+                            title="Edit option"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowDeleteModal(true)}
+                            className="p-1 text-gray-300 hover:text-red-400 rounded"
+                            title="Delete option"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div className={`space-y-0.5${isExpanded ? '' : ' hidden'}`}>
@@ -165,6 +193,12 @@ function OptionSection({ option, people, onEdit, onDelete }: {
                     <ItemRow key={i} item={item} people={people} />
                 ))}
             </div>
+            {showDeleteModal && (
+                <DeleteConfirmModal
+                    onConfirm={() => { onDelete(); setShowDeleteModal(false) }}
+                    onCancel={() => setShowDeleteModal(false)}
+                />
+            )}
         </div>
     )
 }
