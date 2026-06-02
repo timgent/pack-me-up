@@ -521,18 +521,49 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
             )}
             <div className="space-y-2">
                 {items.map((item, itemIdx) => (
-                    <div key={itemIdx} className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                            <CustomCreatableSelect
-                                value={item.text}
-                                onChange={val => updateItemText(itemIdx, val)}
-                                options={allItemNames}
-                                placeholder="Item name"
-                                menuPortalTarget={document.body}
-                            />
+                    <div key={itemIdx} className="sm:flex sm:items-center sm:gap-2 rounded-lg border border-gray-200 sm:border-transparent p-2 sm:p-0">
+                        {/* Item name + desktop people + remove */}
+                        <div className="flex items-center gap-2 sm:flex-1 sm:min-w-0">
+                            <div className="flex-1 min-w-0">
+                                <CustomCreatableSelect
+                                    value={item.text}
+                                    onChange={val => updateItemText(itemIdx, val)}
+                                    options={allItemNames}
+                                    placeholder="Item name"
+                                    menuPortalTarget={document.body}
+                                />
+                            </div>
+                            {/* Desktop: inline avatars */}
+                            {people.length > 1 && (
+                                <div className="hidden sm:flex gap-0.5 shrink-0">
+                                    {people.map((person, personIdx) => {
+                                        const selected = item.personSelections?.[personIdx]?.selected ?? false
+                                        return (
+                                            <button
+                                                key={person.id}
+                                                type="button"
+                                                onClick={() => togglePerson(itemIdx, personIdx)}
+                                                title={person.name}
+                                                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
+                                            >
+                                                {person.name.charAt(0).toUpperCase()}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => removeItem(itemIdx)}
+                                className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
+                                title="Remove item"
+                            >
+                                ×
+                            </button>
                         </div>
+                        {/* Mobile: people on their own row as large labelled tiles */}
                         {people.length > 1 && (
-                            <div className="flex gap-0.5 shrink-0">
+                            <div className="mt-2 sm:hidden flex gap-2">
                                 {people.map((person, personIdx) => {
                                     const selected = item.personSelections?.[personIdx]?.selected ?? false
                                     return (
@@ -540,23 +571,19 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                             key={person.id}
                                             type="button"
                                             onClick={() => togglePerson(itemIdx, personIdx)}
-                                            title={person.name}
-                                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
+                                            className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${selected ? `${AVATAR_ON[personIdx % AVATAR_ON.length]} border-transparent` : `bg-white border-gray-200 text-gray-400`}`}
                                         >
-                                            {person.name.charAt(0).toUpperCase()}
+                                            <span className="text-lg font-bold leading-none">
+                                                {person.name.charAt(0).toUpperCase()}
+                                            </span>
+                                            <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
+                                                {person.name}
+                                            </span>
                                         </button>
                                     )
                                 })}
                             </div>
                         )}
-                        <button
-                            type="button"
-                            onClick={() => removeItem(itemIdx)}
-                            className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
-                            title="Remove item"
-                        >
-                            ×
-                        </button>
                     </div>
                 ))}
             </div>
