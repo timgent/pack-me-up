@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
 import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion } from '../edit-questions/types'
@@ -169,68 +170,41 @@ function OptionSection({ option, optionIndex, people, onEdit, onDelete }: {
     )
 }
 
-function QuestionContextMenuItem({ label, onClick, disabled, danger }: {
-    label: string
-    onClick: () => void
-    disabled?: boolean
-    danger?: boolean
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled}
-            className={`w-full text-left px-4 py-2.5 text-sm ${disabled ? 'text-gray-300 cursor-not-allowed' : danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'}`}
-        >
-            {label}
-        </button>
-    )
-}
-
 function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
     onMoveUp?: () => void
     onMoveDown?: () => void
     onEdit: () => void
     onDelete: () => void
 }) {
-    const [open, setOpen] = useState(false)
     const [confirmDelete, setConfirmDelete] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        if (!open) return
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                setOpen(false)
-                setConfirmDelete(false)
-            }
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [open])
 
     return (
-        <div ref={ref} className="relative">
-            <button
-                type="button"
-                onClick={() => setOpen(o => !o)}
-                className="p-2 text-gray-400 hover:text-gray-700 rounded"
-                title="More actions"
-            >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="5" r="1.5" />
-                    <circle cx="12" cy="12" r="1.5" />
-                    <circle cx="12" cy="19" r="1.5" />
-                </svg>
-            </button>
-            {open && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 z-20 py-1">
+        <DropdownMenu.Root onOpenChange={open => { if (!open) setConfirmDelete(false) }}>
+            <DropdownMenu.Trigger asChild>
+                <button
+                    type="button"
+                    className="p-2 text-gray-400 hover:text-gray-700 rounded"
+                    title="More actions"
+                >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
+                    </svg>
+                </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                    align="end"
+                    sideOffset={4}
+                    className="w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50"
+                >
                     {confirmDelete ? (
                         <div className="px-3 py-2 flex items-center gap-2">
                             <span className="text-xs text-gray-500 flex-1">Delete?</span>
                             <button
                                 type="button"
-                                onClick={() => { onDelete(); setOpen(false); setConfirmDelete(false) }}
+                                onClick={onDelete}
                                 className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                             >
                                 Yes
@@ -245,15 +219,37 @@ function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
                         </div>
                     ) : (
                         <>
-                            <QuestionContextMenuItem label="Edit" onClick={() => { onEdit(); setOpen(false) }} />
-                            <QuestionContextMenuItem label="Move Up" disabled={!onMoveUp} onClick={() => { onMoveUp?.(); setOpen(false) }} />
-                            <QuestionContextMenuItem label="Move Down" disabled={!onMoveDown} onClick={() => { onMoveDown?.(); setOpen(false) }} />
-                            <QuestionContextMenuItem label="Delete" danger onClick={() => setConfirmDelete(true)} />
+                            <DropdownMenu.Item
+                                onSelect={onEdit}
+                                className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none"
+                            >
+                                Edit
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                                onSelect={onMoveUp}
+                                disabled={!onMoveUp}
+                                className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
+                            >
+                                Move Up
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                                onSelect={onMoveDown}
+                                disabled={!onMoveDown}
+                                className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
+                            >
+                                Move Down
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                                onSelect={e => { e.preventDefault(); setConfirmDelete(true) }}
+                                className="px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 cursor-default outline-none"
+                            >
+                                Delete
+                            </DropdownMenu.Item>
                         </>
                     )}
-                </div>
-            )}
-        </div>
+                </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+        </DropdownMenu.Root>
     )
 }
 

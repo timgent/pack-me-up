@@ -23,6 +23,7 @@
     "@inrupt/solid-client": "^2.1.2",
     "@inrupt/vocab-common-rdf": "^1.0.5",
     "@inrupt/vocab-solid": "^1.0.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@tailwindcss/vite": "^4.1.4",
     "@types/pouchdb": "^6.4.2",
     "@types/react-select": "^5.0.1",
