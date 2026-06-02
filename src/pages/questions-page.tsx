@@ -441,7 +441,7 @@ function AlwaysSection({ items, people, onEdit }: { items: Item[]; people: Perso
                     </svg>
                     <span className="flex flex-col min-w-0">
                         <span className="font-medium text-gray-900">Always Needed Items</span>
-                        <span className="text-sm font-normal text-gray-500">{items.length} items</span>
+                        <span className="hidden sm:inline text-sm font-normal text-gray-500">{items.length} items</span>
                     </span>
                 </button>
                 <button
