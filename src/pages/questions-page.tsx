@@ -169,6 +169,94 @@ function OptionSection({ option, optionIndex, people, onEdit, onDelete }: {
     )
 }
 
+function QuestionContextMenuItem({ label, onClick, disabled, danger }: {
+    label: string
+    onClick: () => void
+    disabled?: boolean
+    danger?: boolean
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={`w-full text-left px-4 py-2.5 text-sm ${disabled ? 'text-gray-300 cursor-not-allowed' : danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'}`}
+        >
+            {label}
+        </button>
+    )
+}
+
+function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
+    onMoveUp?: () => void
+    onMoveDown?: () => void
+    onEdit: () => void
+    onDelete: () => void
+}) {
+    const [open, setOpen] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (!open) return
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false)
+                setConfirmDelete(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [open])
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded"
+                title="More actions"
+            >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="5" r="1.5" />
+                    <circle cx="12" cy="12" r="1.5" />
+                    <circle cx="12" cy="19" r="1.5" />
+                </svg>
+            </button>
+            {open && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 z-20 py-1">
+                    {confirmDelete ? (
+                        <div className="px-3 py-2 flex items-center gap-2">
+                            <span className="text-xs text-gray-500 flex-1">Delete?</span>
+                            <button
+                                type="button"
+                                onClick={() => { onDelete(); setOpen(false); setConfirmDelete(false) }}
+                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                            >
+                                Yes
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(false)}
+                                className="px-2 py-1 text-xs text-gray-500 rounded hover:bg-gray-100"
+                            >
+                                No
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <QuestionContextMenuItem label="Move Up" disabled={!onMoveUp} onClick={() => { onMoveUp?.(); setOpen(false) }} />
+                            <QuestionContextMenuItem label="Move Down" disabled={!onMoveDown} onClick={() => { onMoveDown?.(); setOpen(false) }} />
+                            <QuestionContextMenuItem label="Edit" onClick={() => { onEdit(); setOpen(false) }} />
+                            <QuestionContextMenuItem label="Delete" danger onClick={() => setConfirmDelete(true)} />
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
 function QuestionSection({ question, people, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMoveUp, onMoveDown }: {
     question: Question
     people: Person[]
@@ -199,73 +287,85 @@ function QuestionSection({ question, people, onEdit, onDelete, onAddOption, onEd
                     <span className="font-medium text-gray-900 flex-1 min-w-0">
                         {question.text || <em className="text-gray-400 font-normal">Untitled question</em>}
                     </span>
-                    <span className="text-xs text-gray-400 flex-shrink-0 mr-2">{question.options.length} options</span>
+                    <span className="hidden sm:inline text-xs text-gray-400 flex-shrink-0 mr-2">{question.options.length} options</span>
                 </button>
-                <div className="flex items-center gap-0.5 pr-3 flex-shrink-0">
-                    {confirmDelete ? (
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-gray-500">Delete?</span>
-                            <button
-                                type="button"
-                                onClick={() => { onDelete(); setConfirmDelete(false) }}
-                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-                            >
-                                Yes
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(false)}
-                                className="px-2 py-1 text-xs text-gray-500 rounded hover:bg-gray-100"
-                            >
-                                No
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            <button
-                                type="button"
-                                onClick={onMoveUp}
-                                disabled={!onMoveUp}
-                                className={`p-1.5 rounded ${onMoveUp ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
-                                title="Move up"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onMoveDown}
-                                disabled={!onMoveDown}
-                                className={`p-1.5 rounded ${onMoveDown ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
-                                title="Move down"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onEdit}
-                                className="p-1.5 text-gray-300 hover:text-gray-600 rounded"
-                                title="Edit question"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(true)}
-                                className="p-1.5 text-gray-300 hover:text-red-400 rounded"
-                                title="Delete question"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </>
-                    )}
+                <div className="flex items-center pr-3 flex-shrink-0">
+                    {/* Mobile: context menu */}
+                    <div className="sm:hidden">
+                        <QuestionContextMenu
+                            onMoveUp={onMoveUp}
+                            onMoveDown={onMoveDown}
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                        />
+                    </div>
+                    {/* Desktop: inline buttons */}
+                    <div className="hidden sm:flex items-center gap-0.5">
+                        {confirmDelete ? (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-gray-500">Delete?</span>
+                                <button
+                                    type="button"
+                                    onClick={() => { onDelete(); setConfirmDelete(false) }}
+                                    className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                                >
+                                    Yes
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmDelete(false)}
+                                    className="px-2 py-1 text-xs text-gray-500 rounded hover:bg-gray-100"
+                                >
+                                    No
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={onMoveUp}
+                                    disabled={!onMoveUp}
+                                    className={`p-1.5 rounded ${onMoveUp ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                                    title="Move up"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onMoveDown}
+                                    disabled={!onMoveDown}
+                                    className={`p-1.5 rounded ${onMoveDown ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                                    title="Move down"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onEdit}
+                                    className="p-1.5 text-gray-300 hover:text-gray-600 rounded"
+                                    title="Edit question"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmDelete(true)}
+                                    className="p-1.5 text-gray-300 hover:text-red-400 rounded"
+                                    title="Delete question"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
             <div className={isExpanded ? 'px-4 sm:px-6 pb-4 sm:pb-6 space-y-2' : 'hidden'}>
