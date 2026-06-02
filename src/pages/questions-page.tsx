@@ -245,9 +245,9 @@ function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
                         </div>
                     ) : (
                         <>
+                            <QuestionContextMenuItem label="Edit" onClick={() => { onEdit(); setOpen(false) }} />
                             <QuestionContextMenuItem label="Move Up" disabled={!onMoveUp} onClick={() => { onMoveUp?.(); setOpen(false) }} />
                             <QuestionContextMenuItem label="Move Down" disabled={!onMoveDown} onClick={() => { onMoveDown?.(); setOpen(false) }} />
-                            <QuestionContextMenuItem label="Edit" onClick={() => { onEdit(); setOpen(false) }} />
                             <QuestionContextMenuItem label="Delete" danger onClick={() => setConfirmDelete(true)} />
                         </>
                     )}
