@@ -73,6 +73,58 @@ describe('createExampleData', () => {
     })
 })
 
+describe('createExampleData - unassigned items excluded', () => {
+    const adult: Person = { id: 'a1', name: 'Alice', ageRange: 'Adult' }
+    const baby: Person = { id: 'b1', name: 'Baby', ageRange: 'Baby' }
+    const toddler: Person = { id: 't1', name: 'Toddler', ageRange: 'Toddler' }
+
+    it('excludes baby items from alwaysNeededItems when no babies in group', () => {
+        const result = createExampleData([adult])
+        const babyItemTexts = ['Nappies (pack/supply)', 'Baby wipes', 'Nappy bags', 'Change mat', 'Bibs', 'Muslins/Burp cloths']
+        for (const text of babyItemTexts) {
+            expect(result.alwaysNeededItems.find(i => i.text === text), `"${text}" should not appear`).toBeUndefined()
+        }
+    })
+
+    it('excludes toddler items from alwaysNeededItems when no toddlers in group', () => {
+        const result = createExampleData([adult])
+        const toddlerItemTexts = ['Pull-ups/Toddler nappies', 'Potty (travel potty)', 'Sippy cup/Toddler cup', 'Toddler snacks', 'Comfort item (teddy/blanket)']
+        for (const text of toddlerItemTexts) {
+            expect(result.alwaysNeededItems.find(i => i.text === text), `"${text}" should not appear`).toBeUndefined()
+        }
+    })
+
+    it('includes baby items in alwaysNeededItems when babies are in the group', () => {
+        const result = createExampleData([adult, baby])
+        expect(result.alwaysNeededItems.find(i => i.text === 'Nappies (pack/supply)')).toBeTruthy()
+    })
+
+    it('excludes baby swimming items when no babies in group', () => {
+        const result = createExampleData([adult])
+        const activities = result.questions.find(q => q.text === 'What activities will you be doing?')!
+        const swimmingItems = activities.options.find(o => o.id === ACTIVITY_OPTION_IDS.swimming)!.items
+        expect(swimmingItems.find(i => i.text === 'Baby swim nappy')).toBeUndefined()
+        expect(swimmingItems.find(i => i.text === 'Baby float/Swim seat')).toBeUndefined()
+    })
+
+    it('includes toddler items in alwaysNeededItems when toddlers are in the group', () => {
+        const result = createExampleData([adult, toddler])
+        expect(result.alwaysNeededItems.find(i => i.text === 'Sippy cup/Toddler cup')).toBeTruthy()
+    })
+
+    it('no item in the question set has all personSelections unselected', () => {
+        const result = createExampleData([adult])
+        const allItems = [
+            ...result.alwaysNeededItems,
+            ...result.questions.flatMap(q => q.options.flatMap(o => o.items)),
+        ]
+        for (const item of allItems) {
+            const anySelected = item.personSelections.some(ps => ps.selected)
+            expect(anySelected, `Item "${item.text}" has no one assigned`).toBe(true)
+        }
+    })
+})
+
 describe('createExampleData - gender-specific items', () => {
     function getOvernightYesItems(result: ReturnType<typeof createExampleData>) {
         const overnight = result.questions.find(q => q.text === 'Will you be staying overnight?')!
@@ -93,12 +145,10 @@ describe('createExampleData - gender-specific items', () => {
         expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
     })
 
-    it('does not select Menstrual products for male adult', () => {
+    it('does not include Menstrual products for male-only group', () => {
         const result = createExampleData([maleAdult])
         const items = getOvernightYesItems(result)
-        const item = items.find(i => i.text === 'Menstrual products')
-        expect(item).toBeTruthy()
-        expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
+        expect(items.find(i => i.text === 'Menstrual products')).toBeUndefined()
     })
 
     it('includes Sports bra selected for female adult runner', () => {
@@ -136,6 +186,12 @@ describe('createExampleData - gender-specific items', () => {
         expect(item).toBeTruthy()
         expect(item!.personSelections.find(ps => ps.personId === femaleAdult.id)?.selected).toBe(true)
         expect(item!.personSelections.find(ps => ps.personId === maleAdult.id)?.selected).toBe(false)
+    })
+
+    it('does not include Shaving kit for female-only group', () => {
+        const result = createExampleData([femaleAdult])
+        const items = getOvernightYesItems(result)
+        expect(items.find(i => i.text === 'Shaving kit')).toBeUndefined()
     })
 
     it('includes Shaving kit selected for male adult', () => {

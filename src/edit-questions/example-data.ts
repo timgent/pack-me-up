@@ -29,8 +29,9 @@ import {
  * @param people - All people in the group
  * @param ageFilter - Optional function to filter people by age range (defaults to everyone)
  */
-function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
+function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item | null {
     const selectedPeople = ageFilter ? ageFilter(people) : people;
+    if (selectedPeople.length === 0) return null;
     return {
         text,
         personSelections: people.map(p => ({
@@ -38,6 +39,10 @@ function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Perso
             selected: selectedPeople.some(sp => sp.id === p.id)
         }))
     };
+}
+
+function items(...args: (Item | null)[]): Item[] {
+    return args.filter((i): i is Item => i !== null);
 }
 
 export function createExampleData(people: Person[], selectedActivityIds: string[] = []): PackingListQuestionSet {
@@ -50,101 +55,96 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             id: ACTIVITY_OPTION_IDS.swimming,
             text: "Swimming",
             order: 0,
-            items: [
+            items: items(
                 item("Swimsuit", people, getToddlersAndOlder),
                 item("Swim towel", people),
                 item("Goggles", people, getChildrenAndOlder),
                 item("Swim cap", people, getChildrenAndOlder),
-                // Baby items
                 item("Baby swim nappy", people, getBabies),
                 item("Baby float/Swim seat", people, getBabies),
                 item("Baby sun hat with neck protection", people, getBabies),
                 item("Baby rash guard/Sun suit", people, getBabies),
-                // Toddler items
                 item("Swim nappy (if not potty trained)", people, getToddlers),
                 item("Armbands/Floaties", people, getToddlers),
                 item("Toddler sun hat", people, getToddlers),
-                // Child items
-                item("Swim aids (noodles, kickboard)", people, getChildren)
-            ]
+                item("Swim aids (noodles, kickboard)", people, getChildren),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.watersports,
             text: "Watersports",
             order: 1,
-            items: [
+            items: items(
                 item("Wetsuit", people, getTeenagersAndAdults),
                 item("Water shoes", people, getTeenagersAndAdults),
                 item("Waterproof bag", people, getTeenagersAndAdults),
-                item("Rash guard", people, getTeenagersAndAdults)
-            ]
+                item("Rash guard", people, getTeenagersAndAdults),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.cycling,
             text: "Cycling",
             order: 2,
-            items: [
+            items: items(
                 item("Cycling shorts", people, getTeenagersAndAdults),
                 item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Helmet", people, getTeenagersAndAdults),
                 item("Water bottle", people, getTeenagersAndAdults),
                 item("Bike repair kit", people, getTeenagersAndAdults),
-                item("Cycling gloves", people, getTeenagersAndAdults)
-            ]
+                item("Cycling gloves", people, getTeenagersAndAdults),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.running,
             text: "Running",
             order: 3,
-            items: [
+            items: items(
                 item("Running shoes", people, getTeenagersAndAdults),
                 item("Running clothes", people, getTeenagersAndAdults),
                 item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Sports watch", people, getTeenagersAndAdults),
-                item("Running socks", people, getTeenagersAndAdults)
-            ]
+                item("Running socks", people, getTeenagersAndAdults),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.climbing,
             text: "Climbing",
             order: 4,
-            items: [
+            items: items(
                 item("Climbing shoes", people, getTeenagersAndAdults),
                 item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Chalk bag", people, getTeenagersAndAdults),
                 item("Harness", people, getTeenagersAndAdults),
                 item("Climbing gloves", people, getTeenagersAndAdults),
-                item("Belay device", people, getTeenagersAndAdults)
-            ]
+                item("Belay device", people, getTeenagersAndAdults),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.hiking,
             text: "Hiking",
             order: 5,
-            items: [
+            items: items(
                 item("Hiking boots", people, getChildrenAndOlder),
                 item("Sports bra", people, getFemaleTeenagersAndAdults),
                 item("Daypack/Backpack", people, getTeenagersAndAdults),
                 item("Walking poles", people, getAdults),
                 item("Trail map", people, getAdults),
                 item("First aid kit", people, getAdults),
-                // Baby items
                 item("Baby carrier/Sling", people, getBabies),
-                // Toddler items
                 item("Toddler reins/Backpack harness", people, getToddlers),
-                item("Lightweight buggy/Stroller", people, getToddlers)
-            ]
+                item("Lightweight buggy/Stroller", people, getToddlers),
+            )
         },
         {
             id: ACTIVITY_OPTION_IDS.formalOccasions,
             text: "Formal occasions",
             order: 6,
-            items: [
+            items: items(
                 item("Formal outfit", people),
                 item("Dress shoes", people, getToddlersAndOlder),
                 item("Accessories (watch, jewelry, etc.)", people, getTeenagersAndAdults),
-                item("Evening bag/Clutch", people, getTeenagersAndAdults)
-            ]
+                item("Evening bag/Clutch", people, getTeenagersAndAdults),
+            )
         }
     ]
 
@@ -155,11 +155,10 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
     return {
         _id: "1",
         people,
-        alwaysNeededItems: [
+        alwaysNeededItems: items(
             item("Day bag / Backpack", people, getChildrenAndOlder),
             item("Snacks", people),
             item("Water bottle", people, getToddlersAndOlder),
-            // Baby items
             item("Nappies (pack/supply)", people, getBabies),
             item("Baby wipes", people, getBabies),
             item("Nappy bags", people, getBabies),
@@ -170,7 +169,6 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("Formula/Baby food", people, getBabies),
             item("Dummy/Pacifier (if used)", people, getBabies),
             item("Spare clothes (×3-4 sets)", people, getBabies),
-            // Toddler items
             item("Pull-ups/Toddler nappies", people, getToddlers),
             item("Potty (travel potty)", people, getToddlers),
             item("Wipes", people, getToddlers),
@@ -178,17 +176,14 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("Sippy cup/Toddler cup", people, getToddlers),
             item("Toddler snacks", people, getToddlers),
             item("Comfort item (teddy/blanket)", people, getToddlers),
-            // Child items
             item("Entertainment (books/small toys)", people, getChildren),
             item("Playing cards/Travel games", people, getChildren),
-            // Teenager items
             item("Headphones", people, getTeenagers),
             item("Phone charger", people, getTeenagers),
-            // First aid / medication
             item("First aid kit", people),
             item("Plasters / Band-aids", people),
             item("Pain relief (paracetamol / ibuprofen)", people, getAdults),
-        ],
+        ),
         questions: [
             {
                 id: generateUUID(),
@@ -201,7 +196,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         id: generateUUID(),
                         text: "Yes",
                         order: 0,
-                        items: [
+                        items: items(
                             item("Toothbrush", people, getToddlersAndOlder),
                             item("Toothpaste", people, getAdults),
                             item("Deodorant", people, getTeenagersAndAdults),
@@ -217,21 +212,17 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             item("T-shirt/Top", people),
                             item("Trousers/Shorts", people),
                             item("Jumper", people),
-                            // Baby items
                             item("Baby monitor", people, getBabies),
                             item("Nightlight", people, getBabies),
                             item("Baby sleeping bag/Swaddle", people, getBabies),
                             item("Extra bedding/sheets", people, getBabies),
                             item("Bedtime bottle", people, getBabies),
-                            // Toddler items
                             item("Bedtime books", people, getToddlers),
                             item("Night nappy/Pull-up", people, getToddlers),
-                            // Child items
                             item("Favorite toy/Stuffed animal", people, getChildren),
                             item("Flashlight", people, getChildren),
-                            // Teenager items
-                            item("Personal care items (face wash, etc.)", people, getTeenagers)
-                        ]
+                            item("Personal care items (face wash, etc.)", people, getTeenagers),
+                        )
                     },
                     {
                         id: generateUUID(),
@@ -252,12 +243,12 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         id: generateUUID(),
                         text: "Yes",
                         order: 0,
-                        items: [
+                        items: items(
                             item("Dish soap and sponge", people, getAdults),
                             item("Dishwasher tablets", people, getAdults),
                             item("Tea towels", people, getAdults),
-                            item("Shopping bags", people, getAdults)
-                        ]
+                            item("Shopping bags", people, getAdults),
+                        )
                     },
                     {
                         id: generateUUID(),
@@ -286,66 +277,61 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         id: generateUUID(),
                         text: "Hot",
                         order: 0,
-                        items: [
+                        items: items(
                             item("Sunscreen", people),
                             item("Sun hat", people),
                             item("Sunglasses", people, getChildrenAndOlder),
                             item("Light, breathable clothing", people),
                             item("Sandals", people, getToddlersAndOlder),
-                            // Baby items
                             item("Baby sunscreen (SPF 50+)", people, getBabies),
                             item("Sun protective baby clothing", people, getBabies),
                             item("Shade cover/Parasol for pram", people, getBabies),
-                            // Toddler items
                             item("Toddler sunscreen", people, getToddlers),
                             item("Sun protective clothing", people, getToddlers),
-                            // Child items
-                            item("Kids sunscreen", people, getChildren)
-                        ]
+                            item("Kids sunscreen", people, getChildren),
+                        )
                     },
                     {
                         id: generateUUID(),
                         text: "Rain",
                         order: 1,
-                        items: [
+                        items: items(
                             item("Raincoat", people),
                             item("Umbrella", people),
                             item("Waterproof shoes/boots", people),
-                            item("Waterproof bag cover", people)
-                        ]
+                            item("Waterproof bag cover", people),
+                        )
                     },
                     {
                         id: generateUUID(),
                         text: "Warm",
                         order: 2,
-                        items: [
+                        items: items(
                             item("Light jacket", people),
                             item("Comfortable layers", people),
                             item("Long-sleeved shirts", people),
-                            item("Comfortable walking shoes", people)
-                        ]
+                            item("Comfortable walking shoes", people),
+                        )
                     },
                     {
                         id: generateUUID(),
                         text: "Cold",
                         order: 3,
-                        items: [
+                        items: items(
                             item("Winter coat", people),
                             item("Gloves", people),
                             item("Scarf", people),
                             item("Warm hat/Beanie", people),
                             item("Thermal underwear", people),
                             item("Warm boots", people),
-                            // Baby items
                             item("Baby snowsuit/Pramsuit", people, getBabies),
                             item("Baby mittens", people, getBabies),
                             item("Baby warm hat with ear coverage", people, getBabies),
                             item("Blanket for carrier/pram", people, getBabies),
-                            // Toddler items
                             item("Toddler snowsuit/Winter coat", people, getToddlers),
                             item("Toddler mittens (not gloves - easier)", people, getToddlers),
-                            item("Toddler warm hat", people, getToddlers)
-                        ]
+                            item("Toddler warm hat", people, getToddlers),
+                        )
                     }
                 ]
             }
