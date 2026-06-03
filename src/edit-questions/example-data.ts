@@ -29,9 +29,8 @@ import {
  * @param people - All people in the group
  * @param ageFilter - Optional function to filter people by age range (defaults to everyone)
  */
-function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item | null {
+function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
     const selectedPeople = ageFilter ? ageFilter(people) : people;
-    if (selectedPeople.length === 0) return null;
     return {
         text,
         personSelections: people.map(p => ({
@@ -41,8 +40,8 @@ function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Perso
     };
 }
 
-function items(...args: (Item | null)[]): Item[] {
-    return args.filter((i): i is Item => i !== null);
+function items(...args: Item[]): Item[] {
+    return args.filter(i => i.personSelections.some(ps => ps.selected));
 }
 
 export function createExampleData(people: Person[], selectedActivityIds: string[] = []): PackingListQuestionSet {
