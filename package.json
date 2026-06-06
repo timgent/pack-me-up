@@ -19,7 +19,8 @@
     "build:mobile": "tsc -b && vite build && npx cap copy",
     "cap:sync": "tsc -b && vite build && npx cap sync",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
-    "cap:android": "npm run build && npx cap sync android && npx cap open android"
+    "cap:android": "npm run build && npx cap sync android && npx cap open android",
+    "build:android-release": "npm run build && npx cap sync android && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
