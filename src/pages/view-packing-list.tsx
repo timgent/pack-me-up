@@ -660,7 +660,7 @@ export function ViewPackingList() {
                             }}
                             placeholder="Guest name..."
                             autoFocus
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
                             type="button"
@@ -679,7 +679,7 @@ export function ViewPackingList() {
                     </div>
                 )}
                 <div>
-                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                         {personSections.map(([personName, items]) => {
                             const stats = personStats[personName] ?? { packed: 0, total: 0 }
                             const guestId = guestPersonIdByName.get(personName)
@@ -853,7 +853,7 @@ export function ViewPackingList() {
                                                     }
                                                 }}
                                                 placeholder="Add new item..."
-                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                             />
                                             <button
                                                 type="button"
