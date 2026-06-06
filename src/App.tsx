@@ -31,7 +31,7 @@ function App() {
           <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
             <Navigation />
             <SessionExpiredBanner />
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-4 py-8" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/wizard" element={<Wizard />} />

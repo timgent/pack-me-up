@@ -152,7 +152,7 @@ export const Navigation = () => {
                         <div className="md:hidden">
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
-                                className="inline-flex items-center justify-center p-2 rounded-lg text-white hover:bg-white/20 focus:outline-none transition-all duration-200"
+                                className="inline-flex items-center justify-center p-2.5 rounded-lg text-white hover:bg-white/20 focus:outline-none transition-all duration-200"
                                 aria-expanded="false"
                             >
                                 <span className="sr-only">Open main menu</span>
@@ -186,21 +186,21 @@ export const Navigation = () => {
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             to={manageQuestionsPath}
-                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             {inForeignContext ? 'Questions & Items' : 'My Questions & Items'}
                         </Link>
                         <Link
                             to={createListPath}
-                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             Create List
                         </Link>
                         <Link
                             to={viewListsPath}
-                            className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             View Lists
@@ -208,7 +208,7 @@ export const Navigation = () => {
                         {isLoggedIn && (
                             <Link
                                 to="/backups"
-                                className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                                className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                                 onClick={() => setIsOpen(false)}
                             >
                                 Backups
@@ -217,7 +217,7 @@ export const Navigation = () => {
                         {isLoggedIn && (
                             <Link
                                 to="/sharing"
-                                className="block px-3 py-2 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                                className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                                 onClick={() => setIsOpen(false)}
                             >
                                 Sharing
@@ -225,7 +225,7 @@ export const Navigation = () => {
                         )}
                         <a
                             href="mailto:tim.packmeup@gmail.com"
-                            className="block px-3 py-2 rounded-xl text-base font-medium text-white/70 hover:text-white transition-colors duration-200"
+                            className="block px-3 py-3 rounded-xl text-base font-medium text-white/70 hover:text-white transition-colors duration-200"
                             onClick={() => setIsOpen(false)}
                         >
                             Feedback
@@ -242,7 +242,7 @@ export const Navigation = () => {
                                             handleLogout()
                                             setIsOpen(false)
                                         }}
-                                        className="w-full text-left px-3 py-2 rounded-xl text-base font-semibold bg-white/20 hover:bg-white/30 transition-all duration-200"
+                                        className="w-full text-left px-3 py-3 rounded-xl text-base font-semibold bg-white/20 hover:bg-white/30 transition-all duration-200"
                                     >
                                         Logout
                                     </button>
@@ -254,7 +254,7 @@ export const Navigation = () => {
                                             handleSolidLogin()
                                             setIsOpen(false)
                                         }}
-                                        className="w-full text-left px-3 py-2 rounded-xl text-base font-semibold bg-white/90 text-primary-700 hover:bg-white transition-all duration-200"
+                                        className="w-full text-left px-3 py-3 rounded-xl text-base font-semibold bg-white/90 text-primary-700 hover:bg-white transition-all duration-200"
                                         title="Store your packing lists in your own personal Pod - you own your data"
                                     >
                                         Login with Solid Pod
