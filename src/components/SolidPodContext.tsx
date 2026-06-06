@@ -28,14 +28,20 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const uvdslSessionRef = useRef<SessionCore>(null!);
   if (!uvdslSessionRef.current) {
     const origin = window.location.origin || "http://localhost";
+    // On production, VITE_CLIENT_ID_URL is set so the provider fetches the hosted Client ID
+    // Document (static registration). On preview deploys and localhost it is unset, so we fall
+    // back to dynamic client registration using the current origin's redirect URI.
+    const clientIdUrl = import.meta.env.VITE_CLIENT_ID_URL as string | undefined;
     uvdslSessionRef.current = new SessionCore(
-      {
-        // Use SPA root so the redirect_uri in the token exchange matches what's registered.
-        // If we go through pod-auth-callback.html, the library strips params from that URL
-        // and sends the wrong redirect_uri to the token endpoint.
-        redirect_uris: [origin + "/"],
-        client_name: "Pack Me Up",
-      },
+      clientIdUrl
+        ? { client_id: clientIdUrl }
+        : {
+            // Use SPA root so the redirect_uri in the token exchange matches what's registered.
+            // If we go through pod-auth-callback.html, the library strips params from that URL
+            // and sends the wrong redirect_uri to the token endpoint.
+            redirect_uris: [origin + "/"],
+            client_name: "Pack Me Up",
+          },
       {
         database: new SessionIDB(),
         onSessionStateChange: (e) => {

@@ -1,0 +1,9 @@
+{
+  "@context": "https://www.w3.org/ns/solid/oidc-context.jsonld",
+  "client_id": "https://packmeup.tim-gent.com/client-id.json",
+  "redirect_uris": ["https://packmeup.tim-gent.com/"],
+  "client_name": "Pack Me Up",
+  "client_uri": "https://packmeup.tim-gent.com/",
+  "scope": "openid offline_access webid",
+  "grant_types": ["refresh_token", "authorization_code"]
+}
