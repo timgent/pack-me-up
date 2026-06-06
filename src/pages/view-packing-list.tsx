@@ -282,8 +282,10 @@ export function ViewPackingList() {
                 }))
             }
 
-            // Save with sync prevention (handles local DB + Pod save)
-            if (isLoggedIn) {
+            // Save with sync prevention (handles local DB + Pod save).
+            // Also applies when not logged in but viewing a foreign pod — saveToPod
+            // will use globalThis.fetch for anonymous writes to publicly-shared resources.
+            if (isLoggedIn || foreignPodUrl) {
                 console.log('handleItemChange: Saving to local DB and Pod...')
                 const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod);
                 if (savedPackingList) {
@@ -291,7 +293,7 @@ export function ViewPackingList() {
                     console.log('handleItemChange: Saved to local DB and Pod')
                 }
             } else {
-                // Not logged in, just save locally
+                // Not logged in and no pod target — local only
                 const dataWithTimestamp = {
                     ...updatedPackingList,
                     lastModified: new Date().toISOString()
@@ -302,7 +304,7 @@ export function ViewPackingList() {
                     _rev: dbResult.rev
                 };
                 setPackingList(savedPackingList);
-                console.log('handleItemChange: Saved to local DB')
+                console.log('handleItemChange: Saved to local DB only')
             }
 
             setAutoSaveStatus('saved')
@@ -331,12 +333,13 @@ export function ViewPackingList() {
     }, [watchedItems, handleItemChange])
 
     const persistPackingList = async (updatedPackingList: PackingList) => {
-        if (isLoggedIn) {
+        if (isLoggedIn || foreignPodUrl) {
             const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod)
             if (savedPackingList) {
                 setPackingList(savedPackingList)
             }
-        } else if (!foreignPodCtx) {
+        } else {
+            // No pod target — save locally only
             const dataWithTimestamp = { ...updatedPackingList, lastModified: new Date().toISOString() }
             const dbResult = await db.savePackingList(dataWithTimestamp)
             setPackingList({ ...dataWithTimestamp, _rev: dbResult.rev })

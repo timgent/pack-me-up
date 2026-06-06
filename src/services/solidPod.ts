@@ -592,7 +592,7 @@ export async function loadFileFromPod<T>(options: LoadFromPodOptions): Promise<T
 // ── RDF Pod operations ────────────────────────────────────────────────────────
 
 export interface SaveRdfToPodOptions<T> {
-    session: Session
+    session: Session | null
     fileUrl: string
     data: T
     serializer: (data: T, datasetUrl: string) => SolidDataset
@@ -624,13 +624,14 @@ export async function loadRdfFromPod<T>(
  */
 export async function saveRdfToPod<T>(options: SaveRdfToPodOptions<T>): Promise<void> {
     const { session, fileUrl, data, serializer } = options
+    const fetchFn = session?.fetch ?? globalThis.fetch
     try {
         const newDataset = serializer(data, fileUrl)
         const turtleContent = await solidDatasetAsTurtle(newDataset)
         const blob = new Blob([turtleContent], { type: 'text/turtle' })
-        await overwriteFile(fileUrl, blob, { fetch: session.fetch, contentType: 'text/turtle' })
+        await overwriteFile(fileUrl, blob, { fetch: fetchFn, contentType: 'text/turtle' })
     } catch (error: unknown) {
-        if (isAuthenticationError(error)) handlePodError(error)
+        if (session && isAuthenticationError(error)) handlePodError(error)
         throw error
     }
 }

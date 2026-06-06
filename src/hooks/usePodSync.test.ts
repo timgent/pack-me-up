@@ -363,7 +363,7 @@ describe('usePodSync', () => {
       expect(onSaveError).toHaveBeenCalledWith('network error')
     })
 
-    it('does not save when not logged in', async () => {
+    it('does not save when not logged in and no foreign pod configured', async () => {
       setupLoggedOut()
 
       const { result } = renderHook(() =>
@@ -381,6 +381,36 @@ describe('usePodSync', () => {
 
       expect(success).toBe(false)
       expect(mockSaveRdfToPod).not.toHaveBeenCalled()
+    })
+
+    it('saves to a foreign pod when not logged in (anonymous write)', async () => {
+      setupLoggedOut()
+      mockSaveRdfToPod.mockResolvedValue(undefined)
+
+      const { result } = renderHook(() =>
+        usePodSync({
+          pathConfig: {
+            container: 'pack-me-up/packing-lists/',
+            filename: 'test-list.ttl',
+            podUrl: 'https://alice.solidcommunity.net/',
+          },
+          enabled: true,
+          rdf: rdfOptions,
+        })
+      )
+
+      let success: boolean | undefined
+      await act(async () => {
+        success = await result.current.saveToPod(QUESTION_SET_DATA)
+      })
+
+      expect(success).toBe(true)
+      expect(mockSaveRdfToPod).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: null,
+          fileUrl: 'https://alice.solidcommunity.net/pack-me-up/packing-lists/test-list.ttl',
+        })
+      )
     })
   })
 

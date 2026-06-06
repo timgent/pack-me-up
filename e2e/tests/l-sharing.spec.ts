@@ -138,4 +138,47 @@ test.describe('L – Sharing a packing list', () => {
             await ctxB.close()
         }
     })
+
+    test('L4: anonymous user checks item on public link; owner sees the change within one poll cycle', async ({ browser }) => {
+        // User A shares the list publicly (L3 already has 1 packed item hidden on pageA)
+        await expect(pageA.getByRole('button', { name: 'Share' })).toBeEnabled({ timeout: 10_000 })
+        await pageA.getByRole('button', { name: 'Share' }).click()
+        await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
+        await pageA.getByRole('button', { name: 'Anyone with the link' }).click()
+        await pageA.getByRole('dialog').getByRole('button', { name: /^Share publicly/i }).click()
+        await expect(pageA.getByRole('textbox', { name: /shareable link/i })).toBeVisible({ timeout: 15_000 })
+        const publicLink = await pageA.getByRole('textbox', { name: /shareable link/i }).inputValue()
+        await pageA.keyboard.press('Escape')
+
+        // Open a fresh anonymous context — no login
+        const ctxAnon = await browser.newContext()
+        const pageAnon = await ctxAnon.newPage()
+        try {
+            await pageAnon.goto(publicLink)
+
+            // Wait for list items to load via pod poll.
+            // Item 1 is already packed (from L3) so it's hidden with showPacked=false;
+            // the first visible checkbox is item 2.
+            const firstCheckbox = pageAnon.locator('input[type="checkbox"]').first()
+            await firstCheckbox.waitFor({ timeout: 20_000 })
+
+            // Check the first visible item
+            await firstCheckbox.click()
+
+            // Wait for the anonymous write to reach the pod
+            await pageAnon.waitForResponse(
+                r => r.url().includes('/pack-me-up/packing-lists/') && r.request().method() === 'PUT',
+                { timeout: 10_000 }
+            )
+
+            // Confirm no pod-write error was surfaced
+            await expect(pageAnon.getByText(/Failed to save to Pod/i)).not.toBeVisible()
+
+            // User A polls every 5 s — give 3 cycles (15 s) for propagation.
+            // After L3 there was 1 packed item hidden; after L4 there should be 2.
+            await expect(pageA.getByText(/2 packed.*hidden/i)).toBeVisible({ timeout: 20_000 })
+        } finally {
+            await ctxAnon.close()
+        }
+    })
 })

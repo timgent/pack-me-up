@@ -241,14 +241,15 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
    * Save data to the Pod
    */
   const saveToPod = useCallback(async (data: T): Promise<boolean> => {
-    if (!enabled || !isLoggedIn) {
+    const isForeignPod = !!pathConfig.podUrl
+    if (!enabled || (!isLoggedIn && !isForeignPod)) {
       return false;
     }
 
     setError(null);
 
     try {
-      const podUrl = pathConfig.podUrl ?? await getPrimaryPodUrl(session);
+      const podUrl = pathConfig.podUrl ?? await getPrimaryPodUrl(session!);
 
       if (!podUrl) {
         throw new Error('No pod URL found');
@@ -261,7 +262,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       }
 
       await saveRdfToPod({
-        session: session!,
+        session: isLoggedIn ? session! : null,
         fileUrl,
         data,
         serializer: rdf.serialize,

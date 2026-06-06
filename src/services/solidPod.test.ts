@@ -498,6 +498,27 @@ describe('saveRdfToPod', () => {
             saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => createSolidDataset() })
         ).rejects.toThrow(AuthenticationError)
     })
+
+    it('uses globalThis.fetch when session is null', async () => {
+        const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
+        const mockFetch = vi.fn() as typeof fetch
+        vi.stubGlobal('fetch', mockFetch)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+        await saveRdfToPod({
+            session: null,
+            fileUrl: url,
+            data: makePackingList('my-list'),
+            serializer: packingListToDataset,
+        })
+
+        expect(mockOverwriteFile).toHaveBeenCalledWith(
+            url,
+            expect.any(Blob),
+            expect.objectContaining({ fetch: mockFetch, contentType: 'text/turtle' })
+        )
+        vi.unstubAllGlobals()
+    })
 })
 
 // ─── loadMultipleRdfFromPod ──────────────────────────────────────────────────
