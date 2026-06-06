@@ -162,12 +162,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
-    // Persist the return route so SolidPodHandleRedirectPage can navigate back after login.
-    // We do this here (not just in initializeSession) to handle the case where login is
-    // triggered from a page the init effect didn't record.
     sessionStorage.setItem(AUTH_RETURN_TO_KEY, currentLocation);
-    // Use the SPA root as redirect_uri so the URI registered via dynamic client
-    // registration matches what the library derives when exchanging the code.
     const redirectUri = (window.location.origin || "http://localhost") + "/";
     await uvdslSession.login(oidcIssuer, redirectUri);
   };
