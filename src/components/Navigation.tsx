@@ -43,7 +43,7 @@ export const Navigation = () => {
 
     return (
         <>
-            <nav className="bg-primary-950 text-white shadow-soft">
+            <nav className="bg-primary-950 text-white shadow-soft" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
