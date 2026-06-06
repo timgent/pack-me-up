@@ -140,8 +140,14 @@ test.describe('L – Sharing a packing list', () => {
     })
 
     test('L4: anonymous user checks item on public link; owner sees the change within one poll cycle', async ({ browser }) => {
-        // User A shares the list publicly (L3 already has 1 packed item hidden on pageA)
-        await expect(pageA.getByRole('button', { name: 'Share' })).toBeEnabled({ timeout: 10_000 })
+        // Close any dialog left open from L1: the Modal component has no Escape handler,
+        // so clicking the X close button is the only reliable way to dismiss it.
+        const residualDialog = pageA.locator('[role="dialog"]')
+        if (await residualDialog.isVisible()) {
+            await residualDialog.getByRole('button', { name: 'Close' }).click()
+            await expect(residualDialog).toHaveCount(0)
+        }
+        // Now the toolbar Share button is the only one visible
         await pageA.getByRole('button', { name: 'Share' }).click()
         await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
         await pageA.getByRole('button', { name: 'Anyone with the link' }).click()
