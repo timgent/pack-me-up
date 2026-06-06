@@ -16,6 +16,7 @@ import { packingListToDataset, datasetToPackingList } from '../services/rdfSeria
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
+import { mergePackingLists } from '../utils/mergePackingLists'
 
 type FormData = {
     items: Record<string, boolean>
@@ -145,6 +146,10 @@ export function ViewPackingList() {
     // Use useWatch instead of watch() for proper re-renders on form changes
     const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
 
+    // Ref to the pod save function so useSyncCoordinator can push merged results back.
+    // Populated after usePodSync is called below.
+    const saveToPodRef = useRef<((data: PackingList) => Promise<boolean>) | undefined>(undefined)
+
     // Set up sync coordination (handles conflict resolution, focus preservation, etc.)
     const { syncingFromPod, handleSyncSuccess, handleSyncError, saveWithSyncPrevention } =
         useSyncCoordinator<PackingList>({
@@ -166,7 +171,9 @@ export function ViewPackingList() {
                 });
                 reset({ items: formValues });
             },
-            conflictStrategy: 'fallback-to-pod', // Use same strategy as edit questions for consistency
+            conflictStrategy: 'fallback-to-pod',
+            mergeFunction: mergePackingLists,
+            saveToPod: saveToPodRef.current,
         });
 
     // When viewing a shared (foreign) pod list and the initial pod fetch fails,
@@ -207,6 +214,11 @@ export function ViewPackingList() {
         onSaveSuccess: handleSaveSuccess,
         onSaveError: handleSaveError,
     });
+
+    // Keep saveToPodRef in sync so useSyncCoordinator can push merge results back to pod
+    useEffect(() => {
+        saveToPodRef.current = saveToPod
+    }, [saveToPod])
 
     useEffect(() => {
         const fetchPackingList = async () => {

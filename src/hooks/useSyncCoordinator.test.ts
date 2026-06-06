@@ -193,4 +193,131 @@ describe('useSyncCoordinator', () => {
       expect(updateFormAndState).toHaveBeenCalledOnce()
     })
   })
+
+  // ─────────────────────────────────────────────────────────────────
+  // CRDT merge function
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('mergeFunction', () => {
+    interface MergeTestData extends TimestampedData {
+      id: string
+      items: string[]
+    }
+
+    const makeMergeData = (overrides: Partial<MergeTestData> = {}): MergeTestData => ({
+      id: 'list-1',
+      items: [],
+      ...overrides,
+    })
+
+    const mergeFn = (local: MergeTestData, pod: MergeTestData): MergeTestData => ({
+      ...(pod.lastModified! >= (local.lastModified ?? '') ? pod : local),
+      items: [...new Set([...local.items, ...pod.items])],
+    })
+
+    it('applies mergeFunction result instead of raw pod data when pod is newer', async () => {
+      const LOCAL_TIME = 1700000000000
+      const POD_TIME = LOCAL_TIME + 1000
+
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const updateFormAndState = vi.fn()
+      const currentData = makeMergeData({
+        items: ['local-item'],
+        lastModified: new Date(LOCAL_TIME).toISOString(),
+      })
+      const options = makeOptions({
+        currentData,
+        saveToLocalDb,
+        updateFormAndState,
+        conflictStrategy: 'fallback-to-pod',
+        mergeFunction: mergeFn,
+      })
+
+      const { result } = renderHook(() => useSyncCoordinator<MergeTestData>(options))
+
+      const podData = makeMergeData({
+        items: ['pod-item'],
+        lastModified: new Date(POD_TIME).toISOString(),
+      })
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(podData)
+      })
+
+      // updateFormAndState should be called with merged items (both items present)
+      expect(updateFormAndState).toHaveBeenCalledOnce()
+      const [savedArg] = updateFormAndState.mock.calls[0]
+      expect(savedArg.items).toEqual(expect.arrayContaining(['local-item', 'pod-item']))
+    })
+
+    it('calls saveToPod with merged result to push convergence back to pod', async () => {
+      const LOCAL_TIME = 1700000000000
+      const POD_TIME = LOCAL_TIME + 1000
+
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const updateFormAndState = vi.fn()
+      const saveToPod = vi.fn().mockResolvedValue(true)
+      const currentData = makeMergeData({
+        items: ['local-item'],
+        lastModified: new Date(LOCAL_TIME).toISOString(),
+      })
+      const options = makeOptions({
+        currentData,
+        saveToLocalDb,
+        updateFormAndState,
+        conflictStrategy: 'fallback-to-pod',
+        mergeFunction: mergeFn,
+        saveToPod,
+      })
+
+      const { result } = renderHook(() => useSyncCoordinator<MergeTestData>(options))
+
+      const podData = makeMergeData({
+        items: ['pod-item'],
+        lastModified: new Date(POD_TIME).toISOString(),
+      })
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(podData)
+      })
+
+      expect(saveToPod).toHaveBeenCalledOnce()
+      const pushedData = saveToPod.mock.calls[0][0]
+      expect(pushedData.items).toEqual(expect.arrayContaining(['local-item', 'pod-item']))
+    })
+
+    it('does not call saveToPod during merge-back push when no saveToPod is configured', async () => {
+      const LOCAL_TIME = 1700000000000
+      const POD_TIME = LOCAL_TIME + 1000
+
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const updateFormAndState = vi.fn()
+      const currentData = makeMergeData({
+        items: ['local-item'],
+        lastModified: new Date(LOCAL_TIME).toISOString(),
+      })
+      // No saveToPod provided
+      const options = makeOptions({
+        currentData,
+        saveToLocalDb,
+        updateFormAndState,
+        conflictStrategy: 'fallback-to-pod',
+        mergeFunction: mergeFn,
+      })
+
+      const { result } = renderHook(() => useSyncCoordinator<MergeTestData>(options))
+
+      const podData = makeMergeData({
+        items: ['pod-item'],
+        lastModified: new Date(POD_TIME).toISOString(),
+      })
+
+      // Should not throw even without saveToPod
+      await expect(act(async () => {
+        await result.current.handleSyncSuccess(podData)
+      })).resolves.not.toThrow()
+
+      expect(updateFormAndState).toHaveBeenCalledOnce()
+    })
+  })
 })

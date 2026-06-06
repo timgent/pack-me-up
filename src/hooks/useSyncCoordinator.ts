@@ -43,6 +43,20 @@ export interface SyncCoordinatorOptions<T extends TimestampedData> {
   conflictStrategy?: ConflictStrategy;
 
   /**
+   * Optional merge function for CRDT-style conflict resolution.
+   * When provided, called instead of simple replacement when pod data is applicable.
+   * The result is saved locally and, if saveToPod is also provided, pushed back to
+   * the pod so both peers converge to the same merged state.
+   */
+  mergeFunction?: (local: T, remote: T) => T;
+
+  /**
+   * Optional pod save function used to push merged results back after a merge.
+   * Only called when mergeFunction is also provided.
+   */
+  saveToPod?: (data: T) => Promise<boolean>;
+
+  /**
    * Duration to show sync indicator (milliseconds)
    */
   syncIndicatorDuration?: number;
@@ -105,6 +119,8 @@ export function useSyncCoordinator<T extends TimestampedData>(
     saveToLocalDb,
     updateFormAndState,
     conflictStrategy = 'fallback-to-pod',
+    mergeFunction,
+    saveToPod: saveToPodOption,
     syncIndicatorDuration = 2000,
   } = options;
 
@@ -228,19 +244,35 @@ export function useSyncCoordinator<T extends TimestampedData>(
       setSyncingFromPod(true);
 
       try {
+        // Apply merge function if provided, otherwise use pod data as-is
+        const resolved: T = mergeFunction && currentData
+          ? mergeFunction(currentData, data)
+          : { ...data };
+
         // Remove _rev to avoid conflicts with local database version
-        const dataWithoutRev = { ...data };
-        delete dataWithoutRev._rev;
+        delete (resolved as Record<string, unknown>)._rev;
 
         // Save to local database to get the proper _rev
-        const dbResult = await saveToLocalDb(dataWithoutRev as T);
+        const dbResult = await saveToLocalDb(resolved);
 
-        // Update form and state with synced data
+        const resolvedWithRev = { ...resolved, _rev: dbResult.rev } as T;
+
+        // Update form and state with resolved data
         preserveFocusAndSelection(() => {
-          updateFormAndState(dataWithoutRev as T, dbResult.rev);
+          updateFormAndState(resolved, dbResult.rev);
         });
 
-        lastSyncedDataRef.current = incomingDataString;
+        lastSyncedDataRef.current = JSON.stringify(resolvedWithRev);
+
+        // Push merged result back to pod so both peers converge
+        if (mergeFunction && saveToPodOption && currentData) {
+          const mergedTimestamp = resolved.lastModified;
+          lastSavedTimestampRef.current = mergedTimestamp ?? null;
+          isLocalChangeRef.current = true;
+          saveToPodOption(resolvedWithRev).finally(() => {
+            setTimeout(() => { isLocalChangeRef.current = false; }, SYNC_PREVENTION_WINDOW_MS);
+          });
+        }
 
         // Show sync indicator briefly
         setTimeout(() => setSyncingFromPod(false), syncIndicatorDuration);
@@ -256,6 +288,8 @@ export function useSyncCoordinator<T extends TimestampedData>(
       shouldApplyPodData,
       preserveFocusAndSelection,
       syncIndicatorDuration,
+      mergeFunction,
+      saveToPodOption,
     ]
   );
 
