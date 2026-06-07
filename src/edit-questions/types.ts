@@ -29,7 +29,9 @@ export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
   ageRange: AgeRangeSchema.optional(),
-  gender: GenderSchema.optional()
+  gender: GenderSchema.optional(),
+  lastModified: z.string().optional(),
+  deletedAt: z.string().optional(),
 })
 
 export const PersonSelectionSchema = z.object({
@@ -38,8 +40,11 @@ export const PersonSelectionSchema = z.object({
 })
 
 export const ItemSchema = z.object({
+  id: z.string().optional(),
   text: z.string(),
-  personSelections: z.array(PersonSelectionSchema)
+  personSelections: z.array(PersonSelectionSchema),
+  lastModified: z.string().optional(),
+  deletedAt: z.string().optional(),
 })
 
 export const QuestionTypeSchema = z.enum(['single-choice', 'multiple-choice'])
@@ -56,7 +61,9 @@ const CommonQuestionSchema = z.object({
   text: z.string(),
   options: z.array(OptionSchema),
   order: z.number(),
-  questionType: QuestionTypeSchema.optional() // Optional for backward compatibility
+  questionType: QuestionTypeSchema.optional(),
+  lastModified: z.string().optional(),
+  deletedAt: z.string().optional(),
 })
 
 export const DraftQuestionSchema = CommonQuestionSchema.extend({

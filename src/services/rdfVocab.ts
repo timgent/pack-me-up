@@ -37,6 +37,8 @@ export const PMU = {
     // Person predicates
     ageRange: `${PMU_NS}ageRange`,
     gender: `${PMU_NS}gender`,
+    personLastModified: `${PMU_NS}personLastModified`,
+    personDeletedAt: `${PMU_NS}personDeletedAt`,
 
     // Question predicates
     hasOption: `${PMU_NS}hasOption`,
@@ -44,12 +46,17 @@ export const PMU = {
     questionStatus: `${PMU_NS}questionStatus`,
     order: `${PMU_NS}order`,
     text: `${PMU_NS}text`,
+    questionLastModified: `${PMU_NS}questionLastModified`,
+    questionDeletedAt: `${PMU_NS}questionDeletedAt`,
 
     // Option predicates
     hasQuestionItem: `${PMU_NS}hasQuestionItem`,
 
     // Item predicates (on option items and always-needed items)
     hasPersonSelection: `${PMU_NS}hasPersonSelection`,
+    questionItemId: `${PMU_NS}questionItemId`,
+    questionItemLastModified: `${PMU_NS}questionItemLastModified`,
+    questionItemDeletedAt: `${PMU_NS}questionItemDeletedAt`,
 
     // PersonSelection predicates
     selectionPersonId: `${PMU_NS}selectionPersonId`,

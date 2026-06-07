@@ -223,21 +223,27 @@ function personToThing(person: Person, personUrl: string): Thing {
 
     if (person.ageRange) t = t.addStringNoLocale(PMU.ageRange, person.ageRange)
     if (person.gender) t = t.addStringNoLocale(PMU.gender, person.gender)
+    if (person.lastModified) t = t.addDatetime(PMU.personLastModified, new Date(person.lastModified))
+    if (person.deletedAt) t = t.addDatetime(PMU.personDeletedAt, new Date(person.deletedAt))
 
     return t.build()
 }
 
 function thingToPerson(thing: Thing | null, url: string): Person | null {
     if (!thing) return null
-    const id = url.split('#person-')[1] ?? url
+    const id = (url.split('#')[1] ?? '').replace(/^person-/, '') || url
     const name = getStringNoLocale(thing, PMU.name) ?? ''
     const ageRange = getStringNoLocale(thing, PMU.ageRange) ?? undefined
     const gender = getStringNoLocale(thing, PMU.gender) ?? undefined
+    const lastModified = getDatetime(thing, PMU.personLastModified)?.toISOString()
+    const deletedAt = getDatetime(thing, PMU.personDeletedAt)?.toISOString()
     return {
         id,
         name,
         ...(ageRange !== undefined ? { ageRange: ageRange as Person['ageRange'] } : {}),
         ...(gender !== undefined ? { gender: gender as Person['gender'] } : {}),
+        ...(lastModified !== undefined ? { lastModified } : {}),
+        ...(deletedAt !== undefined ? { deletedAt } : {}),
     }
 }
 
@@ -257,6 +263,12 @@ function questionToThings(
     if (question.questionType) {
         qBuilder = qBuilder.addStringNoLocale(PMU.questionType, question.questionType)
     }
+    if (question.lastModified) {
+        qBuilder = qBuilder.addDatetime(PMU.questionLastModified, new Date(question.lastModified))
+    }
+    if (question.deletedAt) {
+        qBuilder = qBuilder.addDatetime(PMU.questionDeletedAt, new Date(question.deletedAt))
+    }
 
     for (const option of question.options) {
         const optionUrl = `${datasetUrl}#option-${option.id}`
@@ -272,11 +284,13 @@ function thingToQuestion(dataset: SolidDataset, url: string): Question | null {
     const thing = getThing(dataset, url)
     if (!thing) return null
 
-    const id = url.split('#question-')[1] ?? url
+    const id = (url.split('#')[1] ?? '').replace(/^question-/, '') || url
     const text = getStringNoLocale(thing, PMU.text) ?? ''
     const type = (getStringNoLocale(thing, PMU.questionStatus) ?? 'saved') as Question['type']
     const order = getInteger(thing, PMU.order) ?? 0
     const questionType = getStringNoLocale(thing, PMU.questionType) ?? undefined
+    const lastModified = getDatetime(thing, PMU.questionLastModified)?.toISOString()
+    const deletedAt = getDatetime(thing, PMU.questionDeletedAt)?.toISOString()
 
     const optionUrls = getUrlAll(thing, PMU.hasOption)
     const options = optionUrls
@@ -291,6 +305,8 @@ function thingToQuestion(dataset: SolidDataset, url: string): Question | null {
         order,
         options,
         ...(questionType !== undefined ? { questionType: questionType as Question['questionType'] } : {}),
+        ...(lastModified !== undefined ? { lastModified } : {}),
+        ...(deletedAt !== undefined ? { deletedAt } : {}),
     }
 }
 
@@ -347,6 +363,10 @@ function questionItemToThings(
     let itemBuilder = buildThing({ url: itemUrl })
         .addUrl(RDF.type, PMU.QuestionItem)
         .addStringNoLocale(PMU.text, item.text)
+
+    if (item.id) itemBuilder = itemBuilder.addStringNoLocale(PMU.questionItemId, item.id)
+    if (item.lastModified) itemBuilder = itemBuilder.addDatetime(PMU.questionItemLastModified, new Date(item.lastModified))
+    if (item.deletedAt) itemBuilder = itemBuilder.addDatetime(PMU.questionItemDeletedAt, new Date(item.deletedAt))
 
     for (let i = 0; i < item.personSelections.length; i++) {
         const ps = item.personSelections[i]
@@ -506,6 +526,9 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     if (!thing) return null
 
     const text = getStringNoLocale(thing, PMU.text) ?? ''
+    const id = getStringNoLocale(thing, PMU.questionItemId) ?? undefined
+    const lastModified = getDatetime(thing, PMU.questionItemLastModified)?.toISOString()
+    const deletedAt = getDatetime(thing, PMU.questionItemDeletedAt)?.toISOString()
 
     const psUrls = getUrlAll(thing, PMU.hasPersonSelection)
     const personSelectionsWithOrder: Array<PersonSelection & { order: number }> = psUrls
@@ -522,5 +545,11 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     personSelectionsWithOrder.sort((a, b) => a.order - b.order)
     const personSelections: PersonSelection[] = personSelectionsWithOrder.map(({ personId, selected }) => ({ personId, selected }))
 
-    return { text, personSelections }
+    return {
+        text,
+        personSelections,
+        ...(id !== undefined ? { id } : {}),
+        ...(lastModified !== undefined ? { lastModified } : {}),
+        ...(deletedAt !== undefined ? { deletedAt } : {}),
+    }
 }

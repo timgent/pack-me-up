@@ -6,6 +6,7 @@ import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, n
 import { Link } from 'react-router-dom'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { usePodSync } from '../hooks/usePodSync'
+import { mergeQuestionSets } from '../utils/mergeQuestionSets'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
 import { useSolidPod } from '../components/SolidPodContext'
@@ -889,6 +890,8 @@ export function QuestionsPage() {
     const [peopleModal, setPeopleModal] = useState(false)
     const [alwaysModal, setAlwaysModal] = useState(false)
 
+    const saveToPodRef = useRef<((data: PackingListQuestionSet) => Promise<boolean>) | undefined>(undefined)
+
     const { saveWithSyncPrevention, handleSyncSuccess, handleSyncError } = useSyncCoordinator<PackingListQuestionSet>({
         currentData: data,
         saveToLocalDb: async (d) => db.saveQuestionSet({ _id: '1', ...d, _rev: rev }),
@@ -897,6 +900,8 @@ export function QuestionsPage() {
             setData({ ...d, _rev: newRev })
         },
         conflictStrategy: 'fallback-to-pod',
+        mergeFunction: mergeQuestionSets,
+        saveToPod: saveToPodRef.current,
     })
 
     const { saveToPod } = usePodSync<PackingListQuestionSet>({
@@ -907,6 +912,9 @@ export function QuestionsPage() {
         onSyncSuccess: handleSyncSuccess,
         onSyncError: handleSyncError,
     })
+
+    // Keep saveToPodRef in sync so useSyncCoordinator can push merge results back to pod
+    useEffect(() => { saveToPodRef.current = saveToPod }, [saveToPod])
 
     useEffect(() => {
         if (loginSyncInProgress) return
@@ -939,14 +947,15 @@ export function QuestionsPage() {
     const handleQuestionModalSave = useCallback(async (text: string, type: QuestionType) => {
         if (!data || questionModal === null) return
         const questions = data.questions ?? []
+        const now = new Date().toISOString()
         let newQuestions: Question[]
         if (questionModal.question) {
             newQuestions = questions.map(q =>
-                q.id === questionModal.question!.id ? { ...q, text, questionType: type } : q
+                q.id === questionModal.question!.id ? { ...q, text, questionType: type, lastModified: now } : q
             )
         } else {
             const maxOrder = questions.reduce((max, q) => Math.max(max, q.order), -1)
-            newQuestions = [...questions, { ...newDraftQuestion(maxOrder + 1), text, questionType: type }]
+            newQuestions = [...questions, { ...newDraftQuestion(maxOrder + 1), text, questionType: type, lastModified: now }]
         }
         setQuestionModal(null)
         await saveData({ ...data, questions: newQuestions })
@@ -954,18 +963,25 @@ export function QuestionsPage() {
 
     const handleDeleteQuestion = useCallback(async (id: string) => {
         if (!data) return
-        await saveData({ ...data, questions: data.questions.filter(q => q.id !== id) })
+        const now = new Date().toISOString()
+        await saveData({
+            ...data,
+            questions: data.questions.map(q => q.id === id ? { ...q, deletedAt: now } : q),
+        })
     }, [data, saveData])
 
     const handleMoveQuestion = useCallback(async (id: string, direction: 'up' | 'down') => {
         if (!data) return
-        const idx = data.questions.findIndex(q => q.id === id)
+        const active = data.questions.filter(q => !q.deletedAt)
+        const idx = active.findIndex(q => q.id === id)
         if (idx < 0) return
         const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-        if (swapIdx < 0 || swapIdx >= data.questions.length) return
-        const newQuestions = [...data.questions]
-        ;[newQuestions[idx], newQuestions[swapIdx]] = [newQuestions[swapIdx], newQuestions[idx]]
-        await saveData({ ...data, questions: newQuestions })
+        if (swapIdx < 0 || swapIdx >= active.length) return
+        const newActive = [...active]
+        ;[newActive[idx], newActive[swapIdx]] = [newActive[swapIdx], newActive[idx]]
+        // Rebuild full questions array preserving deleted ones
+        const deletedQuestions = data.questions.filter(q => q.deletedAt)
+        await saveData({ ...data, questions: [...newActive, ...deletedQuestions] })
     }, [data, saveData])
 
     const handleOptionModalSave = useCallback(async (updatedOption: Option) => {
@@ -996,10 +1012,29 @@ export function QuestionsPage() {
     const handlePeopleSave = useCallback(async (newPeople: Person[]) => {
         if (!data) return
         const oldPeople = data.people ?? []
-        const reconcile = (items: Item[]) => reconcileItems(items, oldPeople, newPeople)
+        const oldPeopleMap = new Map(oldPeople.map(p => [p.id, p]))
+        const newPeopleIds = new Set(newPeople.map(p => p.id))
+        const now = new Date().toISOString()
+
+        // Stamp lastModified on new or changed people
+        const stamped: Person[] = newPeople.map(p => {
+            const existing = oldPeopleMap.get(p.id)
+            const changed = !existing || existing.name !== p.name ||
+                existing.ageRange !== p.ageRange || existing.gender !== p.gender
+            return changed ? { ...p, lastModified: now } : p
+        })
+
+        // Mark removed people as deleted; preserve previously-deleted people
+        const previouslyDeleted = oldPeople.filter(p => p.deletedAt)
+        const nowDeleted = oldPeople
+            .filter(p => !p.deletedAt && !newPeopleIds.has(p.id))
+            .map(p => ({ ...p, deletedAt: now }))
+        const allPeople = [...stamped, ...nowDeleted, ...previouslyDeleted]
+
+        const reconcile = (items: Item[]) => reconcileItems(items, oldPeople.filter(p => !p.deletedAt), stamped)
         const newData: PackingListQuestionSet = {
             ...data,
-            people: newPeople,
+            people: allPeople,
             alwaysNeededItems: reconcile(data.alwaysNeededItems ?? []),
             questions: data.questions.map(q => ({
                 ...q,
@@ -1021,8 +1056,8 @@ export function QuestionsPage() {
     const allItemNames = useMemo(() => {
         if (!data) return []
         const names = [
-            ...(data.alwaysNeededItems ?? []).map(i => i.text),
-            ...data.questions.flatMap(q => q.options.flatMap(o => o.items.map(i => i.text))),
+            ...(data.alwaysNeededItems ?? []).filter(i => !i.deletedAt).map(i => i.text),
+            ...data.questions.filter(q => !q.deletedAt).flatMap(q => q.options.flatMap(o => o.items.filter(i => !i.deletedAt).map(i => i.text))),
         ].filter(Boolean)
         return [...new Set(names)]
     }, [data])
@@ -1030,7 +1065,9 @@ export function QuestionsPage() {
     if (error) return <div className="p-8 text-red-600">Error: {error}</div>
     if (!data) return <div className="p-8 text-gray-500">Loading…</div>
 
-    const people = data.people ?? []
+    const people = (data.people ?? []).filter(p => !p.deletedAt)
+    const activeQuestions = data.questions.filter(q => !q.deletedAt)
+    const activeAlwaysNeededItems = (data.alwaysNeededItems ?? []).filter(i => !i.deletedAt)
 
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
@@ -1041,8 +1078,8 @@ export function QuestionsPage() {
                     {!isForeign && <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
                 </div>
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
-                <AlwaysSection items={data.alwaysNeededItems ?? []} people={people} onEdit={() => setAlwaysModal(true)} />
-                {data.questions.map((q, qi) => (
+                <AlwaysSection items={activeAlwaysNeededItems} people={people} onEdit={() => setAlwaysModal(true)} />
+                {activeQuestions.map((q, qi) => (
                     <QuestionSection
                         key={q.id}
                         question={q}
@@ -1053,7 +1090,7 @@ export function QuestionsPage() {
                         onEditOption={(option) => setOptionModal({ questionId: q.id, option })}
                         onDeleteOption={(optionId) => handleDeleteOption(q.id, optionId)}
                         onMoveUp={qi > 0 ? () => handleMoveQuestion(q.id, 'up') : undefined}
-                        onMoveDown={qi < data.questions.length - 1 ? () => handleMoveQuestion(q.id, 'down') : undefined}
+                        onMoveDown={qi < activeQuestions.length - 1 ? () => handleMoveQuestion(q.id, 'down') : undefined}
                     />
                 ))}
                 <button
@@ -1082,7 +1119,7 @@ export function QuestionsPage() {
             )}
             {alwaysModal && (
                 <AlwaysNeededModal
-                    initialItems={data.alwaysNeededItems ?? []}
+                    initialItems={activeAlwaysNeededItems}
                     people={people}
                     allItemNames={allItemNames}
                     onSave={handleAlwaysSave}
