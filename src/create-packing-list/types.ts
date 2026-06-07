@@ -21,6 +21,7 @@ export interface PackingListItem {
     packed: boolean
     category?: string
     reviewed?: boolean
+    lastModified?: string // ISO timestamp; absent on legacy items
 }
 
 export interface PackingListFormData {

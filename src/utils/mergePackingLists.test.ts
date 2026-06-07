@@ -181,6 +181,100 @@ describe('mergePackingLists', () => {
     })
   })
 
+  describe('per-item LWW (item-level lastModified)', () => {
+    it('local item wins when its lastModified is newer, regardless of list timestamps', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-1', packed: true, lastModified: '2024-01-01T10:00:10.000Z' })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-1', packed: false, lastModified: '2024-01-01T10:00:03.000Z' })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items[0].packed).toBe(true)
+    })
+
+    it('pod item wins when its lastModified is newer, even when local list is newer', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:10.000Z',
+        items: [makeItem({ id: 'item-1', packed: false, lastModified: '2024-01-01T10:00:03.000Z' })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-1', packed: true, lastModified: '2024-01-01T10:00:08.000Z' })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items[0].packed).toBe(true)
+    })
+
+    it('falls back to list-level LWW when local item has no timestamp', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:03.000Z',
+        items: [makeItem({ id: 'item-1', packed: false })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:10.000Z',
+        items: [makeItem({ id: 'item-1', packed: true, lastModified: '2024-01-01T10:00:08.000Z' })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items[0].packed).toBe(true) // pod list is newer → list-level LWW → pod wins
+    })
+
+    it('falls back to list-level LWW when neither item has a timestamp', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:10.000Z',
+        items: [makeItem({ id: 'item-1', packed: true })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-1', packed: false })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items[0].packed).toBe(true) // local list is newer → existing behavior
+    })
+
+    it('pod item wins when both have equal item-level timestamps', () => {
+      const ts = '2024-01-01T10:00:05.000Z'
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:03.000Z',
+        items: [makeItem({ id: 'item-1', packed: false, lastModified: ts })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:03.000Z',
+        items: [makeItem({ id: 'item-1', packed: true, lastModified: ts })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items[0].packed).toBe(true) // pod wins on tie
+    })
+
+    it('items unique to each side are preserved regardless of item timestamps', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-local', packed: false, lastModified: '2024-01-01T10:00:04.000Z' })],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:05.000Z',
+        items: [makeItem({ id: 'item-pod', packed: true, lastModified: '2024-01-01T10:00:04.000Z' })],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.items).toHaveLength(2)
+      expect(result.items.map(i => i.id)).toEqual(expect.arrayContaining(['item-local', 'item-pod']))
+    })
+  })
+
   describe('edge cases', () => {
     it('handles local with no items', () => {
       const itemQ = makeItem({ id: 'item-Q', itemText: 'Sunscreen' })

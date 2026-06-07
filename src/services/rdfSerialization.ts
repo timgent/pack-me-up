@@ -110,6 +110,7 @@ function packingListItemToThing(item: PackingListItem, itemUrl: string): Thing {
 
     if (item.category !== undefined) t = t.addStringNoLocale(PMU.category, item.category)
     if (item.reviewed !== undefined) t = t.addBoolean(PMU.reviewed, item.reviewed)
+    if (item.lastModified !== undefined) t = t.addDatetime(PMU.itemLastModified, new Date(item.lastModified))
 
     return t.build()
 }
@@ -127,6 +128,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
     const packed = getBoolean(thing, PMU.packed) ?? false
     const category = getStringNoLocale(thing, PMU.category) ?? undefined
     const reviewed = getBoolean(thing, PMU.reviewed)
+    const itemLastModified = getDatetime(thing, PMU.itemLastModified)?.toISOString()
 
     return {
         id,
@@ -138,6 +140,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
         packed,
         ...(category !== undefined ? { category } : {}),
         ...(reviewed !== null ? { reviewed } : {}),
+        ...(itemLastModified !== undefined ? { lastModified: itemLastModified } : {}),
     }
 }
 

@@ -286,12 +286,14 @@ export function ViewPackingList() {
 
             console.log('handleItemChange: Changes detected, saving...')
             setAutoSaveStatus('saving')
+            const now = new Date().toISOString()
             const updatedPackingList: PackingList = {
                 ...packingList,
-                items: packingList.items.map(item => ({
-                    ...item,
-                    packed: currentFormValues[item.id] ?? false
-                }))
+                items: packingList.items.map(item => {
+                    const newPacked = currentFormValues[item.id] ?? false
+                    if (item.packed === newPacked) return item
+                    return { ...item, packed: newPacked, lastModified: now }
+                })
             }
 
             // Save with sync prevention (handles local DB + Pod save).
@@ -368,8 +370,9 @@ export function ViewPackingList() {
             const updatedItems = packingList.items.filter(i => i.id !== itemId)
 
             // Track deletions for question-set items so the user can be prompted later
+            const deletedAt = new Date().toISOString()
             const newDeletedItems = item && item.questionId !== ''
-                ? [...(packingList.deletedItems ?? []), { ...item, reviewed: false }]
+                ? [...(packingList.deletedItems ?? []), { ...item, reviewed: false, lastModified: deletedAt }]
                 : (packingList.deletedItems ?? [])
 
             const updatedPackingList: PackingList = {
@@ -414,8 +417,9 @@ export function ViewPackingList() {
         try {
             setAutoSaveStatus('saving')
 
+            const now = new Date().toISOString()
             const updatedItems = packingList.items.map(item =>
-                item.id === itemId ? { ...item, itemText: trimmed } : item
+                item.id === itemId ? { ...item, itemText: trimmed, lastModified: now } : item
             )
             await persistPackingList({ ...packingList, items: updatedItems })
 
@@ -446,7 +450,8 @@ export function ViewPackingList() {
                 personId: personId,
                 questionId: '',
                 optionId: '',
-                packed: false
+                packed: false,
+                lastModified: new Date().toISOString(),
             }
 
             // Add to form values and clear the input before saving

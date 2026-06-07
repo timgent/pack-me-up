@@ -27,6 +27,7 @@ export const PMU = {
     packed: `${PMU_NS}packed`,
     category: `${PMU_NS}category`,
     reviewed: `${PMU_NS}reviewed`,
+    itemLastModified: `${PMU_NS}itemLastModified`,
 
     // QuestionSet predicates
     hasPerson: `${PMU_NS}hasPerson`,

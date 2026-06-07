@@ -153,6 +153,23 @@ describe('packingListToDataset / datasetToPackingList', () => {
         const result = roundTripList(makePackingList())
         expect(result.deletedItems).toEqual([])
     })
+
+    it('round-trips item lastModified', () => {
+        const item = makeItem({ lastModified: '2024-06-01T12:00:00.000Z' })
+        const result = roundTripList(makePackingList({ items: [item] }))
+        expect(result.items[0].lastModified).toBe('2024-06-01T12:00:00.000Z')
+    })
+
+    it('omits item lastModified when not set', () => {
+        const result = roundTripList(makePackingList({ items: [makeItem()] }))
+        expect(result.items[0].lastModified).toBeUndefined()
+    })
+
+    it('round-trips deletedItem lastModified', () => {
+        const deleted = makeItem({ id: 'item-del', lastModified: '2024-05-01T00:00:00.000Z' })
+        const result = roundTripList(makePackingList({ deletedItems: [deleted] }))
+        expect(result.deletedItems![0].lastModified).toBe('2024-05-01T00:00:00.000Z')
+    })
 })
 
 // ── QuestionSet round-trip ────────────────────────────────────────────────────
