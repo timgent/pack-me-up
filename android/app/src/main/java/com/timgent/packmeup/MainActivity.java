@@ -1,4 +1,4 @@
-package com.packmeup.app;
+package com.timgent.packmeup;
 
 import android.os.Bundle;
 import android.webkit.WebResourceRequest;
