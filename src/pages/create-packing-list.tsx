@@ -542,6 +542,11 @@ export function CreatePackingList() {
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
         if (!questionSet) return
 
+        if (selectedPeopleIds.length === 0) {
+            showToast('Please select at least one traveller.', 'error')
+            return
+        }
+
         // Get items from question answers
         const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionIds: string[] }) => {
             const questionId = qa.questionId
@@ -760,9 +765,22 @@ export function CreatePackingList() {
                 {/* Person Selection */}
                 {questionSet.people.length > 0 && (
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
-                            Who is going on this trip?
-                        </h3>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                Who is going on this trip?
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    selectedPeopleIds.length === questionSet.people.length
+                                        ? setSelectedPeopleIds([])
+                                        : setSelectedPeopleIds(questionSet.people.map(p => p.id))
+                                }
+                                className="text-sm text-blue-600 underline hover:text-blue-800"
+                            >
+                                {selectedPeopleIds.length === questionSet.people.length ? 'Select none' : 'Select all'}
+                            </button>
+                        </div>
                         <div className="space-y-2">
                             {questionSet.people.map((person) => (
                                 <label key={person.id} className="flex items-center space-x-3">

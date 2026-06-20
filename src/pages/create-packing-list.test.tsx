@@ -1198,3 +1198,94 @@ describe('CreatePackingList – question set pod sync on mount', () => {
         expect(db.saveQuestionSet).not.toHaveBeenCalled()
     })
 })
+
+// ─── CreatePackingList – travellers select-all/none and validation ─────────────
+
+const twoPersonQuestionSet: PackingListQuestionSet = {
+    people: [
+        { id: 'p1', name: 'Alice' },
+        { id: 'p2', name: 'Bob' },
+    ],
+    alwaysNeededItems: [],
+    questions: [
+        {
+            id: 'q1',
+            text: 'Where are you going?',
+            order: 0,
+            type: 'saved',
+            options: [{ id: 'o1', text: 'Beach', order: 0, items: [] }],
+        },
+    ],
+}
+
+function makeTwoPersonDb(overrides: Record<string, unknown> = {}) {
+    return {
+        getQuestionSet: vi.fn().mockResolvedValue(twoPersonQuestionSet),
+        getAllPackingLists: vi.fn().mockResolvedValue([]),
+        saveQuestionSet: vi.fn().mockResolvedValue({ rev: '2' }),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        ...overrides,
+    }
+}
+
+describe('CreatePackingList – travellers select-all/none and validation', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({ isLoggedIn: false } as ReturnType<typeof useSolidPod>)
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('shows a select all/none toggle button in the people section', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeTwoPersonDb() } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+        expect(screen.getByRole('button', { name: /select (all|none)/i })).toBeTruthy()
+    })
+
+    it('"Select none" deselects all travellers', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeTwoPersonDb() } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        const toggle = screen.getByRole('button', { name: /select none/i })
+        fireEvent.click(toggle)
+
+        const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+        expect(checkboxes.every(cb => !cb.checked)).toBe(true)
+    })
+
+    it('"Select all" re-selects all travellers after deselecting', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeTwoPersonDb() } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.click(screen.getByRole('button', { name: /select none/i }))
+        fireEvent.click(screen.getByRole('button', { name: /select all/i }))
+
+        const checkboxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+        expect(checkboxes.every(cb => cb.checked)).toBe(true)
+    })
+
+    it('blocks submission and shows error toast when no travellers are selected', async () => {
+        const showToast = vi.fn()
+        mockUseToast.mockReturnValue({ showToast } as ReturnType<typeof useToast>)
+        const db = makeTwoPersonDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.click(screen.getByRole('button', { name: /select none/i }))
+        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My Trip' } })
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(showToast).toHaveBeenCalledWith(
+            expect.stringMatching(/at least one traveller/i),
+            'error'
+        ))
+        expect(db.savePackingList).not.toHaveBeenCalled()
+    })
+})
