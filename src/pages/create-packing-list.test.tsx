@@ -926,7 +926,7 @@ describe('CreatePackingList – deletion suggestion card', () => {
 
         const keepButtons = screen.getAllByRole('button', { name: /keep/i })
         fireEvent.click(keepButtons[0])
-        await waitFor(() => screen.getAllByRole('button', { name: /keep/i }).length < 2)
+        await waitFor(() => expect(screen.getAllByRole('button', { name: /keep/i })).toHaveLength(1))
         fireEvent.click(screen.getByRole('button', { name: /keep/i }))
 
         await waitFor(() => expect(screen.queryByText(/previously removed/i)).toBeNull())
