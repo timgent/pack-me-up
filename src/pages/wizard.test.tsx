@@ -255,6 +255,41 @@ describe('Wizard', () => {
         )
     })
 
+    it('name input for each person row has a programmatically associated label', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        // The first person row's name input must be reachable by label text
+        const nameInput = await screen.findByLabelText(/^name$/i)
+        expect(nameInput).toBeTruthy()
+        expect((nameInput as HTMLInputElement).type).toBe('text')
+    })
+
+    it('name input for dynamically added person rows also has an associated label', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        const addBtn = await screen.findByRole('button', { name: /add another person/i })
+        addBtn.click()
+
+        await waitFor(() => {
+            const nameInputs = screen.getAllByLabelText(/^name$/i)
+            expect(nameInputs).toHaveLength(2)
+        })
+    })
+
     it('renders a gender select for each person', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
