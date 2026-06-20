@@ -20,6 +20,10 @@ Each serial suite that writes to a Solid pod **must use its own dedicated pod us
 | M (User A) | `muser` |
 | L/M (User B) | `collabuser` |
 
+## Pull Requests
+
+When raising a PR that addresses a GitHub issue, always reference the issue in the PR description using `Closes #<issue-number>` or `Fixes #<issue-number>` so GitHub automatically links and closes the issue on merge.
+
 ## Data Access
 
 Never call `db.*` (local PouchDB) and pod storage functions directly in the same place. Use the established intermediate layers:
