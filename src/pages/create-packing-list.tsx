@@ -13,6 +13,7 @@ import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS, loadMultipleRdfFromPod 
 import { usePodSync } from '../hooks/usePodSync'
 import { questionSetToDataset, datasetToQuestionSet, packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { useForeignPod } from '../components/ForeignPodContext'
+import { generateQuestionBasedItems } from '../create-packing-list/generatePackingListItems'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -543,38 +544,12 @@ export function CreatePackingList() {
         if (!questionSet) return
 
         // Get items from question answers
-        const questionBasedItems = data.questionAnswers.flatMap((qa: { questionId: string; selectedOptionIds: string[] }) => {
-            const questionId = qa.questionId
-            const selectedOptionIds = qa.selectedOptionIds || []
-            const question = questionSet.questions.find((q) => q.id === questionId)
-            if (!question) return []
-
-            // For each selected option, get all items
-            return selectedOptionIds.flatMap((selectedOptionId) => {
-                if (!selectedOptionId) return []
-                const selectedOption = question.options.find((option) => (option.id === selectedOptionId))
-                if (!selectedOption) return []
-                const packingListItems: PackingListItem[] = selectedOption.items.flatMap((item) => {
-                    const selectedPeople = item.personSelections.filter((person) => (
-                        person.selected && selectedPeopleIds.includes(person.personId)
-                    ))
-                    return selectedPeople.flatMap((person) => {
-                        const personName = questionSet.people.find((p) => p.id === person.personId)!.name
-                        return {
-                            id: crypto.randomUUID(),
-                            itemText: item.text,
-                            personId: person.personId,
-                            personName,
-                            questionId: question.id,
-                            optionId: selectedOption.id,
-                            packed: false,
-                            category: question.questionType === 'multiple-choice' ? selectedOption.text : question.text,
-                        }
-                    })
-                })
-                return packingListItems
-            })
-        })
+        const questionBasedItems = generateQuestionBasedItems(
+            questionSet.questions,
+            data.questionAnswers,
+            questionSet.people,
+            selectedPeopleIds
+        )
 
         // Get always needed items
         const alwaysNeededItems = questionSet.alwaysNeededItems.flatMap((item) => {
