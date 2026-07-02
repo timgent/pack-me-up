@@ -8,7 +8,7 @@ vi.mock('@vercel/analytics/react', () => ({
 
 vi.mock('./components/SolidPodContext', () => ({
   SolidPodProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useSolidPod: vi.fn(),
+  useSolidPod: vi.fn(() => ({ isLoggedIn: false, isLoading: false })),
 }))
 
 vi.mock('./components/DatabaseContext', () => ({
