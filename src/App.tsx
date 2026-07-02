@@ -11,7 +11,7 @@ import { LandingPage } from './pages/landing-page'
 import { CreatePackingList } from './pages/create-packing-list'
 import { PackingLists } from './pages/packing-lists'
 import { ViewPackingList } from './pages/view-packing-list'
-import { SolidPodProvider } from './components/SolidPodContext'
+import { SolidPodProvider, useSolidPod } from './components/SolidPodContext'
 import { DatabaseProvider } from './components/DatabaseContext'
 import { SolidPodHandleRedirectPage } from './pages/solid-pod-handle-redirect-page'
 import { Wizard } from './pages/wizard'
@@ -20,6 +20,12 @@ import { ForeignPodLayout } from './components/ForeignPodLayout'
 import { ForeignPackingListsPage } from './pages/foreign-packing-lists'
 import { SharingSettingsPage } from './pages/sharing-settings'
 import { QuestionsPage } from './pages/questions-page'
+
+function DefaultRedirect() {
+  const { isLoggedIn, isLoading } = useSolidPod()
+  if (isLoading) return null
+  return <Navigate to={isLoggedIn ? '/view-lists' : '/home'} replace />
+}
 
 function App() {
   return (
@@ -33,7 +39,8 @@ function App() {
             <SessionExpiredBanner />
             <div className="container mx-auto px-4 py-8" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}>
               <Routes>
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={<DefaultRedirect />} />
+                <Route path="/home" element={<LandingPage />} />
                 <Route path="/wizard" element={<Wizard />} />
                 <Route path="/manage-questions" element={<QuestionsPage />} />
                 <Route path="/create-packing-list" element={<CreatePackingList />} />

@@ -48,7 +48,7 @@ export const Navigation = () => {
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
-                                <Link to="/" className="flex items-center gap-2 text-2xl font-bold hover:scale-105 transition-transform duration-200 drop-shadow-md">
+                                <Link to="/home" className="flex items-center gap-2 text-2xl font-bold hover:scale-105 transition-transform duration-200 drop-shadow-md">
                                     <img src="/favicon.svg" alt="" className="h-8 w-8" />
                                     Pack Me Up
                                 </Link>
