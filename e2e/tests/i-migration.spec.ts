@@ -75,7 +75,7 @@ test.describe('I – Data Migration', () => {
     const cancelBtn = dialog.getByRole('button').filter({ hasText: /no|cancel|skip|start fresh/i }).first()
     await cancelBtn.click({ timeout: 10_000 })
     // Landing page should show "Get Started" (empty pod namespace)
-    await localPage.goto('/')
+    await localPage.goto('/#/home')
     await expect(localPage.getByRole('link', { name: /Get Started/i })).toBeVisible({ timeout: 5_000 })
     await localCtx.close()
   })
