@@ -8,9 +8,9 @@ import { Modal } from '../components/Modal'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
-import { wizardSchema, WizardFormData } from './wizard-types'
+import { wizardSchema, WizardFormData, WizardEntry } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
-import { AGE_RANGE_OPTIONS, GENDER_OPTIONS } from '../edit-questions/types'
+import { AGE_RANGE_OPTIONS, GENDER_OPTIONS, PET_SPECIES_OPTIONS } from '../edit-questions/types'
 
 const SOLID_POD_UPSELL_SHOWN_KEY = 'solid-pod-upsell-shown'
 
@@ -28,7 +28,7 @@ export const Wizard = () => {
     const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
         resolver: zodResolver(wizardSchema),
         defaultValues: {
-            people: [{ name: 'Me', ageRange: undefined }],
+            people: [{ kind: 'person', name: 'Me', ageRange: undefined, gender: undefined }],
         }
     })
 
@@ -94,17 +94,21 @@ export const Wizard = () => {
         await generateAndSave(data)
     }
 
+    // Cast through unknown: react-hook-form seeds rows with empty (undefined)
+    // selects, which the strict discriminated union doesn't model.
     const handleAddPerson = () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        append({ name: `Person ${fields.length + 1}` } as any)
+        append({ kind: 'person', name: `Person ${fields.length + 1}`, ageRange: undefined, gender: undefined } as unknown as WizardEntry)
+    }
+
+    const handleAddPet = () => {
+        append({ kind: 'pet', name: `Pet ${fields.length + 1}`, species: undefined } as unknown as WizardEntry)
     }
 
     const handleRemovePerson = (index: number) => {
         if (fields.length > 1) {
             remove(index)
         } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            update(0, { name: '' } as any)
+            update(0, { kind: 'person', name: '', ageRange: undefined, gender: undefined } as unknown as WizardEntry)
         }
     }
 
@@ -140,7 +144,7 @@ export const Wizard = () => {
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-bold text-primary-900">👥 Who's Packing?</h2>
                         <span className="text-sm text-gray-600 font-medium">
-                            {fields.length} {fields.length === 1 ? 'person' : 'people'}
+                            {fields.length} in your group
                         </span>
                     </div>
 
@@ -163,47 +167,71 @@ export const Wizard = () => {
                                                 <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.name?.message}</p>
                                             )}
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                Age Range
-                                            </label>
-                                            <select
-                                                {...register(`people.${index}.ageRange`)}
-                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                                            >
-                                                <option value="">Select age range...</option>
-                                                {AGE_RANGE_OPTIONS.map(option => (
-                                                    <option key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {errors.people?.[index]?.ageRange && (
-                                                <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.ageRange?.message}</p>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                                Gender
-                                            </label>
-                                            <select
-                                                {...register(`people.${index}.gender`)}
-                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-                                            >
-                                                <option value="">Select gender...</option>
-                                                {GENDER_OPTIONS.map(option => (
-                                                    <option key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        {field.kind === 'pet' ? (
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    Species
+                                                </label>
+                                                <select
+                                                    {...register(`people.${index}.species`)}
+                                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                >
+                                                    <option value="">Select species...</option>
+                                                    {PET_SPECIES_OPTIONS.map(option => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {errors.people?.[index] && 'species' in errors.people[index]! && (
+                                                    <p className="text-danger-500 text-sm mt-1">Species is required</p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        Age Range
+                                                    </label>
+                                                    <select
+                                                        {...register(`people.${index}.ageRange`)}
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                    >
+                                                        <option value="">Select age range...</option>
+                                                        {AGE_RANGE_OPTIONS.map(option => (
+                                                            <option key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {errors.people?.[index] && 'ageRange' in errors.people[index]! && (
+                                                        <p className="text-danger-500 text-sm mt-1">{(errors.people[index] as { ageRange?: { message?: string } }).ageRange?.message}</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        Gender
+                                                    </label>
+                                                    <select
+                                                        {...register(`people.${index}.gender`)}
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                    >
+                                                        <option value="">Select gender...</option>
+                                                        {GENDER_OPTIONS.map(option => (
+                                                            <option key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => handleRemovePerson(index)}
                                         className="mt-8 p-2 text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
-                                        title="Remove person"
+                                        title={field.kind === 'pet' ? 'Remove pet' : 'Remove person'}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -215,7 +243,7 @@ export const Wizard = () => {
                     </div>
 
                     {fields.length < 10 && (
-                        <div className="mt-4">
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={handleAddPerson}
@@ -226,12 +254,20 @@ export const Wizard = () => {
                                 </svg>
                                 Add Another Person
                             </button>
+                            <button
+                                type="button"
+                                onClick={handleAddPet}
+                                className="w-full py-3 px-4 border-2 border-dashed border-primary-300 rounded-xl text-primary-700 font-semibold hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            >
+                                <span className="text-lg leading-none">🐾</span>
+                                Add a Pet
+                            </button>
                         </div>
                     )}
 
                     {fields.length >= 10 && (
                         <p className="mt-4 text-sm text-gray-600 text-center">
-                            Maximum of 10 people reached
+                            Maximum of 10 reached
                         </p>
                     )}
 

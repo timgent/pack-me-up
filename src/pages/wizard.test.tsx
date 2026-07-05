@@ -306,6 +306,41 @@ describe('Wizard', () => {
     })
 
 
+    describe("Who's Packing? - pets", () => {
+        function renderWizard() {
+            const db = makeDb()
+            mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+            return render(
+                <MemoryRouter>
+                    <Wizard />
+                </MemoryRouter>
+            )
+        }
+
+        it('shows an "Add a Pet" button', async () => {
+            renderWizard()
+            expect(await screen.findByRole('button', { name: /add a pet/i })).toBeTruthy()
+        })
+
+        it('adds a pet row with a species select when "Add a Pet" is clicked', async () => {
+            renderWizard()
+            const addPetBtn = await screen.findByRole('button', { name: /add a pet/i })
+            addPetBtn.click()
+            await waitFor(() => expect(screen.getByText('Select species...')).toBeTruthy())
+        })
+
+        it('a pet row does not render an age range select', async () => {
+            renderWizard()
+            // Only the initial person row exists: one age range placeholder
+            await waitFor(() => expect(screen.getAllByText('Select age range...')).toHaveLength(1))
+            const addPetBtn = await screen.findByRole('button', { name: /add a pet/i })
+            addPetBtn.click()
+            // Adding a pet must not add another age range select
+            await waitFor(() => expect(screen.getByText('Select species...')).toBeTruthy())
+            expect(screen.getAllByText('Select age range...')).toHaveLength(1)
+        })
+    })
+
     describe("Who's Packing? - remove person", () => {
         function renderWizard() {
             const db = makeDb()

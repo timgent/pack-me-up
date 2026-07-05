@@ -22,15 +22,18 @@ import {
     getFemaleTeenagersAndAdults,
     getMaleTeenagersAndAdults,
 } from './age-specific-items';
+import { getDogs, getCats, getPets, getHumans } from './pet-specific-items';
 
 /**
  * Helper function to create an item with age-appropriate person selections
  * @param text - The item text/name
  * @param people - All people in the group
- * @param ageFilter - Optional function to filter people by age range (defaults to everyone)
+ * @param ageFilter - Optional function to filter people (defaults to all humans).
+ *   Defaulting to humans (rather than everyone) keeps pets from inheriting
+ *   human items; it's a no-op for groups with no pets.
  */
 function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
-    const selectedPeople = ageFilter ? ageFilter(people) : people;
+    const selectedPeople = ageFilter ? ageFilter(people) : getHumans(people);
     return {
         text,
         personSelections: people.map(p => ({
@@ -182,6 +185,19 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("First aid kit", people),
             item("Plasters / Band-aids", people),
             item("Pain relief (paracetamol / ibuprofen)", people, getAdults),
+            // Pet items — only appear when a matching pet is in the group
+            item("Pet food", people, getPets),
+            item("Food & water bowls", people, getPets),
+            item("Pet bed/blanket", people, getPets),
+            item("Pet medication", people, getPets),
+            item("Vaccination/health records", people, getPets),
+            item("Lead/Leash", people, getDogs),
+            item("Collar & ID tag", people, getDogs),
+            item("Poop bags", people, getDogs),
+            item("Dog toy", people, getDogs),
+            item("Litter tray & litter", people, getCats),
+            item("Cat carrier", people, getCats),
+            item("Scratching pad", people, getCats),
         ),
         questions: [
             {

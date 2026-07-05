@@ -24,12 +24,26 @@ export const GENDER_OPTIONS = [
   { value: 'prefer-not-to-say' as const, label: 'Prefer not to say' },
 ] as const
 
+// Pet Species Type
+export const PetSpeciesSchema = z.enum(['dog', 'cat', 'other'])
+export type PetSpecies = z.infer<typeof PetSpeciesSchema>
+
+export const PET_SPECIES_OPTIONS = [
+  { value: 'dog' as const, label: '🐕 Dog' },
+  { value: 'cat' as const, label: '🐈 Cat' },
+  { value: 'other' as const, label: '🐾 Other pet' },
+] as const
+
 // Zod Schemas
+// `species` is optional and additive: a Person without it is a human (existing
+// data loads unchanged); a Person with it is a pet, modelled as just another
+// person once the question set is generated.
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
   ageRange: AgeRangeSchema.optional(),
   gender: GenderSchema.optional(),
+  species: PetSpeciesSchema.optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })

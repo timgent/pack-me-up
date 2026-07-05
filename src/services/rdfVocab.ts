@@ -37,6 +37,7 @@ export const PMU = {
     // Person predicates
     ageRange: `${PMU_NS}ageRange`,
     gender: `${PMU_NS}gender`,
+    species: `${PMU_NS}species`,
     personLastModified: `${PMU_NS}personLastModified`,
     personDeletedAt: `${PMU_NS}personDeletedAt`,
 

@@ -32,12 +32,11 @@ export function useWizardGeneration() {
     })
 
     const generateQuestionSet = (data: WizardFormData) => {
-        const people: Person[] = data.people.map(p => ({
-            id: generateUUID(),
-            name: p.name,
-            ageRange: p.ageRange,
-            gender: p.gender
-        }))
+        const people: Person[] = data.people.map(entry =>
+            entry.kind === 'pet'
+                ? { id: generateUUID(), name: entry.name, species: entry.species }
+                : { id: generateUUID(), name: entry.name, ageRange: entry.ageRange, gender: entry.gender }
+        )
         return createExampleData(people, [])
     }
 

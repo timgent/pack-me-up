@@ -125,6 +125,77 @@ describe('createExampleData - unassigned items excluded', () => {
     })
 })
 
+describe('createExampleData - pets', () => {
+    const adult: Person = { id: 'a1', name: 'Alice', ageRange: 'Adult' }
+    const dog: Person = { id: 'd1', name: 'Rex', species: 'dog' }
+    const cat: Person = { id: 'c1', name: 'Whiskers', species: 'cat' }
+
+    const petItem = (result: ReturnType<typeof createExampleData>, text: string) =>
+        result.alwaysNeededItems.find(i => i.text === text)
+
+    it('excludes all pet items when no pets are in the group', () => {
+        const result = createExampleData([adult])
+        for (const text of ['Pet food', 'Lead/Leash', 'Poop bags', 'Litter tray & litter', 'Cat carrier']) {
+            expect(petItem(result, text), `"${text}" should not appear`).toBeUndefined()
+        }
+    })
+
+    it('includes dog-specific items selected for the dog only', () => {
+        const result = createExampleData([adult, dog])
+        const lead = petItem(result, 'Lead/Leash')
+        expect(lead).toBeTruthy()
+        expect(lead!.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(true)
+        expect(lead!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(false)
+    })
+
+    it('includes generic pet items (Pet food) selected for the dog', () => {
+        const result = createExampleData([adult, dog])
+        const food = petItem(result, 'Pet food')
+        expect(food).toBeTruthy()
+        expect(food!.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(true)
+    })
+
+    it('does not select the dog for human items (Snacks)', () => {
+        const result = createExampleData([adult, dog])
+        const snacks = result.alwaysNeededItems.find(i => i.text === 'Snacks')!
+        expect(snacks.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(false)
+        expect(snacks.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(true)
+    })
+
+    it('does not select the dog for unfiltered weather items (Sunscreen)', () => {
+        const result = createExampleData([adult, dog])
+        const weather = result.questions.find(q => q.text === 'What weather do you expect?')!
+        const hotItems = weather.options.find(o => o.text === 'Hot')!.items
+        const sunscreen = hotItems.find(i => i.text === 'Sunscreen')!
+        expect(sunscreen.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(false)
+    })
+
+    it('includes cat-specific items for a cat but no dog items', () => {
+        const result = createExampleData([adult, cat])
+        const litter = petItem(result, 'Litter tray & litter')
+        expect(litter).toBeTruthy()
+        expect(litter!.personSelections.find(ps => ps.personId === cat.id)?.selected).toBe(true)
+        expect(petItem(result, 'Lead/Leash')).toBeUndefined()
+    })
+
+    it('does not select humans for pet items', () => {
+        const result = createExampleData([adult, dog])
+        const food = petItem(result, 'Pet food')!
+        expect(food.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(false)
+    })
+
+    it('produces no item that has all personSelections unselected (with a mixed group)', () => {
+        const result = createExampleData([adult, dog, cat])
+        const allItems = [
+            ...result.alwaysNeededItems,
+            ...result.questions.flatMap(q => q.options.flatMap(o => o.items)),
+        ]
+        for (const item of allItems) {
+            expect(item.personSelections.some(ps => ps.selected), `Item "${item.text}" has no one assigned`).toBe(true)
+        }
+    })
+})
+
 describe('createExampleData - gender-specific items', () => {
     function getOvernightYesItems(result: ReturnType<typeof createExampleData>) {
         const overnight = result.questions.find(q => q.text === 'Will you be staying overnight?')!
