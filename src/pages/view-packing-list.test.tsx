@@ -511,6 +511,57 @@ describe('ViewPackingList checked item styling', () => {
     })
 })
 
+describe('ViewPackingList new item feedback', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({
+            saveToPod: vi.fn(),
+        })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('highlights a newly added item', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        const input = screen.getByPlaceholderText('Add new item...')
+        fireEvent.change(input, { target: { value: 'Sunscreen' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => {
+            const span = screen.getByText('Sunscreen')
+            const row = span.closest('div.rounded-lg')
+            expect(row?.className).toContain('ring-green-400')
+        })
+    })
+
+    it('does not highlight items that were not just added', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        const span = screen.getByText('Passport')
+        const row = span.closest('div.rounded-lg')
+        expect(row?.className).not.toContain('ring-green-400')
+    })
+})
+
 describe('ViewPackingList inline item editing', () => {
     let db: ReturnType<typeof makeDb>
 
