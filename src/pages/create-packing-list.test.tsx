@@ -376,7 +376,9 @@ describe('CreatePackingList – suggestion card', () => {
                 ]),
             })
         ))
-        expect(screen.queryByText('Sunscreen SPF50')).toBeNull()
+        // The card removal re-renders after the awaited save resolves — poll
+        // rather than asserting synchronously (flaked on slower CI runners)
+        await waitFor(() => expect(screen.queryByText('Sunscreen SPF50')).toBeNull())
     })
 
     it('"Add" calls db.saveQuestionSet and db.savePackingList with reviewed:true', async () => {
@@ -405,7 +407,7 @@ describe('CreatePackingList – suggestion card', () => {
                 })
             )
         })
-        expect(screen.queryByText('Sunscreen SPF50')).toBeNull()
+        await waitFor(() => expect(screen.queryByText('Sunscreen SPF50')).toBeNull())
     })
 
     it('"Add" sets selected:true for the matching person in personSelections', async () => {
