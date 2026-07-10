@@ -196,6 +196,72 @@ describe('createExampleData - pets', () => {
     })
 })
 
+describe('createExampleData - travelling abroad', () => {
+    const adult: Person = { id: 'a1', name: 'Alice', ageRange: 'Adult' }
+    const baby: Person = { id: 'b1', name: 'Baby', ageRange: 'Baby' }
+    const dog: Person = { id: 'd1', name: 'Rex', species: 'dog' }
+
+    function getAbroadQuestion(result: ReturnType<typeof createExampleData>) {
+        return result.questions.find(q => q.text === 'Are you travelling abroad?')
+    }
+
+    function getAbroadYesItems(result: ReturnType<typeof createExampleData>) {
+        return getAbroadQuestion(result)!.options.find(o => o.text === 'Yes')!.items
+    }
+
+    it('includes a single-choice travelling abroad question with Yes/No options', () => {
+        const result = createExampleData([adult])
+        const question = getAbroadQuestion(result)
+        expect(question).toBeTruthy()
+        expect(question!.questionType).toBe('single-choice')
+        const optionTexts = question!.options.map(o => o.text)
+        expect(optionTexts).toEqual(['Yes', 'No'])
+    })
+
+    it('has no items on the No option', () => {
+        const result = createExampleData([adult])
+        const noOption = getAbroadQuestion(result)!.options.find(o => o.text === 'No')!
+        expect(noOption.items).toEqual([])
+    })
+
+    it('includes Passport selected for all humans including babies', () => {
+        const result = createExampleData([adult, baby, dog])
+        const passport = getAbroadYesItems(result).find(i => i.text === 'Passport')
+        expect(passport).toBeTruthy()
+        expect(passport!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(true)
+        expect(passport!.personSelections.find(ps => ps.personId === baby.id)?.selected).toBe(true)
+        expect(passport!.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(false)
+    })
+
+    it('includes travel document items selected for adults only', () => {
+        const result = createExampleData([adult, baby])
+        for (const text of ['Travel insurance documents', 'Visa (if required)', 'Local currency', 'Copies of important documents']) {
+            const found = getAbroadYesItems(result).find(i => i.text === text)
+            expect(found, `"${text}" should appear`).toBeTruthy()
+            expect(found!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(true)
+            expect(found!.personSelections.find(ps => ps.personId === baby.id)?.selected).toBe(false)
+        }
+    })
+
+    it('includes Travel adapter for adults', () => {
+        const result = createExampleData([adult])
+        const adapter = getAbroadYesItems(result).find(i => i.text === 'Travel adapter')
+        expect(adapter).toBeTruthy()
+        expect(adapter!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(true)
+    })
+
+    it('includes pet travel documents only when pets are in the group', () => {
+        const withPet = createExampleData([adult, dog])
+        const petDocs = getAbroadYesItems(withPet).find(i => i.text === 'Pet passport/Animal health certificate')
+        expect(petDocs).toBeTruthy()
+        expect(petDocs!.personSelections.find(ps => ps.personId === dog.id)?.selected).toBe(true)
+        expect(petDocs!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(false)
+
+        const withoutPet = createExampleData([adult])
+        expect(getAbroadYesItems(withoutPet).find(i => i.text === 'Pet passport/Animal health certificate')).toBeUndefined()
+    })
+})
+
 describe('createExampleData - gender-specific items', () => {
     function getOvernightYesItems(result: ReturnType<typeof createExampleData>) {
         const overnight = result.questions.find(q => q.text === 'Will you be staying overnight?')!

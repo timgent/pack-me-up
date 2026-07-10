@@ -250,8 +250,38 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             {
                 id: generateUUID(),
                 type: "saved",
-                text: "Are you self-catering?",
+                text: "Are you travelling abroad?",
                 order: 1,
+                questionType: "single-choice",
+                options: [
+                    {
+                        id: generateUUID(),
+                        text: "Yes",
+                        order: 0,
+                        items: items(
+                            item("Passport", people),
+                            item("Travel insurance documents", people, getAdults),
+                            item("Visa (if required)", people, getAdults),
+                            item("Local currency", people, getAdults),
+                            item("Travel adapter", people, getAdults),
+                            item("Copies of important documents", people, getAdults),
+                            item("EHIC/GHIC card (if applicable)", people, getAdults),
+                            item("Pet passport/Animal health certificate", people, getPets),
+                        )
+                    },
+                    {
+                        id: generateUUID(),
+                        text: "No",
+                        order: 1,
+                        items: []
+                    }
+                ]
+            },
+            {
+                id: generateUUID(),
+                type: "saved",
+                text: "Are you self-catering?",
+                order: 2,
                 questionType: "single-choice",
                 options: [
                     {
@@ -277,7 +307,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 id: activitiesQuestionId,
                 type: "saved",
                 text: "What activities will you be doing?",
-                order: 2,
+                order: 3,
                 questionType: "multiple-choice",
                 options: activityOptions
             },
@@ -285,7 +315,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 id: generateUUID(),
                 type: "saved",
                 text: "What weather do you expect?",
-                order: 3,
+                order: 4,
                 questionType: "multiple-choice",
                 options: [
                     {
