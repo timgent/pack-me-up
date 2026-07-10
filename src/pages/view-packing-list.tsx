@@ -764,6 +764,31 @@ export function ViewPackingList() {
                                     </div>
                                 </div>
                                 {!collapsedPersons.has(personName) && <div>
+                                    {/* Add new item input */}
+                                    <div className="mb-4 pb-4 border-b border-gray-200">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={newItemInputs[personName] || ''}
+                                                onChange={(e) => setNewItemInputs({ ...newItemInputs, [personName]: e.target.value })}
+                                                onKeyPress={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault()
+                                                        handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')
+                                                    }
+                                                }}
+                                                placeholder="Add new item..."
+                                                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')}
+                                                className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    </div>
                                     {groupByCategory(items).map(({ category, items: catItems }) => {
                                         const sectionKey = `${personName}::${category}`
                                         const isCollapsed = collapsedCategories.has(sectionKey)
@@ -858,32 +883,6 @@ export function ViewPackingList() {
                                             </div>
                                         )
                                     })}
-
-                                    {/* Add new item input */}
-                                    <div className="mt-4 pt-4 border-t border-gray-200">
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={newItemInputs[personName] || ''}
-                                                onChange={(e) => setNewItemInputs({ ...newItemInputs, [personName]: e.target.value })}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault()
-                                                        handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')
-                                                    }
-                                                }}
-                                                placeholder="Add new item..."
-                                                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAddItem(personName, guestPersonIdByName.get(personName) ?? '')}
-                                                className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                                            >
-                                                Add
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>}
                             </div>
                         )})}
