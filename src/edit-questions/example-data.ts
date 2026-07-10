@@ -43,6 +43,15 @@ function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Perso
     };
 }
 
+/**
+ * Like `item`, but packed once for the whole group. The person selections
+ * become a trigger: the item is included when at least one selected person
+ * is on the trip (e.g. a litter tray only when the cat is coming).
+ */
+function communalItem(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
+    return { ...item(text, people, ageFilter), communal: true };
+}
+
 function items(...args: Item[]): Item[] {
     return args.filter(i => i.personSelections.some(ps => ps.selected));
 }
@@ -131,7 +140,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 item("Daypack/Backpack", people, getTeenagersAndAdults),
                 item("Walking poles", people, getAdults),
                 item("Trail map", people, getAdults),
-                item("First aid kit", people, getAdults),
+                communalItem("First aid kit", people, getAdults),
                 item("Baby carrier/Sling", people, getBabies),
                 item("Toddler reins/Backpack harness", people, getToddlers),
                 item("Lightweight buggy/Stroller", people, getToddlers),
@@ -179,15 +188,15 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("Toddler snacks", people, getToddlers),
             item("Comfort item (teddy/blanket)", people, getToddlers),
             item("Entertainment (books/small toys)", people, getChildren),
-            item("Playing cards/Travel games", people, getChildren),
+            communalItem("Playing cards/Travel games", people, getChildren),
             item("Headphones", people, getTeenagers),
             item("Phone charger", people, getTeenagers),
-            item("First aid kit", people),
-            item("Plasters / Band-aids", people),
-            item("Pain relief (paracetamol / ibuprofen)", people, getAdults),
+            communalItem("First aid kit", people),
+            communalItem("Plasters / Band-aids", people),
+            communalItem("Pain relief (paracetamol / ibuprofen)", people, getAdults),
             // Pet items — only appear when a matching pet is in the group
-            item("Pet food", people, getPets),
-            item("Food & water bowls", people, getPets),
+            communalItem("Pet food", people, getPets),
+            communalItem("Food & water bowls", people, getPets),
             item("Pet bed/blanket", people, getPets),
             item("Pet medication", people, getPets),
             item("Vaccination/health records", people, getPets),
@@ -195,7 +204,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
             item("Collar & ID tag", people, getDogs),
             item("Poop bags", people, getDogs),
             item("Dog toy", people, getDogs),
-            item("Litter tray & litter", people, getCats),
+            communalItem("Litter tray & litter", people, getCats),
             item("Cat carrier", people, getCats),
             item("Scratching pad", people, getCats),
         ),
@@ -213,7 +222,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         order: 0,
                         items: items(
                             item("Toothbrush", people, getToddlersAndOlder),
-                            item("Toothpaste", people, getAdults),
+                            communalItem("Toothpaste", people, getAdults),
                             item("Deodorant", people, getTeenagersAndAdults),
                             item("Phone Charger", people, getTeenagersAndAdults),
                             item("Passport/ID", people, getAdults),
@@ -260,10 +269,10 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         order: 0,
                         items: items(
                             item("Passport", people),
-                            item("Travel insurance documents", people, getAdults),
+                            communalItem("Travel insurance documents", people, getAdults),
                             item("Visa", people, getAdults),
                             item("Local currency", people, getAdults),
-                            item("Travel adapter", people, getAdults),
+                            communalItem("Travel adapter", people, getAdults),
                             item("Copies of important documents", people, getAdults),
                             item("EHIC/GHIC card", people, getAdults),
                             item("Pet passport/Animal health certificate", people, getPets),

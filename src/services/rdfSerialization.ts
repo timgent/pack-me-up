@@ -108,6 +108,7 @@ function packingListItemToThing(item: PackingListItem, itemUrl: string): Thing {
         .addStringNoLocale(PMU.optionId, item.optionId)
         .addBoolean(PMU.packed, item.packed)
 
+    if (item.communal !== undefined) t = t.addBoolean(PMU.communal, item.communal)
     if (item.category !== undefined) t = t.addStringNoLocale(PMU.category, item.category)
     if (item.reviewed !== undefined) t = t.addBoolean(PMU.reviewed, item.reviewed)
     if (item.lastModified !== undefined) t = t.addDatetime(PMU.itemLastModified, new Date(item.lastModified))
@@ -126,6 +127,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
     const questionId = getStringNoLocale(thing, PMU.questionId) ?? ''
     const optionId = getStringNoLocale(thing, PMU.optionId) ?? ''
     const packed = getBoolean(thing, PMU.packed) ?? false
+    const communal = getBoolean(thing, PMU.communal)
     const category = getStringNoLocale(thing, PMU.category) ?? undefined
     const reviewed = getBoolean(thing, PMU.reviewed)
     const itemLastModified = getDatetime(thing, PMU.itemLastModified)?.toISOString()
@@ -138,6 +140,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
         questionId,
         optionId,
         packed,
+        ...(communal !== null ? { communal } : {}),
         ...(category !== undefined ? { category } : {}),
         ...(reviewed !== null ? { reviewed } : {}),
         ...(itemLastModified !== undefined ? { lastModified: itemLastModified } : {}),
@@ -368,6 +371,7 @@ function questionItemToThings(
         .addStringNoLocale(PMU.text, item.text)
 
     if (item.id) itemBuilder = itemBuilder.addStringNoLocale(PMU.questionItemId, item.id)
+    if (item.communal !== undefined) itemBuilder = itemBuilder.addBoolean(PMU.communal, item.communal)
     if (item.lastModified) itemBuilder = itemBuilder.addDatetime(PMU.questionItemLastModified, new Date(item.lastModified))
     if (item.deletedAt) itemBuilder = itemBuilder.addDatetime(PMU.questionItemDeletedAt, new Date(item.deletedAt))
 
@@ -530,6 +534,7 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
 
     const text = getStringNoLocale(thing, PMU.text) ?? ''
     const id = getStringNoLocale(thing, PMU.questionItemId) ?? undefined
+    const communal = getBoolean(thing, PMU.communal)
     const lastModified = getDatetime(thing, PMU.questionItemLastModified)?.toISOString()
     const deletedAt = getDatetime(thing, PMU.questionItemDeletedAt)?.toISOString()
 
@@ -552,6 +557,7 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
         text,
         personSelections,
         ...(id !== undefined ? { id } : {}),
+        ...(communal !== null ? { communal } : {}),
         ...(lastModified !== undefined ? { lastModified } : {}),
         ...(deletedAt !== undefined ? { deletedAt } : {}),
     }

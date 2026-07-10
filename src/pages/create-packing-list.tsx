@@ -13,7 +13,7 @@ import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS, loadMultipleRdfFromPod 
 import { usePodSync } from '../hooks/usePodSync'
 import { questionSetToDataset, datasetToQuestionSet, packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { useForeignPod } from '../components/ForeignPodContext'
-import { generateQuestionBasedItems } from '../create-packing-list/generatePackingListItems'
+import { generateQuestionBasedItems, generateAlwaysNeededItems } from '../create-packing-list/generatePackingListItems'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -95,7 +95,7 @@ type SaveDestination =
 interface SuggestionCardProps {
     suggestions: Array<{ listId: string; listName: string; item: PackingListItem }>
     questionSet: PackingListQuestionSet
-    onSaveToQuestionSet: (listId: string, item: PackingListItem, destination: SaveDestination) => void
+    onSaveToQuestionSet: (listId: string, item: PackingListItem, destination: SaveDestination, communal: boolean) => void
     onSkip: (listId: string, item: PackingListItem) => void
     onDismiss: () => void
 }
@@ -103,6 +103,7 @@ interface SuggestionCardProps {
 function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip, onDismiss }: SuggestionCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [destinations, setDestinations] = useState<Record<string, string>>({})
+    const [communalFlags, setCommunalFlags] = useState<Record<string, boolean>>({})
 
     // Group by list
     const grouped = useMemo(() => {
@@ -154,6 +155,7 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                             const [questionId, optionId] = destValue.split('::')
                                             return { type: 'option', questionId, optionId }
                                         })()
+                                    const isShared = communalFlags[item.id] ?? item.communal ?? false
                                     return (
                                     <div key={item.id} className="flex flex-col gap-2 bg-white rounded border border-amber-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
@@ -178,11 +180,21 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                                     ))
                                                 )}
                                             </select>
+                                            <label className="flex items-center gap-1.5 text-sm text-gray-600 shrink-0" title="Packed once for the whole group instead of per person">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Save ${item.itemText} as a shared item`}
+                                                    checked={isShared}
+                                                    onChange={(e) => setCommunalFlags(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                                                    className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                                />
+                                                👥 Shared
+                                            </label>
                                             <div className="flex gap-2">
                                                 <Button
                                                     type="button"
                                                     variant="primary"
-                                                    onClick={() => onSaveToQuestionSet(listId, item, destination)}
+                                                    onClick={() => onSaveToQuestionSet(listId, item, destination, isShared)}
                                                 >
                                                     Add
                                                 </Button>
@@ -402,14 +414,16 @@ export function CreatePackingList() {
         [allPackingLists, questionSet]
     )
 
-    const handleSaveToQuestionSet = async (listId: string, item: PackingListItem, destination: SaveDestination) => {
+    const handleSaveToQuestionSet = async (listId: string, item: PackingListItem, destination: SaveDestination, communal: boolean) => {
         if (!questionSet) return
 
+        // Shared items select everyone so the trigger always fires; per-person
+        // items select just the person the custom item belonged to.
         const personSelections = questionSet.people.map(p => ({
             personId: p.id,
-            selected: p.name.toLowerCase() === item.personName.toLowerCase(),
+            selected: communal || p.name.toLowerCase() === item.personName.toLowerCase(),
         }))
-        const newItem = { text: item.itemText, personSelections }
+        const newItem = { text: item.itemText, personSelections, ...(communal ? { communal: true } : {}) }
 
         let updatedQs: PackingListQuestionSet
         if (destination.type === 'always') {
@@ -557,24 +571,11 @@ export function CreatePackingList() {
         )
 
         // Get always needed items
-        const alwaysNeededItems = questionSet.alwaysNeededItems.flatMap((item) => {
-            const selectedPeople = item.personSelections.filter((person) => (
-                person.selected && selectedPeopleIds.includes(person.personId)
-            ))
-            return selectedPeople.flatMap((person) => {
-                const personName = questionSet.people.find((p) => p.id === person.personId)!.name
-                return {
-                    id: crypto.randomUUID(),
-                    itemText: item.text,
-                    personId: person.personId,
-                    personName,
-                    questionId: 'always-needed',
-                    optionId: 'always-needed',
-                    packed: false,
-                    category: 'Essentials',
-                }
-            })
-        })
+        const alwaysNeededItems = generateAlwaysNeededItems(
+            questionSet.alwaysNeededItems,
+            questionSet.people,
+            selectedPeopleIds
+        )
 
         const packingList: PackingList = {
             id: crypto.randomUUID(),

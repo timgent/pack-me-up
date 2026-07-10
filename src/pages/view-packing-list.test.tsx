@@ -804,3 +804,103 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
         )
     })
 })
+
+const communalPackingList = {
+    id: 'test-list-3',
+    name: 'Communal Trip',
+    createdAt: '2026-01-01T00:00:00Z',
+    items: [
+        { id: 'item-c1', itemText: 'Tent', personName: '', personId: '', questionId: 'q2', optionId: 'o2', packed: false, communal: true, category: 'Camping' },
+        { id: 'item-c2', itemText: 'First aid kit', personName: '', personId: '', questionId: 'always-needed', optionId: 'always-needed', packed: false, communal: true, category: 'Essentials' },
+        { id: 'item-a1', itemText: 'Sleeping bag', personName: 'Alice', personId: 'p1', questionId: 'q2', optionId: 'o2', packed: false, category: 'Camping' },
+    ],
+}
+
+describe('ViewPackingList shared (communal) section', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...communalPackingList, _rev: '2' }),
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderCommunal(list = communalPackingList) {
+        const db = {
+            getPackingList: vi.fn().mockResolvedValue(list),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        render(
+            <MemoryRouter initialEntries={[`/view-list/${list.id}`]}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        return db
+    }
+
+    it('renders communal items in a Shared Items section', async () => {
+        renderCommunal()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        expect(screen.getByText('Shared Items')).toBeTruthy()
+        expect(screen.getByText('First aid kit')).toBeTruthy()
+        // Per-person items still appear under the person
+        expect(screen.getByText("Alice's Items")).toBeTruthy()
+        expect(screen.getByText('Sleeping bag')).toBeTruthy()
+    })
+
+    it('does not render a Shared Items section when there are no communal items', async () => {
+        renderCommunal({ ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) })
+        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
+        expect(screen.queryByText('Shared Items')).toBeNull()
+    })
+
+    it('shows shared packed stats in the section header', async () => {
+        renderCommunal()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        const header = screen.getByRole('button', { name: /collapse the shared items list/i })
+        expect(header.textContent).toContain('0 / 2')
+    })
+
+    it('collapsing the shared section hides its items but not person items', async () => {
+        renderCommunal()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /collapse the shared items list/i }))
+        expect(screen.queryByText('Tent')).toBeNull()
+        expect(screen.getByText('Sleeping bag')).toBeTruthy()
+    })
+
+    it('adding an item in the shared section creates a communal item', async () => {
+        const db = renderCommunal()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+
+        // Shared section is rendered first
+        const inputs = screen.getAllByPlaceholderText('Add new item...')
+        fireEvent.change(inputs[0], { target: { value: 'Camping stove' } })
+        fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0]
+        const added = savedList.items.find((i: { itemText: string }) => i.itemText === 'Camping stove')
+        expect(added).toBeTruthy()
+        expect(added.communal).toBe(true)
+        expect(added.personId).toBe('')
+        expect(added.personName).toBe('')
+    })
+})

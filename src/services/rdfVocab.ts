@@ -28,6 +28,9 @@ export const PMU = {
     category: `${PMU_NS}category`,
     reviewed: `${PMU_NS}reviewed`,
     itemLastModified: `${PMU_NS}itemLastModified`,
+    // Shared by PackingListItem and QuestionItem: item is packed once for the
+    // whole group rather than per person
+    communal: `${PMU_NS}communal`,
 
     // QuestionSet predicates
     hasPerson: `${PMU_NS}hasPerson`,

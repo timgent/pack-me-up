@@ -73,6 +73,14 @@ function ItemRow({ item, people }: { item: Item; people: Person[] }) {
             <span className={`flex-1 min-w-0 ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
                 {item.text || 'no text'}
             </span>
+            {item.communal && (
+                <span
+                    title="Shared — packed once for the whole group"
+                    className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-blue-100 text-blue-700 select-none shrink-0"
+                >
+                    👥
+                </span>
+            )}
             {showDots && (
                 <div className="flex gap-0.5 shrink-0">
                     {people.map((person, i) => (
@@ -493,6 +501,11 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             return { ...item, personSelections: selections }
         }))
 
+    const toggleCommunal = (itemIdx: number) =>
+        setItems(prev => prev.map((item, i) =>
+            i === itemIdx ? { ...item, communal: item.communal ? undefined : true } : item
+        ))
+
     const removeItem = (idx: number) =>
         setItems(prev => prev.filter((_, i) => i !== idx))
 
@@ -502,16 +515,17 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             personSelections: people.map(p => ({ personId: p.id, selected: true })),
         }])
 
-    return { items, scrollRef, updateItemText, togglePerson, removeItem, addItem }
+    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem }
 }
 
-function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, removeItem, addItem }: {
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem }: {
     items: Item[]
     people: Person[]
     allItemNames: string[]
     scrollRef: React.RefObject<HTMLDivElement | null>
     updateItemText: (idx: number, text: string) => void
     togglePerson: (itemIdx: number, personIdx: number) => void
+    toggleCommunal: (itemIdx: number) => void
     removeItem: (idx: number) => void
     addItem: () => void
 }) {
@@ -521,7 +535,15 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                 <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Items</div>
             )}
             <div className="space-y-2">
-                {items.map((item, itemIdx) => (
+                {items.map((item, itemIdx) => {
+                    const isCommunal = item.communal === true
+                    const communalTitle = isCommunal
+                        ? 'Shared item — packed once for the group. Click to make per-person.'
+                        : 'Make this a shared item, packed once for the group'
+                    const personTitle = (name: string) => isCommunal
+                        ? `Needed when ${name} is on the trip`
+                        : name
+                    return (
                     <div key={itemIdx} className="sm:flex sm:items-center sm:gap-2 rounded-lg border border-gray-200 sm:border-transparent p-2 sm:p-0">
                         {/* Item name + desktop people + remove */}
                         <div className="flex items-center gap-2 sm:flex-1 sm:min-w-0">
@@ -534,25 +556,33 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                     menuPortalTarget={document.body}
                                 />
                             </div>
-                            {/* Desktop: inline avatars */}
-                            {people.length > 1 && (
-                                <div className="hidden sm:flex gap-0.5 shrink-0">
-                                    {people.map((person, personIdx) => {
-                                        const selected = item.personSelections?.[personIdx]?.selected ?? false
-                                        return (
-                                            <button
-                                                key={person.id}
-                                                type="button"
-                                                onClick={() => togglePerson(itemIdx, personIdx)}
-                                                title={person.name}
-                                                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF}`}
-                                            >
-                                                {person.name.charAt(0).toUpperCase()}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            )}
+                            {/* Desktop: shared toggle + inline avatars */}
+                            <div className="hidden sm:flex gap-0.5 shrink-0 items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleCommunal(itemIdx)}
+                                    title={communalTitle}
+                                    aria-label={`Toggle shared for ${item.text || 'item'}`}
+                                    aria-pressed={isCommunal}
+                                    className={`inline-flex items-center justify-center h-5 rounded-full px-1 text-[10px] transition-colors mr-1 ${isCommunal ? 'bg-blue-600 text-white' : AVATAR_OFF}`}
+                                >
+                                    👥
+                                </button>
+                                {people.length > 1 && people.map((person, personIdx) => {
+                                    const selected = item.personSelections?.[personIdx]?.selected ?? false
+                                    return (
+                                        <button
+                                            key={person.id}
+                                            type="button"
+                                            onClick={() => togglePerson(itemIdx, personIdx)}
+                                            title={personTitle(person.name)}
+                                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? AVATAR_ON[personIdx % AVATAR_ON.length] : AVATAR_OFF} ${isCommunal && selected ? 'ring-2 ring-blue-300 ring-offset-1' : ''}`}
+                                        >
+                                            {person.name.charAt(0).toUpperCase()}
+                                        </button>
+                                    )
+                                })}
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => removeItem(itemIdx)}
@@ -562,31 +592,48 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                 ×
                             </button>
                         </div>
-                        {/* Mobile: people on their own row as large labelled tiles */}
-                        {people.length > 1 && (
-                            <div className="mt-2 sm:hidden flex gap-2">
-                                {people.map((person, personIdx) => {
-                                    const selected = item.personSelections?.[personIdx]?.selected ?? false
-                                    return (
-                                        <button
-                                            key={person.id}
-                                            type="button"
-                                            onClick={() => togglePerson(itemIdx, personIdx)}
-                                            className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${selected ? `${AVATAR_ON[personIdx % AVATAR_ON.length]} border-transparent` : `bg-white border-gray-200 text-gray-400`}`}
-                                        >
-                                            <span className="text-lg font-bold leading-none">
-                                                {person.name.charAt(0).toUpperCase()}
-                                            </span>
-                                            <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
-                                                {person.name}
-                                            </span>
-                                        </button>
-                                    )
-                                })}
+                        {/* Mobile: shared toggle + people on their own row as large labelled tiles */}
+                        <div className="mt-2 sm:hidden flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => toggleCommunal(itemIdx)}
+                                title={communalTitle}
+                                aria-pressed={isCommunal}
+                                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${isCommunal ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-400'}`}
+                            >
+                                <span className="text-lg font-bold leading-none">👥</span>
+                                <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
+                                    Shared
+                                </span>
+                            </button>
+                            {people.length > 1 && people.map((person, personIdx) => {
+                                const selected = item.personSelections?.[personIdx]?.selected ?? false
+                                return (
+                                    <button
+                                        key={person.id}
+                                        type="button"
+                                        onClick={() => togglePerson(itemIdx, personIdx)}
+                                        title={personTitle(person.name)}
+                                        className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${selected ? `${AVATAR_ON[personIdx % AVATAR_ON.length]} border-transparent` : `bg-white border-gray-200 text-gray-400`}`}
+                                    >
+                                        <span className="text-lg font-bold leading-none">
+                                            {person.name.charAt(0).toUpperCase()}
+                                        </span>
+                                        <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
+                                            {person.name}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        {isCommunal && people.length > 1 && (
+                            <div className="mt-1 sm:mt-0 sm:hidden text-[11px] text-blue-600 px-1">
+                                Packed once for the group — included when a highlighted person is going
                             </div>
                         )}
                     </div>
-                ))}
+                    )
+                })}
             </div>
             <button
                 type="button"
@@ -607,7 +654,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const { items, scrollRef, updateItemText, togglePerson, removeItem, addItem } = useItemListState(option?.items ?? [], people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem } = useItemListState(option?.items ?? [], people)
 
     const handleSave = () => onSave({
         id: option?.id ?? crypto.randomUUID(),
@@ -655,7 +702,8 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                 <ItemListEditor
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
-                    togglePerson={togglePerson} removeItem={removeItem} addItem={addItem}
+                    togglePerson={togglePerson} toggleCommunal={toggleCommunal}
+                    removeItem={removeItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
@@ -677,7 +725,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
-    const { items, scrollRef, updateItemText, togglePerson, removeItem, addItem } = useItemListState(initialItems, people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem } = useItemListState(initialItems, people)
 
     return (
         <div
@@ -707,7 +755,8 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
                 <ItemListEditor
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
-                    togglePerson={togglePerson} removeItem={removeItem} addItem={addItem}
+                    togglePerson={togglePerson} toggleCommunal={toggleCommunal}
+                    removeItem={removeItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">

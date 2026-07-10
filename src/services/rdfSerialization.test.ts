@@ -126,6 +126,15 @@ describe('packingListToDataset / datasetToPackingList', () => {
         const result = roundTripList(makePackingList({ items: [makeItem()] }))
         expect(result.items[0].category).toBeUndefined()
         expect(result.items[0].reviewed).toBeUndefined()
+        expect(result.items[0].communal).toBeUndefined()
+    })
+
+    it('round-trips a communal item', () => {
+        const item = makeItem({ communal: true, personId: '', personName: '' })
+        const result = roundTripList(makePackingList({ items: [item] }))
+        expect(result.items[0].communal).toBe(true)
+        expect(result.items[0].personId).toBe('')
+        expect(result.items[0].personName).toBe('')
     })
 
     it('round-trips multiple items', () => {
@@ -241,6 +250,27 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         const ps2 = item.personSelections.find(ps => ps.personId === 'p2')!
         expect(ps1.selected).toBe(true)
         expect(ps2.selected).toBe(false)
+    })
+
+    it('round-trips a communal always-needed item and omits the flag otherwise', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [
+                { text: 'First aid kit', communal: true, personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Toothbrush', personSelections: [{ personId: 'p1', selected: true }] },
+            ],
+        })
+        const result = roundTripQs(qs)
+        expect(result.alwaysNeededItems[0].communal).toBe(true)
+        expect(result.alwaysNeededItems[1].communal).toBeUndefined()
+    })
+
+    it('round-trips a communal item inside a question option', () => {
+        const option = makeOption({
+            items: [{ text: 'Tent', communal: true, personSelections: [{ personId: 'p1', selected: true }] }],
+        })
+        const question = makeQuestion({ options: [option] })
+        const result = roundTripQs(makeQuestionSet({ questions: [question] }))
+        expect(result.questions[0].options[0].items[0].communal).toBe(true)
     })
 
     it('round-trips a saved question with option and items', () => {

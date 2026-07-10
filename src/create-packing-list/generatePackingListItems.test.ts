@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateQuestionBasedItems } from './generatePackingListItems'
+import { generateQuestionBasedItems, generateAlwaysNeededItems } from './generatePackingListItems'
 import { Question } from '../edit-questions/types'
 
 const p1 = { id: 'p1', name: 'Alice' }
@@ -176,6 +176,190 @@ describe('generateQuestionBasedItems – selected options contribute items', () 
     it('skips a question when the questionId does not match any question', () => {
         const answers = [{ questionId: 'unknown-id', selectedOptionIds: ['opt-swimming'] }]
         const result = generateQuestionBasedItems([activitiesQuestion], answers, [p1], ['p1'])
+        expect(result).toHaveLength(0)
+    })
+})
+
+// ─── Communal items ───────────────────────────────────────────────────────────
+
+describe('generateQuestionBasedItems – communal items', () => {
+    const campingQuestion: Question = {
+        id: 'q-camping',
+        type: 'saved',
+        text: 'Are you camping?',
+        order: 0,
+        questionType: 'single-choice',
+        options: [
+            {
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [
+                    {
+                        text: 'Tent',
+                        communal: true,
+                        personSelections: [
+                            { personId: 'p1', selected: true },
+                            { personId: 'p2', selected: true },
+                        ],
+                    },
+                    {
+                        text: 'Sleeping bag',
+                        personSelections: [
+                            { personId: 'p1', selected: true },
+                            { personId: 'p2', selected: true },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+    const answers = [{ questionId: 'q-camping', selectedOptionIds: ['opt-yes'] }]
+
+    it('generates a single entry for a communal item regardless of traveller count', () => {
+        const result = generateQuestionBasedItems([campingQuestion], answers, [p1, p2], ['p1', 'p2'])
+        const tents = result.filter(i => i.itemText === 'Tent')
+        expect(tents).toHaveLength(1)
+        expect(tents[0].communal).toBe(true)
+        expect(tents[0].personId).toBe('')
+        expect(tents[0].personName).toBe('')
+        // Per-person items still fan out
+        expect(result.filter(i => i.itemText === 'Sleeping bag')).toHaveLength(2)
+    })
+
+    it('includes a communal item when at least one trigger person is travelling', () => {
+        const babyGear: Question = {
+            ...campingQuestion,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [{
+                    text: 'Travel cot',
+                    communal: true,
+                    personSelections: [{ personId: 'p2', selected: true }],
+                }],
+            }],
+        }
+        const withBaby = generateQuestionBasedItems([babyGear], answers, [p1, p2], ['p1', 'p2'])
+        expect(withBaby.map(i => i.itemText)).toContain('Travel cot')
+
+        const withoutBaby = generateQuestionBasedItems([babyGear], answers, [p1, p2], ['p1'])
+        expect(withoutBaby.map(i => i.itemText)).not.toContain('Travel cot')
+    })
+
+    it('excludes a communal item when no trigger people are selected on the item', () => {
+        const q: Question = {
+            ...campingQuestion,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [{
+                    text: 'Tent',
+                    communal: true,
+                    personSelections: [
+                        { personId: 'p1', selected: false },
+                        { personId: 'p2', selected: false },
+                    ],
+                }],
+            }],
+        }
+        const result = generateQuestionBasedItems([q], answers, [p1, p2], ['p1', 'p2'])
+        expect(result).toHaveLength(0)
+    })
+
+    it('always includes a communal item that has no person selections', () => {
+        const q: Question = {
+            ...campingQuestion,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [{ text: 'First aid kit', communal: true, personSelections: [] }],
+            }],
+        }
+        const result = generateQuestionBasedItems([q], answers, [p1, p2], ['p1'])
+        expect(result.map(i => i.itemText)).toContain('First aid kit')
+    })
+
+    it('sets the category on communal items like per-person items', () => {
+        const result = generateQuestionBasedItems([campingQuestion], answers, [p1], ['p1'])
+        const tent = result.find(i => i.itemText === 'Tent')
+        expect(tent?.category).toBe('Are you camping?')
+    })
+})
+
+// ─── Always-needed items ──────────────────────────────────────────────────────
+
+describe('generateAlwaysNeededItems', () => {
+    it('fans out per-person items to each selected traveller', () => {
+        const result = generateAlwaysNeededItems(
+            [{
+                text: 'Water bottle',
+                personSelections: [
+                    { personId: 'p1', selected: true },
+                    { personId: 'p2', selected: true },
+                ],
+            }],
+            [p1, p2],
+            ['p1', 'p2']
+        )
+        expect(result).toHaveLength(2)
+        expect(result.map(i => i.personName).sort()).toEqual(['Alice', 'Bob'])
+        result.forEach(item => {
+            expect(item.questionId).toBe('always-needed')
+            expect(item.optionId).toBe('always-needed')
+            expect(item.category).toBe('Essentials')
+        })
+    })
+
+    it('excludes people who are not travelling', () => {
+        const result = generateAlwaysNeededItems(
+            [{
+                text: 'Water bottle',
+                personSelections: [
+                    { personId: 'p1', selected: true },
+                    { personId: 'p2', selected: true },
+                ],
+            }],
+            [p1, p2],
+            ['p2']
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0].personName).toBe('Bob')
+    })
+
+    it('generates a single shared entry for communal items', () => {
+        const result = generateAlwaysNeededItems(
+            [{
+                text: 'First aid kit',
+                communal: true,
+                personSelections: [
+                    { personId: 'p1', selected: true },
+                    { personId: 'p2', selected: true },
+                ],
+            }],
+            [p1, p2],
+            ['p1', 'p2']
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0].communal).toBe(true)
+        expect(result[0].personId).toBe('')
+        expect(result[0].personName).toBe('')
+        expect(result[0].category).toBe('Essentials')
+    })
+
+    it('excludes a communal item when none of its trigger people are travelling', () => {
+        const result = generateAlwaysNeededItems(
+            [{
+                text: 'Litter tray',
+                communal: true,
+                personSelections: [{ personId: 'p2', selected: true }],
+            }],
+            [p1, p2],
+            ['p1']
+        )
         expect(result).toHaveLength(0)
     })
 })

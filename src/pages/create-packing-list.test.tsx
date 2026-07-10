@@ -424,6 +424,75 @@ describe('CreatePackingList – suggestion card', () => {
         expect(newItem?.personSelections).toContainEqual({ personId: 'p1', selected: true })
     })
 
+    it('"Add" saves a communal custom item as a shared question-set item', async () => {
+        const communalCustom: PackingListItem = {
+            id: 'custom-shared-1',
+            itemText: 'Camping stove',
+            personName: '',
+            personId: '',
+            questionId: '',
+            optionId: '',
+            packed: false,
+            communal: true,
+        }
+        const db = makeDb({
+            getAllPackingLists: vi.fn().mockResolvedValue([{ ...pastList, items: [communalCustom] }]),
+        })
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        // The shared checkbox is pre-checked for items that were communal on the list
+        const checkbox = screen.getByRole('checkbox', { name: /shared/i }) as HTMLInputElement
+        expect(checkbox.checked).toBe(true)
+
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
+        const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
+        const newItem = savedQs.alwaysNeededItems.find(i => i.text === 'Camping stove')
+        expect(newItem?.communal).toBe(true)
+        // Everyone selected so the shared item always triggers
+        expect(newItem?.personSelections).toContainEqual({ personId: 'p1', selected: true })
+    })
+
+    it('checking Shared on a regular suggestion saves it as communal', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        const checkbox = screen.getByRole('checkbox', { name: /shared/i }) as HTMLInputElement
+        expect(checkbox.checked).toBe(false)
+        fireEvent.click(checkbox)
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
+        const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
+        const newItem = savedQs.alwaysNeededItems.find(i => i.text === 'Sunscreen SPF50')
+        expect(newItem?.communal).toBe(true)
+    })
+
+    it('leaving Shared unchecked keeps the per-person save behaviour', async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+        fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+
+        await waitFor(() => expect(db.saveQuestionSet).toHaveBeenCalled())
+        const savedQs = db.saveQuestionSet.mock.calls[0][0] as PackingListQuestionSet
+        const newItem = savedQs.alwaysNeededItems.find(i => i.text === 'Sunscreen SPF50')
+        expect(newItem?.communal).toBeUndefined()
+        expect(newItem?.personSelections).toContainEqual({ personId: 'p1', selected: true })
+    })
+
     it('uses updated _rev from first save when processing second item', async () => {
         const secondItem: PackingListItem = {
             ...customItem,

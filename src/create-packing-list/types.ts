@@ -14,11 +14,12 @@ export interface PackingList {
 export interface PackingListItem {
     id: string
     itemText: string
-    personId: string
-    personName: string
+    personId: string   // '' for communal and custom items
+    personName: string // '' for communal items
     questionId: string
     optionId: string
     packed: boolean
+    communal?: boolean // packed once for the whole group; absent = per-person
     category?: string
     reviewed?: boolean
     lastModified?: string // ISO timestamp; absent on legacy items

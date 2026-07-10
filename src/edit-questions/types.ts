@@ -53,10 +53,15 @@ export const PersonSelectionSchema = z.object({
   selected: z.boolean()
 })
 
+// `communal` is optional and additive: absent means the item fans out
+// per-person as before. When true, the item is packed once for the whole
+// group and `personSelections` become a trigger — the item is included when
+// at least one selected person is on the trip.
 export const ItemSchema = z.object({
   id: z.string().optional(),
   text: z.string(),
   personSelections: z.array(PersonSelectionSchema),
+  communal: z.boolean().optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })

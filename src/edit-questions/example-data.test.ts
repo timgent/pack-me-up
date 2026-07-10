@@ -340,3 +340,43 @@ describe('createExampleData - gender-specific items', () => {
         expect(item!.personSelections.find(ps => ps.personId === femaleAdult.id)?.selected).toBe(false)
     })
 })
+
+describe('createExampleData communal items', () => {
+    const family: Person[] = [
+        { id: 'a1', name: 'Alice', ageRange: 'Adult', gender: 'female' },
+        { id: 'c1', name: 'Charlie', ageRange: 'Child' },
+        { id: 'cat1', name: 'Whiskers', species: 'cat' },
+    ]
+
+    function allItems(result: ReturnType<typeof createExampleData>) {
+        return [
+            ...result.alwaysNeededItems,
+            ...result.questions.flatMap(q => q.options.flatMap(o => o.items)),
+        ]
+    }
+
+    it('marks group kit as communal with existing filters kept as triggers', () => {
+        const result = createExampleData(family)
+        const items = allItems(result)
+
+        const firstAid = result.alwaysNeededItems.find(i => i.text === 'First aid kit')!
+        expect(firstAid.communal).toBe(true)
+
+        const litterTray = result.alwaysNeededItems.find(i => i.text === 'Litter tray & litter')!
+        expect(litterTray.communal).toBe(true)
+        // Trigger selections preserved: only the cat is selected
+        expect(litterTray.personSelections.find(ps => ps.personId === 'cat1')?.selected).toBe(true)
+        expect(litterTray.personSelections.find(ps => ps.personId === 'a1')?.selected).toBe(false)
+
+        const travelAdapter = items.find(i => i.text === 'Travel adapter')!
+        expect(travelAdapter.communal).toBe(true)
+    })
+
+    it('keeps personal items per-person', () => {
+        const result = createExampleData(family)
+        const items = allItems(result)
+        expect(result.alwaysNeededItems.find(i => i.text === 'Snacks')?.communal).toBeUndefined()
+        expect(items.find(i => i.text === 'Toothbrush')?.communal).toBeUndefined()
+        expect(items.find(i => i.text === 'Passport')?.communal).toBeUndefined()
+    })
+})
