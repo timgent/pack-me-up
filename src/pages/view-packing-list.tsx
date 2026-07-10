@@ -86,6 +86,9 @@ export function ViewPackingList() {
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
     const [collapsedPersons, setCollapsedPersons] = useState<Set<string>>(new Set())
     const [showAddGuest, setShowAddGuest] = useState(false)
+    // Reveals an empty Shared Items section on lists that have no communal
+    // items yet; once an item is added the section persists from the data.
+    const [showSharedSection, setShowSharedSection] = useState(false)
     const [newGuestName, setNewGuestName] = useState('')
     const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
     const [renamingGuestName, setRenamingGuestName] = useState('')
@@ -565,7 +568,8 @@ export function ViewPackingList() {
 
     // Shared section first (when the list has communal items), then regular
     // people (from question set) alphabetically, then guests in add-order
-    const sharedSections: ListSection[] = packingList.items.some(i => i.communal)
+    const hasCommunalItems = packingList.items.some(i => i.communal)
+    const sharedSections: ListSection[] = (hasCommunalItems || showSharedSection)
         ? [{
             key: SHARED_SECTION_KEY,
             title: 'Shared Items',
@@ -611,6 +615,15 @@ export function ViewPackingList() {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        {!foreignPodUrl && !hasCommunalItems && !showSharedSection && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setShowSharedSection(true)}
+                            >
+                                + Add Shared Items
+                            </Button>
+                        )}
                         {!foreignPodUrl && (
                             <Button
                                 type="button"

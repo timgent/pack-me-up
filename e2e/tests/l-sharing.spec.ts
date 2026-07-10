@@ -56,10 +56,11 @@ test.describe('L – Sharing a packing list', () => {
 
     test('L1: User A shares a list; shareable link contains expected params', async () => {
         // Share button renders immediately, enabled once pod URL resolves (~1 network round-trip)
-        await expect(pageA.getByRole('button', { name: 'Share' })).toBeEnabled({ timeout: 10_000 })
+        // exact: true — the packing list's "Collapse the shared items list" section header also matches a bare 'Share' substring
+        await expect(pageA.getByRole('button', { name: 'Share', exact: true })).toBeEnabled({ timeout: 10_000 })
 
         // Open share modal
-        await pageA.getByRole('button', { name: 'Share' }).click()
+        await pageA.getByRole('button', { name: 'Share', exact: true }).click()
         await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
 
         // Enter User B's WebID then submit via the dialog's Share button (not the toolbar one)
@@ -100,7 +101,7 @@ test.describe('L – Sharing a packing list', () => {
             await expect(pageB.getByText(listName)).toBeVisible({ timeout: 15_000 })
 
             // Share button must NOT be visible on a shared list
-            await expect(pageB.getByRole('button', { name: 'Share' })).not.toBeVisible()
+            await expect(pageB.getByRole('button', { name: 'Share', exact: true })).not.toBeVisible()
         } finally {
             await ctxB.close()
         }
@@ -148,7 +149,7 @@ test.describe('L – Sharing a packing list', () => {
             await expect(residualDialog).toHaveCount(0)
         }
         // Now the toolbar Share button is the only one visible
-        await pageA.getByRole('button', { name: 'Share' }).click()
+        await pageA.getByRole('button', { name: 'Share', exact: true }).click()
         await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
         await pageA.getByRole('button', { name: 'Anyone with the link' }).click()
         await pageA.getByRole('dialog').getByRole('button', { name: /^Share publicly/i }).click()

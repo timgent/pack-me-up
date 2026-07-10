@@ -886,6 +886,33 @@ describe('ViewPackingList shared (communal) section', () => {
         expect(screen.getByText('Sleeping bag')).toBeTruthy()
     })
 
+    it('"+ Add Shared Items" reveals an empty shared section and is hidden once the section exists', async () => {
+        const db = renderCommunal({ ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) })
+        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
+        expect(screen.queryByText('Shared Items')).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', { name: /add shared items/i }))
+
+        expect(screen.getByText('Shared Items')).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
+
+        // Adding an item through the revealed section creates a communal item
+        const inputs = screen.getAllByPlaceholderText('Add new item...')
+        fireEvent.change(inputs[0], { target: { value: 'Tent' } })
+        fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0]
+        const added = savedList.items.find((i: { itemText: string }) => i.itemText === 'Tent')
+        expect(added.communal).toBe(true)
+    })
+
+    it('does not show "+ Add Shared Items" when the list already has communal items', async () => {
+        renderCommunal()
+        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
+    })
+
     it('adding an item in the shared section creates a communal item', async () => {
         const db = renderCommunal()
         await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
