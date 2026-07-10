@@ -865,6 +865,22 @@ describe('ViewPackingList shared (communal) section', () => {
         expect(screen.getByText('Sleeping bag')).toBeTruthy()
     })
 
+    it('hides the Shared Items section when all communal items are packed and packed items are hidden', async () => {
+        renderCommunal({
+            ...communalPackingList,
+            items: communalPackingList.items.map(i => i.communal ? { ...i, packed: true } : i),
+        })
+        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
+        // Packed items are hidden by default, so the fully-packed shared section
+        // should disappear just like a fully-packed person's section does
+        expect(screen.queryByText('Shared Items')).toBeNull()
+
+        // Showing packed items brings the section back
+        fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
+        expect(screen.getByText('Shared Items')).toBeTruthy()
+        expect(screen.getByText('Tent')).toBeTruthy()
+    })
+
     it('does not render a Shared Items section when there are no communal items', async () => {
         renderCommunal({ ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) })
         await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())

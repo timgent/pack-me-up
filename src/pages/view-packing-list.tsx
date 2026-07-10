@@ -566,16 +566,19 @@ export function ViewPackingList() {
         groupedItems[item.personName].push(item)
     }
 
-    // Shared section first (when the list has communal items), then regular
-    // people (from question set) alphabetically, then guests in add-order
+    // Shared section first (when the list has visible communal items), then
+    // regular people (from question set) alphabetically, then guests in
+    // add-order. Like person sections, the shared section disappears when all
+    // its items are packed and packed items are hidden.
     const hasCommunalItems = packingList.items.some(i => i.communal)
-    const sharedSections: ListSection[] = (hasCommunalItems || showSharedSection)
+    const visibleCommunalItems = filteredItems.filter(i => i.communal)
+    const sharedSections: ListSection[] = (visibleCommunalItems.length > 0 || showSharedSection)
         ? [{
             key: SHARED_SECTION_KEY,
             title: 'Shared Items',
             name: '',
             communal: true,
-            items: filteredItems.filter(i => i.communal),
+            items: visibleCommunalItems,
         }]
         : []
     const regularSections: ListSection[] = Object.entries(groupedItems)
