@@ -804,7 +804,7 @@ export function ViewPackingList() {
                     </div>
                 )}
                 <div>
-                    <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                    <div style={{ columnWidth: '300px', columnGap: '1rem' }}>
                         {listSections.map((section) => {
                             const { key: sectionKey, title, items, guestId } = section
                             const isCategorySection = section.isCategory === true
@@ -818,7 +818,7 @@ export function ViewPackingList() {
                                 ? groupByCategory(items)
                                 : groupByPerson(items)
                             return (
-                            <div key={sectionKey} className={`border rounded-lg p-4 bg-white shadow-sm ${isGuest ? 'border-amber-200' : isShared ? 'border-blue-200' : 'border-gray-200'}`}>
+                            <div key={sectionKey} className={`border rounded-lg p-4 bg-white shadow-sm mb-4 ${isGuest ? 'border-amber-200' : isShared ? 'border-blue-200' : 'border-gray-200'}`} style={{ breakInside: 'avoid' }}>
                                 <div className="mb-4 pb-2 border-b border-gray-200">
                                     <div className="flex items-center gap-1 min-h-[2rem]">
                                         {isGuest && renamingGuestId === guestId ? (
