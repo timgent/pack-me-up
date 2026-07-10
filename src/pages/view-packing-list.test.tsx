@@ -283,6 +283,69 @@ describe('ViewPackingList category grouping', () => {
     })
 })
 
+describe('ViewPackingList person/question view toggle', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...multiCategoryPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDbMultiCategory() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('defaults to person view, showing person section titles', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        expect(screen.getByText("Alice's Items")).toBeTruthy()
+        expect(screen.getByText("Bob's Items")).toBeTruthy()
+    })
+
+    it('switches to question view, showing category section titles grouped by person within', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+
+        // Top-level sections are now categories, not people
+        expect(screen.queryByText("Alice's Items")).toBeNull()
+        expect(screen.queryByText("Bob's Items")).toBeNull()
+        expect(screen.getAllByText('Essentials').length).toBeGreaterThan(0)
+        expect(screen.getByText('Hiking')).toBeTruthy()
+
+        // Within each category, items are grouped by person
+        expect(screen.getAllByRole('button', { name: /Collapse Alice/i }).length).toBeGreaterThan(0)
+        expect(screen.getByRole('button', { name: /Collapse Bob/i })).toBeTruthy()
+        expect(screen.getByText('Toothbrush')).toBeTruthy()
+        expect(screen.getByText('Nappies')).toBeTruthy()
+    })
+
+    it('switches back to person view', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        await waitFor(() => expect(screen.getByText('Hiking')).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Person View' }))
+        expect(screen.getByText("Alice's Items")).toBeTruthy()
+        expect(screen.getByText("Bob's Items")).toBeTruthy()
+    })
+})
+
 describe('ViewPackingList hidden items banner', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({

@@ -34,6 +34,8 @@ interface ListSection {
     name: string
     guestId?: string
     communal?: boolean
+    // True for question-centric top-level sections (grouped by category rather than person)
+    isCategory?: boolean
 }
 
 function groupByCategory(items: PackingListItem[]) {
@@ -52,8 +54,23 @@ function groupByCategory(items: PackingListItem[]) {
             return a.localeCompare(b)
         })
         .map(([category, catItems]) => ({
-            category,
+            label: category,
             items: catItems.sort((a, b) => a.itemText.localeCompare(b.itemText)),
+        }))
+}
+
+function groupByPerson(items: PackingListItem[]) {
+    const map = new Map<string, PackingListItem[]>()
+    for (const item of items) {
+        const person = item.personName || 'Unassigned'
+        if (!map.has(person)) map.set(person, [])
+        map.get(person)!.push(item)
+    }
+    return [...map.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([person, personItems]) => ({
+            label: person,
+            items: personItems.sort((a, b) => a.itemText.localeCompare(b.itemText)),
         }))
 }
 
@@ -78,6 +95,7 @@ export function ViewPackingList() {
     // when a foreign-pod fetch fails.
     const hasLoadedRef = useRef(false)
     const [showPacked, setShowPacked] = useState(false)
+    const [viewMode, setViewMode] = useState<'person' | 'question'>('person')
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({})
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
@@ -451,10 +469,10 @@ export function ViewPackingList() {
         }
     }
 
-    const handleAddItem = async (section: ListSection) => {
+    const handleAddItem = async (inputKey: string, personName: string, guestId?: string, communal?: boolean) => {
         if (!packingList) return
 
-        const newItemText = newItemInputs[section.key]?.trim()
+        const newItemText = newItemInputs[inputKey]?.trim()
         if (!newItemText) return
 
         try {
@@ -463,18 +481,18 @@ export function ViewPackingList() {
             const newItem = {
                 id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 itemText: newItemText,
-                personName: section.communal ? '' : section.name,
-                personId: section.guestId ?? '',
+                personName: communal ? '' : personName,
+                personId: guestId ?? '',
                 questionId: '',
                 optionId: '',
                 packed: false,
-                ...(section.communal ? { communal: true } : {}),
+                ...(communal ? { communal: true } : {}),
                 lastModified: new Date().toISOString(),
             }
 
             // Add to form values and clear the input before saving
             setValue(`items.${newItem.id}`, false)
-            setNewItemInputs({ ...newItemInputs, [section.key]: '' })
+            setNewItemInputs({ ...newItemInputs, [inputKey]: '' })
 
             await persistPackingList({ ...packingList, items: [...packingList.items, newItem] })
 
@@ -555,7 +573,18 @@ export function ViewPackingList() {
         return acc
     }, {} as Record<string, { packed: number; total: number }>)
 
+    // Stats per category, used by question-centric top-level sections
+    const categoryStats = packingList.items.reduce((acc, item) => {
+        if (item.communal) return acc
+        const key = item.category ?? 'Other'
+        if (!acc[key]) acc[key] = { packed: 0, total: 0 }
+        acc[key].total++
+        if (watchedItems[item.id]) acc[key].packed++
+        return acc
+    }, {} as Record<string, { packed: number; total: number }>)
+
     const guestNames = new Set((packingList.guests ?? []).map(g => g.name))
+    const guestIdByName = new Map((packingList.guests ?? []).map(g => [g.name, g.id]))
 
     // Build grouped item map, seeding guest names so their sections exist even when empty
     const groupedItems: Record<string, PackingListItem[]> = {}
@@ -567,9 +596,9 @@ export function ViewPackingList() {
     }
 
     // Shared section first (when the list has visible communal items), then
-    // regular people (from question set) alphabetically, then guests in
-    // add-order. Like person sections, the shared section disappears when all
-    // its items are packed and packed items are hidden.
+    // either people (person-centric) or categories (question-centric). Like
+    // person sections, the shared section disappears when all its items are
+    // packed and packed items are hidden.
     const hasCommunalItems = packingList.items.some(i => i.communal)
     const visibleCommunalItems = filteredItems.filter(i => i.communal)
     const sharedSections: ListSection[] = (visibleCommunalItems.length > 0 || showSharedSection)
@@ -581,19 +610,28 @@ export function ViewPackingList() {
             items: visibleCommunalItems,
         }]
         : []
-    const regularSections: ListSection[] = Object.entries(groupedItems)
-        .filter(([name]) => !guestNames.has(name))
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, items]) => ({ key: name, title: `${name}'s Items`, name, items }))
-    const guestSections: ListSection[] = (packingList.guests ?? [])
-        .map(g => ({
-            key: g.name,
-            title: `${g.name}'s Items`,
-            name: g.name,
-            guestId: g.id,
-            items: groupedItems[g.name] ?? [],
-        }))
-    const listSections = [...sharedSections, ...regularSections, ...guestSections]
+
+    let listSections: ListSection[]
+    if (viewMode === 'person') {
+        // Regular people (from question set) alphabetically, then guests in add-order
+        const regularSections: ListSection[] = Object.entries(groupedItems)
+            .filter(([name]) => !guestNames.has(name))
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([name, items]) => ({ key: name, title: `${name}'s Items`, name, items }))
+        const guestSections: ListSection[] = (packingList.guests ?? [])
+            .map(g => ({
+                key: g.name,
+                title: `${g.name}'s Items`,
+                name: g.name,
+                guestId: g.id,
+                items: groupedItems[g.name] ?? [],
+            }))
+        listSections = [...sharedSections, ...regularSections, ...guestSections]
+    } else {
+        const categorySections: ListSection[] = groupByCategory(filteredItems.filter(i => !i.communal))
+            .map(({ label, items }) => ({ key: label, title: label, name: '', items, isCategory: true }))
+        listSections = [...sharedSections, ...categorySections]
+    }
 
     return (
         <>
@@ -673,13 +711,33 @@ export function ViewPackingList() {
                         <span className={`text-sm font-medium ${allPacked ? 'text-emerald-600' : 'text-gray-600'}`}>
                             {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
                         </span>
-                        <Button
-                            type="button"
-                            variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
-                            onClick={() => setShowPacked(!showPacked)}
-                        >
-                            {showPacked ? 'Hide Packed' : 'Show Packed'}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center rounded-md border border-gray-300 overflow-hidden" role="group" aria-label="View mode">
+                                <button
+                                    type="button"
+                                    aria-pressed={viewMode === 'person'}
+                                    onClick={() => setViewMode('person')}
+                                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${viewMode === 'person' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Person View
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-pressed={viewMode === 'question'}
+                                    onClick={() => setViewMode('question')}
+                                    className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 ${viewMode === 'question' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Question View
+                                </button>
+                            </div>
+                            <Button
+                                type="button"
+                                variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
+                                onClick={() => setShowPacked(!showPacked)}
+                            >
+                                {showPacked ? 'Hide Packed' : 'Show Packed'}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -749,10 +807,16 @@ export function ViewPackingList() {
                     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                         {listSections.map((section) => {
                             const { key: sectionKey, title, items, guestId } = section
-                            const stats = sectionStats[sectionKey] ?? { packed: 0, total: 0 }
+                            const isCategorySection = section.isCategory === true
+                            const stats = isCategorySection
+                                ? (categoryStats[sectionKey] ?? { packed: 0, total: 0 })
+                                : (sectionStats[sectionKey] ?? { packed: 0, total: 0 })
                             const isGuest = guestId !== undefined
                             const isShared = section.communal === true
-                            const collapseLabelTarget = isShared ? 'the shared items' : `${section.name}'s`
+                            const collapseLabelTarget = isShared ? 'the shared items' : isCategorySection ? title : `${section.name}'s`
+                            const innerGroups = (isShared || !isCategorySection)
+                                ? groupByCategory(items)
+                                : groupByPerson(items)
                             return (
                             <div key={sectionKey} className={`border rounded-lg p-4 bg-white shadow-sm ${isGuest ? 'border-amber-200' : isShared ? 'border-blue-200' : 'border-gray-200'}`}>
                                 <div className="mb-4 pb-2 border-b border-gray-200">
@@ -818,45 +882,48 @@ export function ViewPackingList() {
                                     </div>
                                 </div>
                                 {!collapsedPersons.has(sectionKey) && <div>
-                                    {/* Add new item input */}
-                                    <div className="mb-4 pb-4 border-b border-gray-200">
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={newItemInputs[sectionKey] || ''}
-                                                onChange={(e) => setNewItemInputs({ ...newItemInputs, [sectionKey]: e.target.value })}
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault()
-                                                        handleAddItem(section)
-                                                    }
-                                                }}
-                                                placeholder="Add new item..."
-                                                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAddItem(section)}
-                                                className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                                            >
-                                                Add
-                                            </button>
+                                    {/* Add new item input — only shown when this section maps to a single person/guest */}
+                                    {!isCategorySection && (
+                                        <div className="mb-4 pb-4 border-b border-gray-200">
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newItemInputs[sectionKey] || ''}
+                                                    onChange={(e) => setNewItemInputs({ ...newItemInputs, [sectionKey]: e.target.value })}
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault()
+                                                            handleAddItem(sectionKey, section.name, section.guestId, section.communal)
+                                                        }
+                                                    }}
+                                                    placeholder="Add new item..."
+                                                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAddItem(sectionKey, section.name, section.guestId, section.communal)}
+                                                    className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    {groupByCategory(items).map(({ category, items: catItems }) => {
-                                        const categoryKey = `${sectionKey}::${category}`
+                                    )}
+                                    {innerGroups.map(({ label, items: catItems }) => {
+                                        const categoryKey = `${sectionKey}::${label}`
                                         const isCollapsed = collapsedCategories.has(categoryKey)
+                                        const innerInputKey = `${sectionKey}::add::${label}`
                                         return (
                                             <div key={categoryKey} className="mb-3">
                                                 <div className="flex items-center justify-between py-1 mb-1">
                                                     <button
                                                         type="button"
-                                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${category}`}
+                                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${label}`}
                                                         onClick={() => toggleCategory(categoryKey)}
                                                         className="flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-gray-900"
                                                     >
                                                         <span>{isCollapsed ? '▶' : '▼'}</span>
-                                                        <span>{category}</span>
+                                                        <span>{label}</span>
                                                         <span className="text-xs font-normal text-gray-400 ml-1">({catItems.length})</span>
                                                     </button>
                                                     {!isCollapsed && (
@@ -870,6 +937,30 @@ export function ViewPackingList() {
                                                         </button>
                                                     )}
                                                 </div>
+                                                {!isCollapsed && isCategorySection && (
+                                                    <div className="flex gap-2 mb-2">
+                                                        <input
+                                                            type="text"
+                                                            value={newItemInputs[innerInputKey] || ''}
+                                                            onChange={(e) => setNewItemInputs({ ...newItemInputs, [innerInputKey]: e.target.value })}
+                                                            onKeyPress={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault()
+                                                                    handleAddItem(innerInputKey, label, guestIdByName.get(label))
+                                                                }
+                                                            }}
+                                                            placeholder={`Add item for ${label}...`}
+                                                            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleAddItem(innerInputKey, label, guestIdByName.get(label))}
+                                                            className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 {!isCollapsed && (
                                                     <div className="space-y-2">
                                                         {catItems.map((item) => (
