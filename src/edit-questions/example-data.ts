@@ -261,11 +261,11 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                         items: items(
                             item("Passport", people),
                             item("Travel insurance documents", people, getAdults),
-                            item("Visa (if required)", people, getAdults),
+                            item("Visa", people, getAdults),
                             item("Local currency", people, getAdults),
                             item("Travel adapter", people, getAdults),
                             item("Copies of important documents", people, getAdults),
-                            item("EHIC/GHIC card (if applicable)", people, getAdults),
+                            item("EHIC/GHIC card", people, getAdults),
                             item("Pet passport/Animal health certificate", people, getPets),
                         )
                     },

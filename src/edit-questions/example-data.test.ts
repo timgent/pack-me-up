@@ -235,7 +235,7 @@ describe('createExampleData - travelling abroad', () => {
 
     it('includes travel document items selected for adults only', () => {
         const result = createExampleData([adult, baby])
-        for (const text of ['Travel insurance documents', 'Visa (if required)', 'Local currency', 'Copies of important documents']) {
+        for (const text of ['Travel insurance documents', 'Visa', 'Local currency', 'Copies of important documents']) {
             const found = getAbroadYesItems(result).find(i => i.text === text)
             expect(found, `"${text}" should appear`).toBeTruthy()
             expect(found!.personSelections.find(ps => ps.personId === adult.id)?.selected).toBe(true)
