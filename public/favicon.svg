@@ -1,12 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Badge background: primary-900, elevated from nav's primary-950 -->
   <rect width="64" height="64" rx="14" fill="#134e4a"/>
-  <!-- Carry handle -->
-  <path d="M22 22v-6a10 10 0 0 1 20 0v6" stroke="#2dd4bf" stroke-width="4" stroke-linecap="round" fill="none"/>
-  <!-- Main bag body -->
-  <rect x="10" y="22" width="44" height="33" rx="8" fill="#14b8a6"/>
-  <!-- Front pocket -->
-  <rect x="16" y="34" width="32" height="17" rx="5" fill="#0d9488"/>
-  <!-- Zipper pull -->
-  <circle cx="32" cy="34" r="2.5" fill="#2dd4bf"/>
+  <g stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" fill="none">
+    <line x1="8" y1="24" x2="15" y2="24"/>
+    <line x1="6" y1="34" x2="14" y2="34"/>
+    <line x1="9" y1="44" x2="16" y2="44"/>
+  </g>
+  <g transform="rotate(10 38 33)">
+    <path d="M32 16 v-6 h12 v6" fill="none" stroke="#2dd4bf" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <rect x="24" y="16" width="28" height="34" rx="7" fill="#14b8a6"/>
+    <path d="M31 24 v18 M45 24 v18" fill="none" stroke="#0d9488" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="29" cy="53" r="3.4" fill="#2dd4bf"/>
+    <circle cx="47" cy="53" r="3.4" fill="#2dd4bf"/>
+  </g>
 </svg>
