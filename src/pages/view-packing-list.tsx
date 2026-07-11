@@ -94,6 +94,7 @@ export function ViewPackingList() {
     const [renamingGuestName, setRenamingGuestName] = useState('')
     const [guestToRemove, setGuestToRemove] = useState<string | null>(null)
     const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<string | null>(null)
+    const itemRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
 
     const toggleCategory = (key: string) =>
@@ -154,6 +155,10 @@ export function ViewPackingList() {
             .catch(() => {})
     }, [packingList?.id, foreignPodUrl, ownerWebIdFromUrl, db])
 
+    useEffect(() => {
+        if (!recentlyAddedItemId) return
+        itemRowRefs.current.get(recentlyAddedItemId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [recentlyAddedItemId])
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
@@ -888,6 +893,10 @@ export function ViewPackingList() {
                                                         {catItems.map((item) => (
                                                             <div
                                                                 key={`${item.id}-${sectionKey}`}
+                                                                ref={(el) => {
+                                                                    if (el) itemRowRefs.current.set(item.id, el)
+                                                                    else itemRowRefs.current.delete(item.id)
+                                                                }}
                                                                 className={`rounded-lg p-3 transition-colors duration-1000 ${item.id === recentlyAddedItemId ? 'bg-green-100 ring-2 ring-green-400' : 'bg-gray-50'}`}
                                                             >
                                                                 <div className="flex items-center justify-between">

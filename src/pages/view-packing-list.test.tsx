@@ -560,6 +560,21 @@ describe('ViewPackingList new item feedback', () => {
         const row = span.closest('div.rounded-lg')
         expect(row?.className).not.toContain('ring-green-400')
     })
+
+    it('scrolls the newly added item into view', async () => {
+        const scrollIntoView = vi.fn()
+        Element.prototype.scrollIntoView = scrollIntoView
+
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        const input = screen.getByPlaceholderText('Add new item...')
+        fireEvent.change(input, { target: { value: 'Sunscreen' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    })
 })
 
 describe('ViewPackingList inline item editing', () => {
