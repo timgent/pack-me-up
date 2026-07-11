@@ -500,12 +500,16 @@ export function ViewPackingList() {
             setValue(`items.${newItem.id}`, false)
             setNewItemInputs({ ...newItemInputs, [inputKey]: '' })
 
-            // Make sure the category the new item lands in is expanded so it's visible
+            // Make sure the category the new item lands in is expanded so it's
+            // visible. New items have no category, so they land under "Other" —
+            // keyed `${sectionKey}::Other` in person view and
+            // `Other::${personName}` in question view.
             setCollapsedCategories(prev => {
-                const categoryKey = `${section.key}::Other`
-                if (!prev.has(categoryKey)) return prev
+                const sectionKey = inputKey.split('::add::')[0]
+                const keysToExpand = [`${sectionKey}::Other`, `Other::${personName}`]
+                if (!keysToExpand.some(k => prev.has(k))) return prev
                 const next = new Set(prev)
-                next.delete(categoryKey)
+                for (const k of keysToExpand) next.delete(k)
                 return next
             })
 
