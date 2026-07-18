@@ -41,6 +41,12 @@ describe('AgePromotionCard', () => {
         expect(screen.getByText(/Neve is now a child/i)).toBeTruthy()
     })
 
+    it('uses "an adult" phrasing for the Adult bracket', () => {
+        const almostAdult: Person = { id: 'kid2', name: 'Sam', ageRange: 'Teenager', dateOfBirth: '2008-01-01' }
+        render(<AgePromotionCard questionSet={makeQuestionSet([mum, almostAdult])} onApply={vi.fn()} today={TODAY} />)
+        expect(screen.getByText(/Sam is now an adult!/)).toBeTruthy()
+    })
+
     it('applies checked suggestions and acknowledges the new bracket', async () => {
         const potty = makeItem('Travel potty', {
             ageRanges: ['Toddler'],

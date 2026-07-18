@@ -90,7 +90,7 @@ export function AgePromotionCard({ questionSet, onApply, today }: AgePromotionCa
     }
 
     const summary = transitions
-        .map(t => `${t.person.name} is now a ${t.to.toLowerCase() === 'adult' ? 'an adult' : t.to.toLowerCase()}`)
+        .map(t => `${t.person.name} is now ${t.to === 'Adult' ? 'an adult' : `a ${t.to.toLowerCase()}`}`)
         .join(', ')
 
     const renderSuggestion = (s: PromotionSuggestion) => (
