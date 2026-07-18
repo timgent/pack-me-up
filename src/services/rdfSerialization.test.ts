@@ -179,6 +179,18 @@ describe('packingListToDataset / datasetToPackingList', () => {
         const result = roundTripList(makePackingList({ deletedItems: [deleted] }))
         expect(result.deletedItems![0].lastModified).toBe('2024-05-01T00:00:00.000Z')
     })
+
+    it('round-trips nights and omits it when not set', () => {
+        expect(roundTripList(makePackingList({ nights: 3 })).nights).toBe(3)
+        expect(roundTripList(makePackingList()).nights).toBeUndefined()
+    })
+
+    it('round-trips item quantity and omits it when not set', () => {
+        const result = roundTripList(makePackingList({ items: [makeItem({ quantity: 4 })] }))
+        expect(result.items[0].quantity).toBe(4)
+        const without = roundTripList(makePackingList({ items: [makeItem()] }))
+        expect(without.items[0].quantity).toBeUndefined()
+    })
 })
 
 // ── QuestionSet round-trip ────────────────────────────────────────────────────
@@ -271,6 +283,30 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         const question = makeQuestion({ options: [option] })
         const result = roundTripQs(makeQuestionSet({ questions: [question] }))
         expect(result.questions[0].options[0].items[0].communal).toBe(true)
+    })
+
+    it('round-trips perNight and maxQuantity on items, omitting them when not set', () => {
+        const option = makeOption({
+            items: [
+                { text: 'Socks', perNight: 1, personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Pyjamas', perNight: 1, maxQuantity: 2, personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Toothbrush', personSelections: [{ personId: 'p1', selected: true }] },
+            ],
+        })
+        const question = makeQuestion({ options: [option] })
+        const qs = makeQuestionSet({
+            questions: [question],
+            alwaysNeededItems: [{ text: 'Underwear', perNight: 2, personSelections: [{ personId: 'p1', selected: true }] }],
+        })
+        const result = roundTripQs(qs)
+        const items = result.questions[0].options[0].items
+        expect(items[0].perNight).toBe(1)
+        expect(items[0].maxQuantity).toBeUndefined()
+        expect(items[1].perNight).toBe(1)
+        expect(items[1].maxQuantity).toBe(2)
+        expect(items[2].perNight).toBeUndefined()
+        expect(items[2].maxQuantity).toBeUndefined()
+        expect(result.alwaysNeededItems[0].perNight).toBe(2)
     })
 
     it('round-trips a saved question with option and items', () => {

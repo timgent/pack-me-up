@@ -33,8 +33,14 @@ import { getDogs, getCats, getPets, getHumans } from './pet-specific-items';
  * @param ageFilter - Optional function to filter people (defaults to all humans).
  *   Defaulting to humans (rather than everyone) keeps pets from inheriting
  *   human items; it's a no-op for groups with no pets.
+ * @param quantity - Optional per-night rate (and cap) for suggested quantities
  */
-function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
+function item(
+    text: string,
+    people: Person[],
+    ageFilter?: (p: Person[]) => Person[],
+    quantity?: { perNight: number; maxQuantity?: number }
+): Item {
     const selectedPeople = ageFilter ? ageFilter(people) : getHumans(people);
     const ageRanges = ageFilter && 'ageRanges' in ageFilter
         ? [...(ageFilter as AgeRangeFilter).ageRanges]
@@ -42,6 +48,7 @@ function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Perso
     return {
         text,
         ...(ageRanges ? { ageRanges } : {}),
+        ...(quantity ? { perNight: quantity.perNight, ...(quantity.maxQuantity !== undefined ? { maxQuantity: quantity.maxQuantity } : {}) } : {}),
         personSelections: people.map(p => ({
             personId: p.id,
             selected: selectedPeople.some(sp => sp.id === p.id)
@@ -244,13 +251,13 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             item("Deodorant", people, getTeenagersAndAdults),
                             item("Phone Charger", people, getTeenagersAndAdults),
                             item("Passport/ID", people, getAdults),
-                            item("Pyjamas", people),
+                            item("Pyjamas", people, undefined, { perNight: 1, maxQuantity: 2 }),
                             item("Toiletries bag", people, getTeenagersAndAdults),
                             item("Menstrual products", people, getFemaleTeenagersAndAdults),
                             item("Bra", people, getFemaleTeenagersAndAdults),
                             item("Shaving kit", people, getMaleTeenagersAndAdults),
-                            item("Underwear", people, getToddlersAndOlder),
-                            item("Socks", people),
+                            item("Underwear", people, getToddlersAndOlder, { perNight: 1 }),
+                            item("Socks", people, undefined, { perNight: 1 }),
                             item("T-shirt/Top", people),
                             item("Trousers/Shorts", people),
                             item("Jumper", people),

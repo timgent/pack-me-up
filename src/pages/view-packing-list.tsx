@@ -102,6 +102,7 @@ export function ViewPackingList() {
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
     const [editingItemText, setEditingItemText] = useState<string>('')
+    const [editingItemQuantity, setEditingItemQuantity] = useState<string>('')
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
     const [collapsedPersons, setCollapsedPersons] = useState<Set<string>>(new Set())
     const [showAddGuest, setShowAddGuest] = useState(false)
@@ -442,11 +443,13 @@ export function ViewPackingList() {
     const handleStartEdit = (item: PackingListItem) => {
         setEditingItemId(item.id)
         setEditingItemText(item.itemText)
+        setEditingItemQuantity(item.quantity !== undefined ? String(item.quantity) : '')
     }
 
     const handleCancelEdit = () => {
         setEditingItemId(null)
         setEditingItemText('')
+        setEditingItemQuantity('')
     }
 
     const handleSaveEdit = async (itemId: string) => {
@@ -457,12 +460,17 @@ export function ViewPackingList() {
         }
         if (!packingList) return
 
+        const parsedQuantity = parseInt(editingItemQuantity, 10)
+        const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : undefined
+
         try {
             setAutoSaveStatus('saving')
 
             const now = new Date().toISOString()
             const updatedItems = packingList.items.map(item =>
-                item.id === itemId ? { ...item, itemText: trimmed, lastModified: now } : item
+                item.id === itemId
+                    ? { ...item, itemText: trimmed, quantity, lastModified: now }
+                    : item
             )
             await persistPackingList({ ...packingList, items: updatedItems })
 
@@ -474,6 +482,7 @@ export function ViewPackingList() {
         } finally {
             setEditingItemId(null)
             setEditingItemText('')
+            setEditingItemQuantity('')
         }
     }
 
@@ -1004,25 +1013,51 @@ export function ViewPackingList() {
                                                                             className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                                                         />
                                                                         {editingItemId === item.id ? (
-                                                                            <input
-                                                                                type="text"
-                                                                                value={editingItemText}
-                                                                                onChange={(e) => setEditingItemText(e.target.value)}
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
-                                                                                    if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
+                                                                            <span
+                                                                                className="flex items-center gap-1 flex-1"
+                                                                                onBlur={(e) => {
+                                                                                    // Only save when focus leaves both the name and quantity inputs
+                                                                                    if (!e.currentTarget.contains(e.relatedTarget)) handleSaveEdit(item.id)
                                                                                 }}
-                                                                                onBlur={() => handleSaveEdit(item.id)}
-                                                                                autoFocus
-                                                                                aria-label="Edit item name"
-                                                                                className="flex-1 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
-                                                                            />
+                                                                            >
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={editingItemText}
+                                                                                    onChange={(e) => setEditingItemText(e.target.value)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
+                                                                                        if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
+                                                                                    }}
+                                                                                    autoFocus
+                                                                                    aria-label="Edit item name"
+                                                                                    className="flex-1 min-w-0 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
+                                                                                />
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min={1}
+                                                                                    value={editingItemQuantity}
+                                                                                    onChange={(e) => setEditingItemQuantity(e.target.value)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
+                                                                                        if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
+                                                                                    }}
+                                                                                    placeholder="Qty"
+                                                                                    aria-label="Edit item quantity"
+                                                                                    title="How many to pack (leave blank for no quantity)"
+                                                                                    className="w-16 shrink-0 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
+                                                                                />
+                                                                            </span>
                                                                         ) : (
                                                                             <span
                                                                                 className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}
                                                                                 onDoubleClick={() => handleStartEdit(item)}
                                                                             >
                                                                                 {item.itemText}
+                                                                                {item.quantity !== undefined && item.quantity > 1 && (
+                                                                                    <span className="ml-1.5 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full px-1.5 py-0.5 align-middle">
+                                                                                        ×{item.quantity}
+                                                                                    </span>
+                                                                                )}
                                                                             </span>
                                                                         )}
                                                                     </label>

@@ -25,6 +25,8 @@ export const PMU = {
     questionId: `${PMU_NS}questionId`,
     optionId: `${PMU_NS}optionId`,
     packed: `${PMU_NS}packed`,
+    quantity: `${PMU_NS}quantity`,
+    nights: `${PMU_NS}nights`,
     category: `${PMU_NS}category`,
     reviewed: `${PMU_NS}reviewed`,
     itemLastModified: `${PMU_NS}itemLastModified`,
@@ -63,6 +65,9 @@ export const PMU = {
     // One value per bracket the item applies to
     hasAgeRange: `${PMU_NS}hasAgeRange`,
     questionItemId: `${PMU_NS}questionItemId`,
+    // Suggested-quantity rate: pack ceil(nights × perNight), capped at maxQuantity
+    perNight: `${PMU_NS}perNight`,
+    maxQuantity: `${PMU_NS}maxQuantity`,
     questionItemLastModified: `${PMU_NS}questionItemLastModified`,
     questionItemDeletedAt: `${PMU_NS}questionItemDeletedAt`,
 

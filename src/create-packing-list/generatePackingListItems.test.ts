@@ -290,6 +290,87 @@ describe('generateQuestionBasedItems – communal items', () => {
     })
 })
 
+// ─── Quantity suggestions from nights away ────────────────────────────────────
+
+describe('quantity suggestions from nights away', () => {
+    const overnightWithRates: Question = {
+        id: 'q-overnight',
+        type: 'saved',
+        text: 'Staying overnight?',
+        order: 0,
+        questionType: 'single-choice',
+        options: [
+            {
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [
+                    { text: 'Socks', perNight: 1, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'Underwear', perNight: 2, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'Pyjamas', perNight: 1, maxQuantity: 2, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'Toothbrush', personSelections: [{ personId: 'p1', selected: true }] },
+                ],
+            },
+        ],
+    }
+    const answers = [{ questionId: 'q-overnight', selectedOptionIds: ['opt-yes'] }]
+
+    it('multiplies the per-night rate by the number of nights', () => {
+        const result = generateQuestionBasedItems([overnightWithRates], answers, [p1], ['p1'], 3)
+        expect(result.find(i => i.itemText === 'Socks')?.quantity).toBe(3)
+        expect(result.find(i => i.itemText === 'Underwear')?.quantity).toBe(6)
+    })
+
+    it('caps the suggestion at maxQuantity', () => {
+        const result = generateQuestionBasedItems([overnightWithRates], answers, [p1], ['p1'], 7)
+        expect(result.find(i => i.itemText === 'Pyjamas')?.quantity).toBe(2)
+    })
+
+    it('leaves quantity unset for items without a per-night rate', () => {
+        const result = generateQuestionBasedItems([overnightWithRates], answers, [p1], ['p1'], 3)
+        expect(result.find(i => i.itemText === 'Toothbrush')?.quantity).toBeUndefined()
+    })
+
+    it('leaves quantity unset when nights is not provided', () => {
+        const result = generateQuestionBasedItems([overnightWithRates], answers, [p1], ['p1'])
+        result.forEach(item => expect(item.quantity).toBeUndefined())
+    })
+
+    it('suggests at least 1 even for very short trips', () => {
+        const result = generateQuestionBasedItems([overnightWithRates], answers, [p1], ['p1'], 1)
+        expect(result.find(i => i.itemText === 'Socks')?.quantity).toBe(1)
+    })
+
+    it('applies rates to communal items too', () => {
+        const q: Question = {
+            ...overnightWithRates,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [{
+                    text: 'Nappies',
+                    communal: true,
+                    perNight: 6,
+                    personSelections: [{ personId: 'p1', selected: true }],
+                }],
+            }],
+        }
+        const result = generateQuestionBasedItems([q], answers, [p1], ['p1'], 2)
+        expect(result.find(i => i.itemText === 'Nappies')?.quantity).toBe(12)
+    })
+
+    it('applies rates to always-needed items', () => {
+        const result = generateAlwaysNeededItems(
+            [{ text: 'Socks', perNight: 1, personSelections: [{ personId: 'p1', selected: true }] }],
+            [p1],
+            ['p1'],
+            4
+        )
+        expect(result[0].quantity).toBe(4)
+    })
+})
+
 // ─── Always-needed items ──────────────────────────────────────────────────────
 
 describe('generateAlwaysNeededItems', () => {

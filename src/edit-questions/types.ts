@@ -65,12 +65,17 @@ export const PersonSelectionSchema = z.object({
 // filter record which brackets they apply to, so age-up transitions can
 // suggest selecting/deselecting a person. User-created items have no tag and
 // are never touched by those suggestions.
+// `perNight`/`maxQuantity` are optional and additive: when a trip's number of
+// nights is known, the suggested quantity is ceil(nights × perNight), capped
+// at maxQuantity. Items without a rate behave exactly as before.
 export const ItemSchema = z.object({
   id: z.string().optional(),
   text: z.string(),
   personSelections: z.array(PersonSelectionSchema),
   communal: z.boolean().optional(),
   ageRanges: z.array(AgeRangeSchema).optional(),
+  perNight: z.number().optional(),
+  maxQuantity: z.number().optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })

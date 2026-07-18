@@ -575,19 +575,23 @@ export function CreatePackingList() {
             return
         }
 
+        const nights = data.nights && data.nights > 0 ? data.nights : undefined
+
         // Get items from question answers
         const questionBasedItems = generateQuestionBasedItems(
             questionSet.questions,
             data.questionAnswers,
             questionSet.people,
-            selectedPeopleIds
+            selectedPeopleIds,
+            nights
         )
 
         // Get always needed items
         const alwaysNeededItems = generateAlwaysNeededItems(
             questionSet.alwaysNeededItems,
             questionSet.people,
-            selectedPeopleIds
+            selectedPeopleIds,
+            nights
         )
 
         const packingList: PackingList = {
@@ -595,6 +599,7 @@ export function CreatePackingList() {
             name: data.name,
             createdAt: new Date().toISOString(),
             lastModified: new Date().toISOString(),
+            ...(nights !== undefined ? { nights } : {}),
             items: deduplicateItems([...questionBasedItems, ...alwaysNeededItems])
         }
         try {
@@ -756,6 +761,20 @@ export function CreatePackingList() {
                     placeholder="Enter a name for your packing list"
                     {...register('name', { required: true })}
                 />
+
+                <div>
+                    <Input
+                        label="How many nights away? (optional)"
+                        aria-label="How many nights away? (optional)"
+                        type="number"
+                        min={1}
+                        placeholder="e.g. 3"
+                        {...register('nights', { valueAsNumber: true, min: 1 })}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                        We'll suggest quantities for items with a per-night amount, like socks — e.g. 3 nights → Socks ×3.
+                    </p>
+                </div>
 
                 {/* Person Selection */}
                 {questionSet.people.length > 0 && (
