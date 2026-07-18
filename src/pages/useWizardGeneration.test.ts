@@ -74,6 +74,45 @@ describe('useWizardGeneration', () => {
         expect(savedData.people[0].gender).toBeUndefined()
     })
 
+    it('derives the age bracket from a birthday when no bracket is picked', async () => {
+        const saveQuestionSet = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+        mockUseDatabase.mockReturnValue({ db: { saveQuestionSet } as unknown as PackingAppDatabase })
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-07-18T12:00:00Z'))
+
+        const { result } = renderHook(() => useWizardGeneration())
+        await act(async () => {
+            await result.current.generateAndSave({
+                people: [{ kind: 'person', name: 'Neve', dateOfBirth: '2024-01-10', gender: 'female' }],
+            })
+        })
+        vi.useRealTimers()
+
+        const savedData = saveQuestionSet.mock.calls[0][0]
+        expect(savedData.people[0].ageRange).toBe('Toddler')
+        expect(savedData.people[0].dateOfBirth).toBe('2024-01-10')
+    })
+
+    it('lets a manually picked bracket override the birthday-derived one', async () => {
+        const saveQuestionSet = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+        mockUseDatabase.mockReturnValue({ db: { saveQuestionSet } as unknown as PackingAppDatabase })
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-07-18T12:00:00Z'))
+
+        const { result } = renderHook(() => useWizardGeneration())
+        await act(async () => {
+            await result.current.generateAndSave({
+                // Birthday says Toddler, but the parent says they're ready for Child
+                people: [{ kind: 'person', name: 'Neve', dateOfBirth: '2024-01-10', ageRange: 'Child', gender: 'female' }],
+            })
+        })
+        vi.useRealTimers()
+
+        const savedData = saveQuestionSet.mock.calls[0][0]
+        expect(savedData.people[0].ageRange).toBe('Child')
+        expect(savedData.people[0].dateOfBirth).toBe('2024-01-10')
+    })
+
     it('syncs the question set to the pod after saving locally', async () => {
         const saveQuestionSet = vi.fn().mockResolvedValue({ rev: 'rev-1' })
         mockUseDatabase.mockReturnValue({

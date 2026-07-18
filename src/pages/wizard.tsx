@@ -208,7 +208,7 @@ export const Wizard = () => {
                                                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                     />
                                                     {derivedAgeRange && (
-                                                        <p className="text-xs text-gray-500 mt-1">We'll suggest packing updates as they grow</p>
+                                                        <p className="text-xs text-gray-500 mt-1">Age group filled in from birthday — adjust it if they're ahead or behind</p>
                                                     )}
                                                 </div>
                                                 <div>
@@ -217,9 +217,7 @@ export const Wizard = () => {
                                                     </label>
                                                     <select
                                                         {...register(`people.${index}.ageRange`)}
-                                                        disabled={!!derivedAgeRange}
-                                                        title={derivedAgeRange ? 'Set automatically from their birthday' : undefined}
-                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                     >
                                                         <option value="">Select age range...</option>
                                                         {AGE_RANGE_OPTIONS.map(option => (

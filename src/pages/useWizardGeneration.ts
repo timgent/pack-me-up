@@ -39,9 +39,10 @@ export function useWizardGeneration() {
                 : {
                     id: generateUUID(),
                     name: entry.name,
-                    // A birthday wins over a manually picked bracket; '' is the
-                    // untouched select
-                    ageRange: (entry.dateOfBirth ? deriveAgeRange(entry.dateOfBirth) : undefined) ?? (entry.ageRange || undefined),
+                    // The select is auto-filled from the birthday but stays
+                    // editable, so the (possibly overridden) selection wins;
+                    // '' is the untouched select
+                    ageRange: (entry.ageRange || undefined) ?? (entry.dateOfBirth ? deriveAgeRange(entry.dateOfBirth) : undefined),
                     gender: entry.gender,
                     ...(entry.dateOfBirth ? { dateOfBirth: entry.dateOfBirth } : {}),
                 }
