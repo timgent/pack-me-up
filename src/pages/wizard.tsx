@@ -26,7 +26,7 @@ export const Wizard = () => {
     const { db } = useDatabase()
     const { isLoading, isSuccess, generateAndSave } = useWizardGeneration()
 
-    const { register, control, handleSubmit, watch, formState: { errors } } = useForm<WizardFormData>({
+    const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<WizardFormData>({
         resolver: zodResolver(wizardSchema),
         defaultValues: {
             people: [{ kind: 'person', name: 'Me', ageRange: undefined, gender: undefined }],
@@ -150,7 +150,10 @@ export const Wizard = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {fields.map((field, index) => (
+                        {fields.map((field, index) => {
+                            const dob = field.kind === 'person' ? watch(`people.${index}.dateOfBirth`) : undefined
+                            const derivedAgeRange = dob ? deriveAgeRange(dob) : undefined
+                            return (
                             <div key={field.id} className="bg-primary-50 p-4 rounded-xl border border-primary-200">
                                 <div className="flex items-start gap-4">
                                     <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -196,16 +199,17 @@ export const Wizard = () => {
                                                     </label>
                                                     <input
                                                         type="date"
-                                                        {...register(`people.${index}.dateOfBirth`)}
+                                                        {...register(`people.${index}.dateOfBirth`, {
+                                                            onChange: (e) => {
+                                                                const derived = deriveAgeRange(e.target.value)
+                                                                if (derived) setValue(`people.${index}.ageRange`, derived)
+                                                            },
+                                                        })}
                                                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                     />
-                                                    {(() => {
-                                                        const dob = watch(`people.${index}.dateOfBirth`)
-                                                        const derived = dob ? deriveAgeRange(dob) : undefined
-                                                        return derived
-                                                            ? <p className="text-xs text-gray-500 mt-1">Age group: {derived} — we'll suggest updates as they grow</p>
-                                                            : null
-                                                    })()}
+                                                    {derivedAgeRange && (
+                                                        <p className="text-xs text-gray-500 mt-1">We'll suggest packing updates as they grow</p>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -213,7 +217,9 @@ export const Wizard = () => {
                                                     </label>
                                                     <select
                                                         {...register(`people.${index}.ageRange`)}
-                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                        disabled={!!derivedAgeRange}
+                                                        title={derivedAgeRange ? 'Set automatically from their birthday' : undefined}
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                                                     >
                                                         <option value="">Select age range...</option>
                                                         {AGE_RANGE_OPTIONS.map(option => (
@@ -257,7 +263,8 @@ export const Wizard = () => {
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
 
                     {fields.length < 10 && (
