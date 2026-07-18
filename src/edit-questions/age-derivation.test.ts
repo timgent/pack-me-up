@@ -79,6 +79,12 @@ describe('detectAgeTransitions', () => {
         expect(detectAgeTransitions([kid], TODAY)).toEqual([{ person: kid, from: undefined, to: 'Toddler' }])
     })
 
+    it('never suggests a downward move when the stored bracket is ahead of the derived one', () => {
+        // Manually promoted early — derived says Child, parent already set Teenager
+        const early = person({ name: 'Sam', ageRange: 'Teenager', dateOfBirth: '2020-01-01' })
+        expect(detectAgeTransitions([early], TODAY)).toEqual([])
+    })
+
     it('ignores people whose brackets match, without a DOB, pets, and deleted people', () => {
         const matching = person({ ageRange: 'Child', dateOfBirth: '2020-01-01' })
         const noDob = person({ ageRange: 'Toddler' })

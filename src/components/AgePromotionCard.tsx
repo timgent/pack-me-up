@@ -22,6 +22,15 @@ function isDismissed(t: AgeTransition): boolean {
 interface AgePromotionCardProps {
     questionSet: PackingListQuestionSet
     onApply: (updated: PackingListQuestionSet) => Promise<void> | void
+    /**
+     * Bracket changes the user just made by hand (e.g. promoting a kid
+     * early). Shown alongside birthday-driven transitions so they get the
+     * same item review; never dismissed via localStorage since they're
+     * one-shot.
+     */
+    manualTransitions?: AgeTransition[]
+    /** Called when manual transitions have been applied or dismissed */
+    onManualHandled?: () => void
     /** Injectable clock for tests */
     today?: Date
 }
@@ -33,16 +42,22 @@ interface AgePromotionCardProps {
  * changes the user left ticked. Dismissing remembers the person+bracket in
  * localStorage so the same transition isn't offered again on this device.
  */
-export function AgePromotionCard({ questionSet, onApply, today }: AgePromotionCardProps) {
+export function AgePromotionCard({ questionSet, onApply, manualTransitions, onManualHandled, today }: AgePromotionCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [isApplying, setIsApplying] = useState(false)
     const [unchecked, setUnchecked] = useState<Set<string>>(new Set())
     const [dismissedTick, setDismissedTick] = useState(0)
 
     const transitions = useMemo(
-        () => detectAgeTransitions(questionSet.people ?? [], today).filter(t => !isDismissed(t)),
+        () => {
+            const manual = manualTransitions ?? []
+            const manualIds = new Set(manual.map(t => t.person.id))
+            const auto = detectAgeTransitions(questionSet.people ?? [], today)
+                .filter(t => !isDismissed(t) && !manualIds.has(t.person.id))
+            return [...manual, ...auto]
+        },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [questionSet, today, dismissedTick]
+        [questionSet, manualTransitions, today, dismissedTick]
     )
 
     const suggestions = useMemo(
@@ -68,14 +83,20 @@ export function AgePromotionCard({ questionSet, onApply, today }: AgePromotionCa
     }
 
     const handleDismiss = () => {
+        const manualIds = new Set((manualTransitions ?? []).map(t => t.person.id))
         try {
+            // Manual transitions are one-shot state, not a recurring detection,
+            // so they don't need a localStorage marker.
             for (const t of transitions) {
-                localStorage.setItem(`${DISMISSED_KEY_PREFIX}${t.person.id}`, t.to)
+                if (!manualIds.has(t.person.id)) {
+                    localStorage.setItem(`${DISMISSED_KEY_PREFIX}${t.person.id}`, t.to)
+                }
             }
         } catch {
             // localStorage unavailable — banner just reappears next visit
         }
         setDismissedTick(n => n + 1)
+        onManualHandled?.()
     }
 
     const handleApply = async () => {
@@ -84,6 +105,7 @@ export function AgePromotionCard({ questionSet, onApply, today }: AgePromotionCa
             const accepted = suggestions.filter(s => !unchecked.has(s.key))
             await onApply(applyAgePromotions(questionSet, transitions, accepted))
             setIsExpanded(false)
+            onManualHandled?.()
         } finally {
             setIsApplying(false)
         }

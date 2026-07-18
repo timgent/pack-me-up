@@ -104,6 +104,55 @@ describe('AgePromotionCard', () => {
         expect(localStorage.getItem('age-promotion-dismissed:kid')).toBe('Child')
     })
 
+    it('shows manual transitions (no DOB needed) and reports them handled on apply', async () => {
+        const sam: Person = { id: 'sam', name: 'Sam', ageRange: 'Teenager' } // already saved with the new bracket
+        const qs = makeQuestionSet([mum, { ...kid, ageRange: 'Child' }, sam])
+        const onApply = vi.fn()
+        const onManualHandled = vi.fn()
+        render(
+            <AgePromotionCard
+                questionSet={qs}
+                onApply={onApply}
+                manualTransitions={[{ person: sam, from: 'Child', to: 'Teenager' }]}
+                onManualHandled={onManualHandled}
+                today={TODAY}
+            />
+        )
+        expect(screen.getByText(/Sam is now a teenager/)).toBeTruthy()
+
+        fireEvent.click(screen.getByText('Review changes'))
+        fireEvent.click(screen.getByText('Apply updates'))
+        await waitFor(() => expect(onManualHandled).toHaveBeenCalledTimes(1))
+        expect(onApply).toHaveBeenCalledTimes(1)
+    })
+
+    it('dismissing a manual transition does not write a localStorage marker', () => {
+        const sam: Person = { id: 'sam', name: 'Sam', ageRange: 'Teenager' }
+        const qs = makeQuestionSet([mum, { ...kid, ageRange: 'Child' }, sam])
+        const onManualHandled = vi.fn()
+        render(
+            <AgePromotionCard
+                questionSet={qs}
+                onApply={vi.fn()}
+                manualTransitions={[{ person: sam, from: 'Child', to: 'Teenager' }]}
+                onManualHandled={onManualHandled}
+                today={TODAY}
+            />
+        )
+        fireEvent.click(screen.getByLabelText('Dismiss age update'))
+        expect(onManualHandled).toHaveBeenCalledTimes(1)
+        expect(localStorage.getItem('age-promotion-dismissed:sam')).toBeNull()
+    })
+
+    it('never prompts to demote someone promoted early by hand', () => {
+        // DOB says Child, but the parent already bumped them to Teenager
+        const early: Person = { id: 'kid', name: 'Neve', ageRange: 'Teenager', dateOfBirth: '2018-01-01' }
+        const { container } = render(
+            <AgePromotionCard questionSet={makeQuestionSet([mum, early])} onApply={vi.fn()} today={TODAY} />
+        )
+        expect(container.firstChild).toBeNull()
+    })
+
     it('a dismissed transition stays hidden on re-render but a later bracket shows again', () => {
         localStorage.setItem('age-promotion-dismissed:kid', 'Child')
         const { rerender, container } = render(

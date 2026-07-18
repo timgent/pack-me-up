@@ -53,9 +53,13 @@ export interface AgeTransition {
     to: AgeRange
 }
 
+const BRACKET_ORDER: readonly AgeRange[] = ['Baby', 'Toddler', 'Child', 'Teenager', 'Adult']
+
 /**
- * People whose derived bracket no longer matches the stored one — i.e. they
- * have aged into a new bracket since the user last acknowledged it. Pets and
+ * People whose derived bracket has moved AHEAD of the stored one — i.e. they
+ * have aged up since the user last acknowledged it. Deliberately one-way: a
+ * stored bracket ahead of the derived one means the user promoted them early
+ * (kids mature at different speeds), and we never nag to demote. Pets and
  * deleted people never transition.
  */
 export function detectAgeTransitions(people: Person[], today: Date = new Date()): AgeTransition[] {
@@ -63,7 +67,10 @@ export function detectAgeTransitions(people: Person[], today: Date = new Date())
     for (const person of people) {
         if (person.species || person.deletedAt || !person.dateOfBirth) continue
         const derived = deriveAgeRange(person.dateOfBirth, today)
-        if (derived && derived !== person.ageRange) {
+        if (!derived) continue
+        const agedUp = !person.ageRange ||
+            BRACKET_ORDER.indexOf(derived) > BRACKET_ORDER.indexOf(person.ageRange)
+        if (agedUp) {
             transitions.push({ person, from: person.ageRange, to: derived })
         }
     }
