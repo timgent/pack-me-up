@@ -21,6 +21,7 @@ import {
     getToddlersAndOlder,
     getFemaleTeenagersAndAdults,
     getMaleTeenagersAndAdults,
+    AgeRangeFilter,
 } from './age-specific-items';
 import { getDogs, getCats, getPets, getHumans } from './pet-specific-items';
 
@@ -34,8 +35,12 @@ import { getDogs, getCats, getPets, getHumans } from './pet-specific-items';
  */
 function item(text: string, people: Person[], ageFilter?: (p: Person[]) => Person[]): Item {
     const selectedPeople = ageFilter ? ageFilter(people) : getHumans(people);
+    const ageRanges = ageFilter && 'ageRanges' in ageFilter
+        ? [...(ageFilter as AgeRangeFilter).ageRanges]
+        : undefined;
     return {
         text,
+        ...(ageRanges ? { ageRanges } : {}),
         personSelections: people.map(p => ({
             personId: p.id,
             selected: selectedPeople.some(sp => sp.id === p.id)

@@ -6,6 +6,7 @@ import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
 import { generateUUID } from '../utils/uuid'
 import { Person, PackingListQuestionSet } from '../edit-questions/types'
+import { deriveAgeRange } from '../edit-questions/age-derivation'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS } from '../services/solidPod'
@@ -35,7 +36,15 @@ export function useWizardGeneration() {
         const people: Person[] = data.people.map(entry =>
             entry.kind === 'pet'
                 ? { id: generateUUID(), name: entry.name, species: entry.species }
-                : { id: generateUUID(), name: entry.name, ageRange: entry.ageRange, gender: entry.gender }
+                : {
+                    id: generateUUID(),
+                    name: entry.name,
+                    // A birthday wins over a manually picked bracket; '' is the
+                    // untouched select
+                    ageRange: (entry.dateOfBirth ? deriveAgeRange(entry.dateOfBirth) : undefined) ?? (entry.ageRange || undefined),
+                    gender: entry.gender,
+                    ...(entry.dateOfBirth ? { dateOfBirth: entry.dateOfBirth } : {}),
+                }
         )
         return createExampleData(people, [])
     }

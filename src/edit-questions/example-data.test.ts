@@ -380,3 +380,34 @@ describe('createExampleData communal items', () => {
         expect(items.find(i => i.text === 'Passport')?.communal).toBeUndefined()
     })
 })
+
+describe('createExampleData - ageRanges tagging', () => {
+    const family: Person[] = [
+        { id: 'a1', name: 'Alice', ageRange: 'Adult', gender: 'female' },
+        { id: 'b1', name: 'Bea', ageRange: 'Baby' },
+    ]
+
+    it('tags age-filtered items with the brackets they apply to', () => {
+        const result = createExampleData(family)
+        const nappies = result.alwaysNeededItems.find(i => i.text === 'Nappies (pack/supply)')!
+        expect(nappies.ageRanges).toEqual(['Baby'])
+
+        const swimming = result.questions
+            .find(q => q.text === 'What activities will you be doing?')!
+            .options.find(o => o.id === ACTIVITY_OPTION_IDS.swimming)!
+        const swimsuit = swimming.items.find(i => i.text === 'Swimsuit')!
+        expect(swimsuit.ageRanges).toEqual(['Toddler', 'Child', 'Teenager', 'Adult'])
+    })
+
+    it('leaves everyone-items and gender-filtered items untagged', () => {
+        const result = createExampleData(family)
+        const snacks = result.alwaysNeededItems.find(i => i.text === 'Snacks')!
+        expect(snacks.ageRanges).toBeUndefined()
+
+        const overnightYes = result.questions
+            .find(q => q.text === 'Will you be staying overnight?')!
+            .options.find(o => o.text === 'Yes')!
+        const bra = overnightYes.items.find(i => i.text === 'Bra')!
+        expect(bra.ageRanges).toBeUndefined()
+    })
+})

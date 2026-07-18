@@ -441,3 +441,40 @@ describe('sharedListsWithMeToDataset / datasetToSharedListsWithMe', () => {
         expect(result.lists[0].label).toBeUndefined()
     })
 })
+
+describe('questionSet dateOfBirth and ageRanges round-trip', () => {
+    it('round-trips a person dateOfBirth and omits it when not set', () => {
+        const people = [
+            makePerson({ id: 'p1', name: 'Neve', dateOfBirth: '2023-06-01' }),
+            makePerson({ id: 'p2', name: 'Mum' }),
+        ]
+        const result = roundTripQs(makeQuestionSet({ people }))
+        expect(result.people.find(p => p.name === 'Neve')!.dateOfBirth).toBe('2023-06-01')
+        expect(result.people.find(p => p.name === 'Mum')!.dateOfBirth).toBeUndefined()
+    })
+
+    it('round-trips item ageRanges in canonical bracket order', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [{
+                text: 'Swimsuit',
+                ageRanges: ['Adult', 'Toddler', 'Child', 'Teenager'],
+                personSelections: [{ personId: 'p1', selected: true }],
+            }],
+        })
+        const result = roundTripQs(qs)
+        expect(result.alwaysNeededItems[0].ageRanges).toEqual(['Toddler', 'Child', 'Teenager', 'Adult'])
+    })
+
+    it('omits ageRanges when not set and round-trips it inside a question option', () => {
+        const option = makeOption({
+            items: [
+                { text: 'Nappies', ageRanges: ['Baby'], personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Snacks', personSelections: [{ personId: 'p1', selected: true }] },
+            ],
+        })
+        const question = makeQuestion({ options: [option] })
+        const result = roundTripQs(makeQuestionSet({ questions: [question] }))
+        expect(result.questions[0].options[0].items[0].ageRanges).toEqual(['Baby'])
+        expect(result.questions[0].options[0].items[1].ageRanges).toBeUndefined()
+    })
+})

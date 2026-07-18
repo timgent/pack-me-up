@@ -41,6 +41,8 @@ export const PMU = {
     ageRange: `${PMU_NS}ageRange`,
     gender: `${PMU_NS}gender`,
     species: `${PMU_NS}species`,
+    // Stored as a plain YYYY-MM-DD string (not a datetime) to avoid timezone drift
+    dateOfBirth: 'https://schema.org/birthDate',
     personLastModified: `${PMU_NS}personLastModified`,
     personDeletedAt: `${PMU_NS}personDeletedAt`,
 
@@ -58,6 +60,8 @@ export const PMU = {
 
     // Item predicates (on option items and always-needed items)
     hasPersonSelection: `${PMU_NS}hasPersonSelection`,
+    // One value per bracket the item applies to
+    hasAgeRange: `${PMU_NS}hasAgeRange`,
     questionItemId: `${PMU_NS}questionItemId`,
     questionItemLastModified: `${PMU_NS}questionItemLastModified`,
     questionItemDeletedAt: `${PMU_NS}questionItemDeletedAt`,

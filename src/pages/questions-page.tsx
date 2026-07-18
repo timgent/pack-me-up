@@ -12,6 +12,8 @@ import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSeria
 import { useSolidPod } from '../components/SolidPodContext'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
+import { AgePromotionCard } from '../components/AgePromotionCard'
+import { deriveAgeRange } from '../edit-questions/age-derivation'
 
 // One distinct colour per person slot (by index). Tailwind classes must be literal strings.
 const AVATAR_ON = [
@@ -787,6 +789,10 @@ function PeopleModal({ people, onSave, onClose }: {
     }
     const updateName = (idx: number, name: string) =>
         setLocalPeople(prev => prev.map((p, i) => i === idx ? { ...p, name } : p))
+    const updateDob = (idx: number, dateOfBirth: string) =>
+        setLocalPeople(prev => prev.map((p, i) => i === idx
+            ? { ...p, dateOfBirth: dateOfBirth || undefined }
+            : p))
 
     return (
         <div
@@ -798,33 +804,50 @@ function PeopleModal({ people, onSave, onClose }: {
                 <div className="p-5">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit People</h2>
                     <div className="space-y-2 mb-3">
-                        {localPeople.map((person, i) => (
-                            <div key={person.id} className="flex items-center gap-2">
-                                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${AVATAR_ON[i % AVATAR_ON.length]}`}>
-                                    {person.name.charAt(0).toUpperCase() || '?'}
-                                </span>
-                                <input
-                                    autoFocus={i === 0}
-                                    type="text"
-                                    value={person.name}
-                                    onChange={e => updateName(i, e.target.value)}
-                                    placeholder={`Person ${i + 1}`}
-                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    onKeyDown={e => { if (e.key === 'Enter') addPerson() }}
-                                />
-                                {localPeople.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => removePerson(i)}
-                                        className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0"
-                                        title="Remove person"
-                                    >
-                                        ×
-                                    </button>
+                        {localPeople.map((person, i) => {
+                            const derived = person.dateOfBirth ? deriveAgeRange(person.dateOfBirth) : undefined
+                            return (
+                            <div key={person.id}>
+                                <div className="flex items-center gap-2">
+                                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${AVATAR_ON[i % AVATAR_ON.length]}`}>
+                                        {person.name.charAt(0).toUpperCase() || '?'}
+                                    </span>
+                                    <input
+                                        autoFocus={i === 0}
+                                        type="text"
+                                        value={person.name}
+                                        onChange={e => updateName(i, e.target.value)}
+                                        placeholder={`Person ${i + 1}`}
+                                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        onKeyDown={e => { if (e.key === 'Enter') addPerson() }}
+                                    />
+                                    <input
+                                        type="date"
+                                        aria-label={`Birthday for ${person.name || `Person ${i + 1}`} (optional)`}
+                                        title="Birthday (optional) — used to keep age-based items up to date"
+                                        value={person.dateOfBirth ?? ''}
+                                        onChange={e => updateDob(i, e.target.value)}
+                                        className="w-36 border border-gray-300 rounded-lg px-2 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 shrink-0"
+                                    />
+                                    {localPeople.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removePerson(i)}
+                                            className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0"
+                                            title="Remove person"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                                {derived && derived !== person.ageRange && (
+                                    <p className="ml-9 mt-0.5 text-xs text-gray-400">Age group: {derived}</p>
                                 )}
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
+                    <p className="text-xs text-gray-400 mb-3">Birthdays are optional — add one and we'll suggest packing-item updates as they grow.</p>
                     <button
                         type="button"
                         onClick={addPerson}
@@ -1069,7 +1092,8 @@ export function QuestionsPage() {
         const stamped: Person[] = newPeople.map(p => {
             const existing = oldPeopleMap.get(p.id)
             const changed = !existing || existing.name !== p.name ||
-                existing.ageRange !== p.ageRange || existing.gender !== p.gender
+                existing.ageRange !== p.ageRange || existing.gender !== p.gender ||
+                existing.dateOfBirth !== p.dateOfBirth
             return changed ? { ...p, lastModified: now } : p
         })
 
@@ -1126,6 +1150,7 @@ export function QuestionsPage() {
                     <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
                     {!isForeign && <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
                 </div>
+                {!isForeign && <AgePromotionCard questionSet={data} onApply={saveData} />}
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
                 <AlwaysSection items={activeAlwaysNeededItems} people={people} onEdit={() => setAlwaysModal(true)} />
                 {activeQuestions.map((q, qi) => (

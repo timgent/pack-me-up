@@ -11,6 +11,7 @@ import { useDatabase } from '../components/DatabaseContext'
 import { wizardSchema, WizardFormData, WizardEntry } from './wizard-types'
 import { useWizardGeneration } from './useWizardGeneration'
 import { AGE_RANGE_OPTIONS, GENDER_OPTIONS, PET_SPECIES_OPTIONS } from '../edit-questions/types'
+import { deriveAgeRange } from '../edit-questions/age-derivation'
 
 const SOLID_POD_UPSELL_SHOWN_KEY = 'solid-pod-upsell-shown'
 
@@ -189,6 +190,23 @@ export const Wizard = () => {
                                             </div>
                                         ) : (
                                             <>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                        Birthday <span className="text-gray-400 font-normal">(optional)</span>
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        {...register(`people.${index}.dateOfBirth`)}
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                    />
+                                                    {(() => {
+                                                        const dob = watch(`people.${index}.dateOfBirth`)
+                                                        const derived = dob ? deriveAgeRange(dob) : undefined
+                                                        return derived
+                                                            ? <p className="text-xs text-gray-500 mt-1">Age group: {derived} — we'll suggest updates as they grow</p>
+                                                            : null
+                                                    })()}
+                                                </div>
                                                 <div>
                                                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                                                         Age Range

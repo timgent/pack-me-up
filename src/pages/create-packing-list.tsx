@@ -14,6 +14,7 @@ import { usePodSync } from '../hooks/usePodSync'
 import { questionSetToDataset, datasetToQuestionSet, packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { generateQuestionBasedItems, generateAlwaysNeededItems } from '../create-packing-list/generatePackingListItems'
+import { AgePromotionCard } from '../components/AgePromotionCard'
 
 export function deduplicateItems(items: PackingListItem[]): PackingListItem[] {
     const seen = new Set<string>()
@@ -467,6 +468,17 @@ export function CreatePackingList() {
         await markReviewed(listId, item)
     }
 
+    const handleApplyAgePromotions = async (updated: PackingListQuestionSet) => {
+        // Stamp a lastModified so manage-questions' fallback-to-pod sync resolution
+        // won't overwrite this save with stale pod data.
+        const updatedWithTimestamp = { ...updated, lastModified: new Date().toISOString() }
+        const { rev } = await db.saveQuestionSet(updatedWithTimestamp)
+        const savedQs = { ...updatedWithTimestamp, _rev: rev }
+        setQuestionSet(savedQs)
+        await saveQuestionSetToPod(savedQs)
+        showToast('Packing items updated for their new age group', 'success')
+    }
+
     const pushListToPod = async (list: PackingList) => {
         if (!isLoggedIn || !session) return
         const podUrl = foreignPodUrl ?? await getPrimaryPodUrl(session)
@@ -707,6 +719,12 @@ export function CreatePackingList() {
                 <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
                 <p className="mt-2 text-gray-600">Answer the questions below to create your packing list.</p>
             </div>
+
+            {!foreignPodUrl && (
+                <div className="mb-6 empty:hidden">
+                    <AgePromotionCard questionSet={questionSet} onApply={handleApplyAgePromotions} />
+                </div>
+            )}
 
             {suggestions.length > 0 && !isSuggestionDismissed && (
                 <div className="mb-6">

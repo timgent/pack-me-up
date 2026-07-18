@@ -38,10 +38,14 @@ export const PET_SPECIES_OPTIONS = [
 // `species` is optional and additive: a Person without it is a human (existing
 // data loads unchanged); a Person with it is a pet, modelled as just another
 // person once the question set is generated.
+// `dateOfBirth` (ISO date, YYYY-MM-DD) is optional and additive: when present
+// the person's bracket is derived from it and `ageRange` acts as the last
+// bracket the user acknowledged, which is how age-up transitions are detected.
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
   ageRange: AgeRangeSchema.optional(),
+  dateOfBirth: z.string().optional(),
   gender: GenderSchema.optional(),
   species: PetSpeciesSchema.optional(),
   lastModified: z.string().optional(),
@@ -57,11 +61,16 @@ export const PersonSelectionSchema = z.object({
 // per-person as before. When true, the item is packed once for the whole
 // group and `personSelections` become a trigger — the item is included when
 // at least one selected person is on the trip.
+// `ageRanges` is optional and additive: default items generated from an age
+// filter record which brackets they apply to, so age-up transitions can
+// suggest selecting/deselecting a person. User-created items have no tag and
+// are never touched by those suggestions.
 export const ItemSchema = z.object({
   id: z.string().optional(),
   text: z.string(),
   personSelections: z.array(PersonSelectionSchema),
   communal: z.boolean().optional(),
+  ageRanges: z.array(AgeRangeSchema).optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })
