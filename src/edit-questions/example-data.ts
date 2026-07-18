@@ -9,6 +9,7 @@ export const ACTIVITY_OPTION_IDS = {
     climbing: 'activity-option-climbing',
     hiking: 'activity-option-hiking',
     formalOccasions: 'activity-option-formal-occasions',
+    religiousSites: 'activity-option-religious-sites',
 } as const
 import {
     getBabies,
@@ -160,6 +161,18 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 item("Dress shoes", people, getToddlersAndOlder),
                 item("Accessories (watch, jewelry, etc.)", people, getTeenagersAndAdults),
                 item("Evening bag/Clutch", people, getTeenagersAndAdults),
+            )
+        },
+        {
+            id: ACTIVITY_OPTION_IDS.religiousSites,
+            text: "Visiting religious/sacred sites",
+            order: 7,
+            items: items(
+                item("Scarf/shawl (for covering shoulders/head)", people, getChildrenAndOlder),
+                item("Top with sleeves (covers shoulders)", people, getChildrenAndOlder),
+                item("Long trousers/skirt (knee-length or longer)", people, getChildrenAndOlder),
+                item("Easy-to-remove shoes", people, getToddlersAndOlder),
+                item("Socks (for bare-shoe areas)", people, getToddlersAndOlder),
             )
         }
     ]

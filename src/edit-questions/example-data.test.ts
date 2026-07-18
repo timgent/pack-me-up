@@ -17,6 +17,7 @@ describe('ACTIVITY_OPTION_IDS', () => {
         expect(ACTIVITY_OPTION_IDS.climbing).toBe('activity-option-climbing')
         expect(ACTIVITY_OPTION_IDS.hiking).toBe('activity-option-hiking')
         expect(ACTIVITY_OPTION_IDS.formalOccasions).toBe('activity-option-formal-occasions')
+        expect(ACTIVITY_OPTION_IDS.religiousSites).toBe('activity-option-religious-sites')
     })
 })
 
