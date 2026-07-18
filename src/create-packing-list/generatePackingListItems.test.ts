@@ -341,6 +341,29 @@ describe('quantity suggestions from nights away', () => {
         expect(result.find(i => i.itemText === 'Socks')?.quantity).toBe(1)
     })
 
+    it('supports fractional rates, rounding the suggestion up', () => {
+        const q: Question = {
+            ...overnightWithRates,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [
+                    // One jumper every 4 nights, one t-shirt every 2 nights
+                    { text: 'Jumper', perNight: 0.25, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'T-shirt', perNight: 0.5, personSelections: [{ personId: 'p1', selected: true }] },
+                ],
+            }],
+        }
+        const threeNights = generateQuestionBasedItems([q], answers, [p1], ['p1'], 3)
+        expect(threeNights.find(i => i.itemText === 'Jumper')?.quantity).toBe(1)  // ceil(0.75)
+        expect(threeNights.find(i => i.itemText === 'T-shirt')?.quantity).toBe(2) // ceil(1.5)
+
+        const sevenNights = generateQuestionBasedItems([q], answers, [p1], ['p1'], 7)
+        expect(sevenNights.find(i => i.itemText === 'Jumper')?.quantity).toBe(2)  // ceil(1.75)
+        expect(sevenNights.find(i => i.itemText === 'T-shirt')?.quantity).toBe(4) // ceil(3.5)
+    })
+
     it('applies rates to communal items too', () => {
         const q: Question = {
             ...overnightWithRates,

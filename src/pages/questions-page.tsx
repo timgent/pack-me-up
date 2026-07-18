@@ -518,9 +518,7 @@ function useItemListState(initialItems: Item[], people: Person[]) {
 
     const updatePerNight = (itemIdx: number, perNight: number | undefined) =>
         setItems(prev => prev.map((item, i) =>
-            i === itemIdx
-                ? { ...item, perNight, ...(perNight === undefined ? { maxQuantity: undefined } : {}) }
-                : item
+            i === itemIdx ? { ...item, perNight } : item
         ))
 
     const updateMaxQuantity = (itemIdx: number, maxQuantity: number | undefined) =>
@@ -554,9 +552,22 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     addItem: () => void
 }) {
     const [openQuantityIdx, setOpenQuantityIdx] = useState<number | null>(null)
+    // Raw text of the per-night input while the editor is open, so partial
+    // decimals ("0", "0.") survive typing instead of being reset by parsing
+    const [rateDraft, setRateDraft] = useState('')
     const parseQty = (raw: string): number | undefined => {
         const n = parseInt(raw, 10)
         return Number.isFinite(n) && n > 0 ? n : undefined
+    }
+    // Rates may be fractional: 0.5 = one every 2 nights, 0.25 = one every 4
+    const parseRate = (raw: string): number | undefined => {
+        const n = parseFloat(raw)
+        return Number.isFinite(n) && n > 0 ? n : undefined
+    }
+    const toggleQuantityEditor = (itemIdx: number, item: Item) => {
+        const opening = openQuantityIdx !== itemIdx
+        setOpenQuantityIdx(opening ? itemIdx : null)
+        if (opening) setRateDraft(item.perNight?.toString() ?? '')
     }
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
@@ -619,7 +630,7 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setOpenQuantityIdx(quantityOpen ? null : itemIdx)}
+                                onClick={() => toggleQuantityEditor(itemIdx, item)}
                                 title={quantityTitle}
                                 aria-label={`Set suggested quantity for ${item.text || 'item'}`}
                                 aria-expanded={quantityOpen}
@@ -681,9 +692,13 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                     Per night
                                     <input
                                         type="number"
-                                        min={1}
-                                        value={item.perNight ?? ''}
-                                        onChange={e => updatePerNight(itemIdx, parseQty(e.target.value))}
+                                        min={0}
+                                        step="any"
+                                        value={rateDraft}
+                                        onChange={e => {
+                                            setRateDraft(e.target.value)
+                                            updatePerNight(itemIdx, parseRate(e.target.value))
+                                        }}
                                         aria-label={`Per-night quantity for ${item.text || 'item'}`}
                                         className="w-14 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
@@ -701,7 +716,8 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                     />
                                 </label>
                                 <span className="text-gray-400">
-                                    Suggests a quantity when a list has nights away — leave blank to skip
+                                    Suggests a quantity when a list has nights away — decimals work too
+                                    (0.5 = one every 2 nights); leave blank to skip
                                 </span>
                             </div>
                         )}

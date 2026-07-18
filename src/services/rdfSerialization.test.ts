@@ -309,6 +309,13 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         expect(result.alwaysNeededItems[0].perNight).toBe(2)
     })
 
+    it('round-trips fractional perNight rates', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [{ text: 'Jumper', perNight: 0.25, personSelections: [{ personId: 'p1', selected: true }] }],
+        })
+        expect(roundTripQs(qs).alwaysNeededItems[0].perNight).toBe(0.25)
+    })
+
     it('round-trips a saved question with option and items', () => {
         const option = makeOption({
             items: [{ text: 'Nappies', personSelections: [{ personId: 'p1', selected: true }] }],
