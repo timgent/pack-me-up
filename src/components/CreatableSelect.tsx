@@ -39,7 +39,9 @@ const selectStyles = {
 
 // The full react-select — only mounts when the user actually interacts with this item.
 export function ActiveSelect({ value, onChange, options, placeholder, menuPortalTarget }: CreatableSelectProps) {
-    const [inputValue, setInputValue] = useState('');
+    // Seed the search box with the existing text so the user can edit in place
+    // (place the cursor and insert/delete characters) instead of it opening blank.
+    const [inputValue, setInputValue] = useState(value);
     const [menuIsOpen, setMenuIsOpen] = useState(false);
     const justSelectedRef = useRef(false);
 
@@ -64,6 +66,7 @@ export function ActiveSelect({ value, onChange, options, placeholder, menuPortal
             isClearable
             isSearchable
             value={value ? { label: value, value } : null}
+            inputValue={inputValue}
             onChange={handleChange}
             onInputChange={setInputValue}
             onBlur={handleBlur}
