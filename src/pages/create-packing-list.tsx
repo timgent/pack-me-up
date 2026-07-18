@@ -8,6 +8,7 @@ import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { useToast } from '../components/ToastContext'
 import { useSolidPod } from '../components/SolidPodContext'
+import { reportError } from '../errorReporting'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS, loadMultipleRdfFromPod } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
@@ -394,7 +395,7 @@ export function CreatePackingList() {
                     console.log('No question set found')
                     setNoQuestionsFound(true)
                 } else {
-                    console.error('Error fetching question set:', err)
+                    reportError(err, 'Error fetching question set')
                     showToast('Failed to load questions', 'error')
                 }
             } finally {
@@ -611,7 +612,7 @@ export function CreatePackingList() {
                 navigate(`/view-lists/${packingList.id}`)
             }
         } catch (err) {
-            console.error('Error saving packing list:', err)
+            reportError(err, 'Error saving packing list')
             showToast('Failed to create packing list. Please try again.', 'error')
         }
     }

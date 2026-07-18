@@ -8,6 +8,7 @@ import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
+import { reportError } from '../errorReporting'
 import { usePodSync } from '../hooks/usePodSync'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName, deriveWebIdFromPodUrl } from '../services/solidPod'
@@ -224,6 +225,7 @@ export function ViewPackingList() {
         if (foreignPodUrl && !hasLoadedRef.current) {
             hasLoadedRef.current = true
             setIsLoading(false)
+            reportError(error, 'Could not load shared list')
             showToast(`Could not load shared list: ${error}`, 'error')
         }
     }, [handleSyncError, foreignPodUrl, showToast])
@@ -235,7 +237,7 @@ export function ViewPackingList() {
 
     // Callback when save to Pod fails
     const handleSaveError = useCallback((error: string) => {
-        console.error('Save to Pod error:', error);
+        reportError(error, 'Save to Pod error');
         showToast(`Failed to save to Pod: ${error}`, 'error');
     }, [showToast]);
 
@@ -282,7 +284,7 @@ export function ViewPackingList() {
                 if (isNotFound && foreignPodUrl) {
                     // Leave isLoading=true — the first pod poll will hydrate via handleSyncSuccess
                 } else {
-                    console.error('Error fetching packing list:', err)
+                    reportError(err, 'Error fetching packing list')
                     setIsLoading(false)
                 }
             }
@@ -365,7 +367,7 @@ export function ViewPackingList() {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000) // Show "saved" for 2 seconds
         } catch (err) {
-            console.error('handleItemChange: Error saving packing list:', err)
+            reportError(err, 'handleItemChange: Error saving packing list')
             setAutoSaveStatus('error')
         }
     }, 800) // Reduced to 800ms for faster saves while still batching rapid changes
@@ -432,7 +434,7 @@ export function ViewPackingList() {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
-            console.error('Error deleting item:', err)
+            reportError(err, 'Error deleting item')
             setAutoSaveStatus('error')
         }
     }
@@ -467,7 +469,7 @@ export function ViewPackingList() {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {
-            console.error('Error saving item name:', err)
+            reportError(err, 'Error saving item name')
             setAutoSaveStatus('error')
         } finally {
             setEditingItemId(null)
@@ -521,7 +523,7 @@ export function ViewPackingList() {
             setRecentlyAddedItemId(newItem.id)
             setTimeout(() => setRecentlyAddedItemId(null), 2000)
         } catch (err) {
-            console.error('Error adding item:', err)
+            reportError(err, 'Error adding item')
             setAutoSaveStatus('error')
         }
     }

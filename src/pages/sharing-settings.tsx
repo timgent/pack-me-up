@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
+import { reportError } from '../errorReporting'
 import {
     grantFullCollaboratorAccess,
     revokeFullCollaboratorAccess,
@@ -68,7 +69,7 @@ export function SharingSettingsPage() {
             const list = await getFullCollaborators(session, ownPodUrl)
             setCollaborators(list)
         } catch (err) {
-            console.error('SharingSettingsPage: failed to load collaborators', err)
+            reportError(err, 'SharingSettingsPage: failed to load collaborators')
         } finally {
             setIsLoadingCollaborators(false)
         }
@@ -144,7 +145,7 @@ export function SharingSettingsPage() {
             showToast('Access granted successfully', 'success')
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            console.error('SharingSettingsPage: failed to grant access', err)
+            reportError(err, 'SharingSettingsPage: failed to grant access')
             showToast(`Failed to grant access: ${msg}`, 'error')
         } finally {
             setIsGranting(false)
@@ -161,7 +162,7 @@ export function SharingSettingsPage() {
             })
             showToast('Removed', 'success')
         } catch (err) {
-            console.error('SharingSettingsPage: failed to remove shared context', err)
+            reportError(err, 'SharingSettingsPage: failed to remove shared context')
             showToast('Failed to remove. Please try again.', 'error')
         } finally {
             setRemovingPodUrl(null)
@@ -176,7 +177,7 @@ export function SharingSettingsPage() {
             await loadCollaborators()
             showToast('Access revoked', 'success')
         } catch (err) {
-            console.error('SharingSettingsPage: failed to revoke access', err)
+            reportError(err, 'SharingSettingsPage: failed to revoke access')
             showToast('Failed to revoke access. Please try again.', 'error')
         } finally {
             setRevokingWebId(null)
@@ -194,7 +195,7 @@ export function SharingSettingsPage() {
             await db.deletePackingList(listId).catch(() => {})
             showToast('Removed', 'success')
         } catch (err) {
-            console.error('SharingSettingsPage: failed to remove shared list', err)
+            reportError(err, 'SharingSettingsPage: failed to remove shared list')
             showToast('Failed to remove. Please try again.', 'error')
         } finally {
             setRemovingListId(null)

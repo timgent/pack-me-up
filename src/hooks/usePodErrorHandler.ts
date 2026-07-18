@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useToast } from '../components/ToastContext';
 import { AuthenticationError } from '../services/solidPod';
+import { reportError } from '../errorReporting';
 
 /**
  * Custom hook for handling Pod operation errors in a consistent way
@@ -19,7 +20,7 @@ export function usePodErrorHandler() {
   const { showToast } = useToast();
 
   return useCallback((error: unknown, fallbackMessage: string) => {
-    console.error('Pod operation error:', error);
+    reportError(error, 'Pod operation error');
 
     if (error instanceof AuthenticationError) {
       // Use the specific authentication error message

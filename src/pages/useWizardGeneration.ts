@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useToast } from '../components/ToastContext'
+import { reportError } from '../errorReporting'
 import { useDatabase } from '../components/DatabaseContext'
 import { createExampleData } from '../edit-questions/example-data'
 import { QUESTION_SET_ID } from '../constants'
@@ -54,7 +55,7 @@ export function useWizardGeneration() {
             showToast('Packing list questions generated successfully!', 'success')
             setIsSuccess(true)
         } catch (err) {
-            console.error('Error generating question set:', err)
+            reportError(err, 'Error generating question set')
             showToast('Failed to generate question set', 'error')
         } finally {
             setIsLoading(false)
