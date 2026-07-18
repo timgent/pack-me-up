@@ -112,6 +112,12 @@ describe('createExampleData - unassigned items excluded', () => {
         expect(result.alwaysNeededItems.find(i => i.text === 'Sippy cup/Toddler cup')).toBeTruthy()
     })
 
+    it('includes Headphones and Phone charger in alwaysNeededItems for adults', () => {
+        const result = createExampleData([adult])
+        expect(result.alwaysNeededItems.find(i => i.text === 'Headphones')).toBeTruthy()
+        expect(result.alwaysNeededItems.find(i => i.text === 'Phone charger')).toBeTruthy()
+    })
+
     it('no item in the question set has all personSelections unselected', () => {
         const result = createExampleData([adult])
         const allItems = [
