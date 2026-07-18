@@ -396,8 +396,8 @@ export function CreatePackingList() {
                     console.log('No question set found')
                     setNoQuestionsFound(true)
                 } else {
-                    reportError(err, 'Error fetching question set')
-                    showToast('Failed to load questions', 'error')
+                    const details = reportError(err, 'Error fetching question set')
+                    showToast('Failed to load questions', 'error', details)
                 }
             } finally {
                 setIsLoading(false)
@@ -624,8 +624,8 @@ export function CreatePackingList() {
                 navigate(`/view-lists/${packingList.id}`)
             }
         } catch (err) {
-            reportError(err, 'Error saving packing list')
-            showToast('Failed to create packing list. Please try again.', 'error')
+            const details = reportError(err, 'Error saving packing list')
+            showToast('Failed to create packing list. Please try again.', 'error', details)
         }
     }
 

@@ -225,8 +225,8 @@ export function ViewPackingList() {
         if (foreignPodUrl && !hasLoadedRef.current) {
             hasLoadedRef.current = true
             setIsLoading(false)
-            reportError(error, 'Could not load shared list')
-            showToast(`Could not load shared list: ${error}`, 'error')
+            const details = reportError(error, 'Could not load shared list')
+            showToast(`Could not load shared list: ${error}`, 'error', details)
         }
     }, [handleSyncError, foreignPodUrl, showToast])
 
@@ -237,8 +237,8 @@ export function ViewPackingList() {
 
     // Callback when save to Pod fails
     const handleSaveError = useCallback((error: string) => {
-        reportError(error, 'Save to Pod error');
-        showToast(`Failed to save to Pod: ${error}`, 'error');
+        const details = reportError(error, 'Save to Pod error');
+        showToast(`Failed to save to Pod: ${error}`, 'error', details);
     }, [showToast]);
 
     // Set up automatic Pod sync with polling

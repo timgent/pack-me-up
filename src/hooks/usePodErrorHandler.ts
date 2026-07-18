@@ -20,14 +20,14 @@ export function usePodErrorHandler() {
   const { showToast } = useToast();
 
   return useCallback((error: unknown, fallbackMessage: string) => {
-    reportError(error, 'Pod operation error');
+    const details = reportError(error, 'Pod operation error');
 
     if (error instanceof AuthenticationError) {
       // Use the specific authentication error message
-      showToast(error.message, 'error');
+      showToast(error.message, 'error', details);
     } else {
       // Use the fallback message for other errors
-      showToast(fallbackMessage, 'error');
+      showToast(fallbackMessage, 'error', details);
     }
   }, [showToast]);
 }

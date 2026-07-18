@@ -145,8 +145,8 @@ export function SharingSettingsPage() {
             showToast('Access granted successfully', 'success')
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            reportError(err, 'SharingSettingsPage: failed to grant access')
-            showToast(`Failed to grant access: ${msg}`, 'error')
+            const details = reportError(err, 'SharingSettingsPage: failed to grant access')
+            showToast(`Failed to grant access: ${msg}`, 'error', details)
         } finally {
             setIsGranting(false)
         }
@@ -162,8 +162,8 @@ export function SharingSettingsPage() {
             })
             showToast('Removed', 'success')
         } catch (err) {
-            reportError(err, 'SharingSettingsPage: failed to remove shared context')
-            showToast('Failed to remove. Please try again.', 'error')
+            const details = reportError(err, 'SharingSettingsPage: failed to remove shared context')
+            showToast('Failed to remove. Please try again.', 'error', details)
         } finally {
             setRemovingPodUrl(null)
         }
@@ -177,8 +177,8 @@ export function SharingSettingsPage() {
             await loadCollaborators()
             showToast('Access revoked', 'success')
         } catch (err) {
-            reportError(err, 'SharingSettingsPage: failed to revoke access')
-            showToast('Failed to revoke access. Please try again.', 'error')
+            const details = reportError(err, 'SharingSettingsPage: failed to revoke access')
+            showToast('Failed to revoke access. Please try again.', 'error', details)
         } finally {
             setRevokingWebId(null)
         }
@@ -195,8 +195,8 @@ export function SharingSettingsPage() {
             await db.deletePackingList(listId).catch(() => {})
             showToast('Removed', 'success')
         } catch (err) {
-            reportError(err, 'SharingSettingsPage: failed to remove shared list')
-            showToast('Failed to remove. Please try again.', 'error')
+            const details = reportError(err, 'SharingSettingsPage: failed to remove shared list')
+            showToast('Failed to remove. Please try again.', 'error', details)
         } finally {
             setRemovingListId(null)
         }

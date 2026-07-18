@@ -25,4 +25,19 @@ describe('reportError', () => {
 
         expect(console.error).toHaveBeenCalledWith('Unhandled error', error)
     })
+
+    it('returns copyable details including the context and error message', () => {
+        const error = new Error('boom')
+        const details = reportError(error, 'Failed to create packing list')
+
+        expect(details).toContain('Failed to create packing list')
+        expect(details).toContain('boom')
+    })
+
+    it('formats non-Error values as their string representation', () => {
+        const details = reportError('a plain string error', 'Save to Pod error')
+
+        expect(details).toContain('Save to Pod error')
+        expect(details).toContain('a plain string error')
+    })
 })

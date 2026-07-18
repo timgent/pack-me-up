@@ -929,7 +929,8 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
         // Toast should have been shown
         expect(mockShowToast).toHaveBeenCalledWith(
             expect.stringContaining('Could not load shared list'),
-            'error'
+            'error',
+            expect.any(String)
         )
     })
 })

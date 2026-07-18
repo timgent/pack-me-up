@@ -6,7 +6,7 @@ vi.mock('../components/ToastContext', () => ({
   useToast: () => ({ showToast }),
 }))
 
-const reportError = vi.fn()
+const reportError = vi.fn(() => 'formatted error details')
 vi.mock('../errorReporting', () => ({
   reportError: (...args: unknown[]) => reportError(...args),
 }))
@@ -27,7 +27,7 @@ describe('usePodErrorHandler', () => {
     result.current(error, 'Failed to create backup.')
 
     expect(reportError).toHaveBeenCalledWith(error, 'Pod operation error')
-    expect(showToast).toHaveBeenCalledWith('Failed to create backup.', 'error')
+    expect(showToast).toHaveBeenCalledWith('Failed to create backup.', 'error', 'formatted error details')
   })
 
   it('shows the authentication error message instead of the fallback', () => {
@@ -37,6 +37,6 @@ describe('usePodErrorHandler', () => {
     result.current(error, 'Failed to create backup.')
 
     expect(reportError).toHaveBeenCalledWith(error, 'Pod operation error')
-    expect(showToast).toHaveBeenCalledWith('Session expired', 'error')
+    expect(showToast).toHaveBeenCalledWith('Session expired', 'error', 'formatted error details')
   })
 })

@@ -65,8 +65,8 @@ export function useWizardGeneration() {
             showToast('Packing list questions generated successfully!', 'success')
             setIsSuccess(true)
         } catch (err) {
-            reportError(err, 'Error generating question set')
-            showToast('Failed to generate question set', 'error')
+            const details = reportError(err, 'Error generating question set')
+            showToast('Failed to generate question set', 'error', details)
         } finally {
             setIsLoading(false)
         }
