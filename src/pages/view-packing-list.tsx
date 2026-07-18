@@ -1006,7 +1006,7 @@ export function ViewPackingList() {
                                                                 className={`rounded-lg p-3 transition-colors duration-1000 ${item.id === recentlyAddedItemId ? 'bg-green-100 ring-2 ring-green-400' : 'bg-gray-50'}`}
                                                             >
                                                                 <div className="flex items-center justify-between">
-                                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1">
+                                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0">
                                                                         <input
                                                                             type="checkbox"
                                                                             {...register(`items.${item.id}`)}
@@ -1014,7 +1014,7 @@ export function ViewPackingList() {
                                                                         />
                                                                         {editingItemId === item.id ? (
                                                                             <span
-                                                                                className="flex items-center gap-1 flex-1"
+                                                                                className="flex items-center gap-1 flex-1 min-w-0"
                                                                                 onBlur={(e) => {
                                                                                     // Only save when focus leaves both the name and quantity inputs
                                                                                     if (!e.currentTarget.contains(e.relatedTarget)) handleSaveEdit(item.id)
@@ -1044,7 +1044,7 @@ export function ViewPackingList() {
                                                                                     placeholder="Qty"
                                                                                     aria-label="Edit item quantity"
                                                                                     title="How many to pack (leave blank for no quantity)"
-                                                                                    className="w-16 shrink-0 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
+                                                                                    className="w-12 sm:w-16 shrink-0 px-1.5 sm:px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
                                                                                 />
                                                                             </span>
                                                                         ) : (
@@ -1073,6 +1073,7 @@ export function ViewPackingList() {
                                                                             </svg>
                                                                         </button>
                                                                     )}
+                                                                    {editingItemId !== item.id && (
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setItemToDelete(item.id)}
@@ -1083,6 +1084,7 @@ export function ViewPackingList() {
                                                                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                                                         </svg>
                                                                     </button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         ))}
