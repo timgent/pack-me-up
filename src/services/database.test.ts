@@ -175,6 +175,18 @@ describe('PackingAppDatabase', () => {
       expect(retrieved.people[2].name).toBe('Charlie')
     })
 
+    it('should persist templateVersion', async () => {
+      await db.saveQuestionSet({ ...mockQuestionSet, templateVersion: 2 })
+      const retrieved = await db.getQuestionSet()
+      expect(retrieved.templateVersion).toBe(2)
+    })
+
+    it('should omit templateVersion when not set', async () => {
+      await db.saveQuestionSet(mockQuestionSet)
+      const retrieved = await db.getQuestionSet()
+      expect(retrieved.templateVersion).toBeUndefined()
+    })
+
     it('should throw not_found error when question set does not exist', async () => {
       await expect(db.getQuestionSet()).rejects.toEqual({
         name: 'not_found',

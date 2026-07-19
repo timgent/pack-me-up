@@ -11,6 +11,25 @@ export const ACTIVITY_OPTION_IDS = {
     formalOccasions: 'activity-option-formal-occasions',
     religiousSites: 'activity-option-religious-sites',
 } as const
+
+// Stable IDs for the built-in wizard questions. Using fixed IDs (rather than
+// fresh UUIDs) lets template-update detection match a user's saved question
+// back to its template origin exactly, even after the question text is edited.
+export const TEMPLATE_QUESTION_IDS = {
+    overnight: 'template-question-overnight',
+    abroad: 'template-question-abroad',
+    selfCatering: 'template-question-self-catering',
+    activities: 'template-question-activities',
+    weather: 'template-question-weather',
+} as const
+
+// Version of the wizard template content. Bump this whenever `createExampleData`
+// changes in a way existing users should be offered (new items, options, or
+// questions). A saved question set stamped with an older version triggers the
+// "new suggestions" review card on My Questions & Items; the stamp is updated
+// once the user reviews (applies or dismisses) the suggestions. Purely
+// additive detection — bumping never removes or rewrites a user's own edits.
+export const WIZARD_TEMPLATE_VERSION = 1
 import {
     getBabies,
     getToddlers,
@@ -77,7 +96,7 @@ function items(...args: Item[]): Item[] {
 export function createExampleData(people: Person[], selectedActivityIds: string[] = []): PackingListQuestionSet {
     const validActivityIds = Object.values(ACTIVITY_OPTION_IDS) as string[]
     const validSelectedIds = selectedActivityIds.filter(id => validActivityIds.includes(id))
-    const activitiesQuestionId = generateUUID()
+    const activitiesQuestionId = TEMPLATE_QUESTION_IDS.activities
 
     const allActivityOptions = [
         {
@@ -240,7 +259,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
         ),
         questions: [
             {
-                id: generateUUID(),
+                id: TEMPLATE_QUESTION_IDS.overnight,
                 type: "saved",
                 text: "Will you be staying overnight?",
                 order: 0,
@@ -287,7 +306,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 ]
             },
             {
-                id: generateUUID(),
+                id: TEMPLATE_QUESTION_IDS.abroad,
                 type: "saved",
                 text: "Are you travelling abroad?",
                 order: 1,
@@ -317,7 +336,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 ]
             },
             {
-                id: generateUUID(),
+                id: TEMPLATE_QUESTION_IDS.selfCatering,
                 type: "saved",
                 text: "Are you self-catering?",
                 order: 2,
@@ -351,7 +370,7 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                 options: activityOptions
             },
             {
-                id: generateUUID(),
+                id: TEMPLATE_QUESTION_IDS.weather,
                 type: "saved",
                 text: "What weather do you expect?",
                 order: 4,

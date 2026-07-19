@@ -38,6 +38,8 @@ export const PMU = {
     hasPerson: `${PMU_NS}hasPerson`,
     hasQuestion: `${PMU_NS}hasQuestion`,
     hasAlwaysNeededItem: `${PMU_NS}hasAlwaysNeededItem`,
+    // Wizard template version this set was last reconciled against
+    templateVersion: `${PMU_NS}templateVersion`,
 
     // Person predicates
     ageRange: `${PMU_NS}ageRange`,

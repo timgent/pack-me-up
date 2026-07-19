@@ -213,6 +213,21 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         expect(result.lastModified).toBeUndefined()
     })
 
+    it('round-trips templateVersion', () => {
+        const result = roundTripQs(makeQuestionSet({ templateVersion: 3 }))
+        expect(result.templateVersion).toBe(3)
+    })
+
+    it('round-trips templateVersion of 0', () => {
+        const result = roundTripQs(makeQuestionSet({ templateVersion: 0 }))
+        expect(result.templateVersion).toBe(0)
+    })
+
+    it('omits templateVersion when not set (legacy data)', () => {
+        const result = roundTripQs(makeQuestionSet())
+        expect(result.templateVersion).toBeUndefined()
+    })
+
     it('does NOT store _rev', () => {
         const result = roundTripQs(makeQuestionSet({ _rev: '1-xyz' } as PackingListQuestionSet))
         expect(result._rev).toBeUndefined()

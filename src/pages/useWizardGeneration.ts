@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useToast } from '../components/ToastContext'
 import { reportError } from '../errorReporting'
 import { useDatabase } from '../components/DatabaseContext'
-import { createExampleData } from '../edit-questions/example-data'
+import { createExampleData, WIZARD_TEMPLATE_VERSION } from '../edit-questions/example-data'
 import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
 import { generateUUID } from '../utils/uuid'
@@ -48,7 +48,7 @@ export function useWizardGeneration() {
                     ...(entry.dateOfBirth ? { dateOfBirth: entry.dateOfBirth } : {}),
                 }
         )
-        return createExampleData(people, [])
+        return { ...createExampleData(people, []), templateVersion: WIZARD_TEMPLATE_VERSION }
     }
 
     const generateAndSave = async (data: WizardFormData) => {

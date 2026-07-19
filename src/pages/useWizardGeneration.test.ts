@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWizardGeneration } from './useWizardGeneration'
+import { WIZARD_TEMPLATE_VERSION } from '../edit-questions/example-data'
 
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
@@ -111,6 +112,21 @@ describe('useWizardGeneration', () => {
         const savedData = saveQuestionSet.mock.calls[0][0]
         expect(savedData.people[0].ageRange).toBe('Child')
         expect(savedData.people[0].dateOfBirth).toBe('2024-01-10')
+    })
+
+    it('stamps the generated set with the current template version', async () => {
+        const saveQuestionSet = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+        mockUseDatabase.mockReturnValue({ db: { saveQuestionSet } as unknown as PackingAppDatabase })
+
+        const { result } = renderHook(() => useWizardGeneration())
+        await act(async () => {
+            await result.current.generateAndSave({
+                people: [{ name: 'Alice', ageRange: 'Adult' }],
+            })
+        })
+
+        const savedData = saveQuestionSet.mock.calls[0][0]
+        expect(savedData.templateVersion).toBe(WIZARD_TEMPLATE_VERSION)
     })
 
     it('syncs the question set to the pod after saving locally', async () => {

@@ -58,6 +58,21 @@ describe('concurrent question adds', () => {
   })
 })
 
+describe('templateVersion', () => {
+  it('keeps the higher template version regardless of which side is newer', () => {
+    // Pod is newer at the doc level but was written by an older-app device
+    // still on version 0; the reconciled version must not regress.
+    const local = makeQS({ templateVersion: 1, lastModified: '2024-01-01T10:00:00.000Z' })
+    const pod   = makeQS({ templateVersion: 0, lastModified: '2024-01-01T11:00:00.000Z' })
+    expect(mergeQuestionSets(local, pod).templateVersion).toBe(1)
+  })
+
+  it('omits templateVersion when neither side has one', () => {
+    const result = mergeQuestionSets(makeQS(), makeQS())
+    expect(result.templateVersion).toBeUndefined()
+  })
+})
+
 describe('concurrent person adds', () => {
   it('preserves both people when each side added a unique one', () => {
     const p1 = makePerson({ id: 'p1', name: 'Alice', lastModified: '2024-01-01T10:00:00.000Z' })

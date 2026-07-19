@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createExampleData, ACTIVITY_OPTION_IDS } from './example-data'
+import { createExampleData, ACTIVITY_OPTION_IDS, TEMPLATE_QUESTION_IDS, WIZARD_TEMPLATE_VERSION } from './example-data'
 import { Person } from './types'
 
 const people: Person[] = [{ id: 'person-1', name: 'Alice', ageRange: 'Adult' }]
@@ -21,7 +21,34 @@ describe('ACTIVITY_OPTION_IDS', () => {
     })
 })
 
+describe('TEMPLATE_QUESTION_IDS', () => {
+    it('exports stable non-UUID string IDs for each built-in question', () => {
+        expect(TEMPLATE_QUESTION_IDS.overnight).toBe('template-question-overnight')
+        expect(TEMPLATE_QUESTION_IDS.abroad).toBe('template-question-abroad')
+        expect(TEMPLATE_QUESTION_IDS.selfCatering).toBe('template-question-self-catering')
+        expect(TEMPLATE_QUESTION_IDS.activities).toBe('template-question-activities')
+        expect(TEMPLATE_QUESTION_IDS.weather).toBe('template-question-weather')
+    })
+})
+
+describe('WIZARD_TEMPLATE_VERSION', () => {
+    it('is a positive integer', () => {
+        expect(Number.isInteger(WIZARD_TEMPLATE_VERSION)).toBe(true)
+        expect(WIZARD_TEMPLATE_VERSION).toBeGreaterThan(0)
+    })
+})
+
 describe('createExampleData', () => {
+    it('uses stable IDs for the built-in questions', () => {
+        const result = createExampleData(people)
+        const ids = result.questions.map(q => q.id)
+        expect(ids).toContain(TEMPLATE_QUESTION_IDS.overnight)
+        expect(ids).toContain(TEMPLATE_QUESTION_IDS.abroad)
+        expect(ids).toContain(TEMPLATE_QUESTION_IDS.selfCatering)
+        expect(ids).toContain(TEMPLATE_QUESTION_IDS.activities)
+        expect(ids).toContain(TEMPLATE_QUESTION_IDS.weather)
+    })
+
     it('uses stable IDs for activity question options', () => {
         const result = createExampleData(people)
         const activitiesQuestion = result.questions.find(q => q.text === 'What activities will you be doing?')!

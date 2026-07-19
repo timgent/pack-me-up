@@ -119,7 +119,12 @@ export const PackingListQuestionSetSchema = z.object({
   people: z.array(PersonSchema),
   alwaysNeededItems: z.array(ItemSchema),
   questions: z.array(QuestionSchema),
-  lastModified: z.string().optional() // ISO timestamp for sync conflict resolution
+  lastModified: z.string().optional(), // ISO timestamp for sync conflict resolution
+  // Version of the wizard template this set was generated from / last
+  // reconciled against. Absent means pre-versioning (treated as 0), so the
+  // first template update is offered to every existing user. See
+  // WIZARD_TEMPLATE_VERSION in example-data.ts.
+  templateVersion: z.number().optional(),
 })
 
 // TypeScript Types (inferred from schemas)

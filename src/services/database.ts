@@ -134,7 +134,12 @@ export class PackingAppDatabase {
                     data: {
                         people: questionSet.people,
                         alwaysNeededItems: questionSet.alwaysNeededItems,
-                        questions: questionSet.questions
+                        questions: questionSet.questions,
+                        // Persisted so the "new template suggestions" prompt can
+                        // tell whether this set predates the latest template.
+                        ...(questionSet.templateVersion !== undefined
+                            ? { templateVersion: questionSet.templateVersion }
+                            : {}),
                     }
                 }
 

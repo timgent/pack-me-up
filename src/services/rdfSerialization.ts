@@ -172,6 +172,10 @@ export function questionSetToDataset(qs: PackingListQuestionSet, datasetUrl: str
         rootBuilder = rootBuilder.addDatetime(DCTERMS.modified, new Date(qs.lastModified))
     }
 
+    if (qs.templateVersion !== undefined) {
+        rootBuilder = rootBuilder.addInteger(PMU.templateVersion, qs.templateVersion)
+    }
+
     for (const person of qs.people) {
         const personUrl = `${datasetUrl}#person-${person.id}`
         rootBuilder = rootBuilder.addUrl(PMU.hasPerson, personUrl)
@@ -204,6 +208,9 @@ export function datasetToQuestionSet(dataset: SolidDataset, datasetUrl: string):
     const lastModifiedDate = getDatetime(rootThing, DCTERMS.modified)
     const lastModified = lastModifiedDate?.toISOString()
 
+    const templateVersionValue = getInteger(rootThing, PMU.templateVersion)
+    const templateVersion = templateVersionValue === null ? undefined : templateVersionValue
+
     const people = getUrlAll(rootThing, PMU.hasPerson)
         .map(url => thingToPerson(getThing(dataset, url), url))
         .filter((p): p is Person => p !== null)
@@ -229,6 +236,7 @@ export function datasetToQuestionSet(dataset: SolidDataset, datasetUrl: string):
         questions,
         alwaysNeededItems,
         ...(lastModified !== undefined ? { lastModified } : {}),
+        ...(templateVersion !== undefined ? { templateVersion } : {}),
     }
 }
 

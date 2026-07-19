@@ -13,6 +13,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { CustomCreatableSelect } from '../components/CreatableSelect'
 import { AgePromotionCard } from '../components/AgePromotionCard'
+import { TemplateUpdatesCard } from '../components/TemplateUpdatesCard'
 import { AgeTransition } from '../edit-questions/age-derivation'
 
 // One distinct colour per person slot (by index). Tailwind classes must be literal strings.
@@ -1284,6 +1285,7 @@ export function QuestionsPage() {
                         onManualHandled={() => setManualPromotions([])}
                     />
                 )}
+                {!isForeign && <TemplateUpdatesCard questionSet={data} onApply={saveData} />}
                 <PersonLegend people={people} onEdit={() => setPeopleModal(true)} />
                 <AlwaysSection items={activeAlwaysNeededItems} people={people} onEdit={() => setAlwaysModal(true)} />
                 {activeQuestions.map((q, qi) => (

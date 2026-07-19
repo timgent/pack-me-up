@@ -2,10 +2,9 @@ import { PackingListQuestionSet, Person, Item, Question, Option } from './types'
 import { AgeTransition } from './age-derivation'
 import { createExampleData } from './example-data'
 import { generateUUID } from '../utils/uuid'
+import { ItemLocation, LocatedItems, locationKey, normalize, collectLocations } from './item-locations'
 
-export type ItemLocation =
-    | { kind: 'always' }
-    | { kind: 'option'; questionId: string; optionId: string }
+export type { ItemLocation }
 
 export interface PromotionSuggestion {
     /** Stable key for UI checkbox state */
@@ -21,37 +20,6 @@ export interface PromotionSuggestion {
     itemIndex?: number
     /** For addItem: the ready-to-insert catalog item (selections aligned to active people) */
     newItem?: Item
-}
-
-function locationKey(location: ItemLocation): string {
-    return location.kind === 'always' ? 'always' : `option:${location.questionId}:${location.optionId}`
-}
-
-function normalize(text: string): string {
-    return text.trim().toLowerCase()
-}
-
-interface LocatedItems {
-    location: ItemLocation
-    contextLabel: string
-    items: Item[]
-}
-
-function collectLocations(qs: PackingListQuestionSet): LocatedItems[] {
-    const locations: LocatedItems[] = [
-        { location: { kind: 'always' }, contextLabel: 'Always needed', items: qs.alwaysNeededItems ?? [] },
-    ]
-    for (const question of qs.questions) {
-        if (question.deletedAt) continue
-        for (const option of question.options) {
-            locations.push({
-                location: { kind: 'option', questionId: question.id, optionId: option.id },
-                contextLabel: `${question.text} — ${option.text}`,
-                items: option.items,
-            })
-        }
-    }
-    return locations
 }
 
 function toggleSuggestions(qs: PackingListQuestionSet, transitions: AgeTransition[]): PromotionSuggestion[] {

@@ -151,10 +151,19 @@ export function mergeQuestionSets(
     ? mergeItemsById(localItems, podItems, docLevelNewerIsLocal)
     : newer.alwaysNeededItems ?? []
 
+  // Template version is monotonic and additive: once a device has reconciled
+  // to a newer template, a merge with an older-app copy must not regress it, so
+  // take the max rather than following doc-level LWW.
+  const maxTemplateVersion = Math.max(local.templateVersion ?? 0, pod.templateVersion ?? 0)
+  const templateVersion = local.templateVersion === undefined && pod.templateVersion === undefined
+    ? undefined
+    : maxTemplateVersion
+
   return {
     ...newer,
     questions,
     people,
     alwaysNeededItems,
+    ...(templateVersion !== undefined ? { templateVersion } : {}),
   }
 }

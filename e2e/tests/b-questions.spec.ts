@@ -137,4 +137,17 @@ test.describe('B – Editing Questions', () => {
     // No JSON toggle button should be present
     await expect(page.getByRole('button', { name: /^json$|edit.*json/i })).not.toBeVisible()
   })
+
+  test('B6: a freshly set-up user is not shown the template-updates prompt', async ({ freshPage: page }) => {
+    // The wizard stamps the current template version, so a brand-new set is
+    // already up to date and must not nag the user with "new suggestions".
+    await setupWizardAndGoToQuestions(page)
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible()
+    await expect(page.getByText(/new suggestion/i)).not.toBeVisible()
+    // Reloading (re-reading the persisted set) must not surface it either.
+    await page.waitForTimeout(500)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible()
+    await expect(page.getByText(/new suggestion/i)).not.toBeVisible()
+  })
 })
