@@ -316,6 +316,18 @@ describe('questionSetToDataset / datasetToQuestionSet', () => {
         expect(roundTripQs(qs).alwaysNeededItems[0].perNight).toBe(0.25)
     })
 
+    it('round-trips perNights and omits it when not set', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [
+                { text: 'Jumper', perNight: 1, perNights: 4, personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Socks', perNight: 1, personSelections: [{ personId: 'p1', selected: true }] },
+            ],
+        })
+        const result = roundTripQs(qs)
+        expect(result.alwaysNeededItems[0].perNights).toBe(4)
+        expect(result.alwaysNeededItems[1].perNights).toBeUndefined()
+    })
+
     it('round-trips a saved question with option and items', () => {
         const option = makeOption({
             items: [{ text: 'Nappies', personSelections: [{ personId: 'p1', selected: true }] }],

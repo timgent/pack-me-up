@@ -341,7 +341,7 @@ describe('quantity suggestions from nights away', () => {
         expect(result.find(i => i.itemText === 'Socks')?.quantity).toBe(1)
     })
 
-    it('supports fractional rates, rounding the suggestion up', () => {
+    it('supports "1 per N nights" rates via perNights, rounding the suggestion up', () => {
         const q: Question = {
             ...overnightWithRates,
             options: [{
@@ -350,8 +350,8 @@ describe('quantity suggestions from nights away', () => {
                 order: 0,
                 items: [
                     // One jumper every 4 nights, one t-shirt every 2 nights
-                    { text: 'Jumper', perNight: 0.25, personSelections: [{ personId: 'p1', selected: true }] },
-                    { text: 'T-shirt', perNight: 0.5, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'Jumper', perNight: 1, perNights: 4, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'T-shirt', perNight: 1, perNights: 2, personSelections: [{ personId: 'p1', selected: true }] },
                 ],
             }],
         }
@@ -362,6 +362,20 @@ describe('quantity suggestions from nights away', () => {
         const sevenNights = generateQuestionBasedItems([q], answers, [p1], ['p1'], 7)
         expect(sevenNights.find(i => i.itemText === 'Jumper')?.quantity).toBe(2)  // ceil(1.75)
         expect(sevenNights.find(i => i.itemText === 'T-shirt')?.quantity).toBe(4) // ceil(3.5)
+    })
+
+    it('still supports fractional perNight rates without a perNights divisor', () => {
+        const q: Question = {
+            ...overnightWithRates,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [{ text: 'Jumper', perNight: 0.25, personSelections: [{ personId: 'p1', selected: true }] }],
+            }],
+        }
+        const result = generateQuestionBasedItems([q], answers, [p1], ['p1'], 7)
+        expect(result.find(i => i.itemText === 'Jumper')?.quantity).toBe(2) // ceil(1.75)
     })
 
     it('applies rates to communal items too', () => {

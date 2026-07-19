@@ -8,12 +8,14 @@ interface ItemContext {
     nights?: number
 }
 
-// ceil(nights × perNight), capped at maxQuantity, never below 1. Undefined
-// when either the trip length or the item's rate is unknown, so items and
-// trips that don't opt in behave exactly as before.
+// The rate is "perNight per perNights nights" (perNights defaults to 1):
+// ceil(nights × perNight / perNights), capped at maxQuantity, never below 1.
+// Undefined when either the trip length or the item's rate is unknown, so
+// items and trips that don't opt in behave exactly as before.
 export function suggestedQuantity(item: Item, nights?: number): number | undefined {
     if (!nights || nights <= 0 || !item.perNight || item.perNight <= 0) return undefined
-    const quantity = Math.ceil(nights * item.perNight)
+    const perNights = item.perNights && item.perNights > 0 ? item.perNights : 1
+    const quantity = Math.ceil(nights * item.perNight / perNights)
     return Math.max(1, Math.min(quantity, item.maxQuantity ?? Infinity))
 }
 

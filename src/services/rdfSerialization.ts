@@ -390,6 +390,7 @@ function questionItemToThings(
     if (item.communal !== undefined) itemBuilder = itemBuilder.addBoolean(PMU.communal, item.communal)
     // perNight is stored as a decimal to allow rates like 0.5 per night
     if (item.perNight !== undefined) itemBuilder = itemBuilder.addDecimal(PMU.perNight, item.perNight)
+    if (item.perNights !== undefined) itemBuilder = itemBuilder.addInteger(PMU.perNights, item.perNights)
     if (item.maxQuantity !== undefined) itemBuilder = itemBuilder.addInteger(PMU.maxQuantity, item.maxQuantity)
     for (const ageRange of item.ageRanges ?? []) {
         itemBuilder = itemBuilder.addStringNoLocale(PMU.hasAgeRange, ageRange)
@@ -558,6 +559,7 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     const id = getStringNoLocale(thing, PMU.questionItemId) ?? undefined
     const communal = getBoolean(thing, PMU.communal)
     const perNight = getDecimal(thing, PMU.perNight)
+    const perNights = getInteger(thing, PMU.perNights)
     const maxQuantity = getInteger(thing, PMU.maxQuantity)
     const lastModified = getDatetime(thing, PMU.questionItemLastModified)?.toISOString()
     const deletedAt = getDatetime(thing, PMU.questionItemDeletedAt)?.toISOString()
@@ -589,6 +591,7 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
         ...(id !== undefined ? { id } : {}),
         ...(communal !== null ? { communal } : {}),
         ...(perNight !== null ? { perNight } : {}),
+        ...(perNights !== null ? { perNights } : {}),
         ...(maxQuantity !== null ? { maxQuantity } : {}),
         ...(ageRanges.length > 0 ? { ageRanges } : {}),
         ...(lastModified !== undefined ? { lastModified } : {}),

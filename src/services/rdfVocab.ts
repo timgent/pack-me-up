@@ -65,8 +65,10 @@ export const PMU = {
     // One value per bracket the item applies to
     hasAgeRange: `${PMU_NS}hasAgeRange`,
     questionItemId: `${PMU_NS}questionItemId`,
-    // Suggested-quantity rate: pack ceil(nights × perNight), capped at maxQuantity
+    // Suggested-quantity rate: pack perNight per perNights nights (perNights
+    // defaults to 1) — ceil(nights × perNight / perNights), capped at maxQuantity
     perNight: `${PMU_NS}perNight`,
+    perNights: `${PMU_NS}perNights`,
     maxQuantity: `${PMU_NS}maxQuantity`,
     questionItemLastModified: `${PMU_NS}questionItemLastModified`,
     questionItemDeletedAt: `${PMU_NS}questionItemDeletedAt`,

@@ -85,10 +85,10 @@ function ItemRow({ item, people }: { item: Item; people: Person[] }) {
             )}
             {item.perNight !== undefined && (
                 <span
-                    title={`Suggested quantity: ${item.perNight} per night${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`}
+                    title={`Suggested quantity: ${rateLabel(item)}${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`}
                     className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 select-none shrink-0"
                 >
-                    ×{item.perNight}/night
+                    ×{rateLabel(item).replace(' per ', '/')}
                 </span>
             )}
             {showDots && (
@@ -521,6 +521,11 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             i === itemIdx ? { ...item, perNight } : item
         ))
 
+    const updatePerNights = (itemIdx: number, perNights: number | undefined) =>
+        setItems(prev => prev.map((item, i) =>
+            i === itemIdx ? { ...item, perNights } : item
+        ))
+
     const updateMaxQuantity = (itemIdx: number, maxQuantity: number | undefined) =>
         setItems(prev => prev.map((item, i) =>
             i === itemIdx ? { ...item, maxQuantity } : item
@@ -535,10 +540,16 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             personSelections: people.map(p => ({ personId: p.id, selected: true })),
         }])
 
-    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updateMaxQuantity, removeItem, addItem }
+    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, addItem }
 }
 
-function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updateMaxQuantity, removeItem, addItem }: {
+// "2 per night" / "1 per 4 nights" — the human phrasing of an item's rate
+function rateLabel(item: Item): string {
+    const nights = item.perNights ?? 1
+    return nights > 1 ? `${item.perNight} per ${nights} nights` : `${item.perNight} per night`
+}
+
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, addItem }: {
     items: Item[]
     people: Person[]
     allItemNames: string[]
@@ -547,27 +558,15 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     togglePerson: (itemIdx: number, personIdx: number) => void
     toggleCommunal: (itemIdx: number) => void
     updatePerNight: (itemIdx: number, perNight: number | undefined) => void
+    updatePerNights: (itemIdx: number, perNights: number | undefined) => void
     updateMaxQuantity: (itemIdx: number, maxQuantity: number | undefined) => void
     removeItem: (idx: number) => void
     addItem: () => void
 }) {
     const [openQuantityIdx, setOpenQuantityIdx] = useState<number | null>(null)
-    // Raw text of the per-night input while the editor is open, so partial
-    // decimals ("0", "0.") survive typing instead of being reset by parsing
-    const [rateDraft, setRateDraft] = useState('')
     const parseQty = (raw: string): number | undefined => {
         const n = parseInt(raw, 10)
         return Number.isFinite(n) && n > 0 ? n : undefined
-    }
-    // Rates may be fractional: 0.5 = one every 2 nights, 0.25 = one every 4
-    const parseRate = (raw: string): number | undefined => {
-        const n = parseFloat(raw)
-        return Number.isFinite(n) && n > 0 ? n : undefined
-    }
-    const toggleQuantityEditor = (itemIdx: number, item: Item) => {
-        const opening = openQuantityIdx !== itemIdx
-        setOpenQuantityIdx(opening ? itemIdx : null)
-        if (opening) setRateDraft(item.perNight?.toString() ?? '')
     }
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
@@ -586,8 +585,8 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                     const hasRate = item.perNight !== undefined
                     const quantityOpen = openQuantityIdx === itemIdx
                     const quantityTitle = hasRate
-                        ? `Suggested quantity: ${item.perNight} per night${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`
-                        : 'Suggest a quantity based on nights away (e.g. 1 pair of socks per night)'
+                        ? `Suggested quantity: ${rateLabel(item)}${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`
+                        : 'Suggest a quantity based on nights away (e.g. 1 pair of socks per night, or 1 jumper per 4 nights)'
                     return (
                     <div key={itemIdx} className="sm:flex sm:flex-wrap sm:items-center sm:gap-2 rounded-lg border border-gray-200 sm:border-transparent p-2 sm:p-0">
                         {/* Item name + desktop people + remove */}
@@ -630,13 +629,15 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                             </div>
                             <button
                                 type="button"
-                                onClick={() => toggleQuantityEditor(itemIdx, item)}
+                                onClick={() => setOpenQuantityIdx(quantityOpen ? null : itemIdx)}
                                 title={quantityTitle}
                                 aria-label={`Set suggested quantity for ${item.text || 'item'}`}
                                 aria-expanded={quantityOpen}
                                 className={`inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium shrink-0 transition-colors ${hasRate ? 'bg-emerald-600 text-white' : AVATAR_OFF}`}
                             >
-                                {hasRate ? `×${item.perNight}/nt` : '×n'}
+                                {hasRate
+                                    ? ((item.perNights ?? 1) > 1 ? `×${item.perNight}/${item.perNights}nt` : `×${item.perNight}/nt`)
+                                    : '×n'}
                             </button>
                             <button
                                 type="button"
@@ -688,21 +689,29 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                         )}
                         {quantityOpen && (
                             <div className="mt-2 sm:mt-0 w-full flex items-center gap-3 flex-wrap text-xs text-gray-600 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5">
-                                <label className="flex items-center gap-1.5">
-                                    Per night
+                                <span className="flex items-center gap-1.5">
+                                    Pack
                                     <input
                                         type="number"
-                                        min={0}
-                                        step="any"
-                                        value={rateDraft}
-                                        onChange={e => {
-                                            setRateDraft(e.target.value)
-                                            updatePerNight(itemIdx, parseRate(e.target.value))
-                                        }}
-                                        aria-label={`Per-night quantity for ${item.text || 'item'}`}
-                                        className="w-14 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        min={1}
+                                        value={item.perNight ?? ''}
+                                        onChange={e => updatePerNight(itemIdx, parseQty(e.target.value))}
+                                        aria-label={`Quantity to pack for ${item.text || 'item'}`}
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
-                                </label>
+                                    per
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        placeholder="1"
+                                        value={item.perNights ?? ''}
+                                        onChange={e => updatePerNights(itemIdx, parseQty(e.target.value))}
+                                        disabled={!hasRate}
+                                        aria-label={`Number of nights per ${item.text || 'item'}`}
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-40"
+                                    />
+                                    night{(item.perNights ?? 1) > 1 ? 's' : ''}
+                                </span>
                                 <label className={`flex items-center gap-1.5 ${hasRate ? '' : 'opacity-40'}`}>
                                     Max
                                     <input
@@ -712,12 +721,12 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                         onChange={e => updateMaxQuantity(itemIdx, parseQty(e.target.value))}
                                         disabled={!hasRate}
                                         aria-label={`Maximum quantity for ${item.text || 'item'}`}
-                                        className="w-14 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </label>
                                 <span className="text-gray-400">
-                                    Suggests a quantity when a list has nights away — decimals work too
-                                    (0.5 = one every 2 nights); leave blank to skip
+                                    e.g. socks: 1 per night; a jumper: 1 per 4 nights. Suggests a
+                                    quantity when a list has nights away — leave blank to skip
                                 </span>
                             </div>
                         )}
@@ -744,7 +753,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updateMaxQuantity, removeItem, addItem } = useItemListState(option?.items ?? [], people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, addItem } = useItemListState(option?.items ?? [], people)
 
     const handleSave = () => onSave({
         id: option?.id ?? crypto.randomUUID(),
@@ -793,7 +802,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
-                    updatePerNight={updatePerNight} updateMaxQuantity={updateMaxQuantity}
+                    updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
                     removeItem={removeItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
@@ -816,7 +825,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updateMaxQuantity, removeItem, addItem } = useItemListState(initialItems, people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, addItem } = useItemListState(initialItems, people)
 
     return (
         <div
@@ -847,7 +856,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
-                    updatePerNight={updatePerNight} updateMaxQuantity={updateMaxQuantity}
+                    updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
                     removeItem={removeItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
