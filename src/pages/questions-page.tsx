@@ -83,6 +83,14 @@ function ItemRow({ item, people }: { item: Item; people: Person[] }) {
                     👥
                 </span>
             )}
+            {item.perNight !== undefined && (
+                <span
+                    title={`Suggested quantity: ${rateLabel(item)}${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`}
+                    className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 select-none shrink-0"
+                >
+                    ×{rateLabel(item).replace(' per ', '/')}
+                </span>
+            )}
             {showDots && (
                 <div className="flex gap-0.5 shrink-0">
                     {people.map((person, i) => (
@@ -508,6 +516,21 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             i === itemIdx ? { ...item, communal: item.communal ? undefined : true } : item
         ))
 
+    const updatePerNight = (itemIdx: number, perNight: number | undefined) =>
+        setItems(prev => prev.map((item, i) =>
+            i === itemIdx ? { ...item, perNight } : item
+        ))
+
+    const updatePerNights = (itemIdx: number, perNights: number | undefined) =>
+        setItems(prev => prev.map((item, i) =>
+            i === itemIdx ? { ...item, perNights } : item
+        ))
+
+    const updateMaxQuantity = (itemIdx: number, maxQuantity: number | undefined) =>
+        setItems(prev => prev.map((item, i) =>
+            i === itemIdx ? { ...item, maxQuantity } : item
+        ))
+
     const removeItem = (idx: number) =>
         setItems(prev => prev.filter((_, i) => i !== idx))
 
@@ -526,10 +549,16 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             personSelections: people.map(p => ({ personId: p.id, selected: true })),
         }])
 
-    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem }
+    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem }
 }
 
-function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem }: {
+// "2 per night" / "1 per 4 nights" — the human phrasing of an item's rate
+function rateLabel(item: Item): string {
+    const nights = item.perNights ?? 1
+    return nights > 1 ? `${item.perNight} per ${nights} nights` : `${item.perNight} per night`
+}
+
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem }: {
     items: Item[]
     people: Person[]
     allItemNames: string[]
@@ -537,10 +566,18 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     updateItemText: (idx: number, text: string) => void
     togglePerson: (itemIdx: number, personIdx: number) => void
     toggleCommunal: (itemIdx: number) => void
+    updatePerNight: (itemIdx: number, perNight: number | undefined) => void
+    updatePerNights: (itemIdx: number, perNights: number | undefined) => void
+    updateMaxQuantity: (itemIdx: number, maxQuantity: number | undefined) => void
     removeItem: (idx: number) => void
     moveItem: (idx: number, direction: 'up' | 'down') => void
     addItem: () => void
 }) {
+    const [openQuantityIdx, setOpenQuantityIdx] = useState<number | null>(null)
+    const parseQty = (raw: string): number | undefined => {
+        const n = parseInt(raw, 10)
+        return Number.isFinite(n) && n > 0 ? n : undefined
+    }
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
             {items.length > 0 && (
@@ -555,8 +592,13 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                     const personTitle = (name: string) => isCommunal
                         ? `Needed when ${name} is on the trip`
                         : name
+                    const hasRate = item.perNight !== undefined
+                    const quantityOpen = openQuantityIdx === itemIdx
+                    const quantityTitle = hasRate
+                        ? `Suggested quantity: ${rateLabel(item)}${item.maxQuantity !== undefined ? `, up to ${item.maxQuantity}` : ''}`
+                        : 'Suggest a quantity based on nights away (e.g. 1 pair of socks per night, or 1 jumper per 4 nights)'
                     return (
-                    <div key={itemIdx} className="sm:flex sm:items-center sm:gap-2 rounded-lg border border-gray-200 sm:border-transparent p-2 sm:p-0">
+                    <div key={itemIdx} className="sm:flex sm:flex-wrap sm:items-center sm:gap-2 rounded-lg border border-gray-200 sm:border-transparent p-2 sm:p-0">
                         {/* Item name + desktop people + remove */}
                         <div className="flex items-center gap-2 sm:flex-1 sm:min-w-0">
                             <div className="flex-1 min-w-0">
@@ -623,6 +665,18 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                             </div>
                             <button
                                 type="button"
+                                onClick={() => setOpenQuantityIdx(quantityOpen ? null : itemIdx)}
+                                title={quantityTitle}
+                                aria-label={`Set suggested quantity for ${item.text || 'item'}`}
+                                aria-expanded={quantityOpen}
+                                className={`inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium shrink-0 transition-colors ${hasRate ? 'bg-emerald-600 text-white' : AVATAR_OFF}`}
+                            >
+                                {hasRate
+                                    ? ((item.perNights ?? 1) > 1 ? `×${item.perNight}/${item.perNights}nt` : `×${item.perNight}/nt`)
+                                    : '×n'}
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => removeItem(itemIdx)}
                                 className="shrink-0 text-gray-300 hover:text-red-400 text-xl leading-none"
                                 title="Remove item"
@@ -669,6 +723,49 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                 Packed once for the group — included when a highlighted person is going
                             </div>
                         )}
+                        {quantityOpen && (
+                            <div className="mt-2 sm:mt-0 w-full flex items-center gap-3 flex-wrap text-xs text-gray-600 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+                                <span className="flex items-center gap-1.5">
+                                    Pack
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={item.perNight ?? ''}
+                                        onChange={e => updatePerNight(itemIdx, parseQty(e.target.value))}
+                                        aria-label={`Quantity to pack for ${item.text || 'item'}`}
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                    />
+                                    per
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        placeholder="1"
+                                        value={item.perNights ?? ''}
+                                        onChange={e => updatePerNights(itemIdx, parseQty(e.target.value))}
+                                        disabled={!hasRate}
+                                        aria-label={`Number of nights per ${item.text || 'item'}`}
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-40"
+                                    />
+                                    night{(item.perNights ?? 1) > 1 ? 's' : ''}
+                                </span>
+                                <label className={`flex items-center gap-1.5 ${hasRate ? '' : 'opacity-40'}`}>
+                                    Max
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={item.maxQuantity ?? ''}
+                                        onChange={e => updateMaxQuantity(itemIdx, parseQty(e.target.value))}
+                                        disabled={!hasRate}
+                                        aria-label={`Maximum quantity for ${item.text || 'item'}`}
+                                        className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                    />
+                                </label>
+                                <span className="text-gray-400">
+                                    e.g. socks: 1 per night; a jumper: 1 per 4 nights. Suggests a
+                                    quantity when a list has nights away — leave blank to skip
+                                </span>
+                            </div>
+                        )}
                     </div>
                     )
                 })}
@@ -692,7 +789,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem } = useItemListState(option?.items ?? [], people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem } = useItemListState(option?.items ?? [], people)
 
     const handleSave = () => onSave({
         id: option?.id ?? crypto.randomUUID(),
@@ -741,6 +838,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
+                    updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
                     removeItem={removeItem} moveItem={moveItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
@@ -763,7 +861,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem } = useItemListState(initialItems, people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem } = useItemListState(initialItems, people)
 
     return (
         <div
@@ -794,6 +892,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
+                    updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
                     removeItem={removeItem} moveItem={moveItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">

@@ -67,6 +67,12 @@ export const PersonSelectionSchema = z.object({
 // are never touched by those suggestions.
 // `order` is optional and additive: items without it sort after ordered ones
 // in their original position, so legacy data keeps its array order.
+// Quantity-suggestion fields, all optional and additive: the item's rate is
+// "pack `perNight` per `perNights` nights" (perNights defaults to 1, so
+// perNight alone means a per-night amount, e.g. socks 1/night; perNights: 4
+// means e.g. one jumper every 4 nights). When a trip's number of nights is
+// known, the suggested quantity is ceil(nights × perNight / perNights),
+// capped at maxQuantity. Items without a rate behave exactly as before.
 export const ItemSchema = z.object({
   id: z.string().optional(),
   text: z.string(),
@@ -74,6 +80,9 @@ export const ItemSchema = z.object({
   communal: z.boolean().optional(),
   ageRanges: z.array(AgeRangeSchema).optional(),
   order: z.number().optional(),
+  perNight: z.number().optional(),
+  perNights: z.number().optional(),
+  maxQuantity: z.number().optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })

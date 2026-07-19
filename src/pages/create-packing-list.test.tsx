@@ -1360,3 +1360,74 @@ describe('CreatePackingList – travellers select-all/none and validation', () =
         expect(db.savePackingList).not.toHaveBeenCalled()
     })
 })
+
+// ─── CreatePackingList – nights away and suggested quantities ─────────────────
+
+describe('CreatePackingList – nights away and suggested quantities', () => {
+    const nightsQuestionSet: PackingListQuestionSet = {
+        people: [{ id: 'p1', name: 'Alice' }],
+        alwaysNeededItems: [
+            { text: 'Socks', perNight: 1, personSelections: [{ personId: 'p1', selected: true }] },
+            { text: 'Pyjamas', perNight: 1, maxQuantity: 2, personSelections: [{ personId: 'p1', selected: true }] },
+            { text: 'Toothbrush', personSelections: [{ personId: 'p1', selected: true }] },
+        ],
+        questions: [],
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({ isLoggedIn: false } as ReturnType<typeof useSolidPod>)
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    function makeNightsDb() {
+        return makeDb({
+            getQuestionSet: vi.fn().mockResolvedValue(nightsQuestionSet),
+            getAllPackingLists: vi.fn().mockResolvedValue([]),
+        })
+    }
+
+    it('shows an optional nights input', async () => {
+        mockUseDatabase.mockReturnValue({ db: makeNightsDb() } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+        expect(screen.getByLabelText(/how many nights away/i)).toBeTruthy()
+    })
+
+    it('applies per-night rates and caps to generated items and stores nights on the list', async () => {
+        const db = makeNightsDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Cornwall' } })
+        fireEvent.change(screen.getByLabelText(/how many nights away/i), { target: { value: '3' } })
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0] as PackingList
+        expect(savedList.nights).toBe(3)
+        expect(savedList.items.find(i => i.itemText === 'Socks')?.quantity).toBe(3)
+        expect(savedList.items.find(i => i.itemText === 'Pyjamas')?.quantity).toBe(2)
+        expect(savedList.items.find(i => i.itemText === 'Toothbrush')?.quantity).toBeUndefined()
+    })
+
+    it('leaves quantities and nights unset when the nights input is left blank', async () => {
+        const db = makeNightsDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+
+        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Cornwall' } })
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0] as PackingList
+        expect(savedList.nights).toBeUndefined()
+        savedList.items.forEach(item => expect(item.quantity).toBeUndefined())
+    })
+})

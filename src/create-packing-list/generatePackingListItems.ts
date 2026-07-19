@@ -5,6 +5,18 @@ interface ItemContext {
     questionId: string
     optionId: string
     category?: string
+    nights?: number
+}
+
+// The rate is "perNight per perNights nights" (perNights defaults to 1):
+// ceil(nights × perNight / perNights), capped at maxQuantity, never below 1.
+// Undefined when either the trip length or the item's rate is unknown, so
+// items and trips that don't opt in behave exactly as before.
+export function suggestedQuantity(item: Item, nights?: number): number | undefined {
+    if (!nights || nights <= 0 || !item.perNight || item.perNight <= 0) return undefined
+    const perNights = item.perNights && item.perNights > 0 ? item.perNights : 1
+    const quantity = Math.ceil(nights * item.perNight / perNights)
+    return Math.max(1, Math.min(quantity, item.maxQuantity ?? Infinity))
 }
 
 function generateItemInstances(
@@ -13,6 +25,7 @@ function generateItemInstances(
     selectedPeopleIds: string[],
     context: ItemContext
 ): PackingListItem[] {
+    const quantity = suggestedQuantity(item, context.nights)
     if (item.communal) {
         // Person selections act as a trigger: include the single shared item
         // when at least one selected person is travelling. No selections at
@@ -29,6 +42,7 @@ function generateItemInstances(
             optionId: context.optionId,
             packed: false,
             communal: true,
+            ...(quantity !== undefined ? { quantity } : {}),
             category: context.category,
         }]
     }
@@ -46,6 +60,7 @@ function generateItemInstances(
             questionId: context.questionId,
             optionId: context.optionId,
             packed: false,
+            ...(quantity !== undefined ? { quantity } : {}),
             category: context.category,
         } satisfies PackingListItem
     })
@@ -55,7 +70,8 @@ export function generateQuestionBasedItems(
     questions: Question[],
     questionAnswers: Array<{ questionId: string; selectedOptionIds?: string[] }>,
     people: Person[],
-    selectedPeopleIds: string[]
+    selectedPeopleIds: string[],
+    nights?: number
 ): PackingListItem[] {
     // Walk the question set in its own order (questions, then options, then
     // items) rather than answer order, so the generated list mirrors how the
@@ -79,6 +95,7 @@ export function generateQuestionBasedItems(
                             category: question.questionType === 'multiple-choice'
                                 ? selectedOption.text
                                 : question.text,
+                            nights,
                         })
                     )
                 )
@@ -88,13 +105,15 @@ export function generateQuestionBasedItems(
 export function generateAlwaysNeededItems(
     alwaysNeededItems: Item[],
     people: Person[],
-    selectedPeopleIds: string[]
+    selectedPeopleIds: string[],
+    nights?: number
 ): PackingListItem[] {
     return sortItemsByOrder(alwaysNeededItems).flatMap(item =>
         generateItemInstances(item, people, selectedPeopleIds, {
             questionId: 'always-needed',
             optionId: 'always-needed',
             category: 'Essentials',
+            nights,
         })
     )
 }

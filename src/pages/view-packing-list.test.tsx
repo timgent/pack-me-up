@@ -736,6 +736,111 @@ describe('ViewPackingList inline item editing', () => {
     })
 })
 
+describe('ViewPackingList item quantities', () => {
+    const quantityPackingList = {
+        id: 'test-list-1',
+        name: 'Weekend Away',
+        createdAt: '2026-01-01T00:00:00Z',
+        items: [
+            {
+                id: 'item-socks',
+                itemText: 'Socks',
+                personName: 'Alice',
+                personId: 'p1',
+                questionId: 'q1',
+                optionId: 'o1',
+                packed: false,
+                quantity: 3,
+            },
+            {
+                id: 'item-passport',
+                itemText: 'Passport',
+                personName: 'Alice',
+                personId: 'p1',
+                questionId: 'q1',
+                optionId: 'o1',
+                packed: false,
+            },
+        ],
+    }
+    let db: ReturnType<typeof makeDb>
+
+    beforeEach(() => {
+        db = makeDb()
+        db.getPackingList.mockResolvedValue(quantityPackingList)
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...quantityPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('shows a ×N badge for items with a quantity', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Socks')).toBeTruthy())
+        expect(screen.getByText('×3')).toBeTruthy()
+    })
+
+    it('shows no badge for items without a quantity', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        expect(screen.getAllByText(/^×\d+$/)).toHaveLength(1)
+    })
+
+    it('edit mode pre-fills the quantity and saves an updated value', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Socks')).toBeTruthy())
+
+        fireEvent.dblClick(screen.getByText('Socks'))
+        const quantityInput = screen.getByRole('spinbutton', { name: /edit item quantity/i })
+        expect((quantityInput as HTMLInputElement).value).toBe('3')
+
+        fireEvent.change(quantityInput, { target: { value: '5' } })
+        fireEvent.keyDown(quantityInput, { key: 'Enter' })
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalledWith(
+            expect.objectContaining({
+                items: expect.arrayContaining([
+                    expect.objectContaining({ id: 'item-socks', quantity: 5 }),
+                ]),
+            })
+        ))
+    })
+
+    it('clearing the quantity removes it from the item', async () => {
+        renderComponent()
+        await waitFor(() => expect(screen.getByText('Socks')).toBeTruthy())
+
+        fireEvent.dblClick(screen.getByText('Socks'))
+        const quantityInput = screen.getByRole('spinbutton', { name: /edit item quantity/i })
+        fireEvent.change(quantityInput, { target: { value: '' } })
+        fireEvent.keyDown(quantityInput, { key: 'Enter' })
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalledWith(
+            expect.objectContaining({
+                items: expect.arrayContaining([
+                    expect.objectContaining({ id: 'item-socks', quantity: undefined }),
+                ]),
+            })
+        ))
+    })
+})
+
 describe('ViewPackingList expandable person sections', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({

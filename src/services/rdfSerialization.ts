@@ -8,6 +8,7 @@ import {
     getStringNoLocaleAll,
     getBoolean,
     getInteger,
+    getDecimal,
     getDatetime,
 } from '@inrupt/solid-client'
 import type { SolidDataset, Thing } from '@inrupt/solid-client'
@@ -36,6 +37,10 @@ export function packingListToDataset(list: PackingList, datasetUrl: string): Sol
 
     if (list.lastModified) {
         rootBuilder = rootBuilder.addDatetime(DCTERMS.modified, new Date(list.lastModified))
+    }
+
+    if (list.nights !== undefined) {
+        rootBuilder = rootBuilder.addInteger(PMU.nights, list.nights)
     }
 
     for (const item of list.items) {
@@ -71,6 +76,7 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
     const lastModified = lastModifiedDate?.toISOString()
 
     const id = datasetUrl.split('/').pop()?.replace('.ttl', '') ?? datasetUrl
+    const nights = getInteger(rootThing, PMU.nights)
 
     const items = getUrlAll(rootThing, PMU.hasItem)
         .map(url => thingToPackingListItem(getThing(dataset, url), url))
@@ -95,6 +101,7 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
         name,
         createdAt,
         ...(lastModified !== undefined ? { lastModified } : {}),
+        ...(nights !== null ? { nights } : {}),
         items,
         deletedItems,
         ...(guests.length > 0 ? { guests } : {}),
@@ -112,6 +119,7 @@ function packingListItemToThing(item: PackingListItem, itemUrl: string): Thing {
         .addBoolean(PMU.packed, item.packed)
 
     if (item.communal !== undefined) t = t.addBoolean(PMU.communal, item.communal)
+    if (item.quantity !== undefined) t = t.addInteger(PMU.quantity, item.quantity)
     if (item.category !== undefined) t = t.addStringNoLocale(PMU.category, item.category)
     if (item.reviewed !== undefined) t = t.addBoolean(PMU.reviewed, item.reviewed)
     if (item.order !== undefined) t = t.addInteger(PMU.order, item.order)
@@ -132,6 +140,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
     const optionId = getStringNoLocale(thing, PMU.optionId) ?? ''
     const packed = getBoolean(thing, PMU.packed) ?? false
     const communal = getBoolean(thing, PMU.communal)
+    const quantity = getInteger(thing, PMU.quantity)
     const category = getStringNoLocale(thing, PMU.category) ?? undefined
     const reviewed = getBoolean(thing, PMU.reviewed)
     const order = getInteger(thing, PMU.order)
@@ -146,6 +155,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
         optionId,
         packed,
         ...(communal !== null ? { communal } : {}),
+        ...(quantity !== null ? { quantity } : {}),
         ...(category !== undefined ? { category } : {}),
         ...(reviewed !== null ? { reviewed } : {}),
         ...(order !== null ? { order } : {}),
@@ -391,6 +401,10 @@ function questionItemToThings(
     if (item.id) itemBuilder = itemBuilder.addStringNoLocale(PMU.questionItemId, item.id)
     if (item.order !== undefined) itemBuilder = itemBuilder.addInteger(PMU.order, item.order)
     if (item.communal !== undefined) itemBuilder = itemBuilder.addBoolean(PMU.communal, item.communal)
+    // perNight is stored as a decimal to allow rates like 0.5 per night
+    if (item.perNight !== undefined) itemBuilder = itemBuilder.addDecimal(PMU.perNight, item.perNight)
+    if (item.perNights !== undefined) itemBuilder = itemBuilder.addInteger(PMU.perNights, item.perNights)
+    if (item.maxQuantity !== undefined) itemBuilder = itemBuilder.addInteger(PMU.maxQuantity, item.maxQuantity)
     for (const ageRange of item.ageRanges ?? []) {
         itemBuilder = itemBuilder.addStringNoLocale(PMU.hasAgeRange, ageRange)
     }
@@ -558,6 +572,9 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     const id = getStringNoLocale(thing, PMU.questionItemId) ?? undefined
     const communal = getBoolean(thing, PMU.communal)
     const order = getInteger(thing, PMU.order)
+    const perNight = getDecimal(thing, PMU.perNight)
+    const perNights = getInteger(thing, PMU.perNights)
+    const maxQuantity = getInteger(thing, PMU.maxQuantity)
     const lastModified = getDatetime(thing, PMU.questionItemLastModified)?.toISOString()
     const deletedAt = getDatetime(thing, PMU.questionItemDeletedAt)?.toISOString()
 
@@ -587,6 +604,9 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
         personSelections,
         ...(id !== undefined ? { id } : {}),
         ...(communal !== null ? { communal } : {}),
+        ...(perNight !== null ? { perNight } : {}),
+        ...(perNights !== null ? { perNights } : {}),
+        ...(maxQuantity !== null ? { maxQuantity } : {}),
         ...(ageRanges.length > 0 ? { ageRanges } : {}),
         ...(order !== null ? { order } : {}),
         ...(lastModified !== undefined ? { lastModified } : {}),
