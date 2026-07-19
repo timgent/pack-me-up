@@ -21,6 +21,7 @@ export interface PackingListItem {
     packed: boolean
     communal?: boolean // packed once for the whole group; absent = per-person
     category?: string
+    order?: number     // position in the question set at generation time; absent on legacy items (sorted alphabetically)
     reviewed?: boolean
     lastModified?: string // ISO timestamp; absent on legacy items
 }

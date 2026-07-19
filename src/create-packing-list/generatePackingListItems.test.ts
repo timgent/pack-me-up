@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generateQuestionBasedItems, generateAlwaysNeededItems } from './generatePackingListItems'
+import { generateQuestionBasedItems, generateAlwaysNeededItems, withItemOrder } from './generatePackingListItems'
 import { Question } from '../edit-questions/types'
 
 const p1 = { id: 'p1', name: 'Alice' }
@@ -361,5 +361,71 @@ describe('generateAlwaysNeededItems', () => {
             ['p1']
         )
         expect(result).toHaveLength(0)
+    })
+})
+
+// ─── Ordering: generated items follow the question set's order ───────────────
+
+describe('generateQuestionBasedItems – ordering', () => {
+    it('follows question order even when answers arrive in a different order', () => {
+        const answers = [
+            { questionId: 'q-overnight', selectedOptionIds: ['opt-yes'] },
+            { questionId: 'q-activities', selectedOptionIds: ['opt-swimming'] },
+        ]
+        const result = generateQuestionBasedItems(
+            [activitiesQuestion, overnightQuestion],
+            answers,
+            [p1],
+            ['p1']
+        )
+        expect(result.map(i => i.itemText)).toEqual(['Swimsuit', 'Goggles', 'Toothbrush'])
+    })
+
+    it('follows option order regardless of the order options were selected in', () => {
+        const answers = [
+            { questionId: 'q-activities', selectedOptionIds: ['opt-hiking', 'opt-swimming'] },
+        ]
+        const result = generateQuestionBasedItems(
+            [activitiesQuestion],
+            answers,
+            [p1],
+            ['p1']
+        )
+        expect(result.map(i => i.itemText)).toEqual(['Swimsuit', 'Goggles', 'Hiking boots'])
+    })
+
+    it('follows item order fields within an option when present', () => {
+        const question: Question = {
+            id: 'q-1',
+            type: 'saved',
+            text: 'Camping?',
+            order: 0,
+            options: [{
+                id: 'opt-yes',
+                text: 'Yes',
+                order: 0,
+                items: [
+                    { text: 'Sleeping bag', order: 1, personSelections: [{ personId: 'p1', selected: true }] },
+                    { text: 'Tent', order: 0, personSelections: [{ personId: 'p1', selected: true }] },
+                ],
+            }],
+        }
+        const result = generateQuestionBasedItems(
+            [question],
+            [{ questionId: 'q-1', selectedOptionIds: ['opt-yes'] }],
+            [p1],
+            ['p1']
+        )
+        expect(result.map(i => i.itemText)).toEqual(['Tent', 'Sleeping bag'])
+    })
+})
+
+describe('withItemOrder', () => {
+    it('stamps a sequential order onto assembled list items', () => {
+        const items = [
+            { id: '1', itemText: 'Tent', personId: '', personName: '', questionId: 'q', optionId: 'o', packed: false },
+            { id: '2', itemText: 'Map', personId: '', personName: '', questionId: 'q', optionId: 'o', packed: false },
+        ]
+        expect(withItemOrder(items).map(i => i.order)).toEqual([0, 1])
     })
 })

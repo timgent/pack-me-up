@@ -76,7 +76,9 @@ function mergeItemsById(
       result.push((localItem ?? podItem)!)
     }
   }
-  return result
+  // Ordered items first by their order; legacy items (no order) keep their
+  // relative position at the end. Sort is stable so ties preserve insertion.
+  return result.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
 }
 
 export function mergeQuestionSets(
@@ -113,6 +115,9 @@ export function mergeQuestionSets(
       questions.push((localQ ?? podQ)!)
     }
   }
+  // A reorder bumps the moved questions' order + lastModified, so per-question
+  // LWW carries the new positions — sorting here makes them take effect.
+  questions.sort((a, b) => a.order - b.order)
 
   // ── People ─────────────────────────────────────────────────────────────────
   const localPMap = new Map(local.people.map(p => [p.id, p]))

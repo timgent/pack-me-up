@@ -307,3 +307,47 @@ describe('edge cases', () => {
     expect(ids).toContain('q2')
   })
 })
+
+// ── Ordering ──────────────────────────────────────────────────────────────────
+
+describe('ordering flows through merge', () => {
+  it('sorts merged questions by order so a reorder on one side wins', () => {
+    const q1 = makeQuestion({ id: 'q1', text: 'Q1', order: 0, lastModified: '2024-01-01T10:00:00.000Z' })
+    const q2 = makeQuestion({ id: 'q2', text: 'Q2', order: 1, lastModified: '2024-01-01T10:00:00.000Z' })
+    // Pod reordered: q2 now first
+    const podQ2 = { ...q2, order: 0, lastModified: '2024-01-01T12:00:00.000Z' }
+    const podQ1 = { ...q1, order: 1, lastModified: '2024-01-01T12:00:00.000Z' }
+
+    const local = makeQS({ questions: [q1, q2], lastModified: '2024-01-01T10:00:00.000Z' })
+    const pod   = makeQS({ questions: [podQ2, podQ1], lastModified: '2024-01-01T12:00:00.000Z' })
+
+    const result = mergeQuestionSets(local, pod)
+    expect(result.questions.map(q => q.id)).toEqual(['q2', 'q1'])
+  })
+
+  it('sorts merged alwaysNeededItems by order so a reorder on the pod side wins', () => {
+    const a = makeItem({ id: 'a', text: 'Torch', order: 0, lastModified: '2024-01-01T10:00:00.000Z' })
+    const b = makeItem({ id: 'b', text: 'Map', order: 1, lastModified: '2024-01-01T10:00:00.000Z' })
+    // Pod reordered: b now first
+    const podB = { ...b, order: 0, lastModified: '2024-01-01T12:00:00.000Z' }
+    const podA = { ...a, order: 1, lastModified: '2024-01-01T12:00:00.000Z' }
+
+    const local = makeQS({ alwaysNeededItems: [a, b], lastModified: '2024-01-01T10:00:00.000Z' })
+    const pod   = makeQS({ alwaysNeededItems: [podB, podA], lastModified: '2024-01-01T12:00:00.000Z' })
+
+    const result = mergeQuestionSets(local, pod)
+    expect(result.alwaysNeededItems.map(i => i.id)).toEqual(['b', 'a'])
+  })
+
+  it('keeps items without order after ordered ones, preserving legacy relative order', () => {
+    const a = makeItem({ id: 'a', text: 'Torch', lastModified: '2024-01-01T10:00:00.000Z' })
+    const b = makeItem({ id: 'b', text: 'Map', order: 0, lastModified: '2024-01-01T10:00:00.000Z' })
+    const c = makeItem({ id: 'c', text: 'Compass', lastModified: '2024-01-01T10:00:00.000Z' })
+
+    const local = makeQS({ alwaysNeededItems: [a, b, c], lastModified: '2024-01-01T10:00:00.000Z' })
+    const pod   = makeQS({ alwaysNeededItems: [a, b, c], lastModified: '2024-01-01T10:00:00.000Z' })
+
+    const result = mergeQuestionSets(local, pod)
+    expect(result.alwaysNeededItems.map(i => i.id)).toEqual(['b', 'a', 'c'])
+  })
+})

@@ -57,27 +57,32 @@ export function generateQuestionBasedItems(
     people: Person[],
     selectedPeopleIds: string[]
 ): PackingListItem[] {
-    return questionAnswers.flatMap(qa => {
-        const selectedOptionIds = qa.selectedOptionIds ?? []
-        const question = questions.find(q => q.id === qa.questionId)
-        if (!question) return []
+    // Walk the question set in its own order (questions, then options, then
+    // items) rather than answer order, so the generated list mirrors how the
+    // user arranged their questions.
+    const answersByQuestionId = new Map(questionAnswers.map(qa => [qa.questionId, qa]))
+    return [...questions]
+        .sort((a, b) => a.order - b.order)
+        .flatMap(question => {
+            const qa = answersByQuestionId.get(question.id)
+            if (!qa) return []
+            const selectedOptionIds = new Set((qa.selectedOptionIds ?? []).filter(Boolean))
 
-        return selectedOptionIds.flatMap(selectedOptionId => {
-            if (!selectedOptionId) return []
-            const selectedOption = question.options.find(o => o.id === selectedOptionId)
-            if (!selectedOption) return []
-
-            return selectedOption.items.flatMap(item =>
-                generateItemInstances(item, people, selectedPeopleIds, {
-                    questionId: question.id,
-                    optionId: selectedOption.id,
-                    category: question.questionType === 'multiple-choice'
-                        ? selectedOption.text
-                        : question.text,
-                })
-            )
+            return [...question.options]
+                .sort((a, b) => a.order - b.order)
+                .filter(option => selectedOptionIds.has(option.id))
+                .flatMap(selectedOption =>
+                    sortItemsByOrder(selectedOption.items).flatMap(item =>
+                        generateItemInstances(item, people, selectedPeopleIds, {
+                            questionId: question.id,
+                            optionId: selectedOption.id,
+                            category: question.questionType === 'multiple-choice'
+                                ? selectedOption.text
+                                : question.text,
+                        })
+                    )
+                )
         })
-    })
 }
 
 export function generateAlwaysNeededItems(
@@ -85,11 +90,26 @@ export function generateAlwaysNeededItems(
     people: Person[],
     selectedPeopleIds: string[]
 ): PackingListItem[] {
-    return alwaysNeededItems.flatMap(item =>
+    return sortItemsByOrder(alwaysNeededItems).flatMap(item =>
         generateItemInstances(item, people, selectedPeopleIds, {
             questionId: 'always-needed',
             optionId: 'always-needed',
             category: 'Essentials',
         })
     )
+}
+
+// Explicit order wins where present; items without one keep their array
+// position (question sets written before items carried an order field).
+function sortItemsByOrder(items: Item[]): Item[] {
+    return items
+        .map((item, index) => ({ item, key: item.order ?? index }))
+        .sort((a, b) => a.key - b.key)
+        .map(({ item }) => item)
+}
+
+// Stamped onto the final assembled list so the view page can show items in
+// question-set order without needing access to the owner's question set.
+export function withItemOrder(items: PackingListItem[]): PackingListItem[] {
+    return items.map((item, index) => ({ ...item, order: index }))
 }

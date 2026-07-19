@@ -130,6 +130,30 @@ test.describe('B – Editing Questions', () => {
     await expect(page.getByText('WaterBottleTest')).toBeVisible({ timeout: 5_000 })
   })
 
+  test('B6: reorder always-needed items with the move buttons', async ({ freshPage: page }) => {
+    await setupWizardAndGoToQuestions(page)
+    await openAlwaysNeededModal(page)
+
+    // Item names render in inactive CustomCreatableSelect mode (.cursor-text)
+    const itemTexts = page.locator('.cursor-text')
+    // First line only — the row also renders a "×" clear glyph on its own line
+    const first = (await itemTexts.first().innerText()).split('\n')[0].trim()
+    const second = (await itemTexts.nth(1).innerText()).split('\n')[0].trim()
+    expect(first).not.toEqual(second)
+
+    // Move the first item down one position and save
+    await page.locator('button[title="Move item down"]').first().click()
+    await expect(itemTexts.first()).toContainText(second)
+    await expect(itemTexts.nth(1)).toContainText(first)
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
+
+    // Reopen the modal — the swapped order must have persisted
+    await openAlwaysNeededModal(page)
+    await expect(itemTexts.first()).toContainText(second)
+    await expect(itemTexts.nth(1)).toContainText(first)
+  })
+
   test('B5: JSON editor mode toggle is not available (editor is always visual)', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
     // The JSON editor toggle does not exist in the current UI

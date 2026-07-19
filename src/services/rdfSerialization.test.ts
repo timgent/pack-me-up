@@ -478,3 +478,69 @@ describe('questionSet dateOfBirth and ageRanges round-trip', () => {
         expect(result.questions[0].options[0].items[1].ageRanges).toBeUndefined()
     })
 })
+
+describe('item order round-trip', () => {
+    function roundTripQS(qs: PackingListQuestionSet): PackingListQuestionSet {
+        return datasetToQuestionSet(questionSetToDataset(qs, QS_DATASET_URL), QS_DATASET_URL)
+    }
+
+    it('round-trips order on option items and sorts by it on read', () => {
+        const qs = makeQuestionSet({
+            questions: [makeQuestion({
+                options: [makeOption({
+                    items: [
+                        { id: 'i-b', text: 'B item', personSelections: [], order: 1 },
+                        { id: 'i-a', text: 'A item', personSelections: [], order: 0 },
+                    ],
+                })],
+            })],
+        })
+        const result = roundTripQS(qs)
+        const items = result.questions[0].options[0].items
+        expect(items.map(i => i.text)).toEqual(['A item', 'B item'])
+        expect(items.map(i => i.order)).toEqual([0, 1])
+    })
+
+    it('round-trips order on alwaysNeededItems and sorts by it on read', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [
+                { id: 'i-b', text: 'Torch', personSelections: [], order: 1 },
+                { id: 'i-a', text: 'Map', personSelections: [], order: 0 },
+            ],
+        })
+        const result = roundTripQS(qs)
+        expect(result.alwaysNeededItems.map(i => i.text)).toEqual(['Map', 'Torch'])
+        expect(result.alwaysNeededItems.map(i => i.order)).toEqual([0, 1])
+    })
+
+    it('leaves order undefined for legacy items and keeps array order', () => {
+        const qs = makeQuestionSet({
+            alwaysNeededItems: [
+                { id: 'i-b', text: 'Torch', personSelections: [] },
+                { id: 'i-a', text: 'Map', personSelections: [] },
+            ],
+        })
+        const result = roundTripQS(qs)
+        expect(result.alwaysNeededItems.map(i => i.text)).toEqual(['Torch', 'Map'])
+        expect(result.alwaysNeededItems.every(i => i.order === undefined)).toBe(true)
+    })
+
+    it('round-trips order on packing list items', () => {
+        const list = makePackingList({
+            items: [
+                makeItem({ id: 'item-1', itemText: 'Passport', order: 0 }),
+                makeItem({ id: 'item-2', itemText: 'Sunscreen', order: 1 }),
+            ],
+        })
+        const result = roundTripList(list)
+        const byId = new Map(result.items.map(i => [i.id, i]))
+        expect(byId.get('item-1')?.order).toBe(0)
+        expect(byId.get('item-2')?.order).toBe(1)
+    })
+
+    it('leaves order undefined for legacy packing list items', () => {
+        const list = makePackingList({ items: [makeItem({ id: 'item-1' })] })
+        const result = roundTripList(list)
+        expect(result.items[0].order).toBeUndefined()
+    })
+})

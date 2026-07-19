@@ -39,28 +39,40 @@ interface ListSection {
     isCategory?: boolean
 }
 
-function groupByCategory(items: PackingListItem[]) {
+// Generated items carry an `order` stamped from the question set; sort by it so
+// the list mirrors how the user arranged their questions. Items without one
+// (legacy lists, custom additions) fall back to alphabetical at the end.
+function sortByItemOrder(items: PackingListItem[]): PackingListItem[] {
+    return items.sort((a, b) =>
+        ((a.order ?? Infinity) - (b.order ?? Infinity)) || a.itemText.localeCompare(b.itemText)
+    )
+}
+
+export function groupByCategory(items: PackingListItem[]) {
     const map = new Map<string, PackingListItem[]>()
     for (const item of items) {
         const cat = item.category ?? 'Other'
         if (!map.has(cat)) map.set(cat, [])
         map.get(cat)!.push(item)
     }
+    // Categories follow their earliest item; ties (all-legacy) stay alphabetical
+    const minOrder = (catItems: PackingListItem[]) =>
+        Math.min(...catItems.map(i => i.order ?? Infinity))
     return [...map.entries()]
-        .sort(([a], [b]) => {
+        .sort(([a, aItems], [b, bItems]) => {
             if (a === 'Essentials') return -1
             if (b === 'Essentials') return 1
             if (a === 'Other') return 1
             if (b === 'Other') return -1
-            return a.localeCompare(b)
+            return (minOrder(aItems) - minOrder(bItems)) || a.localeCompare(b)
         })
         .map(([category, catItems]) => ({
             label: category,
-            items: catItems.sort((a, b) => a.itemText.localeCompare(b.itemText)),
+            items: sortByItemOrder(catItems),
         }))
 }
 
-function groupByPerson(items: PackingListItem[]) {
+export function groupByPerson(items: PackingListItem[]) {
     const map = new Map<string, PackingListItem[]>()
     for (const item of items) {
         const person = item.personName || 'Unassigned'
@@ -71,7 +83,7 @@ function groupByPerson(items: PackingListItem[]) {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([person, personItems]) => ({
             label: person,
-            items: personItems.sort((a, b) => a.itemText.localeCompare(b.itemText)),
+            items: sortByItemOrder(personItems),
         }))
 }
 
@@ -486,6 +498,7 @@ export function ViewPackingList() {
         try {
             setAutoSaveStatus('saving')
 
+            const maxOrder = Math.max(-1, ...packingList.items.map(i => i.order ?? -1))
             const newItem = {
                 id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 itemText: newItemText,
@@ -495,6 +508,7 @@ export function ViewPackingList() {
                 optionId: '',
                 packed: false,
                 ...(communal ? { communal: true } : {}),
+                order: maxOrder + 1,
                 lastModified: new Date().toISOString(),
             }
 

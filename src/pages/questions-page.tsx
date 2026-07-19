@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
-import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion, AGE_RANGE_OPTIONS } from '../edit-questions/types'
+import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion, renumberItemOrder, AGE_RANGE_OPTIONS } from '../edit-questions/types'
 import { Link } from 'react-router-dom'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { usePodSync } from '../hooks/usePodSync'
@@ -511,16 +511,25 @@ function useItemListState(initialItems: Item[], people: Person[]) {
     const removeItem = (idx: number) =>
         setItems(prev => prev.filter((_, i) => i !== idx))
 
+    const moveItem = (idx: number, direction: 'up' | 'down') =>
+        setItems(prev => {
+            const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+            if (swapIdx < 0 || swapIdx >= prev.length) return prev
+            const next = [...prev]
+            ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+            return next
+        })
+
     const addItem = () =>
         setItems(prev => [...prev, {
             text: '',
             personSelections: people.map(p => ({ personId: p.id, selected: true })),
         }])
 
-    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem }
+    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem }
 }
 
-function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem }: {
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem }: {
     items: Item[]
     people: Person[]
     allItemNames: string[]
@@ -529,6 +538,7 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     togglePerson: (itemIdx: number, personIdx: number) => void
     toggleCommunal: (itemIdx: number) => void
     removeItem: (idx: number) => void
+    moveItem: (idx: number, direction: 'up' | 'down') => void
     addItem: () => void
 }) {
     return (
@@ -584,6 +594,32 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                         </button>
                                     )
                                 })}
+                            </div>
+                            <div className="shrink-0 flex flex-col -my-1">
+                                <button
+                                    type="button"
+                                    onClick={() => moveItem(itemIdx, 'up')}
+                                    disabled={itemIdx === 0}
+                                    className={`px-1 leading-none ${itemIdx === 0 ? 'text-gray-100 cursor-not-allowed' : 'text-gray-300 hover:text-gray-600'}`}
+                                    title="Move item up"
+                                    aria-label={`Move ${item.text || 'item'} up`}
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => moveItem(itemIdx, 'down')}
+                                    disabled={itemIdx === items.length - 1}
+                                    className={`px-1 leading-none ${itemIdx === items.length - 1 ? 'text-gray-100 cursor-not-allowed' : 'text-gray-300 hover:text-gray-600'}`}
+                                    title="Move item down"
+                                    aria-label={`Move ${item.text || 'item'} down`}
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
                             </div>
                             <button
                                 type="button"
@@ -656,13 +692,13 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem } = useItemListState(option?.items ?? [], people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem } = useItemListState(option?.items ?? [], people)
 
     const handleSave = () => onSave({
         id: option?.id ?? crypto.randomUUID(),
         order: option?.order ?? 0,
         text: text.trim(),
-        items,
+        items: renumberItemOrder(items, new Date().toISOString()),
     })
 
     return (
@@ -705,7 +741,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
-                    removeItem={removeItem} addItem={addItem}
+                    removeItem={removeItem} moveItem={moveItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
@@ -727,7 +763,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, addItem } = useItemListState(initialItems, people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, removeItem, moveItem, addItem } = useItemListState(initialItems, people)
 
     return (
         <div
@@ -758,13 +794,13 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
                     items={items} people={people} allItemNames={allItemNames}
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
-                    removeItem={removeItem} addItem={addItem}
+                    removeItem={removeItem} moveItem={moveItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
                         Cancel
                     </button>
-                    <button type="button" onClick={() => onSave(items)} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+                    <button type="button" onClick={() => onSave(renumberItemOrder(items, new Date().toISOString()))} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
                         Save changes
                     </button>
                 </div>
@@ -1068,9 +1104,16 @@ export function QuestionsPage() {
         if (swapIdx < 0 || swapIdx >= active.length) return
         const newActive = [...active]
         ;[newActive[idx], newActive[swapIdx]] = [newActive[swapIdx], newActive[idx]]
+        // Renumber order to match the new positions and stamp lastModified on
+        // moved questions, so the reorder survives pod round-trips (deserialize
+        // sorts by order) and wins per-question LWW during sync merges.
+        const now = new Date().toISOString()
+        const renumbered = newActive.map((q, i) =>
+            q.order === i ? q : { ...q, order: i, lastModified: now }
+        )
         // Rebuild full questions array preserving deleted ones
         const deletedQuestions = data.questions.filter(q => q.deletedAt)
-        await saveData({ ...data, questions: [...newActive, ...deletedQuestions] })
+        await saveData({ ...data, questions: [...renumbered, ...deletedQuestions] })
     }, [data, saveData])
 
     const handleOptionModalSave = useCallback(async (updatedOption: Option) => {

@@ -27,6 +27,32 @@ test.describe('C – Packing Lists', () => {
     await expect(page.getByText('Beach Holiday')).toBeVisible()
   })
 
+  test('C7: reordered question-set items flow through to the view list page', async ({ freshPage: page }) => {
+    await runWizard(page)
+
+    // Reorder the always-needed items: move the first item down one position
+    await page.goto('/#/manage-questions')
+    await page.locator('button[title="Edit always needed items"]').click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).toBeVisible({ timeout: 3_000 })
+    const itemTexts = page.locator('.cursor-text')
+    // First line only — the row also renders a "×" clear glyph on its own line
+    const first = (await itemTexts.first().innerText()).split('\n')[0].trim()
+    const second = (await itemTexts.nth(1).innerText()).split('\n')[0].trim()
+    await page.locator('button[title="Move item down"]').first().click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
+
+    // Create a list and check the view page shows the swapped order
+    await page.goto('/#/create-packing-list')
+    await createList(page, 'Ordered Trip')
+    const body = page.locator('body')
+    await expect(body).toContainText(first)
+    await expect(body).toContainText(second)
+    const content = await body.innerText()
+    expect(content.indexOf(second)).toBeGreaterThanOrEqual(0)
+    expect(content.indexOf(second)).toBeLessThan(content.indexOf(first))
+  })
+
   test('C2: check item as packed persists on reload', async ({ freshPage: page }) => {
     await runWizard(page)
     await createList(page, 'Test Trip')

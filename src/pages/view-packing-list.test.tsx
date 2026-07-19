@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { ViewPackingList } from './view-packing-list'
+import { ViewPackingList, groupByCategory, groupByPerson } from './view-packing-list'
 import type { PackingAppDatabase } from '../services/database'
+import type { PackingListItem } from '../create-packing-list/types'
 
 vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
@@ -1075,5 +1076,69 @@ describe('ViewPackingList shared (communal) section', () => {
         expect(added.communal).toBe(true)
         expect(added.personId).toBe('')
         expect(added.personName).toBe('')
+    })
+})
+
+describe('grouping honours generated item order', () => {
+    const mk = (over: Partial<PackingListItem>): PackingListItem => ({
+        id: Math.random().toString(36).slice(2),
+        itemText: 'Item',
+        personId: 'p1',
+        personName: 'Alice',
+        questionId: 'q1',
+        optionId: 'o1',
+        packed: false,
+        ...over,
+    })
+
+    it('sorts items within a category by order, not alphabetically', () => {
+        const groups = groupByCategory([
+            mk({ itemText: 'Zebra print towel', category: 'Beach', order: 0 }),
+            mk({ itemText: 'Armbands', category: 'Beach', order: 1 }),
+        ])
+        expect(groups[0].items.map(i => i.itemText)).toEqual(['Zebra print towel', 'Armbands'])
+    })
+
+    it('keeps legacy items (no order) alphabetical', () => {
+        const groups = groupByCategory([
+            mk({ itemText: 'Zebra print towel', category: 'Beach' }),
+            mk({ itemText: 'Armbands', category: 'Beach' }),
+        ])
+        expect(groups[0].items.map(i => i.itemText)).toEqual(['Armbands', 'Zebra print towel'])
+    })
+
+    it('places items without order after ordered ones in the same category', () => {
+        const groups = groupByCategory([
+            mk({ itemText: 'Custom addition', category: 'Beach' }),
+            mk({ itemText: 'Towel', category: 'Beach', order: 0 }),
+        ])
+        expect(groups[0].items.map(i => i.itemText)).toEqual(['Towel', 'Custom addition'])
+    })
+
+    it('orders categories by their first item, keeping Essentials first and Other last', () => {
+        const groups = groupByCategory([
+            mk({ itemText: 'Sunscreen', category: 'Essentials', order: 5 }),
+            mk({ itemText: 'Towel', category: 'Beach', order: 2 }),
+            mk({ itemText: 'Boots', category: 'Hiking', order: 0 }),
+            mk({ itemText: 'Mystery', category: undefined, order: 1 }),
+        ])
+        expect(groups.map(g => g.label)).toEqual(['Essentials', 'Hiking', 'Beach', 'Other'])
+    })
+
+    it('keeps legacy category ordering alphabetical when no items carry order', () => {
+        const groups = groupByCategory([
+            mk({ itemText: 'Towel', category: 'Beach' }),
+            mk({ itemText: 'Boots', category: 'Hiking' }),
+            mk({ itemText: 'Sunscreen', category: 'Essentials' }),
+        ])
+        expect(groups.map(g => g.label)).toEqual(['Essentials', 'Beach', 'Hiking'])
+    })
+
+    it('sorts items within a person by order in person view', () => {
+        const groups = groupByPerson([
+            mk({ itemText: 'Zebra print towel', order: 0 }),
+            mk({ itemText: 'Armbands', order: 1 }),
+        ])
+        expect(groups[0].items.map(i => i.itemText)).toEqual(['Zebra print towel', 'Armbands'])
     })
 })
