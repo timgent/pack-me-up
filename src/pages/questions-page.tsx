@@ -574,6 +574,11 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     addItem: () => void
 }) {
     const [openQuantityIdx, setOpenQuantityIdx] = useState<number | null>(null)
+    const [reorderMode, setReorderMode] = useState(false)
+    // Reorder mode only makes sense with something to reorder; if there aren't
+    // at least two items the toggle is hidden and we render the normal editor.
+    const canReorder = items.length > 1
+    const inReorder = reorderMode && canReorder
     const parseQty = (raw: string): number | undefined => {
         const n = parseInt(raw, 10)
         return Number.isFinite(n) && n > 0 ? n : undefined
@@ -581,10 +586,63 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
             {items.length > 0 && (
-                <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Items</div>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">Items</div>
+                    {canReorder && (
+                        <button
+                            type="button"
+                            onClick={() => setReorderMode(m => !m)}
+                            aria-pressed={reorderMode}
+                            className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 transition-colors ${reorderMode ? 'bg-primary-600 text-white' : 'text-primary-600 hover:bg-primary-50'}`}
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            {reorderMode ? 'Finish reordering' : 'Reorder items'}
+                        </button>
+                    )}
+                </div>
+            )}
+            {inReorder && (
+                <div className="text-[11px] text-gray-400 mb-2 px-0.5">
+                    Use the arrows to change the order, then tap Finish reordering.
+                </div>
             )}
             <div className="space-y-2">
-                {items.map((item, itemIdx) => {
+                {inReorder && items.map((item, itemIdx) => (
+                    <div key={itemIdx} className="flex items-center gap-2 rounded-lg border border-gray-200 p-2">
+                        <span className="flex-1 min-w-0 truncate text-sm text-gray-800 px-1">
+                            {item.text || <span className="text-gray-400 italic">Unnamed item</span>}
+                        </span>
+                        <div className="flex gap-1 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => moveItem(itemIdx, 'up')}
+                                disabled={itemIdx === 0}
+                                className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${itemIdx === 0 ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
+                                title="Move item up"
+                                aria-label={`Move ${item.text || 'item'} up`}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => moveItem(itemIdx, 'down')}
+                                disabled={itemIdx === items.length - 1}
+                                className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${itemIdx === items.length - 1 ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
+                                title="Move item down"
+                                aria-label={`Move ${item.text || 'item'} down`}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+                {!inReorder && items.map((item, itemIdx) => {
                     const isCommunal = item.communal === true
                     const communalTitle = isCommunal
                         ? 'Shared item — packed once for the group. Click to make per-person.'
@@ -636,32 +694,6 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                                         </button>
                                     )
                                 })}
-                            </div>
-                            <div className="shrink-0 flex flex-col -my-1">
-                                <button
-                                    type="button"
-                                    onClick={() => moveItem(itemIdx, 'up')}
-                                    disabled={itemIdx === 0}
-                                    className={`px-1 leading-none ${itemIdx === 0 ? 'text-gray-100 cursor-not-allowed' : 'text-gray-300 hover:text-gray-600'}`}
-                                    title="Move item up"
-                                    aria-label={`Move ${item.text || 'item'} up`}
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                    </svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => moveItem(itemIdx, 'down')}
-                                    disabled={itemIdx === items.length - 1}
-                                    className={`px-1 leading-none ${itemIdx === items.length - 1 ? 'text-gray-100 cursor-not-allowed' : 'text-gray-300 hover:text-gray-600'}`}
-                                    title="Move item down"
-                                    aria-label={`Move ${item.text || 'item'} down`}
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
                             </div>
                             <button
                                 type="button"
@@ -770,13 +802,15 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
                     )
                 })}
             </div>
-            <button
-                type="button"
-                onClick={addItem}
-                className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-            >
-                + Add Item
-            </button>
+            {!inReorder && (
+                <button
+                    type="button"
+                    onClick={addItem}
+                    className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                >
+                    + Add Item
+                </button>
+            )}
         </div>
     )
 }

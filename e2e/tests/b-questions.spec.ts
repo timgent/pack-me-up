@@ -130,7 +130,7 @@ test.describe('B – Editing Questions', () => {
     await expect(page.getByText('WaterBottleTest')).toBeVisible({ timeout: 5_000 })
   })
 
-  test('B6: reorder always-needed items with the move buttons', async ({ freshPage: page }) => {
+  test('B6: reorder always-needed items via reorder mode', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
     await openAlwaysNeededModal(page)
 
@@ -141,8 +141,13 @@ test.describe('B – Editing Questions', () => {
     const second = (await itemTexts.nth(1).innerText()).split('\n')[0].trim()
     expect(first).not.toEqual(second)
 
-    // Move the first item down one position and save
+    // Enter reorder mode — rows collapse to name + large move buttons
+    await page.getByRole('button', { name: 'Reorder items' }).click()
+    await expect(page.locator('.cursor-text')).toHaveCount(0)
+
+    // Move the first item down one position, leave reorder mode, save
     await page.locator('button[title="Move item down"]').first().click()
+    await page.getByRole('button', { name: 'Finish reordering' }).click()
     await expect(itemTexts.first()).toContainText(second)
     await expect(itemTexts.nth(1)).toContainText(first)
     await page.getByRole('button', { name: 'Save changes' }).click()

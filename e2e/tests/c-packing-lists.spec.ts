@@ -38,7 +38,9 @@ test.describe('C – Packing Lists', () => {
     // First line only — the row also renders a "×" clear glyph on its own line
     const first = (await itemTexts.first().innerText()).split('\n')[0].trim()
     const second = (await itemTexts.nth(1).innerText()).split('\n')[0].trim()
+    await page.getByRole('button', { name: 'Reorder items' }).click()
     await page.locator('button[title="Move item down"]').first().click()
+    await page.getByRole('button', { name: 'Finish reordering' }).click()
     await page.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
 
