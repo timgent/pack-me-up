@@ -151,8 +151,22 @@ export function useSyncCoordinator<T extends TimestampedData>(
     // Save the currently focused element
     const activeElement = document.activeElement as HTMLElement;
     const activeElementId = activeElement?.id;
-    const selectionStart = (activeElement as HTMLInputElement)?.selectionStart;
-    const selectionEnd = (activeElement as HTMLInputElement)?.selectionEnd;
+    // Only text controls expose a selection API; on buttons/selects the
+    // properties are undefined, and inputs like type="number" throw on access
+    // in some browsers.
+    let selectionStart: number | null = null;
+    let selectionEnd: number | null = null;
+    if (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement
+    ) {
+      try {
+        selectionStart = activeElement.selectionStart;
+        selectionEnd = activeElement.selectionEnd;
+      } catch {
+        // Input type doesn't support selection — restore focus only
+      }
+    }
 
     // Execute the callback
     callback();
@@ -163,8 +177,16 @@ export function useSyncCoordinator<T extends TimestampedData>(
         const elementToFocus = document.getElementById(activeElementId) as HTMLInputElement;
         if (elementToFocus) {
           elementToFocus.focus();
-          if (selectionStart !== null && selectionEnd !== null) {
-            elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+          if (
+            selectionStart !== null &&
+            selectionEnd !== null &&
+            typeof elementToFocus.setSelectionRange === 'function'
+          ) {
+            try {
+              elementToFocus.setSelectionRange(selectionStart, selectionEnd);
+            } catch {
+              // Element re-rendered as a type that doesn't support selection
+            }
           }
         }
       }

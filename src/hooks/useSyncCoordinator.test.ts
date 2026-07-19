@@ -320,4 +320,79 @@ describe('useSyncCoordinator', () => {
       expect(updateFormAndState).toHaveBeenCalledOnce()
     })
   })
+
+  // ─────────────────────────────────────────────────────────────────
+  // Focus preservation during pod sync updates
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('focus preservation during pod sync updates', () => {
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('does not throw when a button is focused during a sync update', async () => {
+      vi.useFakeTimers()
+      const button = document.createElement('button')
+      button.id = 'focused-button'
+      document.body.appendChild(button)
+      button.focus()
+
+      const options = makeOptions()
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(
+          makeTestData({ lastModified: new Date().toISOString() })
+        )
+      })
+
+      expect(() => vi.runAllTimers()).not.toThrow()
+      expect(document.activeElement).toBe(button)
+    })
+
+    it('does not throw when a select is focused during a sync update', async () => {
+      vi.useFakeTimers()
+      const select = document.createElement('select')
+      select.id = 'focused-select'
+      document.body.appendChild(select)
+      select.focus()
+
+      const options = makeOptions()
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(
+          makeTestData({ lastModified: new Date().toISOString() })
+        )
+      })
+
+      expect(() => vi.runAllTimers()).not.toThrow()
+      expect(document.activeElement).toBe(select)
+    })
+
+    it('restores focus and selection on a text input', async () => {
+      vi.useFakeTimers()
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.id = 'focused-input'
+      input.value = 'hello world'
+      document.body.appendChild(input)
+      input.focus()
+      input.setSelectionRange(2, 5)
+
+      const options = makeOptions()
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(
+          makeTestData({ lastModified: new Date().toISOString() })
+        )
+      })
+
+      expect(() => vi.runAllTimers()).not.toThrow()
+      expect(document.activeElement).toBe(input)
+      expect(input.selectionStart).toBe(2)
+      expect(input.selectionEnd).toBe(5)
+    })
+  })
 })
