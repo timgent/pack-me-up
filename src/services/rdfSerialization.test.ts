@@ -191,6 +191,22 @@ describe('packingListToDataset / datasetToPackingList', () => {
         const without = roundTripList(makePackingList({ items: [makeItem()] }))
         expect(without.items[0].quantity).toBeUndefined()
     })
+
+    it('round-trips selectedPeopleIds and omits when not set', () => {
+        const result = roundTripList(makePackingList({ selectedPeopleIds: ['person-1', 'person-2'] }))
+        expect(result.selectedPeopleIds).toEqual(['person-1', 'person-2'])
+        expect(roundTripList(makePackingList()).selectedPeopleIds).toBeUndefined()
+    })
+
+    it('round-trips questionAnswers and omits when not set', () => {
+        const questionAnswers = [
+            { questionId: 'q-1', selectedOptionIds: ['opt-1', 'opt-2'] },
+            { questionId: 'q-2', selectedOptionIds: ['opt-3'] },
+        ]
+        const result = roundTripList(makePackingList({ questionAnswers }))
+        expect(result.questionAnswers).toEqual(questionAnswers)
+        expect(roundTripList(makePackingList()).questionAnswers).toBeUndefined()
+    })
 })
 
 // ── QuestionSet round-trip ────────────────────────────────────────────────────

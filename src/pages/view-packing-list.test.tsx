@@ -1247,3 +1247,160 @@ describe('grouping honours generated item order', () => {
         expect(groups[0].items.map(i => i.itemText)).toEqual(['Zebra print towel', 'Armbands'])
     })
 })
+
+const updatablePackingList = {
+    id: 'test-list-4',
+    name: 'Updatable Trip',
+    createdAt: '2026-01-01T00:00:00Z',
+    selectedPeopleIds: ['p1'],
+    questionAnswers: [{ questionId: 'q-activities', selectedOptionIds: ['opt-swimming'] }],
+    items: [
+        { id: 'item-existing', itemText: 'Swimsuit', personName: 'Alice', personId: 'p1', questionId: 'q-activities', optionId: 'opt-swimming', packed: false },
+    ],
+}
+
+// Question set that now has a new item (Goggles) in the answered option
+const questionSetWithNewItem = {
+    _id: 'question-set',
+    people: [{ id: 'p1', name: 'Alice' }],
+    alwaysNeededItems: [],
+    questions: [{
+        id: 'q-activities',
+        type: 'saved',
+        text: 'Activities?',
+        order: 0,
+        questionType: 'multiple-choice',
+        options: [{
+            id: 'opt-swimming',
+            text: 'Swimming',
+            order: 0,
+            items: [
+                { text: 'Swimsuit', personSelections: [{ personId: 'p1', selected: true }] },
+                { text: 'Goggles', personSelections: [{ personId: 'p1', selected: true }] },
+            ],
+        }],
+    }],
+}
+
+describe('ViewPackingList update from questions', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...updatablePackingList, _rev: '2' }),
+        })
+        mockShowToast.mockClear()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderUpdatable(options: { list?: typeof updatablePackingList; getQuestionSet?: ReturnType<typeof vi.fn> } = {}) {
+        const list = options.list ?? updatablePackingList
+        const db = {
+            getPackingList: vi.fn().mockResolvedValue(list),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+            getQuestionSet: options.getQuestionSet ?? vi.fn().mockResolvedValue(questionSetWithNewItem),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        render(
+            <MemoryRouter initialEntries={[`/view-list/${list.id}`]}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        return db
+    }
+
+    it('hides the button when no question set exists', async () => {
+        renderUpdatable({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
+        await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
+        expect(screen.queryByRole('button', { name: /update from questions/i })).toBeNull()
+    })
+
+    it('shows new items in a preview when the question set has additions', async () => {
+        renderUpdatable()
+        await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
+
+        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+
+        // Preview modal lists the new item, not the one already on the list
+        await waitFor(() => expect(screen.getByRole('button', { name: /add 1 item/i })).toBeTruthy())
+        expect(screen.getByLabelText(/add goggles/i)).toBeTruthy()
+    })
+
+    it('toasts and shows no preview when the list already matches', async () => {
+        // Question set whose only item is already on the list
+        const matchingQs = {
+            ...questionSetWithNewItem,
+            questions: [{
+                ...questionSetWithNewItem.questions[0],
+                options: [{
+                    ...questionSetWithNewItem.questions[0].options[0],
+                    items: [{ text: 'Swimsuit', personSelections: [{ personId: 'p1', selected: true }] }],
+                }],
+            }],
+        }
+        renderUpdatable({ getQuestionSet: vi.fn().mockResolvedValue(matchingQs) })
+        await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
+
+        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+
+        await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('This list already matches your questions', 'success'))
+        expect(screen.queryByRole('button', { name: /add 1 item/i })).toBeNull()
+    })
+
+    it('excludes an unchecked item and persists only the selected additions', async () => {
+        const db = renderUpdatable({
+            list: {
+                ...updatablePackingList,
+                questionAnswers: [{ questionId: 'q-activities', selectedOptionIds: ['opt-swimming'] }],
+                items: [],
+            },
+        })
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Updatable Trip' })).toBeTruthy())
+
+        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+        await screen.findByRole('button', { name: /add 2 items/i })
+
+        // Uncheck Swimsuit, leaving only Goggles
+        fireEvent.click(screen.getByLabelText(/add swimsuit/i))
+        fireEvent.click(screen.getByRole('button', { name: /add 1 item/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const saved = db.savePackingList.mock.calls[0][0]
+        const texts = saved.items.map((i: { itemText: string }) => i.itemText)
+        expect(texts).toContain('Goggles')
+        expect(texts).not.toContain('Swimsuit')
+    })
+
+    it('is hidden for foreign lists', async () => {
+        const db = {
+            getPackingList: vi.fn().mockResolvedValue(updatablePackingList),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+            getQuestionSet: vi.fn().mockResolvedValue(questionSetWithNewItem),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        render(
+            <MemoryRouter initialEntries={[`/view-list/${updatablePackingList.id}?pod=${encodeURIComponent('https://foreign.example/')}`]}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
+        expect(screen.queryByRole('button', { name: /update from questions/i })).toBeNull()
+    })
+})

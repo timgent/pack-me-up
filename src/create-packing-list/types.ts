@@ -10,6 +10,12 @@ export interface PackingList {
     items: PackingListItem[]
     deletedItems?: PackingListItem[]
     guests?: Array<{ id: string; name: string }>
+    // How this list was generated, remembered so it can later be re-run against
+    // an updated question set ("Update from questions"). Both optional and
+    // additive: legacy lists created before this existed have neither, and fall
+    // back to reconstructing the inputs from their items' question/option ids.
+    questionAnswers?: Array<{ questionId: string; selectedOptionIds: string[] }>
+    selectedPeopleIds?: string[]
 }
 
 export interface PackingListItem {

@@ -15,9 +15,11 @@ import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName
 import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
+import { UpdateFromQuestionsModal } from '../components/UpdateFromQuestionsModal'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { mergePackingLists } from '../utils/mergePackingLists'
+import { computeQuestionSetAdditions } from '../create-packing-list/updateFromQuestions'
 
 type FormData = {
     items: Record<string, boolean>
@@ -102,6 +104,10 @@ export function ViewPackingList() {
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [shareModalOpen, setShareModalOpen] = useState(false)
+    // Additions computed from the question set; non-null opens the preview modal.
+    const [questionUpdateAdditions, setQuestionUpdateAdditions] = useState<PackingListItem[] | null>(null)
+    // Whether the question set exists locally (gates the "Update from questions" button).
+    const [hasQuestionSet, setHasQuestionSet] = useState(false)
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     // Tracks whether initial data has been loaded (local DB or pod).
     // Used to surface a real error to the user instead of hanging on "Loading…"
@@ -157,6 +163,20 @@ export function ViewPackingList() {
             getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
         }
     }, [isLoggedIn, session])
+
+    // The "Update from questions" action only applies to the user's own lists,
+    // regenerating them from their local question set. Foreign lists belong to
+    // someone else, so gate the button on a question set existing locally.
+    useEffect(() => {
+        if (foreignPodUrl || !db) {
+            setHasQuestionSet(false)
+            return
+        }
+        Promise.resolve()
+            .then(() => db.getQuestionSet())
+            .then(() => setHasQuestionSet(true))
+            .catch(() => setHasQuestionSet(false))
+    }, [db, foreignPodUrl])
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
@@ -413,6 +433,42 @@ export function ViewPackingList() {
             const dataWithTimestamp = { ...updatedPackingList, lastModified: new Date().toISOString() }
             const dbResult = await db.savePackingList(dataWithTimestamp)
             setPackingList({ ...dataWithTimestamp, _rev: dbResult.rev })
+        }
+    }
+
+    const handleOpenQuestionUpdate = async () => {
+        if (!packingList) return
+        try {
+            const questionSet = await db.getQuestionSet()
+            const additions = computeQuestionSetAdditions(packingList, questionSet)
+            if (additions.length === 0) {
+                showToast('This list already matches your questions', 'success')
+                return
+            }
+            setQuestionUpdateAdditions(additions)
+        } catch (err) {
+            const details = reportError(err, 'Error computing question updates')
+            showToast('Failed to check for question updates', 'error', details)
+        }
+    }
+
+    const handleConfirmQuestionUpdate = async (selected: PackingListItem[]) => {
+        if (!packingList || selected.length === 0) {
+            setQuestionUpdateAdditions(null)
+            return
+        }
+        try {
+            const updatedList: PackingList = {
+                ...packingList,
+                items: [...packingList.items, ...selected],
+            }
+            await persistPackingList(updatedList)
+            showToast(`Added ${selected.length} item${selected.length === 1 ? '' : 's'} from your questions`, 'success')
+        } catch (err) {
+            const details = reportError(err, 'Error adding question updates')
+            showToast('Failed to add items', 'error', details)
+        } finally {
+            setQuestionUpdateAdditions(null)
         }
     }
 
@@ -719,6 +775,15 @@ export function ViewPackingList() {
                                 onClick={() => { setShowAddGuest(v => !v); setNewGuestName('') }}
                             >
                                 + Add Guest
+                            </Button>
+                        )}
+                        {!foreignPodUrl && hasQuestionSet && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={handleOpenQuestionUpdate}
+                            >
+                                Update from questions
                             </Button>
                         )}
                         {isLoggedIn && !foreignPodUrl && (
@@ -1150,6 +1215,12 @@ export function ViewPackingList() {
                 } : undefined}
             />
         )}
+        <UpdateFromQuestionsModal
+            isOpen={questionUpdateAdditions !== null}
+            onClose={() => setQuestionUpdateAdditions(null)}
+            additions={questionUpdateAdditions ?? []}
+            onConfirm={handleConfirmQuestionUpdate}
+        />
         </>
     )
 }

@@ -120,4 +120,61 @@ test.describe('C – Packing Lists', () => {
     // Use heading selector to avoid matching the confirmation dialog text
     await expect(page.getByRole('heading', { name: /To Delete/i })).not.toBeVisible({ timeout: 5_000 })
   })
+
+  // Add a new always-needed item to the question set via manage-questions.
+  async function addAlwaysNeededItem(page: import('@playwright/test').Page, itemName: string) {
+    await page.goto('/#/manage-questions')
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible({ timeout: 8_000 })
+    await page.locator('button[title="Edit always needed items"]').click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).toBeVisible({ timeout: 3_000 })
+    await page.getByRole('button', { name: '+ Add Item' }).click()
+    await page.locator('.cursor-text').last().click()
+    const control = page.locator('.react-select__control').last()
+    await expect(control).toBeVisible({ timeout: 3_000 })
+    await control.click()
+    await page.keyboard.type(itemName)
+    const option = page.locator('.react-select__option').filter({ hasText: new RegExp(itemName, 'i') }).first()
+    await expect(option).toBeVisible({ timeout: 5_000 })
+    await option.click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
+    // Give the async IndexedDB write time to commit
+    await page.waitForTimeout(800)
+  }
+
+  test('C8: update an existing list from question-set changes', async ({ freshPage: page }) => {
+    await runWizard(page)
+    await createList(page, 'Evolving Trip')
+    const listUrl = page.url()
+
+    // The new item is not on the list yet
+    await expect(page.getByText('GadgetTest')).not.toBeVisible()
+
+    // Add a new always-needed item to the question set, then return to the list
+    await addAlwaysNeededItem(page, 'GadgetTest')
+    await page.goto(listUrl)
+    await expect(page.getByRole('heading', { name: 'Evolving Trip' })).toBeVisible({ timeout: 8_000 })
+
+    // Update from questions surfaces the new item in a preview
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await expect(page.getByRole('button', { name: /Add 1 item/i })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByLabel(/Add GadgetTest/i)).toBeVisible()
+    await page.getByRole('button', { name: /Add 1 item/i }).click()
+
+    // The item now appears on the list
+    await expect(page.getByText('GadgetTest')).toBeVisible({ timeout: 5_000 })
+
+    // Delete it, then update again — it must not be re-suggested
+    await page.getByText('GadgetTest', { exact: true })
+      .locator('xpath=ancestor::label[1]/..')
+      .getByTitle('Delete item')
+      .click()
+    await page.getByRole('button', { name: /^Remove$/ }).click()
+    await expect(page.getByText('GadgetTest')).not.toBeVisible({ timeout: 5_000 })
+
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+    // No preview — the list already matches (the deleted item is not resurrected)
+    await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('button', { name: /Add \d+ item/i })).not.toBeVisible()
+  })
 })

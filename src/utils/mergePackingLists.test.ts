@@ -321,5 +321,23 @@ describe('mergePackingLists', () => {
 
       expect(result.items.map(i => i.id)).toEqual(expect.arrayContaining(['item-P', 'item-Q']))
     })
+
+    it('carries generation inputs from the newer side', () => {
+      const local = makeList({
+        lastModified: '2024-01-01T10:00:00.000Z',
+        questionAnswers: [{ questionId: 'q-old', selectedOptionIds: ['opt-old'] }],
+        selectedPeopleIds: ['person-old'],
+      })
+      const pod = makeList({
+        lastModified: '2024-01-01T10:00:01.000Z',
+        questionAnswers: [{ questionId: 'q-new', selectedOptionIds: ['opt-new'] }],
+        selectedPeopleIds: ['person-new'],
+      })
+
+      const result = mergePackingLists(local, pod)
+
+      expect(result.questionAnswers).toEqual([{ questionId: 'q-new', selectedOptionIds: ['opt-new'] }])
+      expect(result.selectedPeopleIds).toEqual(['person-new'])
+    })
   })
 })

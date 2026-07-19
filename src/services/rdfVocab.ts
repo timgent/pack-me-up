@@ -19,6 +19,12 @@ export const PMU = {
     hasItem: `${PMU_NS}hasItem`,
     hasDeletedItem: `${PMU_NS}hasDeletedItem`,
     hasGuest: `${PMU_NS}hasGuest`,
+    // Generation inputs remembered on the list so it can be re-run against an
+    // updated question set. One hasAnswer Thing per answered question; the
+    // selected traveller ids are repeated strings on the root Thing.
+    hasAnswer: `${PMU_NS}hasAnswer`,
+    selectedOptionId: `${PMU_NS}selectedOptionId`,
+    selectedPersonId: `${PMU_NS}selectedPersonId`,
     itemText: `${PMU_NS}itemText`,
     personId: `${PMU_NS}personId`,
     personName: `${PMU_NS}personName`,

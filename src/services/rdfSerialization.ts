@@ -63,6 +63,21 @@ export function packingListToDataset(list: PackingList, datasetUrl: string): Sol
             .build())
     }
 
+    for (const personId of (list.selectedPeopleIds ?? [])) {
+        rootBuilder = rootBuilder.addStringNoLocale(PMU.selectedPersonId, personId)
+    }
+
+    for (const answer of (list.questionAnswers ?? [])) {
+        const answerUrl = `${datasetUrl}#answer-${answer.questionId}`
+        rootBuilder = rootBuilder.addUrl(PMU.hasAnswer, answerUrl)
+        let answerBuilder = buildThing({ url: answerUrl })
+            .addStringNoLocale(PMU.questionId, answer.questionId)
+        for (const optionId of answer.selectedOptionIds) {
+            answerBuilder = answerBuilder.addStringNoLocale(PMU.selectedOptionId, optionId)
+        }
+        ds = setThing(ds, answerBuilder.build())
+    }
+
     return setThing(ds, rootBuilder.build())
 }
 
@@ -96,6 +111,18 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
         })
         .filter((g): g is { id: string; name: string } => g !== null)
 
+    const selectedPeopleIds = getStringNoLocaleAll(rootThing, PMU.selectedPersonId)
+
+    const questionAnswers = getUrlAll(rootThing, PMU.hasAnswer)
+        .map(url => {
+            const thing = getThing(dataset, url)
+            if (!thing) return null
+            const questionId = getStringNoLocale(thing, PMU.questionId) ?? ''
+            const selectedOptionIds = getStringNoLocaleAll(thing, PMU.selectedOptionId)
+            return { questionId, selectedOptionIds }
+        })
+        .filter((a): a is { questionId: string; selectedOptionIds: string[] } => a !== null)
+
     return {
         id,
         name,
@@ -105,6 +132,8 @@ export function datasetToPackingList(dataset: SolidDataset, datasetUrl: string):
         items,
         deletedItems,
         ...(guests.length > 0 ? { guests } : {}),
+        ...(selectedPeopleIds.length > 0 ? { selectedPeopleIds } : {}),
+        ...(questionAnswers.length > 0 ? { questionAnswers } : {}),
     }
 }
 

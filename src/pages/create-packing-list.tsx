@@ -594,13 +594,26 @@ export function CreatePackingList() {
             nights
         )
 
+        // Remember how the list was generated so it can later be re-run against
+        // an updated question set. Normalise the answers the same way the
+        // generator treats them: drop questions with no selected options and any
+        // empty-string option ids.
+        const questionAnswers = data.questionAnswers
+            .map(qa => ({
+                questionId: qa.questionId,
+                selectedOptionIds: (qa.selectedOptionIds ?? []).filter(id => id),
+            }))
+            .filter(qa => qa.questionId && qa.selectedOptionIds.length > 0)
+
         const packingList: PackingList = {
             id: crypto.randomUUID(),
             name: data.name,
             createdAt: new Date().toISOString(),
             lastModified: new Date().toISOString(),
             ...(nights !== undefined ? { nights } : {}),
-            items: withItemOrder(deduplicateItems([...questionBasedItems, ...alwaysNeededItems]))
+            items: withItemOrder(deduplicateItems([...questionBasedItems, ...alwaysNeededItems])),
+            selectedPeopleIds: [...selectedPeopleIds],
+            questionAnswers,
         }
         try {
             if (foreignPodUrl) {
