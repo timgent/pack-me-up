@@ -6,6 +6,7 @@ import {
     syncAllDataFromPod,
     loadRdfFromPod,
     saveRdfToPod,
+    deleteFileFromPod,
     loadMultipleRdfFromPod,
     saveMultipleRdfToPod,
     POD_CONTAINERS,
@@ -33,6 +34,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
         getPodUrlAll: vi.fn(),
         overwriteFile: vi.fn(),
         deleteFile: vi.fn(),
+        createContainerAt: vi.fn(),
         saveSolidDatasetAt: vi.fn(),
         getResourceInfoWithAcl: vi.fn(),
         hasResourceAcl: vi.fn(),
@@ -52,12 +54,14 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, getContainedResourceUrlAll, overwriteFile, createSolidDataset, createContainerAt, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, deleteFile } from '@inrupt/solid-client'
 
 const mockGetFile = vi.mocked(getFile)
 const mockGetSolidDataset = vi.mocked(getSolidDataset)
 const mockGetContainedResourceUrlAll = vi.mocked(getContainedResourceUrlAll)
 const mockOverwriteFile = vi.mocked(overwriteFile)
+const mockCreateContainerAt = vi.mocked(createContainerAt)
+const mockDeleteFile = vi.mocked(deleteFile)
 const mockGetAgentAccessAll = vi.mocked(universalAccess.getAgentAccessAll)
 const mockSetPublicAccess = vi.mocked(universalAccess.setPublicAccess)
 const mockGetResourceInfoWithAcl = vi.mocked(getResourceInfoWithAcl)
@@ -385,6 +389,7 @@ describe('syncAllDataFromPod', () => {
             mockGetSolidDataset
                 .mockRejectedValueOnce({ statusCode: 404 }) // no question set
                 .mockResolvedValueOnce(makeContainerDataset([])) // empty container
+                .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // ensureContainerExists in saveRdfToPod
 
             mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
@@ -409,6 +414,7 @@ describe('syncAllDataFromPod', () => {
                 .mockRejectedValueOnce({ statusCode: 404 }) // no question set
                 .mockResolvedValueOnce(makeContainerDataset([podListUrl]))
                 .mockResolvedValueOnce(makeRdfListDataset(podList))
+                .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // ensureContainerExists in saveRdfToPod
 
             mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
@@ -476,6 +482,7 @@ describe('saveRdfToPod', () => {
     it('serializes data and calls overwriteFile with Turtle content', async () => {
         const list = makePackingList('my-list')
         const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container exists
         mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
         await saveRdfToPod({
@@ -492,7 +499,27 @@ describe('saveRdfToPod', () => {
         )
     })
 
+    it('creates the parent container if it does not exist before writing', async () => {
+        const list = makePackingList('my-list')
+        const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
+        const containerUrl = `${POD_URL}pack-me-up/packing-lists/`
+        mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 404 }) // container missing
+        mockCreateContainerAt.mockResolvedValueOnce({} as unknown as ReturnType<typeof createContainerAt> extends Promise<infer R> ? R : never)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+        await saveRdfToPod({
+            session: mockSession,
+            fileUrl: url,
+            data: list,
+            serializer: packingListToDataset,
+        })
+
+        expect(mockCreateContainerAt).toHaveBeenCalledWith(containerUrl, expect.objectContaining({ fetch: mockSession.fetch }))
+        expect(mockOverwriteFile).toHaveBeenCalledWith(url, expect.any(Blob), expect.any(Object))
+    })
+
     it('throws AuthenticationError on 401', async () => {
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container exists
         mockOverwriteFile.mockRejectedValueOnce({ statusCode: 401 })
         await expect(
             saveRdfToPod({ session: mockSession, fileUrl: 'https://x.example.com/f.ttl', data: {}, serializer: () => createSolidDataset() })
@@ -518,6 +545,39 @@ describe('saveRdfToPod', () => {
             expect.objectContaining({ fetch: mockFetch, contentType: 'text/turtle' })
         )
         vi.unstubAllGlobals()
+    })
+})
+
+// ─── deleteFileFromPod ───────────────────────────────────────────────────────
+
+describe('deleteFileFromPod', () => {
+    afterEach(() => { vi.restoreAllMocks() })
+
+    it('calls deleteFile with the correct URL', async () => {
+        const fileUrl = `${POD_URL}pack-me-up/packing-lists/abc.ttl`
+        mockDeleteFile.mockResolvedValueOnce(undefined)
+
+        await deleteFileFromPod(mockSession, fileUrl)
+
+        expect(mockDeleteFile).toHaveBeenCalledWith(fileUrl, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+
+    it('treats 404 as success (idempotent delete)', async () => {
+        mockDeleteFile.mockRejectedValueOnce({ statusCode: 404 })
+
+        await expect(deleteFileFromPod(mockSession, `${POD_URL}pack-me-up/packing-lists/gone.ttl`)).resolves.toBeUndefined()
+    })
+
+    it('rethrows non-404 errors', async () => {
+        mockDeleteFile.mockRejectedValueOnce({ statusCode: 500 })
+
+        await expect(deleteFileFromPod(mockSession, `${POD_URL}pack-me-up/packing-lists/err.ttl`)).rejects.toMatchObject({ statusCode: 500 })
+    })
+
+    it('throws AuthenticationError on 403', async () => {
+        mockDeleteFile.mockRejectedValueOnce({ statusCode: 403 })
+
+        await expect(deleteFileFromPod(mockSession, `${POD_URL}pack-me-up/packing-lists/auth.ttl`)).rejects.toThrow(AuthenticationError)
     })
 })
 
