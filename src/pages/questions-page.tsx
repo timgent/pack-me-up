@@ -1,5 +1,23 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    MouseSensor,
+    TouchSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type Modifier,
+} from '@dnd-kit/core'
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useDatabase } from '../components/DatabaseContext'
 import { DatabaseMigration } from '../services/migration'
 import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, newDraftQuestion, renumberItemOrder, AGE_RANGE_OPTIONS } from '../edit-questions/types'
@@ -570,13 +588,24 @@ function useItemListState(initialItems: Item[], people: Person[]) {
             return next
         }), [])
 
+    // Pull the item at `from` out and reinsert it at `to` — used by drag to
+    // reorder; up/down buttons stay as the discrete, keyboard-friendly path.
+    const reorderItem = useCallback((from: number, to: number) =>
+        setItems(prev => {
+            if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev
+            const next = [...prev]
+            const [moved] = next.splice(from, 1)
+            next.splice(to, 0, moved)
+            return next
+        }), [])
+
     const addItem = useCallback(() =>
         setItems(prev => [...prev, {
             text: '',
             personSelections: people.map(p => ({ personId: p.id, selected: true })),
         }]), [people])
 
-    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem }
+    return { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem }
 }
 
 // "2 per night" / "1 per 4 nights" — the human phrasing of an item's rate
@@ -778,7 +807,79 @@ const ItemEditorRow = memo(function ItemEditorRow({ item, itemIdx, people, allIt
     )
 })
 
-function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem }: {
+// Lock the drag to the vertical axis — the list is one column, so any
+// horizontal drift just reads as jitter. (Inlined rather than pulling in
+// @dnd-kit/modifiers for a one-line transform.)
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 })
+
+// A single row in reorder mode: a drag handle (dnd-kit sortable) plus the
+// up/down buttons, which stay as the discrete, always-available fallback.
+function SortableItemRow({ id, item, index, isLast, moveItem }: {
+    id: string
+    item: Item
+    index: number
+    isLast: boolean
+    moveItem: (idx: number, direction: 'up' | 'down') => void
+}) {
+    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id })
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    }
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            data-reorder-row
+            className={`flex items-center gap-1 rounded-lg border bg-white p-2 ${isDragging ? 'relative z-10 border-primary-400 shadow-md opacity-95' : 'border-gray-200'}`}
+        >
+            <button
+                type="button"
+                ref={setActivatorNodeRef}
+                {...attributes}
+                {...listeners}
+                className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 cursor-grab active:cursor-grabbing touch-none"
+                title="Drag to reorder"
+                aria-label={`Drag ${item.text || 'item'} to reorder`}
+            >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z" />
+                </svg>
+            </button>
+            <span className="flex-1 min-w-0 truncate text-sm text-gray-800 px-1">
+                {item.text || <span className="text-gray-400 italic">Unnamed item</span>}
+            </span>
+            <div className="flex gap-1 shrink-0">
+                <button
+                    type="button"
+                    onClick={() => moveItem(index, 'up')}
+                    disabled={index === 0}
+                    className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${index === 0 ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
+                    title="Move item up"
+                    aria-label={`Move ${item.text || 'item'} up`}
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => moveItem(index, 'down')}
+                    disabled={isLast}
+                    className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${isLast ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
+                    title="Move item down"
+                    aria-label={`Move ${item.text || 'item'} down`}
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    )
+}
+
+function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem }: {
     items: Item[]
     people: Person[]
     allItemNames: string[]
@@ -791,6 +892,7 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     updateMaxQuantity: (itemIdx: number, maxQuantity: number | undefined) => void
     removeItem: (idx: number) => void
     moveItem: (idx: number, direction: 'up' | 'down') => void
+    reorderItem: (from: number, to: number) => void
     addItem: () => void
 }) {
     const [openQuantityIdx, setOpenQuantityIdx] = useState<number | null>(null)
@@ -802,6 +904,43 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     // at least two items the toggle is hidden and we render the normal editor.
     const canReorder = items.length > 1
     const inReorder = reorderMode && canReorder
+
+    // dnd-kit needs a stable id per row that survives reorders. Items may lack
+    // an `id` (e.g. defaults not yet saved), so map each item object to a
+    // client-only drag id. Reordering splices the same object references, so
+    // ids stay put across a drag; edits create new objects (fine — not mid-drag).
+    const dragIdMap = useRef(new WeakMap<Item, string>())
+    const dragIdSeq = useRef(0)
+    const dragIdFor = (item: Item): string => {
+        let id = dragIdMap.current.get(item)
+        if (!id) {
+            id = `item-${dragIdSeq.current++}`
+            dragIdMap.current.set(item, id)
+        }
+        return id
+    }
+    const itemIds = items.map(dragIdFor)
+
+    // Split mouse/touch sensors so each platform gets the right activation:
+    //  - Mouse: a small distance threshold, so desktop drags start instantly
+    //    while taps on the sibling buttons still register as clicks.
+    //  - Touch: a press-and-hold delay, so an ordinary swipe scrolls the list
+    //    (and doesn't jump the page / toggle the mobile URL bar); only a
+    //    deliberate hold begins a drag. This is dnd-kit's recommended mobile
+    //    setup and is what fixes the touch jankiness.
+    //  - Keyboard: makes the drag operable without a pointer.
+    const sensors = useSensors(
+        useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    )
+    const handleDragEnd = (e: DragEndEvent) => {
+        const { active, over } = e
+        if (!over || active.id === over.id) return
+        const from = itemIds.indexOf(String(active.id))
+        const to = itemIds.indexOf(String(over.id))
+        if (from !== -1 && to !== -1) reorderItem(from, to)
+    }
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
             {items.length > 0 && (
@@ -824,43 +963,39 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
             )}
             {inReorder && (
                 <div className="text-[11px] text-gray-400 mb-2 px-0.5">
-                    Use the arrows to change the order, then tap Finish reordering.
+                    Drag the handle (press and hold on touch), or use the arrows, then tap Finish reordering.
                 </div>
             )}
             <div className="space-y-2">
-                {inReorder && items.map((item, itemIdx) => (
-                    <div key={itemIdx} className="flex items-center gap-2 rounded-lg border border-gray-200 p-2">
-                        <span className="flex-1 min-w-0 truncate text-sm text-gray-800 px-1">
-                            {item.text || <span className="text-gray-400 italic">Unnamed item</span>}
-                        </span>
-                        <div className="flex gap-1 shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => moveItem(itemIdx, 'up')}
-                                disabled={itemIdx === 0}
-                                className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${itemIdx === 0 ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
-                                title="Move item up"
-                                aria-label={`Move ${item.text || 'item'} up`}
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => moveItem(itemIdx, 'down')}
-                                disabled={itemIdx === items.length - 1}
-                                className={`inline-flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${itemIdx === items.length - 1 ? 'text-gray-200 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:bg-gray-50 active:bg-gray-100'}`}
-                                title="Move item down"
-                                aria-label={`Move ${item.text || 'item'} down`}
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                {inReorder && (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        modifiers={[restrictToVerticalAxis]}
+                        // Only ever auto-scroll the modal's own scroll area. The
+                        // modal doesn't lock body scroll, so without this dnd-kit
+                        // scrolls the whole window when a drag nears the screen
+                        // edge — which jumps the page and toggles the mobile URL
+                        // bar mid-drag.
+                        autoScroll={{ canScroll: (el) => el === scrollRef.current }}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-2">
+                                {items.map((item, itemIdx) => (
+                                    <SortableItemRow
+                                        key={itemIds[itemIdx]}
+                                        id={itemIds[itemIdx]}
+                                        item={item}
+                                        index={itemIdx}
+                                        isLast={itemIdx === items.length - 1}
+                                        moveItem={moveItem}
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                )}
                 {!inReorder && items.map((item, itemIdx) => (
                     <ItemEditorRow
                         key={itemIdx}
@@ -902,7 +1037,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onClose: () => void
 }) {
     const [text, setText] = useState(option?.text ?? '')
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem } = useItemListState(option?.items ?? [], people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem } = useItemListState(option?.items ?? [], people)
 
     const handleSave = () => onSave({
         id: option?.id ?? crypto.randomUUID(),
@@ -952,7 +1087,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
                     updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
-                    removeItem={removeItem} moveItem={moveItem} addItem={addItem}
+                    removeItem={removeItem} moveItem={moveItem} reorderItem={reorderItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
@@ -974,7 +1109,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
-    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, addItem } = useItemListState(initialItems, people)
+    const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem } = useItemListState(initialItems, people)
 
     return (
         <div
@@ -1006,7 +1141,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
                     scrollRef={scrollRef} updateItemText={updateItemText}
                     togglePerson={togglePerson} toggleCommunal={toggleCommunal}
                     updatePerNight={updatePerNight} updatePerNights={updatePerNights} updateMaxQuantity={updateMaxQuantity}
-                    removeItem={removeItem} moveItem={moveItem} addItem={addItem}
+                    removeItem={removeItem} moveItem={moveItem} reorderItem={reorderItem} addItem={addItem}
                 />
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2 justify-end">
                     <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">

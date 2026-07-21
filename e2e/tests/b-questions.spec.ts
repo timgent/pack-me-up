@@ -159,6 +159,53 @@ test.describe('B – Editing Questions', () => {
     await expect(itemTexts.nth(1)).toContainText(first)
   })
 
+  test('B7: reorder always-needed items by dragging the handle', async ({ freshPage: page }) => {
+    await setupWizardAndGoToQuestions(page)
+    await openAlwaysNeededModal(page)
+
+    const itemTexts = page.locator('.cursor-text')
+    const first = (await itemTexts.first().innerText()).split('\n')[0].trim()
+    const second = (await itemTexts.nth(1).innerText()).split('\n')[0].trim()
+    expect(first).not.toEqual(second)
+
+    await page.getByRole('button', { name: 'Reorder items' }).click()
+    const rows = page.locator('[data-reorder-row]')
+    await expect(rows.first()).toBeVisible()
+
+    // Drag the first row's handle down into the second row, just past its top
+    // edge (before its midpoint) so the item lands in exactly slot 1. Aiming
+    // deeper would cross the next row's midpoint and overshoot. Low-level mouse
+    // moves dispatch pointer events, driving the same code path as touch.
+    const handle = page.locator('button[title="Drag to reorder"]').first()
+    const hb = (await handle.boundingBox())!
+    const sb = (await rows.nth(1).boundingBox())!
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(hb.x + hb.width / 2, sb.y + 4, { steps: 10 })
+    await page.mouse.up()
+
+    // The drag reordered the two items (still in reorder mode, rows show plain text)
+    await expect(rows.first()).toContainText(second)
+    await expect(rows.nth(1)).toContainText(first)
+
+    // Leave reorder mode. dnd-kit suppresses the single click that immediately
+    // follows a drop, so retry until reorder mode actually exits (a real user
+    // never taps this fast; the suppression is invisible in practice).
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Finish reordering' }).click()
+      await expect(page.getByRole('button', { name: 'Reorder items' })).toBeVisible({ timeout: 1_000 })
+    }).toPass()
+    await expect(itemTexts.first()).toContainText(second)
+    await expect(itemTexts.nth(1)).toContainText(first)
+
+    // Persist and reopen — the dragged order must survive a save round-trip
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Always Needed Items' })).not.toBeVisible({ timeout: 3_000 })
+    await openAlwaysNeededModal(page)
+    await expect(itemTexts.first()).toContainText(second)
+    await expect(itemTexts.nth(1)).toContainText(first)
+  })
+
   test('B5: JSON editor mode toggle is not available (editor is always visual)', async ({ freshPage: page }) => {
     await setupWizardAndGoToQuestions(page)
     // The JSON editor toggle does not exist in the current UI
