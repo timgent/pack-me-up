@@ -1029,6 +1029,29 @@ function ItemListEditor({ items, people, allItemNames, scrollRef, updateItemText
     )
 }
 
+// Lock background page scroll while a modal is open. Besides being correct
+// modal behaviour, on mobile it keeps the page — and the browser's URL bar —
+// from moving while a drag is happening inside the modal, which was the source
+// of the touch-drag jank (dnd-kit's own auto-scroll is already confined to the
+// item list; this stops the window scrolling underneath it).
+function useBodyScrollLock() {
+    useEffect(() => {
+        const body = document.body
+        const html = document.documentElement
+        const prev = { body: body.style.overflow, html: html.style.overflow, overscroll: body.style.overscrollBehavior }
+        // Lock both — the scrolling element is <body> on some browsers and
+        // <html> on others (notably mobile) — and stop scroll chaining.
+        body.style.overflow = 'hidden'
+        html.style.overflow = 'hidden'
+        body.style.overscrollBehavior = 'none'
+        return () => {
+            body.style.overflow = prev.body
+            html.style.overflow = prev.html
+            body.style.overscrollBehavior = prev.overscroll
+        }
+    }, [])
+}
+
 function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     option: Option | null
     people: Person[]
@@ -1036,6 +1059,7 @@ function OptionEditModal({ option, people, allItemNames, onSave, onClose }: {
     onSave: (updated: Option) => void
     onClose: () => void
 }) {
+    useBodyScrollLock()
     const [text, setText] = useState(option?.text ?? '')
     const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem } = useItemListState(option?.items ?? [], people)
 
@@ -1109,6 +1133,7 @@ function AlwaysNeededModal({ initialItems, people, allItemNames, onSave, onClose
     onSave: (items: Item[]) => void
     onClose: () => void
 }) {
+    useBodyScrollLock()
     const { items, scrollRef, updateItemText, togglePerson, toggleCommunal, updatePerNight, updatePerNights, updateMaxQuantity, removeItem, moveItem, reorderItem, addItem } = useItemListState(initialItems, people)
 
     return (
