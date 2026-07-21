@@ -499,6 +499,23 @@ describe('saveRdfToPod', () => {
         )
     })
 
+    it('skips container creation and proceeds if caller lacks read access (403) on foreign pod', async () => {
+        const list = makePackingList('my-list')
+        const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
+        mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 403 }) // no read access to container
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+        await saveRdfToPod({
+            session: mockSession,
+            fileUrl: url,
+            data: list,
+            serializer: packingListToDataset,
+        })
+
+        expect(mockCreateContainerAt).not.toHaveBeenCalled()
+        expect(mockOverwriteFile).toHaveBeenCalledWith(url, expect.any(Blob), expect.any(Object))
+    })
+
     it('creates the parent container if it does not exist before writing', async () => {
         const list = makePackingList('my-list')
         const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`

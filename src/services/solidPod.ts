@@ -416,7 +416,10 @@ async function ensureContainerExists(session: Session, containerUrl: string): Pr
     try {
         await getSolidDataset(containerUrl, { fetch: session.fetch })
     } catch (err) {
-        if (getStatusCode(err) !== 404) throw err
+        const status = getStatusCode(err)
+        // No read access — assume the container exists and let the write reveal any real problem
+        if (status === 401 || status === 403) return
+        if (status !== 404) throw err
         try {
             await createContainerAt(containerUrl, { fetch: session.fetch })
         } catch (createErr) {
