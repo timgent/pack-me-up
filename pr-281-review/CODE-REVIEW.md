@@ -35,13 +35,14 @@ roughly this order:
 | 3 | Dark mode (`ThemeContext`, `index.html`, ~40 files of `dark:` classes) | Merge after fixing B1 and a contrast pass |
 | 4 | Navigation restructure + Solid provider picker rewrite | **Product decisions needed from you first** — see §3 |
 | 5 | `updateFromQuestions` rewrite | Needs its own review; highest regression risk in the PR |
-| 6 | Application Capability document + middleware | **Separate PR, own discussion** — see §5 |
+| 6 | Application Capability document + middleware | Split out; publishing it is agreed, merge after the follow-ups in §5 |
 
 Nothing here is malicious. I read `src/capability/document.ts` and `middleware.ts` in
 full specifically because a 415-line machine-readable "capability description" served
 to non-browser clients from an external contributor deserves that scrutiny. It is what
-it claims to be: an implementation of the dokieli Application Capability spec. It is
-still scope creep of an unusual kind and shouldn't ride in on a UI PR.
+it claims to be: an implementation of the dokieli Application Capability spec.
+Publishing one is something the maintainer is happy to do — it just needs to arrive as
+its own PR, with the gaps in §5 closed first.
 
 ---
 
@@ -380,36 +381,81 @@ it describes the app's capabilities, invocation URI templates, CSP/permission
 requirements and SHACL shapes, in JSON-LD and Turtle, served from `/` when a client
 explicitly asks for `application/ld+json` or `text/turtle`.
 
-It's well-built. The Accept parsing correctly refuses to let a bare `*/*` or a missing
-header trigger the RDF path, which is the mistake that would have broken every plain
-`curl` of the homepage. The RDFa component's comment explaining why it uses
-`<span content=…>` instead of `<meta>` (React 19 hoists `<meta>` into `<head>`, which
-would detach it from its `typeof` ancestor) is genuinely good reasoning.
+### What it's for
 
-That said, it does not belong in this PR:
+Worth stating plainly, because the value isn't visible from the diff. Solid's premise is
+that your data outlives any particular app. So when a pod browser is showing a resource
+typed `pmu:PackingList`, how does it know which apps can open it? Today: a hardcoded
+registry, or nothing. A capability description is the decentralised answer — each app
+publishes its own, and a client reads it and offers "Open with Pack Me Up." This is an
+interop feature aimed entirely at other software; it does nothing for a human using the
+app.
 
-- **It intercepts your production homepage.** `matcher: '/'`. If the middleware throws,
-  `/` is down. And per B8, it's the one file CI never type-checks.
-- **Tie-breaking favours RDF over the app.** `jsonldQ >= htmlQ` means a client sending
-  `Accept: application/ld+json, text/html` (both q=1) gets the capability document, not
-  the app. No mainstream browser does this, but link-preview bots, feed readers and
-  SDK-driven fetches are less predictable. Consider requiring a *strictly* higher q.
-- **Three hand-maintained copies of the same triples** (JSON-LD, Turtle, RDFa), with a
-  doc comment that says "If you change one, change the other." There's no test asserting
-  the JSON-LD and Turtle agree — that's the one test this design most needs.
-- **`APP_ORIGIN` is hardcoded** to `https://packmeup.tim-gent.com`, so every Vercel
-  preview deployment emits a `content-location` and subject IRIs pointing at production.
-- **The file admits it's unverified.** Its own header says network access to w3.org and
-  the ODRL/DPV vocabularies was blocked while it was written, and several terms are
-  flagged `unverified:` inline. Publishing machine-readable claims about your app that
-  the author couldn't check against the specs is a "later, deliberately" thing.
-- **It's a strategic choice, not a UI tweak.** Deciding that Pack Me Up publishes a
-  formal capability description is a product/architecture decision about the app's place
-  in the Solid ecosystem. It should be its own PR with its own conversation.
+### Status: agreed in principle
 
-Also worth noting: the middleware only runs on Vercel. It does nothing under
-`npm run dev`, `vite preview`, or the Capacitor mobile builds — so the feature is
-unexercised by every test path in the repo.
+**The maintainer is happy to publish a capability description.** So this isn't a
+should-we question any more — it's a split-it-out-and-finish-it one. The items below are
+the follow-up work, not objections.
+
+### It's well-built
+
+The Accept parsing correctly refuses to let a bare `*/*` or a missing header trigger the
+RDF path, which is the mistake that would have broken every plain `curl` of the
+homepage. The RDFa component's comment explaining why it uses `<span content=…>` instead
+of `<meta>` (React 19 hoists `<meta>` into `<head>`, which would detach it from its
+`typeof` ancestor) is genuinely good reasoning. The SHACL shapes are cross-checked
+against `rdfSerialization.ts` rather than invented.
+
+### Follow-ups before it merges
+
+1. **The headline capability isn't wired up.** The template for opening a specific list
+   is `#open-packing-list={open}`, and `open-packing-list` appears **nowhere in the app**
+   outside `document.ts` and its own test — verified by grep. The code comment admits it.
+   The other three templates (`#/wizard`, `#/manage-questions`, `#/create-packing-list`)
+   map to real routes in `App.tsx`, so three of four capabilities are genuinely
+   invocable — and the one that isn't is the one the entire interop story rests on. An
+   agent that discovers the description and follows it lands on a route that doesn't
+   exist. Either implement the hash route or drop that capability until it's real;
+   publishing a claim the app can't honour is worse than publishing nothing.
+
+2. **Nothing asserts the JSON-LD and Turtle agree.** *(Correcting an earlier draft of
+   this review, which said there were three hand-maintained copies — there are two.)*
+   `ApplicationCapabilityRdfa.tsx` **imports** the same objects that build
+   `CAPABILITY_JSONLD` (`APPLICATION`, `CAPABILITIES`, `INVOCATIONS`, `REQUIREMENTS`),
+   so the RDFa cannot structurally drift, and `ApplicationCapabilityRdfa.test.tsx`
+   verifies it matches. Only `CAPABILITY_TURTLE` is an independently hand-typed string.
+   That narrows the risk to exactly one seam — JSON-LD ↔ Turtle — which the module's own
+   doc comment flags ("If you change one, change the other") and which nothing enforces.
+   Parse both into RDF and compare the triple sets; it's the single highest-value test
+   this subsystem could have, and the one the maintainer has explicitly asked for.
+
+3. **`middleware.ts` is type-checked by nothing** (see B8). Fix before it gates the
+   production homepage, not after.
+
+4. **`APP_ORIGIN` is hardcoded** to `https://packmeup.tim-gent.com`, so every Vercel
+   preview deployment emits a `content-location` and subject IRIs pointing at
+   production. Derive it from the request.
+
+5. **Resolve the `unverified:` terms.** The file's own header says network access to
+   w3.org and the ODRL/DPV vocabularies was blocked while it was written, and several
+   terms are flagged inline. Worth a spec-in-hand pass before these are treated as
+   normative claims about the app.
+
+6. **Consider a strictly-higher-q tie-break.** `jsonldQ >= htmlQ` means a client sending
+   `Accept: application/ld+json, text/html` (both q=1) gets the capability document
+   rather than the app. No mainstream browser does this, but link-preview bots, feed
+   readers and SDK-driven fetches are less predictable, and the failure mode is a blank
+   homepage for whoever it hits.
+
+### Testing reality
+
+The middleware only runs on Vercel. It does nothing under `npm run dev`, `vite preview`,
+or the Capacitor mobile builds — manual testing confirmed the dev server simply 404s on
+`Accept: application/ld+json`. The negotiation logic was verified separately by importing
+the module with fake `Request` objects (11 Accept cases, all correct), but that was a
+throwaway probe. **Nothing in the repo exercises these ~500 lines.** Given the middleware
+sits in front of `/` in production, a small unit test over the Accept matrix belongs in
+the same follow-up as the Turtle/JSON-LD comparison.
 
 ---
 
@@ -445,19 +491,25 @@ Something along these lines:
 > the persistence conventions in CLAUDE.md without being told.
 >
 > The problem is size: at 77 files and 3.4k lines this is about six PRs, and the
-> description only covers the first two. I can't review the `updateFromQuestions`
-> rewrite properly while it's sitting underneath a dark mode change, and I'd want a
-> separate conversation about the Application Capability document before it goes near
-> the production homepage.
+> description only covers one of them. I can't review the `updateFromQuestions` rewrite
+> properly while it's sitting underneath a dark mode change.
 >
 > Could you split it? I'd happily take, in order: (1) past-trip folding + the card
 > rework, (2) profile photos, (3) dark mode. The navigation restructure and the provider
 > picker changes I'd like to talk through first — removing "Create List" from the nav
 > and dropping the "What is a Solid Pod?" explainer are product calls I want to think
-> about. The capability document should be its own PR.
+> about.
+>
+> On the Application Capability document — I'm glad to publish one, so please do send it
+> as its own PR. Two things it needs first: `#open-packing-list={open}` isn't actually
+> wired up to anything, so we'd be advertising a capability the app can't honour; and
+> there's nothing stopping the JSON-LD and the Turtle drifting apart. A test that parses
+> both and compares the triples would cover that.
 >
 > I've left specific bugs in a review — the dark mode toggle being overridden by the OS
-> and the profile photo map being keyed by name are the two I'd fix first.
+> and the profile photo map being keyed by name are the two I'd fix first. The avatar
+> also never applies the person's colour ring, which both the PR description and the
+> component's own comment say it does.
 
 ---
 
