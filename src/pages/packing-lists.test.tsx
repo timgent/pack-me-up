@@ -651,6 +651,77 @@ describe('PackingLists trip destination and dates', () => {
     })
 })
 
+describe('PackingLists during the login pod sync', () => {
+    const loggedInSession = { fetch: vi.fn() } as unknown as Session
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: loggedInSession,
+            webId: 'https://timgent.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        } as unknown as ReturnType<typeof useSolidPod>)
+        mockGetPrimaryPodUrl.mockResolvedValue('https://timgent.solidcommunity.net')
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderSyncing(lists: Record<string, unknown>[], loginSyncInProgress: boolean) {
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue(lists),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
+            } as unknown as PackingAppDatabase,
+            loginSyncVersion: 0,
+            loginSyncInProgress,
+        })
+        return renderComponent()
+    }
+
+    it('shows locally stored lists without waiting for the pod sync to finish', async () => {
+        renderSyncing([testPackingList], true)
+
+        expect(await screen.findByText(/Beach Trip/)).toBeTruthy()
+        expect(screen.queryByText('Loading packing lists...')).toBeNull()
+    })
+
+    it('flags that a pod sync is still running', async () => {
+        renderSyncing([testPackingList], true)
+
+        await screen.findByText(/Beach Trip/)
+        expect(screen.getByTestId('pod-sync-indicator')).toBeTruthy()
+    })
+
+    it('drops the indicator once the pod sync has finished', async () => {
+        renderSyncing([testPackingList], false)
+
+        await screen.findByText(/Beach Trip/)
+        expect(screen.queryByTestId('pod-sync-indicator')).toBeNull()
+    })
+
+    it('keeps waiting rather than claiming there are no lists while a fresh device is still filling up', async () => {
+        renderSyncing([], true)
+
+        await waitFor(() => {
+            expect(screen.getByRole('status').textContent).toContain('Loading packing lists...')
+        })
+        expect(screen.queryByText(/No packing lists found/i)).toBeNull()
+    })
+
+    it('reports an empty pod once the sync has finished', async () => {
+        renderSyncing([], false)
+
+        await waitFor(() => expect(screen.getByText(/No packing lists found/i)).toBeTruthy())
+    })
+})
+
 describe('PackingLists sync-across-devices prompt', () => {
     beforeEach(() => {
         sessionStorage.clear()

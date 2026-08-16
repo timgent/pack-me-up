@@ -663,6 +663,93 @@ describe('loadMultipleRdfFromPod', () => {
         expect(data).toHaveLength(0)
     })
 
+    it('fetches the files in parallel rather than one round trip at a time', async () => {
+        const urls = ['a', 'b', 'c'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
+        mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
+
+        let inFlight = 0
+        let peakInFlight = 0
+        const release: Array<() => void> = []
+
+        mockGetSolidDataset.mockImplementation((url: string) => {
+            if (url === LISTS_CONTAINER_URL) {
+                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+            }
+            inFlight++
+            peakInFlight = Math.max(peakInFlight, inFlight)
+            return new Promise(resolve => {
+                release.push(() => {
+                    inFlight--
+                    resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+                })
+            })
+        })
+
+        const pending = loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
+            (_ds, url) => ({ id: url, name: '', createdAt: '', items: [] }))
+
+        // Let the container listing settle so the file requests get issued.
+        await vi.waitFor(() => expect(release).toHaveLength(urls.length))
+
+        release.forEach(fn => fn())
+        const { data, result } = await pending
+
+        expect(peakInFlight).toBe(urls.length)
+        expect(result.successCount).toBe(urls.length)
+        expect(data).toHaveLength(urls.length)
+    })
+
+    it('keeps the loaded items in container order when the requests settle out of order', async () => {
+        const urls = ['first', 'second'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
+        mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
+
+        const resolvers = new Map<string, () => void>()
+        mockGetSolidDataset.mockImplementation((url: string) => {
+            if (url === LISTS_CONTAINER_URL) {
+                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+            }
+            return new Promise(resolve => {
+                resolvers.set(url, () => resolve({} as unknown as SolidDataset & WithServerResourceInfo))
+            })
+        })
+
+        const pending = loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
+            (_ds, url) => ({ id: url.split('/').pop()!.replace('.ttl', ''), name: '', createdAt: '', items: [] }))
+
+        await vi.waitFor(() => expect(resolvers.size).toBe(urls.length))
+
+        // Second file comes back first — the results must not follow arrival order.
+        resolvers.get(urls[1])!()
+        resolvers.get(urls[0])!()
+
+        const { data } = await pending
+
+        expect(data.map(l => l.id)).toEqual(['first', 'second'])
+    })
+
+    it('still reports the files that failed when others succeed', async () => {
+        const urls = ['ok', 'bad'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
+        mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
+
+        mockGetSolidDataset.mockImplementation((url: string) => {
+            if (url === LISTS_CONTAINER_URL) {
+                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+            }
+            if (url.endsWith('bad.ttl')) return Promise.reject({ statusCode: 500 })
+            return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+        })
+
+        const onError = vi.fn()
+        const { data, result } = await loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
+            (_ds, url) => ({ id: url, name: '', createdAt: '', items: [] }), onError)
+
+        expect(data).toHaveLength(1)
+        expect(result.successCount).toBe(1)
+        expect(result.failCount).toBe(1)
+        expect(result.success).toBe(false)
+        expect(onError).toHaveBeenCalledWith(urls[1], expect.anything())
+    })
+
     it('ignores non-ttl files', async () => {
         mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValueOnce([
