@@ -156,7 +156,13 @@ export function PackingLists() {
         }).catch(() => {})
     }, [packingLists, isLoggedIn, session])
 
-    if (isLoading || loginSyncInProgress) {
+    // The local PouchDB read is the only thing worth blocking on — it resolves in
+    // milliseconds. The pod sync runs for as long as the pod takes to answer, and
+    // the effect above re-fetches when loginSyncVersion bumps, so local lists can
+    // be shown straight away and quietly refreshed when the pod catches up. The
+    // one case that still has to wait is an empty device on first login: there is
+    // nothing local to show and "No packing lists found" would be a lie.
+    if (isLoading || (packingLists.length === 0 && loginSyncInProgress)) {
         // Keep the real header in place so only the list area changes when the
         // lists land.
         return (
@@ -182,6 +188,20 @@ export function PackingLists() {
                 </div>
                 <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
             </div>
+
+            {/* The lists below are the local copy; say so while the pod is still
+                being read, so anything that appears or changes makes sense. */}
+            {loginSyncInProgress && (
+                <div
+                    data-testid="pod-sync-indicator"
+                    role="status"
+                    aria-live="polite"
+                    className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-600"
+                >
+                    <span aria-hidden="true" className="loading-suitcase text-base leading-none">🧳</span>
+                    Checking your Pod for changes...
+                </div>
+            )}
 
             {/* Only worth asking once there is something to sync */}
             {packingLists.length > 0 && <SyncAcrossDevicesPrompt />}
