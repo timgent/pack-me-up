@@ -8,6 +8,11 @@
 
 ---
 
+> **Companion document:** `manual-testing/MANUAL-TEST-REPORT.md` — the branch driven by
+> hand in a real browser against a live Community Solid Server, with 64 screenshots.
+> It confirms `npm test` passes (1,493 tests, 83 files) and that the core mechanisms
+> work; most of what it adds to this review is dark-mode contrast evidence.
+
 ## Verdict
 
 **Do not merge as one unit.** The work is careful and mostly good — the comments are
@@ -149,19 +154,59 @@ navigation still pays the network cost.
 There's an existing pattern to follow — `useOwnerDisplayName` — worth reusing or
 generalising rather than adding a second uncached profile-fetching path.
 
-### B4 — Dark-mode Delete menu item has a permanent red background (typo)
-`src/pages/packing-lists.tsx` (Radix `DropdownMenu.Item` for Delete)
+### B4 — `dark:bg-` written where `dark:hover:bg-` was meant, 11 times across 7 files
+
+The clearest instance, `src/pages/packing-lists.tsx:262` (Radix `DropdownMenu.Item` for Delete):
 
 ```tsx
 className="... hover:bg-danger-50 dark:bg-danger-950/40 cursor-default outline-none"
 ```
 
-The Duplicate item above it correctly uses `dark:hover:bg-gray-800`. This one says
-`dark:bg-…`, not `dark:hover:bg-…`. In dark mode the Delete row is permanently
-red-tinted and has no hover feedback at all.
+The Duplicate item directly above it correctly uses `dark:hover:bg-gray-800`. This one
+says `dark:bg-…`. In dark mode the Delete row is permanently red-tinted and has no
+hover feedback at all.
+
+It's a systematic slip, not a one-off. Grepping `hover:bg-… dark:bg-…` across the
+branch finds 11:
+
+```
+src/components/SectionOrderEditor.tsx:96    hover:bg-primary-50 dark:bg-primary-950/40
+src/pages/backups.tsx:166                   hover:bg-danger-50  dark:bg-danger-950/40
+src/pages/packing-lists.tsx:262             hover:bg-danger-50  dark:bg-danger-950/40
+src/pages/questions-page.tsx:303,555,1132,1439,2038   hover:bg-primary-50 dark:bg-primary-950/40
+src/pages/wizard.tsx:288                    hover:bg-danger-50  dark:bg-danger-950/40
+src/pages/wizard.tsx:305,315                hover:bg-primary-50 dark:bg-primary-950/40
+```
+
+Every one of these renders a permanently tinted control in dark mode instead of a
+hover state. Manual testing confirmed the visible effect on the Delete item and the
+Add Question button. Worth a mechanical sweep for the pattern before merge.
+
+### B4b — Profile photos silently discard the person's colour
+`src/components/PersonAvatar.tsx:23-35`
+
+The `<img>` branch never uses the `color` prop:
+
+```tsx
+className={`rounded-full object-cover select-none shrink-0 ${dimensions}`}
+```
+
+No ring, no colour, anywhere. But the PR description says the photo is "ringed in their
+assigned colour", and the component's own doc comment says "(still ringed in their
+colour)". Both describe behaviour that isn't implemented.
+
+This matters more than a cosmetic slip, because the colour coding is the feature's whole
+premise — the comment right above it says "find your colour, that's your pile." Anyone
+with a profile photo drops out of that scheme entirely, and on a list for a family where
+some people have photos and some don't, the mark stops being readable as a legend.
+
+`PersonColor` already carries exactly what's needed (`ring: 'ring-blue-400'` etc. in
+`src/edit-questions/person-colors.ts:56-63`), so this is a `ring-2 ${colorRing}` away
+from matching its own documentation. No test covers it — `PersonAvatar.test.tsx` asserts
+the photo renders and that it falls back, but not that it's ringed.
 
 ### B5 — Dark-mode contrast: `bg-white/60` pills with `dark:text-gray-*` text
-`src/pages/packing-lists.tsx`, several places
+`src/pages/packing-lists.tsx`, `src/pages/foreign-packing-lists.tsx`, `src/pages/view-packing-list.tsx`
 
 The card badges kept `bg-white/60` while gaining `dark:text-gray-400` / `dark:text-gray-300`:
 
@@ -170,10 +215,25 @@ The card badges kept `bg-white/60` while gaining `dark:text-gray-400` / `dark:te
 ```
 
 In dark mode the pill is still a light translucent white, so the text goes from
-readable dark-grey-on-light to mid-grey-on-light. Same pattern on the date pill, the
-packed-count pill and the Rename button. These need `dark:bg-white/10` (or similar)
-alongside the text change. This is the kind of thing a manual dark-mode pass catches —
-see the companion manual test report.
+readable dark-grey-on-light to mid-grey-on-light. These need `dark:bg-white/10` (or
+similar) alongside the text change.
+
+Manual testing found this is worse in practice than it reads on paper — the whole
+packing-lists page is affected, and three of the symptoms are severe:
+
+- **Trip dates are completely invisible** in dark mode.
+- **The kebab menu button is invisible**, so the Duplicate/Delete actions are
+  undiscoverable.
+- **The progress track (`bg-white/40`) renders as a solid light bar**, so a list with
+  nothing packed *looks fully packed*. That's actively misleading, not just ugly.
+
+The same code is duplicated in `foreign-packing-lists.tsx`, and `view-packing-list.tsx`'s
+sticky progress strip (`bg-white/90`) is a white band across a dark page. Separately,
+`your-data.tsx` and `privacy-policy.tsx` are light cards with light text — on the page
+that explains what "Delete everything" destroys, the small print is effectively
+unreadable.
+
+Full evidence and screenshots in `manual-testing/MANUAL-TEST-REPORT.md`.
 
 ### B6 — A failed provider connection is still saved as "last used"
 `src/components/SolidProviderSelector.tsx:handleProviderSelect`
