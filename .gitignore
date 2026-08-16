@@ -40,3 +40,6 @@ android/local.properties
 *.njsproj
 *.sln
 *.sw?
+
+# Transient Claude Code agent worktrees
+.claude/worktrees/
