@@ -634,7 +634,30 @@ export interface SaveRdfToPodOptions<T> {
 }
 
 /**
+ * Last-seen ETag + deserialized result per URL, so a poll that finds nothing
+ * changed can skip both the RDF parse and the deserializer walk entirely.
+ *
+ * Module-level and unbounded: keyed by full URL, so switching pods just adds
+ * inert entries for the old one rather than serving stale data, and the
+ * number of distinct RDF resources a session polls is small.
+ */
+const lastSeenByUrl = new Map<string, { etag: string; result: unknown }>()
+
+/**
  * Loads an RDF dataset from a Pod URL and deserializes it via the provided function.
+ *
+ * Sends a conditional GET (`If-None-Match` against the ETag of whatever we
+ * last parsed from this URL) so a poll that finds nothing changed gets back
+ * a body-less 304 instead of the full resource. That matters because parsing
+ * a Turtle response into a SolidDataset is expensive for a graph of any real
+ * size — @inrupt/solid-client builds it by copying the accumulated
+ * graphs/subjects/predicates structure once per quad — and a page that polls
+ * on a timer (see `usePodSync`'s `pollInterval`) was paying that cost on
+ * every tick even when the pod hadn't changed since the last one. See
+ * docs/questions-page-mobile-performance.md for the investigation that found
+ * this. A 304 makes `getSolidDataset` throw (it treats any non-2xx as an
+ * error) before it ever reaches the parser, which is exactly the point —
+ * the cached result from last time is still correct and is returned instead.
  */
 export async function loadRdfFromPod<T>(
     session: Session | null,
@@ -642,10 +665,24 @@ export async function loadRdfFromPod<T>(
     deserializer: (dataset: SolidDataset, datasetUrl: string) => T
 ): Promise<T> {
     const fetchFn = session?.fetch ?? globalThis.fetch
+    const lastSeen = lastSeenByUrl.get(fileUrl)
+    let observedEtag: string | null = null
+    const conditionalFetch: typeof fetch = (input, init) => {
+        const headers = new Headers(init?.headers)
+        if (lastSeen) headers.set('If-None-Match', lastSeen.etag)
+        return fetchFn(input, { ...init, headers }).then(response => {
+            observedEtag = response.headers.get('etag')
+            return response
+        })
+    }
     try {
-        const dataset = await getSolidDataset(fileUrl, { fetch: fetchFn })
-        return deserializer(dataset, fileUrl)
+        const dataset = await getSolidDataset(fileUrl, { fetch: conditionalFetch })
+        const result = deserializer(dataset, fileUrl)
+        if (observedEtag) lastSeenByUrl.set(fileUrl, { etag: observedEtag, result })
+        else lastSeenByUrl.delete(fileUrl)
+        return result
     } catch (error: unknown) {
+        if (getStatusCode(error) === 304 && lastSeen) return lastSeen.result as T
         if (session && isAuthenticationError(error)) handlePodError(error)
         throw error
     }
