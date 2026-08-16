@@ -701,14 +701,26 @@ export async function loadMultipleRdfFromPod<T>(
         return { data: [], result: { success: true, successCount: 0, failCount: 0, totalCount: 0 } }
     }
 
+    // Load all files in parallel for faster sync — one round trip per list adds
+    // up to a long wait on login for anyone with more than a handful of lists.
+    // Settled results stay in ttlUrls order, so the caller sees container order
+    // regardless of which responses arrive first.
+    const settled = await Promise.allSettled(
+        ttlUrls.map(fileUrl => getSolidDataset(fileUrl, { fetch: session.fetch }))
+    )
+
     const loadedData: T[] = []
     let successCount = 0
     let failCount = 0
 
-    for (const fileUrl of ttlUrls) {
+    for (let i = 0; i < settled.length; i++) {
+        const outcome = settled[i]
+        const fileUrl = ttlUrls[i]
         try {
-            const fileDataset = await getSolidDataset(fileUrl, { fetch: session.fetch })
-            loadedData.push(deserializer(fileDataset, fileUrl))
+            if (outcome.status === 'rejected') throw outcome.reason
+            // Deserialization stays inside the try: a malformed file must count
+            // as one failure, not abandon the rest of the container.
+            loadedData.push(deserializer(outcome.value, fileUrl))
             successCount++
         } catch (error: unknown) {
             if (isAuthenticationError(error)) handlePodError(error)
