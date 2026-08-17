@@ -705,6 +705,73 @@ export function datasetToSharedListsWithMe(dataset: SolidDataset, datasetUrl: st
     return { lists, lastModified }
 }
 
+// ── DeletedPackingLists ───────────────────────────────────────────────────────
+
+export interface PackingListDeletion {
+    listId: string
+    deletedAt: string
+}
+
+/**
+ * Tombstones for packing lists the user has deleted.
+ *
+ * Without these, a device holding a list the pod does not have cannot tell a
+ * list deleted on another device from one it has never uploaded, so login sync
+ * uploads it again and the delete undoes itself everywhere.
+ */
+export interface DeletedPackingLists {
+    deletions: PackingListDeletion[]
+    lastModified: string
+}
+
+export function deletedPackingListsToDataset(data: DeletedPackingLists, datasetUrl: string): SolidDataset {
+    let ds = createSolidDataset()
+
+    let rootBuilder = buildThing({ url: datasetUrl })
+        .addUrl(RDF.type, PMU.DeletedPackingLists)
+        .addDatetime(DCTERMS.modified, new Date(data.lastModified))
+
+    for (let i = 0; i < data.deletions.length; i++) {
+        const deletion = data.deletions[i]
+        const deletionUrl = `${datasetUrl}#deletion-${i}`
+        rootBuilder = rootBuilder.addUrl(PMU.hasPackingListDeletion, deletionUrl)
+
+        ds = setThing(
+            ds,
+            buildThing({ url: deletionUrl })
+                .addUrl(RDF.type, PMU.PackingListDeletion)
+                .addStringNoLocale(PMU.deletedListId, deletion.listId)
+                .addDatetime(PMU.listDeletedAt, new Date(deletion.deletedAt))
+                .build()
+        )
+    }
+
+    return setThing(ds, rootBuilder.build())
+}
+
+export function datasetToDeletedPackingLists(dataset: SolidDataset, datasetUrl: string): DeletedPackingLists {
+    const rootThing = getThing(dataset, datasetUrl)
+    if (!rootThing) throw new Error(`No root Thing at ${datasetUrl}`)
+
+    const lastModified = getDatetime(rootThing, DCTERMS.modified)?.toISOString() ?? new Date().toISOString()
+    const deletionUrls = getUrlAll(rootThing, PMU.hasPackingListDeletion)
+
+    const deletions: PackingListDeletion[] = deletionUrls
+        .map(url => {
+            const t = getThing(dataset, url)
+            if (!t) return null
+            const listId = getStringNoLocale(t, PMU.deletedListId)
+            const deletedAt = getDatetime(t, PMU.listDeletedAt)?.toISOString()
+            // A tombstone with no id or no time cannot be acted on — dropping it
+            // is safer than inventing a value that could delete the wrong list.
+            if (!listId || !deletedAt) return null
+            return { listId, deletedAt }
+        })
+        .filter((d): d is PackingListDeletion => d !== null)
+
+    return { deletions, lastModified }
+}
+
 function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
     const thing = getThing(dataset, url)
     if (!thing) return null

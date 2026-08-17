@@ -38,7 +38,10 @@ vi.mock('../services/solidPod', () => ({
     getCollaborators: vi.fn().mockResolvedValue([]),
     isPubliclyAccessible: vi.fn().mockResolvedValue(false),
     friendlyPodName: vi.fn((url: string) => url),
-    POD_CONTAINERS: { PACKING_LISTS: '/packing-lists/' },
+    getPodOwnerName: vi.fn().mockResolvedValue(null),
+    resolveOwnerDisplayName: vi.fn((_name: string | null, _webId: string | null, podUrl: string) => podUrl),
+    buildSharedListPath: vi.fn((id: string, podUrl: string) => `/view-lists/${id}?pod=${podUrl}`),
+    POD_CONTAINERS: { PACKING_LISTS: '/packing-lists/', DELETED_PACKING_LISTS: '/deleted-packing-lists.ttl' },
     POD_ERROR_MESSAGES: {
         NOT_LOGGED_IN: 'Not logged in',
         NOT_LOGGED_IN_LOAD: 'Not logged in to load',
@@ -290,7 +293,29 @@ describe('PackingLists delete confirmation', () => {
         fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
         await waitFor(() => {
-            expect(db.deletePackingList).toHaveBeenCalledWith('list-1')
+            // The tombstone is the point: without it another device that still
+            // holds this list uploads it back on its next login sync.
+            expect(db.deletePackingList).toHaveBeenCalledWith('list-1', { recordDeletion: true })
+        })
+    })
+
+    it('does not tombstone a list that is only a cached copy of a shared one', async () => {
+        const db = makeDb()
+        db.getAllPackingLists = vi.fn().mockResolvedValue([
+            { ...testList, sharedFromPodUrl: 'https://someone-else.example/' },
+        ])
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByText('🗑️ Delete'))
+        await screen.findByText(/cannot be undone/i)
+        fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+
+        await waitFor(() => {
+            expect(db.deletePackingList).toHaveBeenCalledWith('list-1', { recordDeletion: false })
         })
     })
 })

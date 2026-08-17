@@ -5,8 +5,9 @@ const { getAgentAccessAll, setPublicAccess, getPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
-import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe, datasetToSharedListsWithMe } from './rdfSerialization'
-import type { SharedWithMeList, SharedListsWithMe } from './rdfSerialization'
+import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe, datasetToSharedListsWithMe, deletedPackingListsToDataset, datasetToDeletedPackingLists } from './rdfSerialization'
+import type { SharedWithMeList, SharedListsWithMe, DeletedPackingLists } from './rdfSerialization'
+import { deletionsById, emptyDeletedPackingLists, isNewerThanDeletion, mergeDeletedPackingLists, pruneDeletions, registriesEqual, withoutDeletion } from '../utils/packingListDeletions'
 
 /**
  * Pod container paths under the user's Pod root
@@ -20,6 +21,7 @@ export const POD_CONTAINERS = {
     BACKUPS: 'pack-me-up/backups/',
     SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',
     SHARED_LISTS_WITH_ME: 'pack-me-up/shared-lists-with-me.ttl',
+    DELETED_PACKING_LISTS: 'pack-me-up/deleted-packing-lists.ttl',
 } as const
 
 /**
@@ -1011,6 +1013,8 @@ export interface SyncAllResult {
     packingListsSynced: number
     /** number of local-only packing lists uploaded to pod */
     packingListsUploaded: number
+    /** number of local packing lists removed because they were deleted elsewhere */
+    packingListsDeleted: number
     /** true if the shared-with-me list was synced from pod */
     sharedWithMeSynced: boolean
     /** true if the shared-lists-with-me list was synced from pod */
@@ -1024,7 +1028,14 @@ export interface SyncAllResult {
  *   strategy). If no local copy exists, the pod data is always saved.
  * - Packing lists: all lists present on the pod are saved locally (pod wins for
  *   any conflicting IDs). Local-only lists (not yet on the pod) are uploaded so
- *   data is never lost.
+ *   data is never lost — unless they carry a deletion tombstone, in which case
+ *   they are removed locally instead. Without that check "deleted on the other
+ *   device" and "not uploaded yet" look identical from here, and every device
+ *   still holding a copy puts it back.
+ * - Deletion tombstones: the pod and local registries are merged (union, latest
+ *   wins per list) and written back to both, so a deletion made on any device
+ *   reaches all of them. A list whose `lastModified` is newer than its tombstone
+ *   has been resurrected deliberately, so the tombstone is dropped instead.
  *
  * 404 responses are treated as "no data" and handled gracefully.
  * Authentication errors (401/403) are re-thrown immediately.
@@ -1039,13 +1050,15 @@ export async function syncAllDataFromPod(
     let questionSetSynced = false
     let packingListsSynced = 0
     let packingListsUploaded = 0
+    let packingListsDeleted = 0
     let sharedWithMeSynced = false
     let sharedListsWithMeSynced = false
 
     const containerUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}`
+    const deletionsUrl = `${podUrl}${POD_CONTAINERS.DELETED_PACKING_LISTS}`
 
-    // ── Download question set and packing lists in parallel ──────────────────
-    const [podQsResult, podListsResult] = await Promise.allSettled([
+    // ── Download question set, packing lists and tombstones in parallel ──────
+    const [podQsResult, podListsResult, podDeletionsResult] = await Promise.allSettled([
         loadRdfFromPod<PackingListQuestionSet>(
             session,
             `${podUrl}${POD_CONTAINERS.QUESTIONS}`,
@@ -1055,6 +1068,11 @@ export async function syncAllDataFromPod(
             session,
             containerUrl,
             datasetToPackingList,
+        ),
+        loadRdfFromPod<DeletedPackingLists>(
+            session,
+            deletionsUrl,
+            datasetToDeletedPackingLists,
         ),
     ])
 
@@ -1091,32 +1109,100 @@ export async function syncAllDataFromPod(
         // 404 = no question set on pod yet → silently skip
     }
 
-    // ── 2. Packing lists ─────────────────────────────────────────────────────
+    // ── 2. Deletion tombstones ───────────────────────────────────────────────
+    // Read before the lists are reconciled: which lists survive depends on them.
+    let podDeletions = emptyDeletedPackingLists()
+    if (podDeletionsResult.status === 'fulfilled') {
+        podDeletions = podDeletionsResult.value
+    } else {
+        const err = podDeletionsResult.reason
+        if (err instanceof AuthenticationError) throw err
+        const status = getStatusCode(err)
+        if (status !== 404) {
+            console.error('syncAllDataFromPod: error loading deleted packing lists', err)
+        }
+        // 404 = nothing deleted on this pod yet → empty registry
+    }
+
+    let localDeletions = emptyDeletedPackingLists()
+    try {
+        localDeletions = await db.getDeletedPackingLists()
+    } catch (err) {
+        console.error('syncAllDataFromPod: error loading local deleted packing lists', err)
+    }
+
+    let deletions = pruneDeletions(mergeDeletedPackingLists(localDeletions, podDeletions))
+
+    // ── 3. Packing lists ─────────────────────────────────────────────────────
     if (podListsResult.status === 'rejected') {
         const err = podListsResult.reason
         if (err instanceof AuthenticationError) throw err
         console.error('syncAllDataFromPod: error loading packing lists', err)
-        return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced, sharedListsWithMeSynced }
+        return { questionSetSynced, packingListsSynced, packingListsUploaded, packingListsDeleted, sharedWithMeSynced, sharedListsWithMeSynced }
     }
 
     const { data: podLists } = podListsResult.value
     const podListIds = new Set(podLists.map((l) => l.id))
 
-    // Save all pod lists to local DB in parallel (pod wins for conflicting IDs)
+    // A list still on the pod but tombstoned was deleted on another device
+    // before this one uploaded it back, or while this device was offline. Take
+    // the pod copy down too, unless it is newer than the tombstone — that means
+    // it was edited after the delete, so the edit wins and the tombstone goes.
+    const listsToSaveLocally: PackingList[] = []
+    for (const podList of podLists) {
+        const deletedAt = deletionsById(deletions).get(podList.id)
+        if (deletedAt === undefined) {
+            listsToSaveLocally.push(podList)
+            continue
+        }
+        if (isNewerThanDeletion(podList, deletedAt)) {
+            deletions = withoutDeletion(deletions, podList.id)
+            listsToSaveLocally.push(podList)
+            continue
+        }
+        try {
+            await deleteFileFromPod(session, `${containerUrl}${podList.id}.ttl`)
+            podListIds.delete(podList.id)
+        } catch (err) {
+            if (err instanceof AuthenticationError) throw err
+            console.error(`syncAllDataFromPod: error removing deleted list ${podList.id} from pod`, err)
+        }
+    }
+
+    // Save the surviving pod lists to local DB in parallel (pod wins for conflicting IDs)
     const saveResults = await Promise.allSettled(
-        podLists.map(podList => db.savePackingList({ ...podList, _rev: undefined }))
+        listsToSaveLocally.map(podList => db.savePackingList({ ...podList, _rev: undefined }))
     )
     for (let i = 0; i < saveResults.length; i++) {
         if (saveResults[i].status === 'fulfilled') {
             packingListsSynced++
         } else {
-            console.error(`syncAllDataFromPod: error saving packing list ${podLists[i].id}`, (saveResults[i] as PromiseRejectedResult).reason)
+            console.error(`syncAllDataFromPod: error saving packing list ${listsToSaveLocally[i].id}`, (saveResults[i] as PromiseRejectedResult).reason)
         }
     }
 
-    // Upload any local-only lists to the pod so they are not lost
     const localLists = await db.getAllPackingLists()
+    const deletedAtById = deletionsById(deletions)
     for (const localList of localLists) {
+        // A cached copy of somebody else's shared list is not ours to delete or
+        // to tombstone; its id lives in their pod.
+        const deletedAt = localList.sharedFromPodUrl ? undefined : deletedAtById.get(localList.id)
+
+        // Deleted elsewhere and not edited since: this copy is what would have
+        // been re-uploaded, so remove it instead of putting it back.
+        if (deletedAt !== undefined && !isNewerThanDeletion(localList, deletedAt)) {
+            try {
+                // The tombstone already exists — recording it again would only
+                // push its timestamp forward past any concurrent edit.
+                await db.deletePackingList(localList.id, { recordDeletion: false })
+                packingListsDeleted++
+            } catch (err) {
+                console.error(`syncAllDataFromPod: error deleting local list ${localList.id}`, err)
+            }
+            continue
+        }
+
+        // Upload any local-only lists to the pod so they are not lost
         if (podListIds.has(localList.id)) continue
         try {
             await saveRdfToPod({
@@ -1132,7 +1218,26 @@ export async function syncAllDataFromPod(
         }
     }
 
-    // ── 3. SharedWithMe ──────────────────────────────────────────────────────
+    // Write the merged registry back to both sides so the next sync on any
+    // device — this one included — starts from the same set of tombstones.
+    try {
+        if (!registriesEqual(deletions, localDeletions)) {
+            await db.saveDeletedPackingLists(deletions)
+        }
+        if (!registriesEqual(deletions, podDeletions)) {
+            await saveRdfToPod({
+                session,
+                fileUrl: deletionsUrl,
+                data: deletions,
+                serializer: deletedPackingListsToDataset,
+            })
+        }
+    } catch (err) {
+        if (err instanceof AuthenticationError) throw err
+        console.error('syncAllDataFromPod: error saving deleted packing lists', err)
+    }
+
+    // ── 4. SharedWithMe ──────────────────────────────────────────────────────
     try {
         const podSwm = await loadRdfFromPod<SharedWithMeList>(
             session,
@@ -1154,7 +1259,7 @@ export async function syncAllDataFromPod(
         // 404 = no shared-with-me yet → silently skip
     }
 
-    // ── 4. SharedListsWithMe ─────────────────────────────────────────────────
+    // ── 5. SharedListsWithMe ─────────────────────────────────────────────────
     try {
         const podSlwm = await loadRdfFromPod<SharedListsWithMe>(
             session,
@@ -1176,5 +1281,5 @@ export async function syncAllDataFromPod(
         // 404 = no shared-lists-with-me yet → silently skip
     }
 
-    return { questionSetSynced, packingListsSynced, packingListsUploaded, sharedWithMeSynced, sharedListsWithMeSynced }
+    return { questionSetSynced, packingListsSynced, packingListsUploaded, packingListsDeleted, sharedWithMeSynced, sharedListsWithMeSynced }
 }

@@ -26,7 +26,9 @@ import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
 import type { PackingListQuestionSet } from '../edit-questions/types'
 import type { PackingList } from '../create-packing-list/types'
-import { packingListToDataset, questionSetToDataset } from './rdfSerialization'
+import { packingListToDataset, questionSetToDataset, deletedPackingListsToDataset } from './rdfSerialization'
+import type { DeletedPackingLists } from './rdfSerialization'
+import { emptyDeletedPackingLists } from '../utils/packingListDeletions'
 import { fullyPopulatedPackingList, withoutLocalOnlyFields } from '../test-utils/fullyPopulatedFixtures'
 
 // Most tests here use a stubbed db (see makeDb); the field-fidelity test uses a
@@ -259,9 +261,11 @@ function makePackingList(id: string, overrides: Partial<PackingList> = {}): Pack
 function makeDb(overrides: Partial<{
     questionSet: PackingListQuestionSet | null
     packingLists: PackingList[]
+    deletions: DeletedPackingLists
 }> = {}): PackingAppDatabase {
     const questionSet = overrides.questionSet !== undefined ? overrides.questionSet : null
     const packingLists = overrides.packingLists ?? []
+    const deletions = overrides.deletions ?? emptyDeletedPackingLists()
 
     return {
         getQuestionSet: vi.fn().mockImplementation(() =>
@@ -273,6 +277,8 @@ function makeDb(overrides: Partial<{
         getAllPackingLists: vi.fn().mockResolvedValue(packingLists),
         savePackingList: vi.fn().mockResolvedValue({ rev: 'rev-pl' }),
         deletePackingList: vi.fn().mockResolvedValue(undefined),
+        getDeletedPackingLists: vi.fn().mockResolvedValue(deletions),
+        saveDeletedPackingLists: vi.fn().mockResolvedValue({ rev: 'rev-del' }),
     } as unknown as PackingAppDatabase
 }
 
@@ -290,10 +296,42 @@ function makeRdfListDataset(list: PackingList) {
     return packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
 }
 
-function makeContainerDataset(fileUrls: string[]) {
-    const ds = {} as SolidDataset & WithServerResourceInfo
-    mockGetContainedResourceUrlAll.mockReturnValueOnce(fileUrls)
-    return ds
+const DELETIONS_URL = `${POD_URL}${POD_CONTAINERS.DELETED_PACKING_LISTS}`
+
+const EMPTY_DATASET = {} as SolidDataset & WithServerResourceInfo
+
+/**
+ * Answers getSolidDataset by URL rather than by call order.
+ *
+ * syncAllDataFromPod asks for the question set, the packing-list container and
+ * the deletion tombstones concurrently, so a queue of mockResolvedValueOnce
+ * hands each result to whichever request happens to go first — adding a fourth
+ * read would silently re-point the other three. Anything not listed here (a
+ * missing question set, an absent tombstone file) answers 404, which is what a
+ * pod without that resource does.
+ */
+function stubPod(contents: {
+    questionSet?: PackingListQuestionSet
+    lists?: PackingList[]
+    deletions?: DeletedPackingLists
+}) {
+    const { questionSet, lists = [], deletions } = contents
+    mockGetContainedResourceUrlAll.mockReturnValue(lists.map(l => `${LISTS_CONTAINER_URL}${l.id}.ttl`))
+    mockGetSolidDataset.mockImplementation(async (url: string) => {
+        if (url === QUESTIONS_URL) {
+            if (!questionSet) throw { statusCode: 404 }
+            return makeRdfQsDataset(questionSet)
+        }
+        if (url === DELETIONS_URL) {
+            if (!deletions) throw { statusCode: 404 }
+            return deletedPackingListsToDataset(deletions, DELETIONS_URL) as unknown as SolidDataset & WithServerResourceInfo
+        }
+        const list = lists.find(l => `${LISTS_CONTAINER_URL}${l.id}.ttl` === url)
+        if (list) return makeRdfListDataset(list)
+        // The list container itself, and the container probes ensureContainerExists
+        // makes before a write.
+        return EMPTY_DATASET
+    })
 }
 
 describe('syncAllDataFromPod', () => {
@@ -373,18 +411,9 @@ describe('syncAllDataFromPod', () => {
 
     describe('packing lists sync', () => {
         it('saves all pod packing lists to local DB', async () => {
-            const podList1 = makePackingList('list-1')
-            const podList2 = makePackingList('list-2')
             const db = makeDb({ questionSet: null, packingLists: [] })
 
-            const list1Url = `${LISTS_CONTAINER_URL}list-1.ttl`
-            const list2Url = `${LISTS_CONTAINER_URL}list-2.ttl`
-
-            mockGetSolidDataset
-                .mockRejectedValueOnce({ statusCode: 404 }) // no question set
-                .mockResolvedValueOnce(makeContainerDataset([list1Url, list2Url]))
-                .mockResolvedValueOnce(makeRdfListDataset(podList1))
-                .mockResolvedValueOnce(makeRdfListDataset(podList2))
+            stubPod({ lists: [makePackingList('list-1'), makePackingList('list-2')] })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
@@ -396,11 +425,7 @@ describe('syncAllDataFromPod', () => {
             const localOnlyList = makePackingList('local-only')
             const db = makeDb({ questionSet: null, packingLists: [localOnlyList] })
 
-            mockGetSolidDataset
-                .mockRejectedValueOnce({ statusCode: 404 }) // no question set
-                .mockResolvedValueOnce(makeContainerDataset([])) // empty container
-                .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // ensureContainerExists in saveRdfToPod
-
+            stubPod({ lists: [] })
             mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
@@ -414,18 +439,10 @@ describe('syncAllDataFromPod', () => {
         })
 
         it('returns correct counts when both pod and local lists exist', async () => {
-            const podList = makePackingList('pod-list')
             const localOnlyList = makePackingList('local-only')
             const db = makeDb({ questionSet: null, packingLists: [localOnlyList] })
 
-            const podListUrl = `${LISTS_CONTAINER_URL}pod-list.ttl`
-
-            mockGetSolidDataset
-                .mockRejectedValueOnce({ statusCode: 404 }) // no question set
-                .mockResolvedValueOnce(makeContainerDataset([podListUrl]))
-                .mockResolvedValueOnce(makeRdfListDataset(podList))
-                .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // ensureContainerExists in saveRdfToPod
-
+            stubPod({ lists: [makePackingList('pod-list')] })
             mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
@@ -440,18 +457,158 @@ describe('syncAllDataFromPod', () => {
         it('keeps every pod-serialisable field of a synced list in the local DB', async () => {
             const podList: PackingList = { ...fullyPopulatedPackingList, id: 'pod-full' }
             const realDb = PackingAppDatabase.getInstance('sync-field-fidelity')
-            const podListUrl = `${LISTS_CONTAINER_URL}pod-full.ttl`
 
-            mockGetSolidDataset
-                .mockRejectedValueOnce({ statusCode: 404 }) // no question set
-                .mockResolvedValueOnce(makeContainerDataset([podListUrl]))
-                .mockResolvedValueOnce(makeRdfListDataset(podList))
+            stubPod({ lists: [podList] })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, realDb)
 
             expect(result.packingListsSynced).toBe(1)
             const stored = await realDb.getPackingList('pod-full')
             expect(stored).toEqual({ ...withoutLocalOnlyFields(podList), _rev: expect.any(String) })
+        })
+    })
+
+    // A list deleted on one device used to come back everywhere, because a device
+    // that still held it saw "on this device, not on the pod" and uploaded it.
+    describe('deleted packing lists', () => {
+        // Relative to now, not fixed dates: tombstones older than the retention
+        // window are pruned, so hard-coded ones quietly stop being tombstones.
+        const beforeDelete = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        const deletedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+        const afterDelete = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+
+        function makeDeletions(...ids: string[]): DeletedPackingLists {
+            return { deletions: ids.map(listId => ({ listId, deletedAt })), lastModified: deletedAt }
+        }
+
+        it('does not re-upload a local list the pod says was deleted', async () => {
+            const deletedList = makePackingList('deleted-list', { lastModified: beforeDelete })
+            const db = makeDb({ questionSet: null, packingLists: [deletedList] })
+
+            stubPod({ lists: [], deletions: makeDeletions('deleted-list') })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(mockOverwriteFile).not.toHaveBeenCalledWith(
+                expect.stringContaining('deleted-list.ttl'),
+                expect.anything(),
+                expect.anything()
+            )
+            expect(result.packingListsUploaded).toBe(0)
+        })
+
+        it('removes the local copy of a list deleted on another device', async () => {
+            const deletedList = makePackingList('deleted-list', { lastModified: beforeDelete })
+            const db = makeDb({ questionSet: null, packingLists: [deletedList] })
+
+            stubPod({ lists: [], deletions: makeDeletions('deleted-list') })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.deletePackingList).toHaveBeenCalledWith('deleted-list', { recordDeletion: false })
+            expect(result.packingListsDeleted).toBe(1)
+        })
+
+        it('leaves lists without a tombstone alone', async () => {
+            const keptList = makePackingList('kept-list')
+            const db = makeDb({ questionSet: null, packingLists: [keptList] })
+
+            stubPod({ lists: [], deletions: makeDeletions('some-other-list') })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.deletePackingList).not.toHaveBeenCalled()
+            expect(result.packingListsUploaded).toBe(1)
+        })
+
+        it('keeps a cached shared list even when its id is tombstoned', async () => {
+            const sharedList = makePackingList('shared-list', {
+                lastModified: beforeDelete,
+                sharedFromPodUrl: 'https://someone-else.example/',
+            })
+            const db = makeDb({ questionSet: null, packingLists: [sharedList] })
+
+            stubPod({ lists: [], deletions: makeDeletions('shared-list') })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.deletePackingList).not.toHaveBeenCalled()
+            expect(result.packingListsDeleted).toBe(0)
+        })
+
+        it('takes a tombstoned list off the pod as well', async () => {
+            const podList = makePackingList('deleted-list', { lastModified: beforeDelete })
+            const db = makeDb({ questionSet: null, packingLists: [] })
+
+            stubPod({ lists: [podList], deletions: makeDeletions('deleted-list') })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(mockDeleteFile).toHaveBeenCalledWith(
+                `${LISTS_CONTAINER_URL}deleted-list.ttl`,
+                expect.objectContaining({ fetch: mockSession.fetch })
+            )
+            expect(db.savePackingList).not.toHaveBeenCalled()
+            expect(result.packingListsSynced).toBe(0)
+        })
+
+        // Deleting is not final: a copy edited after the delete is the user
+        // coming back to the list, and must not be deleted a second time.
+        it('keeps a list edited after it was deleted, and drops the tombstone', async () => {
+            const revivedList = makePackingList('revived-list', { lastModified: afterDelete })
+            const db = makeDb({ questionSet: null, packingLists: [], deletions: makeDeletions('revived-list') })
+
+            stubPod({ lists: [revivedList], deletions: makeDeletions('revived-list') })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(mockDeleteFile).not.toHaveBeenCalled()
+            expect(result.packingListsSynced).toBe(1)
+            expect(db.saveDeletedPackingLists).toHaveBeenCalledWith(
+                expect.objectContaining({ deletions: [] })
+            )
+        })
+
+        it('pushes local tombstones the pod has not seen', async () => {
+            const db = makeDb({ questionSet: null, packingLists: [], deletions: makeDeletions('deleted-here') })
+
+            stubPod({ lists: [] })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(mockOverwriteFile).toHaveBeenCalledWith(
+                DELETIONS_URL,
+                expect.any(Blob),
+                expect.objectContaining({ fetch: mockSession.fetch, contentType: 'text/turtle' })
+            )
+        })
+
+        it('saves pod tombstones locally so the next sync starts from them', async () => {
+            const db = makeDb({ questionSet: null, packingLists: [] })
+
+            stubPod({ lists: [], deletions: makeDeletions('deleted-elsewhere') })
+
+            await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.saveDeletedPackingLists).toHaveBeenCalledWith(
+                expect.objectContaining({ deletions: [{ listId: 'deleted-elsewhere', deletedAt }] })
+            )
+        })
+
+        it('syncs normally when the pod has no tombstone file yet', async () => {
+            const db = makeDb({ questionSet: null, packingLists: [] })
+
+            stubPod({ lists: [makePackingList('list-1')] })
+
+            const result = await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(result.packingListsSynced).toBe(1)
+            expect(result.packingListsDeleted).toBe(0)
         })
     })
 })

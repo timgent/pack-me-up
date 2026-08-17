@@ -192,7 +192,9 @@ export function SharingSettingsPage() {
                 lists: existing.lists.filter(l => l.listId !== listId),
                 lastModified: new Date().toISOString(),
             })
-            await db.deletePackingList(listId).catch(() => {})
+            // Only the local cache of the owner's list goes; their id is not
+            // ours to tombstone, and they may share it with us again.
+            await db.deletePackingList(listId, { recordDeletion: false }).catch(() => {})
             showToast('Removed', 'success')
         } catch (err) {
             const details = reportError(err, 'SharingSettingsPage: failed to remove shared list')

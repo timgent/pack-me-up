@@ -115,6 +115,17 @@ export const PMU = {
     sharedLabel: `${PMU_NS}sharedLabel`,
     sharedAddedAt: `${PMU_NS}sharedAddedAt`,
 
+    // DeletedPackingLists classes. A deleted list leaves a tombstone rather than
+    // simply vanishing: a device that still holds a copy has no other way to
+    // tell "deleted elsewhere" from "not uploaded yet", and would re-upload it.
+    DeletedPackingLists: `${PMU_NS}DeletedPackingLists`,
+    PackingListDeletion: `${PMU_NS}PackingListDeletion`,
+
+    // DeletedPackingLists predicates
+    hasPackingListDeletion: `${PMU_NS}hasPackingListDeletion`,
+    deletedListId: `${PMU_NS}deletedListId`,
+    listDeletedAt: `${PMU_NS}listDeletedAt`,
+
     // SharedListsWithMe classes
     SharedListContext: `${PMU_NS}SharedListContext`,
     SharedListsWithMe: `${PMU_NS}SharedListsWithMe`,
