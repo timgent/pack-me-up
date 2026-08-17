@@ -1,9 +1,10 @@
 import PouchDB from 'pouchdb'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { PackingList } from '../create-packing-list/types'
-import type { SharedWithMeList, SharedListsWithMe } from './rdfSerialization'
+import type { SharedWithMeList, SharedListsWithMe, DeletedPackingLists } from './rdfSerialization'
+import { emptyDeletedPackingLists, withDeletion } from '../utils/packingListDeletions'
 
-export type DocumentType = 'question-set' | 'packing-list' | 'shared-with-me' | 'shared-lists-with-me'
+export type DocumentType = 'question-set' | 'packing-list' | 'shared-with-me' | 'shared-lists-with-me' | 'deleted-packing-lists'
 
 export interface BaseDocument {
     _id: string
@@ -33,7 +34,12 @@ export interface SharedListsWithMeDocument extends BaseDocument {
     data: SharedListsWithMe
 }
 
-export type AppDocument = QuestionSetDocument | PackingListDocument | SharedWithMeDocument | SharedListsWithMeDocument
+export interface DeletedPackingListsDocument extends BaseDocument {
+    docType: 'deleted-packing-lists'
+    data: DeletedPackingLists
+}
+
+export type AppDocument = QuestionSetDocument | PackingListDocument | SharedWithMeDocument | SharedListsWithMeDocument | DeletedPackingListsDocument
 
 /**
  * Namespace used when the user is not logged into a pod.
@@ -306,7 +312,21 @@ export class PackingAppDatabase {
         }
     }
 
-    public async deletePackingList(id: string): Promise<void> {
+    /**
+     * Removes a packing list and, by default, records a tombstone for it.
+     *
+     * The tombstone is what stops another device that still holds the list from
+     * treating it as "local-only, never uploaded" and pushing it back to the pod
+     * Recording is the default precisely so a new caller cannot forget
+     * it; pass `recordDeletion: false` only for a list whose id is not ours to
+     * tombstone — a cached copy of somebody else's shared list, whose id lives
+     * in their pod and may legitimately come back.
+     */
+    public async deletePackingList(
+        id: string,
+        options: { recordDeletion?: boolean } = {}
+    ): Promise<void> {
+        const { recordDeletion = true } = options
         try {
             const doc = await this.db.get(`packing-list:${id}`)
             await this.db.remove(doc)
@@ -314,6 +334,80 @@ export class PackingAppDatabase {
             console.error('Error deleting packing list:', err)
             throw err
         }
+        if (recordDeletion) {
+            await this.recordPackingListDeletion(id)
+        }
+    }
+
+    /**
+     * Returns the deletion tombstones for this namespace.
+     *
+     * Unlike the other getters this resolves to an empty registry rather than
+     * throwing when nothing has been written: having deleted nothing yet is the
+     * normal state, and every caller would otherwise have to catch not_found.
+     */
+    public async getDeletedPackingLists(): Promise<DeletedPackingLists> {
+        try {
+            const doc = await this.db.get('deleted-packing-lists:1')
+            if (doc.docType !== 'deleted-packing-lists') {
+                throw new Error('Invalid document type for deleted-packing-lists')
+            }
+            return doc.data
+        } catch (err: unknown) {
+            if (hasName(err) && err.name === 'not_found') {
+                return emptyDeletedPackingLists()
+            }
+            throw err
+        }
+    }
+
+    public async saveDeletedPackingLists(data: DeletedPackingLists): Promise<{ rev: string }> {
+        const docId = 'deleted-packing-lists:1'
+        const now = new Date().toISOString()
+        const MAX_RETRIES = 3
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                let existingDoc: DeletedPackingListsDocument | undefined
+                try {
+                    const doc = await this.db.get(docId)
+                    if (doc.docType === 'deleted-packing-lists') {
+                        existingDoc = doc
+                    }
+                } catch (err: unknown) {
+                    if (!hasName(err) || err.name !== 'not_found') {
+                        throw err
+                    }
+                }
+
+                const docToSave: DeletedPackingListsDocument = {
+                    _id: docId,
+                    _rev: existingDoc?._rev,
+                    docType: 'deleted-packing-lists',
+                    createdAt: existingDoc?.createdAt || now,
+                    updatedAt: now,
+                    data,
+                }
+
+                const result = await this.db.put(docToSave)
+                return { rev: result.rev }
+            } catch (err) {
+                if (hasName(err) && err.name === 'conflict' && attempt < MAX_RETRIES) {
+                    continue
+                }
+                console.error('Error saving deleted packing lists:', err)
+                throw err
+            }
+        }
+        throw new Error('saveDeletedPackingLists: max retries exceeded')
+    }
+
+    public async recordPackingListDeletion(
+        id: string,
+        deletedAt: string = new Date().toISOString()
+    ): Promise<void> {
+        const registry = await this.getDeletedPackingLists()
+        await this.saveDeletedPackingLists(withDeletion(registry, id, deletedAt))
     }
 
     public async getSharedWithMe(): Promise<SharedWithMeList> {
@@ -490,6 +584,13 @@ export class PackingAppDatabase {
         const lists = await source.getAllPackingLists()
         for (const list of lists) {
             await this.savePackingList({ ...list, _rev: undefined })
+        }
+
+        // Tombstones travel with the data: dropping them here would let the
+        // copied-into namespace re-upload lists the user has already deleted.
+        const deletions = await source.getDeletedPackingLists()
+        if (deletions.deletions.length > 0) {
+            await this.saveDeletedPackingLists(deletions)
         }
     }
 }

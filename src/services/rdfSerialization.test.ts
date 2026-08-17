@@ -7,10 +7,12 @@ import {
     datasetToQuestionSet,
     sharedListsWithMeToDataset,
     datasetToSharedListsWithMe,
+    deletedPackingListsToDataset,
+    datasetToDeletedPackingLists,
 } from './rdfSerialization'
 import type { PackingList, PackingListItem } from '../create-packing-list/types'
 import type { PackingListQuestionSet, Person, Question, Option } from '../edit-questions/types'
-import type { SharedListsWithMe } from './rdfSerialization'
+import type { SharedListsWithMe, DeletedPackingLists } from './rdfSerialization'
 import {
     fullyPopulatedPackingList,
     fullyPopulatedQuestionSet,
@@ -634,6 +636,52 @@ describe('sharedListsWithMeToDataset / datasetToSharedListsWithMe', () => {
         const result = roundTripSlwm(data)
         expect(result.lists[0].ownerWebId).toBeUndefined()
         expect(result.lists[0].label).toBeUndefined()
+    })
+})
+
+// ── DeletedPackingLists ───────────────────────────────────────────────────────
+
+const DELETIONS_DATASET_URL = 'https://pod.example.com/pack-me-up/deleted-packing-lists.ttl'
+
+function roundTripDeletions(data: DeletedPackingLists): DeletedPackingLists {
+    return datasetToDeletedPackingLists(
+        deletedPackingListsToDataset(data, DELETIONS_DATASET_URL),
+        DELETIONS_DATASET_URL,
+    )
+}
+
+describe('deletedPackingListsToDataset / datasetToDeletedPackingLists', () => {
+    it('round-trips an empty registry', () => {
+        const result = roundTripDeletions({ deletions: [], lastModified: '2026-01-01T00:00:00.000Z' })
+        expect(result.deletions).toEqual([])
+        expect(result.lastModified).toBe('2026-01-01T00:00:00.000Z')
+    })
+
+    it('round-trips a tombstone', () => {
+        const result = roundTripDeletions({
+            deletions: [{ listId: 'list-abc', deletedAt: '2026-02-01T12:00:00.000Z' }],
+            lastModified: '2026-02-01T12:00:00.000Z',
+        })
+        expect(result.deletions).toEqual([{ listId: 'list-abc', deletedAt: '2026-02-01T12:00:00.000Z' }])
+    })
+
+    it('round-trips several tombstones without losing any', () => {
+        const deletions = [
+            { listId: 'list-1', deletedAt: '2026-02-01T12:00:00.000Z' },
+            { listId: 'list-2', deletedAt: '2026-03-01T12:00:00.000Z' },
+            { listId: 'list-3', deletedAt: '2026-04-01T12:00:00.000Z' },
+        ]
+        const result = roundTripDeletions({ deletions, lastModified: '2026-04-01T12:00:00.000Z' })
+        expect(result.deletions).toHaveLength(3)
+        expect(result.deletions).toEqual(expect.arrayContaining(deletions))
+    })
+
+    it('drops a tombstone with no list id rather than guessing one', () => {
+        const dataset = deletedPackingListsToDataset(
+            { deletions: [{ listId: '', deletedAt: '2026-02-01T12:00:00.000Z' }], lastModified: '2026-02-01T12:00:00.000Z' },
+            DELETIONS_DATASET_URL,
+        )
+        expect(datasetToDeletedPackingLists(dataset, DELETIONS_DATASET_URL).deletions).toEqual([])
     })
 })
 

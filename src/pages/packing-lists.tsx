@@ -10,7 +10,7 @@ import { Modal } from '../components/Modal'
 import { SyncAcrossDevicesPrompt } from '../components/SyncAcrossDevicesPrompt'
 import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, resolveOwnerDisplayName, buildSharedListPath } from '../services/solidPod'
 import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
-import { packingListToDataset } from '../services/rdfSerialization'
+import { packingListToDataset, deletedPackingListsToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { generateUUID } from '../utils/uuid'
 import { formatTripDates } from '../create-packing-list/tripDetails'
@@ -83,10 +83,14 @@ export function PackingLists() {
     const confirmDeletePackingList = async () => {
         if (!listToDelete) return
         const { id } = listToDelete
+        // A cached copy of somebody else's shared list only leaves this device:
+        // the pod file is theirs, and the id is theirs to reuse, so it gets no
+        // tombstone of ours.
+        const isForeign = !!packingLists.find(list => list.id === id)?.sharedFromPodUrl
         try {
-            await db.deletePackingList(id)
+            await db.deletePackingList(id, { recordDeletion: !isForeign })
             setPackingLists(packingLists.filter(list => list.id !== id))
-            await removeListFromPod(id)
+            if (!isForeign) await removeListFromPod(id)
         } catch (err) {
             console.error('Error deleting packing list:', err)
         } finally {
@@ -116,6 +120,15 @@ export function PackingLists() {
             const podUrl = await getPrimaryPodUrl(session)
             if (!podUrl) return
             await deleteFileFromPod(session!, `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`)
+            // Removing the file is not enough on its own: a device that still
+            // holds the list would see it missing from the pod and upload it
+            // again. The tombstone is what tells it the list is gone.
+            await saveRdfToPod({
+                session: session!,
+                fileUrl: `${podUrl}${POD_CONTAINERS.DELETED_PACKING_LISTS}`,
+                data: await db.getDeletedPackingLists(),
+                serializer: deletedPackingListsToDataset,
+            })
         } catch (error) {
             handlePodError(error, POD_ERROR_MESSAGES.SAVE_FAILED)
         }

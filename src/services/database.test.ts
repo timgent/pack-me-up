@@ -390,6 +390,72 @@ describe('PackingAppDatabase', () => {
     })
   })
 
+  // A delete that leaves no trace is indistinguishable, on the next
+  // device, from a list that was never uploaded — so it gets uploaded again.
+  describe('deletion tombstones', () => {
+    const mockPackingList: PackingList = {
+      id: 'pl-1',
+      name: 'Beach Trip',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      items: [],
+    }
+
+    it('starts with an empty registry rather than throwing', async () => {
+      expect(await db.getDeletedPackingLists()).toEqual({
+        deletions: [],
+        lastModified: new Date(0).toISOString(),
+      })
+    })
+
+    it('records a tombstone when a list is deleted', async () => {
+      await db.savePackingList(mockPackingList)
+      await db.deletePackingList('pl-1')
+
+      const { deletions } = await db.getDeletedPackingLists()
+      expect(deletions).toHaveLength(1)
+      expect(deletions[0].listId).toBe('pl-1')
+      expect(new Date(deletions[0].deletedAt).getTime()).toBeGreaterThan(0)
+    })
+
+    it('records nothing when the caller opts out', async () => {
+      await db.savePackingList(mockPackingList)
+      await db.deletePackingList('pl-1', { recordDeletion: false })
+
+      expect((await db.getDeletedPackingLists()).deletions).toEqual([])
+    })
+
+    it('records nothing when the delete itself fails', async () => {
+      await expect(db.deletePackingList('nonexistent')).rejects.toThrow()
+      expect((await db.getDeletedPackingLists()).deletions).toEqual([])
+    })
+
+    it('accumulates tombstones across deletes', async () => {
+      await db.savePackingList(mockPackingList)
+      await db.savePackingList({ ...mockPackingList, id: 'pl-2' })
+      await db.deletePackingList('pl-1')
+      await db.deletePackingList('pl-2')
+
+      const { deletions } = await db.getDeletedPackingLists()
+      expect(deletions.map(d => d.listId).sort()).toEqual(['pl-1', 'pl-2'])
+    })
+
+    it('keeps tombstones out of getAllPackingLists', async () => {
+      await db.savePackingList(mockPackingList)
+      await db.deletePackingList('pl-1')
+
+      expect(await db.getAllPackingLists()).toEqual([])
+    })
+
+    it('survives a save/read round trip', async () => {
+      const registry = {
+        deletions: [{ listId: 'a', deletedAt: '2026-05-01T09:00:00.000Z' }],
+        lastModified: '2026-05-01T09:00:00.000Z',
+      }
+      await db.saveDeletedPackingLists(registry)
+      expect(await db.getDeletedPackingLists()).toEqual(registry)
+    })
+  })
+
   // Regression guard for #260: savePackingList built its PouchDB document from a
   // hand-maintained field allowlist, so `nights`, `questionAnswers` and
   // `selectedPeopleIds` never reached local storage — no type error, no test
@@ -641,6 +707,19 @@ describe('PackingAppDatabase', () => {
       const target = PackingAppDatabase.getInstance('copy-noop-target')
       await target.copyAllDataFrom(source)
       expect(await target.isEmpty()).toBe(true)
+    })
+
+    // Leaving these behind would let the target namespace push already-deleted
+    // lists back to the pod on its first sync.
+    it('copies deletion tombstones from source to target', async () => {
+      const source = PackingAppDatabase.getInstance('copy-tombstones-source')
+      const target = PackingAppDatabase.getInstance('copy-tombstones-target')
+      await source.savePackingList({ id: 'gone', name: 'Gone', createdAt: '2026-01-01T00:00:00.000Z', items: [] })
+      await source.deletePackingList('gone')
+
+      await target.copyAllDataFrom(source)
+
+      expect((await target.getDeletedPackingLists()).deletions.map(d => d.listId)).toEqual(['gone'])
     })
 
     it('does not copy _rev so documents save cleanly in target', async () => {

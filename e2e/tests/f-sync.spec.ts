@@ -227,4 +227,51 @@ test.describe('F – Solid Pod Sync', () => {
     await expect(page2.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 10_000 })
     await context2.close()
   })
+
+  // F3 deletes with only one device that has ever seen the list. The bug this
+  // covers needs a *second* device that still holds a local copy: its login sync
+  // saw a list on the device but not on the pod, called it local-only and
+  // uploaded it again, so the delete undid itself everywhere.
+  test('F7: a list deleted on one device is not resurrected by another that still has it', async ({ browser }) => {
+    // A second list that is never deleted: seeing it arrive is how a device that
+    // reads the pod from scratch signals that its sync has finished, so the
+    // absence checks below cannot pass just by being early.
+    const keeperListName = `Delete Resurrect Control ${Date.now()}`
+    await createList(keeperListName)
+    await syncListToPod()
+
+    const f7ListName = `Delete Resurrect Test ${Date.now()}`
+    await createList(f7ListName)
+    await syncListToPod()
+
+    // Device B: log in and let the list land in its local database.
+    const { ctx: contextB, pg: pageB } = await freshLogin(browser)
+    await pageB.goto('/#/view-lists')
+    await expect(pageB.getByText(f7ListName)).toBeVisible({ timeout: 75_000 })
+
+    // Device A: delete the list.
+    await page.goto('/#/view-lists')
+    await page.locator('.rounded-2xl').filter({ hasText: f7ListName }).getByRole('button', { name: /Delete/i }).click()
+    await page.getByRole('button', { name: /^Delete$/ }).click()
+    await expect(page.getByRole('heading').filter({ hasText: f7ListName })).not.toBeVisible({ timeout: 5_000 })
+
+    // Device B: reload so its login sync runs again against the pod. Before the
+    // fix this is where the list came back — and went back to the pod with it.
+    // The card starts out on screen, so the wait is for the sync to take it
+    // away; there is no window in which this passes by being early.
+    await pageB.goto('/#/view-lists')
+    await pageB.reload()
+    await expect(pageB.getByRole('heading').filter({ hasText: f7ListName })).not.toBeVisible({ timeout: 75_000 })
+
+    // Device C: a device that has never seen the list reads the pod from
+    // scratch, so what it shows is exactly what device B left on the pod. The
+    // keeper list arriving proves that read finished.
+    const { ctx: contextC, pg: pageC } = await freshLogin(browser)
+    await pageC.goto('/#/view-lists')
+    await expect(pageC.getByText(keeperListName)).toBeVisible({ timeout: 75_000 })
+    await expect(pageC.getByRole('heading').filter({ hasText: f7ListName })).not.toBeVisible()
+
+    await contextB.close()
+    await contextC.close()
+  })
 })
