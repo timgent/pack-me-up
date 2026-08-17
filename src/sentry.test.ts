@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const init = vi.fn()
 vi.mock('@sentry/capacitor', () => ({ init: (...args: unknown[]) => init(...args) }))
-vi.mock('@sentry/react', () => ({ init: vi.fn(), feedbackIntegration: () => ({ name: 'Feedback' }) }))
+vi.mock('@sentry/react', () => ({
+    init: vi.fn(),
+    feedbackIntegration: () => ({ name: 'Feedback' }),
+    browserTracingIntegration: () => ({ name: 'BrowserTracing' }),
+}))
 
 import { initSentry } from './sentry'
 

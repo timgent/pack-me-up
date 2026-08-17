@@ -20,7 +20,12 @@ export function initSentry() {
     {
       dsn: SENTRY_DSN,
       environment: import.meta.env.MODE,
-      integrations: [SentryReact.feedbackIntegration({ colorScheme: 'system' })],
+      integrations: [
+        SentryReact.feedbackIntegration({ colorScheme: 'system' }),
+        // Field-data counterpart to scripts/perf/mobile-repro.mjs — see docs/questions-page-mobile-performance.md.
+        SentryReact.browserTracingIntegration(),
+      ],
+      tracesSampleRate: 0.1,
     },
     SentryReact.init,
   )

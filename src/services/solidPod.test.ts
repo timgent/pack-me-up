@@ -472,8 +472,15 @@ describe('loadRdfFromPod', () => {
             return { id: 'test-id', name: 'Test', createdAt: new Date().toISOString(), items: [] }
         })
 
-        expect(mockGetSolidDataset).toHaveBeenCalledWith(url, expect.objectContaining({ fetch: mockSession.fetch }))
         expect(result.id).toBe('test-id')
+        // The `fetch` passed to getSolidDataset is a conditional-GET wrapper
+        // (see the loadRdfFromPod tests below), not the session's fetch
+        // directly — assert it delegates to the session's fetch instead of
+        // checking identity.
+        const passedFetch = mockGetSolidDataset.mock.calls[0][1]?.fetch
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200 }))
+        await passedFetch?.(url)
+        expect(mockSession.fetch).toHaveBeenCalledWith(url, expect.anything())
     })
 
     it('throws AuthenticationError on 401', async () => {
@@ -497,10 +504,98 @@ describe('loadRdfFromPod', () => {
         mockGetSolidDataset.mockResolvedValueOnce(
             packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
         )
+        const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }))
 
         await loadRdfFromPod(null, url, (_ds, _u) => ({ id: 'pub-id', name: 'Public', createdAt: '', items: [] }))
 
-        expect(mockGetSolidDataset).toHaveBeenCalledWith(url, expect.objectContaining({ fetch: globalThis.fetch }))
+        const passedFetch = mockGetSolidDataset.mock.calls[0][1]?.fetch
+        await passedFetch?.(url)
+        expect(globalFetchSpy).toHaveBeenCalledWith(url, expect.anything())
+    })
+
+    it('sends the previously seen ETag as If-None-Match on the next load of the same URL', async () => {
+        const url = `${POD_URL}pack-me-up/packing-lists/etag-test.ttl`
+        const list = makePackingList('etag-id')
+        const dataset = packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
+
+        // First load: the pod responds with an ETag, which getSolidDataset's
+        // fetch wrapper should observe.
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            await options!.fetch!(u as string)
+            return dataset
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
+        await loadRdfFromPod(mockSession, url, () => ({ id: 'etag-id', name: '', createdAt: '', items: [] }))
+
+        // Second load: getSolidDataset's fetch wrapper should now send
+        // If-None-Match with the ETag observed above.
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            await options!.fetch!(u as string)
+            return dataset
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200 }))
+        await loadRdfFromPod(mockSession, url, () => ({ id: 'etag-id', name: '', createdAt: '', items: [] }))
+
+        const secondCallHeaders = new Headers(mockSession.fetch.mock.calls[1][1]?.headers)
+        expect(secondCallHeaders.get('If-None-Match')).toBe('"v1"')
+    })
+
+    it('returns the cached result without re-running the deserializer when the pod responds 304', async () => {
+        const url = `${POD_URL}pack-me-up/packing-lists/not-modified.ttl`
+        const list = makePackingList('cached-id')
+        const dataset = packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
+        const deserializer = vi.fn(() => ({ id: 'cached-id', name: 'Cached', createdAt: '', items: [] }))
+
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            await options!.fetch!(u as string)
+            return dataset
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
+        const first = await loadRdfFromPod(mockSession, url, deserializer)
+        expect(deserializer).toHaveBeenCalledTimes(1)
+
+        // Mirrors what getSolidDataset itself does for any non-2xx response
+        // (see @inrupt/solid-client's internal_isUnsuccessfulResponse): a 304
+        // makes it throw before ever reaching the parser.
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            const response = await options!.fetch!(u as string)
+            if (!response.ok) throw { statusCode: response.status }
+            return dataset
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 304 }))
+        const second = await loadRdfFromPod(mockSession, url, deserializer)
+
+        expect(second).toEqual(first)
+        expect(deserializer).toHaveBeenCalledTimes(1) // not called again for the 304
+    })
+
+    it('re-parses and returns fresh data when the pod content actually changed (new ETag)', async () => {
+        const url = `${POD_URL}pack-me-up/packing-lists/changed.ttl`
+        const datasetV1 = packingListToDataset(makePackingList('v1'), url) as unknown as SolidDataset & WithServerResourceInfo
+        const datasetV2 = packingListToDataset(makePackingList('v2'), url) as unknown as SolidDataset & WithServerResourceInfo
+        const deserializer = vi.fn((ds: SolidDataset) => ds === datasetV2
+            ? { id: 'v2', name: 'Updated', createdAt: '', items: [] }
+            : { id: 'v1', name: 'Original', createdAt: '', items: [] })
+
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            await options!.fetch!(u as string)
+            return datasetV1
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
+        const first = await loadRdfFromPod(mockSession, url, deserializer)
+        expect(first.id).toBe('v1')
+
+        // Another device changed the pod resource: server returns 200 with a
+        // new ETag and body, same as a first-ever load.
+        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
+            await options!.fetch!(u as string)
+            return datasetV2
+        })
+        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v2"' } }))
+        const second = await loadRdfFromPod(mockSession, url, deserializer)
+
+        expect(second.id).toBe('v2')
+        expect(deserializer).toHaveBeenCalledTimes(2)
     })
 })
 

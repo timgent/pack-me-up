@@ -24,6 +24,13 @@ playwright-report/
 test-results/
 .e2e-css-pid
 
+# Perf harness output — traces/cpuprofiles capture whatever real data was
+# loaded on the page (screenshots + DOM snapshots), so these must never be committed.
+scripts/perf/results/
+
+# Real personal data used for local perf/repro testing — never commit.
+example-large-backup.json
+
 # Capacitor Android build artifacts
 android/.gradle/
 android/app/build/
