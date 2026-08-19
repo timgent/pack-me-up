@@ -1,4 +1,16 @@
-# Mobile performance repro harness
+# Performance repro harnesses
+
+Two standalone diagnostic scripts, neither part of `npm test` or
+`npm run test:e2e`. Both need a local Community Solid Server and the app's
+production build being served.
+
+- `mobile-repro.mjs` — main-thread blocking on the "My Questions & Items"
+  page (below).
+- `delete-item-repro.mjs` — how long deleting an item from a packing list
+  takes to show on screen ("Deleting an item from a packing list", further
+  down).
+
+## `mobile-repro.mjs`
 
 `mobile-repro.mjs` is a standalone Playwright + CDP script for measuring
 main-thread blocking on a mobile-class device profile. It is **not** part of
@@ -80,3 +92,39 @@ multiple polls, not just the first one.
 sample hit count). For anything deeper, load `<label>.trace.zip` into
 `npx playwright show-trace scripts/perf/results/<label>.trace.zip`, or open
 `<label>.cpuprofile` in Chrome DevTools' Performance panel ("Load profile").
+
+## Deleting an item from a packing list
+
+`delete-item-repro.mjs` measures the wait between confirming a deletion and
+the row leaving the screen, and how long the UI is frozen while it happens.
+Background and findings: `docs/packing-list-delete-performance.md`.
+
+Unlike `mobile-repro.mjs` it needs no manual data setup — it seeds its own
+backup file into the pod over the CSS account API and restores it through the
+app's Backups page:
+
+```
+node scripts/perf/delete-item-repro.mjs --label=before --items=150 --deletes=4 --cpu=4 --podLatency=150
+```
+
+| flag | default | meaning |
+|---|---|---|
+| `--items` | `150` | size of the seeded list |
+| `--deletes` | `4` | how many items to delete and time |
+| `--cpu` | `4` | CDP CPU throttle multiplier |
+| `--podLatency` | `150` | delay (ms) injected on every request to the pod |
+| `--settleMs` | `4000` | how long to keep recording after each delete |
+| `--label` | `delete-item` | output filename prefix |
+
+`--podLatency` and `--cpu` are the attribution levers: if a number tracks the
+first, the UI is waiting on the network; if it tracks the second, it is
+main-thread work. A local pod answers in ~2ms, which is not a latency any real
+user has, so measuring against it alone will hide a round-trip problem.
+
+The script turns on the app's own profiling marks
+(`localStorage['packMeUp.profiling']`, see `src/utils/profiling.ts`), so
+`<label>.summary.json` carries a per-delete phase breakdown — local database
+write, pod URL lookup, container check, RDF serialisation, PUT — alongside
+`medianPerceivedMs` and `medianMaxFrameGapMs`. Against a build without those
+marks it falls back to timing from the click, so before/after comparisons
+across a revert still work.

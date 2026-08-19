@@ -8,6 +8,8 @@ import { PackingList } from '../create-packing-list/types'
 import { packingListToDataset, datasetToPackingList, datasetToQuestionSet, datasetToSharedWithMe, datasetToSharedListsWithMe, deletedPackingListsToDataset, datasetToDeletedPackingLists } from './rdfSerialization'
 import type { SharedWithMeList, SharedListsWithMe, DeletedPackingLists } from './rdfSerialization'
 import { deletionsById, emptyDeletedPackingLists, isNewerThanDeletion, mergeDeletedPackingLists, pruneDeletions, registriesEqual, withoutDeletion } from '../utils/packingListDeletions'
+import { mergePackingLists } from '../utils/mergePackingLists'
+import { profile } from '../utils/profiling'
 
 /**
  * Pod container paths under the user's Pod root
@@ -419,19 +421,35 @@ async function addAcpMemberAccess(session: Session, containerUrl: string): Promi
     }
 }
 
+/**
+ * Containers this session has already established are there. A container that
+ * exists doesn't stop existing while the app is open, and the check is a round
+ * trip in front of every single write — the one saving an item deletion
+ * included. Cleared by `resetPodSessionCaches` when the session changes or the
+ * user deletes their pod data.
+ */
+const knownContainers = new Set<string>()
+
 async function ensureContainerExists(session: Session, containerUrl: string): Promise<void> {
+    if (knownContainers.has(containerUrl)) return
     try {
         await getSolidDataset(containerUrl, { fetch: session.fetch })
+        knownContainers.add(containerUrl)
     } catch (err) {
         const status = getStatusCode(err)
         // No read access — assume the container exists and let the write reveal any real problem
-        if (status === 401 || status === 403) return
+        if (status === 401 || status === 403) {
+            knownContainers.add(containerUrl)
+            return
+        }
         if (status !== 404) throw err
         try {
             await createContainerAt(containerUrl, { fetch: session.fetch })
+            knownContainers.add(containerUrl)
         } catch (createErr) {
             // 409 Conflict = container was created concurrently; ignore
             if (getStatusCode(createErr) !== 409) throw createErr
+            knownContainers.add(containerUrl)
         }
     }
 }
@@ -494,21 +512,66 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
 
     const webId = session.info.webId
 
+    // Reading the profile is a network round trip, and this is called before
+    // every pod read and every pod write. The answer is a property of the
+    // WebID, so resolve it once per session and share the in-flight request
+    // with anyone who asks while it's still running.
+    const inFlight = podUrlByWebId.get(webId)
+    if (inFlight) return inFlight
+
+    const resolution = resolvePrimaryPodUrl(session, webId)
+    const podUrl = resolution.then(result => result.podUrl)
+    podUrlByWebId.set(webId, podUrl)
+    // Only an answer actually read from the profile is worth keeping for the
+    // session. A fallback — or a failure — says nothing about where the Pod is,
+    // and caching it would leave the app stuck on one dropped request.
+    resolution.then(
+        result => { if (!result.authoritative) podUrlByWebId.delete(webId) },
+        () => podUrlByWebId.delete(webId)
+    )
+    return podUrl
+}
+
+/**
+ * The pod URL resolved for each WebID this session has asked about, including
+ * requests still in flight. Cleared by `resetPodSessionCaches`.
+ */
+const podUrlByWebId = new Map<string, Promise<string | null>>()
+
+/**
+ * Forget everything cached for the length of a session: which pod a WebID
+ * lives in, and which containers are known to exist. Call this when the
+ * identity behind the session changes (login, logout) or when pod data is
+ * deleted underneath us.
+ */
+export function resetPodSessionCaches(): void {
+    podUrlByWebId.clear()
+    knownContainers.clear()
+}
+
+/**
+ * `authoritative` marks an answer that came from the profile itself, as opposed
+ * to a last-known-good fallback — only the former is worth remembering.
+ */
+async function resolvePrimaryPodUrl(
+    session: Session,
+    webId: string
+): Promise<{ podUrl: string | null; authoritative: boolean }> {
     let podUrls: string[]
     try {
-        podUrls = await getPodUrlAll(webId, { fetch: session.fetch })
+        podUrls = await profile('pod.getPrimaryPodUrl', () => getPodUrlAll(webId, { fetch: session.fetch }), { webId })
     } catch (err) {
         // The profile document itself couldn't be fetched (transient network
         // error, DPoP nonce race, expired token). We know nothing about the
         // Pod's location, so reuse the last known one and otherwise give up —
         // callers report "no pod" and retry on the next sync.
         console.warn('getPrimaryPodUrl: could not read the WebID profile', err)
-        return readCachedPodUrl(webId)
+        return { podUrl: readCachedPodUrl(webId), authoritative: false }
     }
 
     if (podUrls && podUrls.length > 0) {
         cachePodUrl(webId, podUrls[0])
-        return podUrls[0]
+        return { podUrl: podUrls[0], authoritative: true }
     }
 
     // Profile was readable but declares no pim:storage — the case for CSS v7,
@@ -516,10 +579,10 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
     const derivedPodUrl = derivePodUrlFromWebId(webId)
     if (derivedPodUrl) {
         cachePodUrl(webId, derivedPodUrl)
-        return derivedPodUrl
+        return { podUrl: derivedPodUrl, authoritative: true }
     }
 
-    return readCachedPodUrl(webId)
+    return { podUrl: readCachedPodUrl(webId), authoritative: false }
 }
 
 /**
@@ -678,8 +741,8 @@ export async function loadRdfFromPod<T>(
         })
     }
     try {
-        const dataset = await getSolidDataset(fileUrl, { fetch: conditionalFetch })
-        const result = deserializer(dataset, fileUrl)
+        const dataset = await profile('pod.load.fetch', () => getSolidDataset(fileUrl, { fetch: conditionalFetch }), { fileUrl })
+        const result = profile('pod.load.deserialize', () => deserializer(dataset, fileUrl), { fileUrl })
         if (observedEtag) lastSeenByUrl.set(fileUrl, { etag: observedEtag, result })
         else lastSeenByUrl.delete(fileUrl)
         return result
@@ -702,12 +765,12 @@ export async function saveRdfToPod<T>(options: SaveRdfToPodOptions<T>): Promise<
     try {
         if (session) {
             const containerUrl = fileUrl.substring(0, fileUrl.lastIndexOf('/') + 1)
-            await ensureContainerExists(session, containerUrl)
+            await profile('pod.save.ensureContainer', () => ensureContainerExists(session, containerUrl), { containerUrl })
         }
-        const newDataset = serializer(data, fileUrl)
-        const turtleContent = await solidDatasetAsTurtle(newDataset)
+        const newDataset = profile('pod.save.serialize', () => serializer(data, fileUrl))
+        const turtleContent = await profile('pod.save.turtle', () => solidDatasetAsTurtle(newDataset))
         const blob = new Blob([turtleContent], { type: 'text/turtle' })
-        await overwriteFile(fileUrl, blob, { fetch: fetchFn, contentType: 'text/turtle' })
+        await profile('pod.save.put', () => overwriteFile(fileUrl, blob, { fetch: fetchFn, contentType: 'text/turtle' }), { fileUrl, bytes: turtleContent.length })
     } catch (error: unknown) {
         if (session && isAuthenticationError(error)) handlePodError(error)
         throw error
@@ -1169,9 +1232,36 @@ export async function syncAllDataFromPod(
         }
     }
 
-    // Save the surviving pod lists to local DB in parallel (pod wins for conflicting IDs)
+    // Save the surviving pod lists to local DB in parallel.
+    //
+    // Where both sides have a copy they are merged rather than the pod simply
+    // winning: the push to the pod is best effort and deliberately off the
+    // critical path, so the last edit before a reload can still be local-only
+    // when the app comes back. Merging is what the live sync does with the same
+    // pair, and it means neither side's edit is dropped. A local copy that came
+    // out ahead goes straight back up, so the next device to sync sees it.
+    const localListsById = new Map((await db.getAllPackingLists()).map(list => [list.id, list]))
+
     const saveResults = await Promise.allSettled(
-        listsToSaveLocally.map(podList => db.savePackingList({ ...podList, _rev: undefined }))
+        listsToSaveLocally.map(async podList => {
+            const localList = localListsById.get(podList.id)
+            const resolved = localList ? mergePackingLists(localList, podList) : podList
+            await db.savePackingList({ ...resolved, _rev: undefined })
+
+            if (resolved.lastModified !== podList.lastModified) {
+                try {
+                    await saveRdfToPod({
+                        session,
+                        fileUrl: `${containerUrl}${podList.id}.ttl`,
+                        data: resolved,
+                        serializer: packingListToDataset,
+                    })
+                } catch (err) {
+                    if (err instanceof AuthenticationError) throw err
+                    console.error(`syncAllDataFromPod: error pushing merged list ${podList.id} back to pod`, err)
+                }
+            }
+        })
     )
     for (let i = 0; i < saveResults.length; i++) {
         if (saveResults[i].status === 'fulfilled') {

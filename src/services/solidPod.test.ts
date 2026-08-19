@@ -21,6 +21,7 @@ import {
     friendlyPodName,
     getPrimaryPodUrl,
     derivePodUrlFromWebId,
+    resetPodSessionCaches,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
@@ -95,7 +96,12 @@ const POD_URL = 'https://pod.example.com/'
 
 // Ensure each test starts with clean mock state (vi.restoreAllMocks in inner afterEach
 // hooks doesn't fully clear permanent mockRejectedValue defaults on vi.fn() mocks).
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+    vi.resetAllMocks()
+    // The pod URL and known-container caches live for the length of a session;
+    // each test is its own session.
+    resetPodSessionCaches()
+})
 
 describe('hasPodData', () => {
     beforeEach(() => {
@@ -419,6 +425,77 @@ describe('syncAllDataFromPod', () => {
 
             expect(db.savePackingList).toHaveBeenCalledTimes(2)
             expect(result.packingListsSynced).toBe(2)
+        })
+
+        it('keeps a local edit the pod has not caught up with', async () => {
+            // The pod write for the last edit is best-effort and can be cut off
+            // by a reload. The local copy is the one that is guaranteed, so an
+            // older pod copy must not flatten it on the next login.
+            const item = { id: 'i1', itemText: 'Passport', personId: 'p1', personName: 'Ann', questionId: 'q1', optionId: 'o1' }
+            const podList = makePackingList('list-1', {
+                lastModified: '2024-01-01T10:00:00.000Z',
+                items: [{ ...item, packed: false }],
+            })
+            const locallyEdited = makePackingList('list-1', {
+                lastModified: '2024-06-01T10:00:00.000Z',
+                items: [{ ...item, packed: true }],
+            })
+            const db = makeDb({ questionSet: null, packingLists: [locallyEdited] })
+
+            stubPod({ lists: [podList] })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.savePackingList).toHaveBeenCalledWith(expect.objectContaining({
+                items: [expect.objectContaining({ id: 'i1', packed: true })],
+            }))
+        })
+
+        it('puts a local edit the pod has not caught up with back on the pod', async () => {
+            const item = { id: 'i1', itemText: 'Passport', personId: 'p1', personName: 'Ann', questionId: 'q1', optionId: 'o1' }
+            const podList = makePackingList('list-1', {
+                lastModified: '2024-01-01T10:00:00.000Z',
+                items: [{ ...item, packed: false }],
+            })
+            const locallyEdited = makePackingList('list-1', {
+                lastModified: '2024-06-01T10:00:00.000Z',
+                items: [{ ...item, packed: true }],
+            })
+            const db = makeDb({ questionSet: null, packingLists: [locallyEdited] })
+
+            stubPod({ lists: [podList] })
+            mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+            await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(mockOverwriteFile).toHaveBeenCalledWith(
+                expect.stringContaining('list-1.ttl'),
+                expect.any(Blob),
+                expect.objectContaining({ contentType: 'text/turtle' })
+            )
+        })
+
+        it('takes the pod copy when it is the newer one', async () => {
+            const item = { id: 'i1', itemText: 'Passport', personId: 'p1', personName: 'Ann', questionId: 'q1', optionId: 'o1' }
+            const podList = makePackingList('list-1', {
+                lastModified: '2024-06-01T10:00:00.000Z',
+                items: [{ ...item, packed: true }],
+            })
+            const staleLocal = makePackingList('list-1', {
+                lastModified: '2024-01-01T10:00:00.000Z',
+                items: [{ ...item, packed: false }],
+            })
+            const db = makeDb({ questionSet: null, packingLists: [staleLocal] })
+
+            stubPod({ lists: [podList] })
+
+            await syncAllDataFromPod(mockSession, POD_URL, db)
+
+            expect(db.savePackingList).toHaveBeenCalledWith(expect.objectContaining({
+                items: [expect.objectContaining({ id: 'i1', packed: true })],
+            }))
+            expect(mockOverwriteFile).not.toHaveBeenCalled()
         })
 
         it('uploads local-only packing lists to pod', async () => {
@@ -779,6 +856,26 @@ describe('saveRdfToPod', () => {
             expect.any(Blob),
             expect.objectContaining({ fetch: mockSession.fetch, contentType: 'text/turtle' })
         )
+    })
+
+    it('checks the parent container only once per session, not on every save', async () => {
+        // Every save used to spend a round trip asking whether the container was
+        // there. On a slow connection that doubled the cost of saving an edit.
+        const url = `${POD_URL}pack-me-up/packing-lists/my-list.ttl`
+        mockGetSolidDataset.mockResolvedValue({} as unknown as SolidDataset & WithServerResourceInfo)
+        mockOverwriteFile.mockResolvedValue({} as unknown as Response & { internal_resourceInfo: unknown })
+
+        for (let i = 0; i < 3; i++) {
+            await saveRdfToPod({
+                session: mockSession,
+                fileUrl: url,
+                data: makePackingList('my-list'),
+                serializer: packingListToDataset,
+            })
+        }
+
+        expect(mockGetSolidDataset).toHaveBeenCalledOnce()
+        expect(mockOverwriteFile).toHaveBeenCalledTimes(3)
     })
 
     it('skips container creation and proceeds if caller lacks read access (403) on foreign pod', async () => {
@@ -1525,6 +1622,43 @@ describe('getPrimaryPodUrl', () => {
 
         mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+    })
+
+    it('reads the WebID profile only once per session', async () => {
+        // Resolving the pod URL is a network round trip, and it ran on every
+        // save and every poll — for an answer that cannot change under us.
+        mockGetPodUrlAll.mockResolvedValue([ESS_POD_URL])
+        const session = sessionFor(ESS_WEB_ID)
+
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+
+        expect(mockGetPodUrlAll).toHaveBeenCalledOnce()
+    })
+
+    it('resolves the profile once when several callers ask at the same time', async () => {
+        // Opening the app fires a burst of these at once (page load, poll, save).
+        mockGetPodUrlAll.mockResolvedValue([ESS_POD_URL])
+        const session = sessionFor(ESS_WEB_ID)
+
+        const results = await Promise.all([
+            getPrimaryPodUrl(session),
+            getPrimaryPodUrl(session),
+            getPrimaryPodUrl(session),
+        ])
+
+        expect(results).toEqual([ESS_POD_URL, ESS_POD_URL, ESS_POD_URL])
+        expect(mockGetPodUrlAll).toHaveBeenCalledOnce()
+    })
+
+    it('retries after a failure rather than caching the failure', async () => {
+        mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        const session = sessionFor(ESS_WEB_ID)
+        expect(await getPrimaryPodUrl(session)).toBeNull()
+
+        mockGetPodUrlAll.mockResolvedValueOnce([ESS_POD_URL])
         expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
     })
 

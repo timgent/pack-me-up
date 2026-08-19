@@ -85,7 +85,8 @@ describe('SharingSettingsPage — remove shared context', () => {
                 expect.objectContaining({ contexts: [] })
             )
         })
-        expect(mockSaveRdfToPod).toHaveBeenCalled()
+        // The pod write is deferred until after the local change is on screen
+        await waitFor(() => expect(mockSaveRdfToPod).toHaveBeenCalled())
     })
 
     it('removes the entry from the UI after clicking Remove', async () => {

@@ -36,6 +36,7 @@ import { AddItemComposer, UNCATEGORISED_LABEL, type AddItemTarget, type PersonOp
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, type ListViewMode } from '../utils/listViewPreferences'
+import { profile, profileEvent } from '../utils/profiling'
 
 type FormData = {
     items: Record<string, boolean>
@@ -173,6 +174,11 @@ export function ViewPackingList() {
         : '/view-lists'
     const [packingList, setPackingList] = useState<PackingList | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    // Whether this page has looked in the local database yet. Pod syncing waits
+    // on it: a pod copy applied before we know what is on the device overwrites
+    // it, and the device's copy can be the newer one — the pod write for the
+    // last edit is best effort and may not have landed before the page closed.
+    const [localCopyChecked, setLocalCopyChecked] = useState(false)
     const [shareModalOpen, setShareModalOpen] = useState(false)
     // Sharing needs a pod, so a logged-out sharer gets the ask framed around
     // sharing rather than a generic "set up a pod" pitch.
@@ -542,7 +548,9 @@ export function ViewPackingList() {
         },
         rdf: { serialize: packingListToDataset, deserialize: datasetToPackingList },
         pollInterval: 5000, // Poll every 5 seconds for faster sync
-        enabled: isLoggedIn || !!foreignPodUrl, // Allow reading public shared lists without login
+        // Allow reading public shared lists without login, but never before the
+        // local database has been consulted — see localCopyChecked.
+        enabled: localCopyChecked && (isLoggedIn || !!foreignPodUrl),
         onSyncSuccess: handleSyncSuccess,
         onSyncError: handleViewSyncError,
         onSaveSuccess: handleSaveSuccess,
@@ -566,6 +574,7 @@ export function ViewPackingList() {
         const fetchPackingList = async () => {
             try {
                 const doc = await db.getPackingList(id!)
+                setLocalCopyChecked(true)
                 setPackingList(doc)
                 // Use reset (not setValue) so _defaultValues is updated too.
                 // register() initialises each checkbox from _defaultValues; setValue
@@ -579,6 +588,7 @@ export function ViewPackingList() {
                 hasLoadedRef.current = true
                 setIsLoading(false)
             } catch (err) {
+                setLocalCopyChecked(true)
                 const isNotFound = typeof err === 'object' && err !== null && (err as { name?: string }).name === 'not_found'
                 if (isNotFound) {
                     // Not an error: the list simply isn't on this device. On a
@@ -695,6 +705,13 @@ export function ViewPackingList() {
     }, [watchedItems, handleItemChange])
 
     const persistPackingList = async (updatedPackingList: PackingList) => {
+        // Show the change now. What follows is only writing down what is already
+        // on screen, and holding the render until the database (let alone the
+        // pod) comes back leaves the item the user just deleted sitting there
+        // while it happens. The saves below correct the state when they land,
+        // and report their own failures.
+        setPackingList(updatedPackingList)
+
         if (isLoggedIn || foreignPodUrl) {
             const savedPackingList = await saveWithSyncPrevention(updatedPackingList, saveToPod)
             if (savedPackingList) {
@@ -729,6 +746,10 @@ export function ViewPackingList() {
             setQuestionUpdateAdditions(null)
             return
         }
+        // Close the preview first. The items appear on the list as soon as they
+        // are added now, and leaving the preview up over a list that already has
+        // them reads as the click not having worked.
+        setQuestionUpdateAdditions(null)
         try {
             const updatedList: PackingList = {
                 ...packingList,
@@ -739,14 +760,13 @@ export function ViewPackingList() {
         } catch (err) {
             const details = reportError(err, 'Error adding question updates')
             showToast('Failed to add items', 'error', details)
-        } finally {
-            setQuestionUpdateAdditions(null)
         }
     }
 
     const handleDeleteItem = async (itemId: string) => {
         if (!packingList) return
 
+        profileEvent('delete.click', { itemId, itemCount: packingList.items.length })
         try {
             setAutoSaveStatus('saving')
 
@@ -768,10 +788,11 @@ export function ViewPackingList() {
             // Remove from form values
             const currentFormValues = getValues('items')
             delete currentFormValues[itemId]
-            setValue('items', currentFormValues)
+            profile('delete.setFormValues', () => setValue('items', currentFormValues))
 
-            await persistPackingList(updatedPackingList)
+            await profile('delete.persist', () => persistPackingList(updatedPackingList))
 
+            profileEvent('delete.done', { itemId })
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
         } catch (err) {

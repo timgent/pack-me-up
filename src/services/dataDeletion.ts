@@ -8,7 +8,7 @@ import {
     LOCAL_NAMESPACE,
     databaseNameForNamespace,
 } from './database'
-import { POD_CONTAINERS, isAuthenticationError, handlePodError } from './solidPod'
+import { POD_CONTAINERS, isAuthenticationError, handlePodError, resetPodSessionCaches } from './solidPod'
 
 /**
  * Deleting everything the app has stored — the Google Play "data deletion"
@@ -126,6 +126,9 @@ export async function deleteAllLocalData(): Promise<void> {
  */
 export async function deleteAllPodData(session: Session, podUrl: string): Promise<void> {
     await deleteContainerRecursively(session, `${podUrl}${POD_CONTAINERS.ROOT}`)
+    // The containers we just removed are still in the "known to exist" set —
+    // forget them, so the next write recreates them instead of assuming.
+    resetPodSessionCaches()
 }
 
 async function deleteContainerRecursively(session: Session, containerUrl: string): Promise<void> {

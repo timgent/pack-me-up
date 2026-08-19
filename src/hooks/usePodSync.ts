@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { SolidDataset } from '@inrupt/solid-client';
 import { useSolidPod } from '../components/SolidPodContext';
 import { getPrimaryPodUrl, loadRdfFromPod, saveRdfToPod, AuthenticationError } from '../services/solidPod';
+import { profile, profileEvent } from '../utils/profiling';
 
 /**
  * Configuration for Pod file paths
@@ -214,6 +215,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     }
 
     isSyncingRef.current = true;
+    profileEvent('podSync.syncFromPod.start');
     setError(null);
 
     try {
@@ -230,7 +232,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         return;
       }
 
-      const data = await loadRdfFromPod<T>(session ?? null, fileUrl, rdfRef.current.deserialize);
+      const data = await profile('podSync.syncFromPod.load', () => loadRdfFromPod<T>(session ?? null, fileUrl, rdfRef.current.deserialize), { fileUrl });
 
       lastSyncRef.current = new Date();
 
@@ -268,6 +270,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     }
 
     setError(null);
+    profileEvent('podSync.saveToPod.start');
 
     try {
       const podUrl = pathConfigRef.current.podUrl ?? await getPrimaryPodUrl(session!);
@@ -282,12 +285,12 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         throw new Error('Cannot save: missing resource ID');
       }
 
-      await saveRdfToPod({
+      await profile('podSync.saveToPod.write', () => saveRdfToPod({
         session: isLoggedIn ? session! : null,
         fileUrl,
         data,
         serializer: rdfRef.current.serialize,
-      });
+      }), { fileUrl });
 
       lastSyncRef.current = new Date();
 

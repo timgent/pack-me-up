@@ -14,6 +14,7 @@
 import { chromium } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { loginToCss } from './lib/css.mjs'
 
 const APP_ORIGIN = process.env.PERF_APP_ORIGIN ?? 'http://localhost:4173'
 const CSS_ORIGIN = process.env.PERF_CSS_ORIGIN ?? 'http://localhost:4000'
@@ -35,41 +36,6 @@ fs.mkdirSync(outDir, { recursive: true })
 
 // Moto/Fairphone-class viewport (Fairphone 4: 1080x2340 @ ~2.75x dpr -> ~393x851 CSS px)
 const MOBILE_VIEWPORT = { width: 393, height: 851 }
-
-async function loginToCss(page) {
-  await page.getByRole('button', { name: 'Login with Solid Pod' }).click()
-  await page.getByRole('dialog').waitFor()
-  await page.getByText('Other providers').click()
-  await page.getByRole('button', { name: 'Use Custom Provider' }).click()
-  await page.getByLabel('Custom Provider URL').fill(CSS_ORIGIN)
-  await page.getByRole('button', { name: 'Connect' }).click()
-
-  await page.waitForURL(
-    url => url.hostname === 'localhost' && url.port === new URL(CSS_ORIGIN).port && url.pathname.includes('/login/password'),
-    { timeout: 20_000 }
-  )
-  const loginBtn = page.locator('button[type="submit"][name="submit"]')
-  await loginBtn.waitFor({ timeout: 10_000 })
-  await page.waitForFunction(() => {
-    const btn = document.querySelector('button[type="submit"][name="submit"]')
-    return btn && !btn.disabled
-  }, { timeout: 10_000 })
-  await page.locator('#email').fill(EMAIL)
-  await page.locator('#password').fill(PASSWORD)
-  await loginBtn.click()
-
-  await page.waitForURL(url => url.pathname.includes('/oidc/prompt') || url.pathname.includes('consent'), { timeout: 20_000 })
-  const authorizeBtn = page.locator('#authorize')
-  await authorizeBtn.waitFor({ timeout: 10_000 })
-  await page.waitForFunction(() => {
-    const btn = document.querySelector('#authorize')
-    return btn && !btn.disabled
-  }, { timeout: 10_000 })
-  await authorizeBtn.click()
-
-  await page.waitForURL(new RegExp(new URL(APP_ORIGIN).host), { timeout: 20_000 })
-  await page.getByRole('button', { name: 'Logout' }).first().waitFor({ timeout: 20_000 })
-}
 
 async function restoreSeededBackup(page) {
   await page.goto(`${APP_ORIGIN}/#/backups`)
@@ -117,12 +83,12 @@ async function main() {
   console.log(`[${label}] logging in / preparing data...`)
   await page.goto(APP_ORIGIN)
   if (scenario === 'logged-in') {
-    await loginToCss(page)
+    await loginToCss(page, { appOrigin: APP_ORIGIN, cssOrigin: CSS_ORIGIN, email: EMAIL, password: PASSWORD })
     await restoreSeededBackup(page)
   } else {
     // logged-out scenario still needs the data locally: log in once, restore,
     // then log out so PouchDB keeps the data but pod polling is disabled.
-    await loginToCss(page)
+    await loginToCss(page, { appOrigin: APP_ORIGIN, cssOrigin: CSS_ORIGIN, email: EMAIL, password: PASSWORD })
     await restoreSeededBackup(page)
     await page.getByRole('button', { name: 'Logout' }).first().click()
     await page.getByRole('button', { name: 'Login with Solid Pod' }).first().waitFor({ timeout: 10_000 })
