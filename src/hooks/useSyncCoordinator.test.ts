@@ -195,6 +195,121 @@ describe('useSyncCoordinator', () => {
   })
 
   // ─────────────────────────────────────────────────────────────────
+  // The pod write is off the critical path
+  // ─────────────────────────────────────────────────────────────────
+
+  describe('background pod save', () => {
+    // The push is deferred a task so the browser can paint the edit first;
+    // this lets it start.
+    const startBackgroundPush = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+
+    it('resolves as soon as the local save is done, without waiting for the pod', async () => {
+      // The caller updates the UI from what this resolves with, so waiting for a
+      // network round trip here is a round trip the user spends staring at the
+      // item they just deleted.
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const podSaveStarted = vi.fn()
+      // Never resolves — stands in for a slow (or offline) pod
+      const saveToPod = vi.fn().mockImplementation(() => {
+        podSaveStarted()
+        return new Promise<boolean>(() => {})
+      })
+
+      const options = makeOptions({ saveToLocalDb })
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      let savedData: TestData | null = null
+      await act(async () => {
+        savedData = await result.current.saveWithSyncPrevention(makeTestData(), saveToPod)
+      })
+
+      expect(savedData).toMatchObject({ id: 'test-1', _rev: 'rev-1' })
+      expect(podSaveStarted).not.toHaveBeenCalled()
+
+      await startBackgroundPush()
+      expect(podSaveStarted).toHaveBeenCalledOnce()
+    })
+
+    it('keeps skipping pod updates while the background pod save is still in flight', async () => {
+      // Returning early must not reopen the sync-loop window: until the push
+      // lands, the pod's copy is older than what we hold, and applying it would
+      // resurrect the deleted item.
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const updateFormAndState = vi.fn()
+      let resolvePodSave!: (value: boolean) => void
+      const saveToPod = vi.fn().mockImplementation(
+        () => new Promise<boolean>(resolve => { resolvePodSave = resolve })
+      )
+
+      const options = makeOptions({ saveToLocalDb, updateFormAndState, conflictStrategy: 'fallback-to-pod' })
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      await act(async () => {
+        await result.current.saveWithSyncPrevention(makeTestData(), saveToPod)
+      })
+      await startBackgroundPush()
+
+      const newerPodData = makeTestData({ lastModified: new Date(9999999999999).toISOString() })
+      await act(async () => {
+        await result.current.handleSyncSuccess(newerPodData)
+      })
+
+      expect(updateFormAndState).not.toHaveBeenCalled()
+
+      // Cleanup: let the pending pod save settle
+      await act(async () => { resolvePodSave(true) })
+    })
+
+    it('does not reject the caller when the pod save fails', async () => {
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const saveToPod = vi.fn().mockRejectedValue(new Error('pod unreachable'))
+
+      const options = makeOptions({ saveToLocalDb })
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      let savedData: TestData | null = null
+      await act(async () => {
+        savedData = await result.current.saveWithSyncPrevention(makeTestData(), saveToPod)
+      })
+
+      expect(savedData).toMatchObject({ _rev: 'rev-1' })
+    })
+
+    it('still guards against pod updates when saves overlap', async () => {
+      // Two quick deletes: the first push must not clear the guard while the
+      // second is still in flight.
+      const saveToLocalDb = vi.fn().mockResolvedValue({ rev: 'rev-1' })
+      const updateFormAndState = vi.fn()
+      const resolvers: Array<(value: boolean) => void> = []
+      const saveToPod = vi.fn().mockImplementation(
+        () => new Promise<boolean>(resolve => { resolvers.push(resolve) })
+      )
+
+      const options = makeOptions({ saveToLocalDb, updateFormAndState, conflictStrategy: 'fallback-to-pod' })
+      const { result } = renderHook(() => useSyncCoordinator<TestData>(options))
+
+      await act(async () => {
+        await result.current.saveWithSyncPrevention(makeTestData(), saveToPod)
+      })
+      await act(async () => {
+        await result.current.saveWithSyncPrevention(makeTestData({ value: 'second' }), saveToPod)
+      })
+      await startBackgroundPush()
+
+      // First push completes; the second is still outstanding
+      await act(async () => { resolvers[0](true) })
+
+      await act(async () => {
+        await result.current.handleSyncSuccess(makeTestData({ lastModified: new Date(9999999999999).toISOString() }))
+      })
+
+      expect(updateFormAndState).not.toHaveBeenCalled()
+
+      await act(async () => { resolvers[1](true) })
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────────
   // CRDT merge function
   // ─────────────────────────────────────────────────────────────────
 

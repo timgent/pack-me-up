@@ -189,6 +189,28 @@ describe('ViewPackingList item deletion confirmation', () => {
             expect(screen.queryByText('Passport')).toBeNull()
         })
     })
+
+    it('removes the row without waiting for the save to come back', async () => {
+        // A save that never settles — stands in for a slow phone, or a pod on
+        // the end of a bad connection. The row still has to go straight away.
+        mockUseDatabase.mockReturnValue({
+            db: {
+                ...makeDb(),
+                savePackingList: vi.fn(() => new Promise(() => {})),
+            } as unknown as PackingAppDatabase,
+        })
+
+        renderComponent()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+
+        fireEvent.click(screen.getByTitle('Delete item'))
+        fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
+
+        await waitFor(() => {
+            expect(screen.queryByText('Passport')).toBeNull()
+        })
+    })
 })
 
 const multiCategoryPackingList = {
@@ -1164,6 +1186,46 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
 
     afterEach(() => {
         vi.restoreAllMocks()
+    })
+
+    it('does not sync from the pod until the local copy has been read', async () => {
+        // A pod copy applied before the page knows what is on the device
+        // overwrites it — including an edit whose pod write hasn't landed yet.
+        mockUseDatabase.mockReturnValue({
+            db: {
+                ...makeDb(),
+                getPackingList: vi.fn(() => new Promise(() => {})),
+            } as unknown as PackingAppDatabase,
+        })
+
+        render(
+            <MemoryRouter initialEntries={['/view-list/test-list-1']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(mockUsePodSync).toHaveBeenCalled())
+        for (const [options] of mockUsePodSync.mock.calls) {
+            expect(options.enabled).toBe(false)
+        }
+    })
+
+    it('syncs from the pod once the local copy has been read', async () => {
+        render(
+            <MemoryRouter initialEntries={['/view-list/test-list-1']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.getByText('Test Trip')).toBeTruthy())
+
+        expect(mockUsePodSync).toHaveBeenLastCalledWith(
+            expect.objectContaining({ enabled: true })
+        )
     })
 
     it('passes pathConfig.podUrl to usePodSync when ?pod= param is present', async () => {

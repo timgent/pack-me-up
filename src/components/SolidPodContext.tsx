@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useState, useEffect, useRef } from "react";
 import { SessionCore, type SessionStateChangeDetail } from "@uvdsl/solid-oidc-client-browser/core";
 import { SessionIDB } from "@uvdsl/solid-oidc-client-browser";
-import { isAuthenticationError } from "../services/solidPod";
+import { isAuthenticationError, resetPodSessionCaches } from "../services/solidPod";
 import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
 import { AppSession } from "../types/AppSession";
 
@@ -170,6 +170,9 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     intentionalLogoutRef.current = true;
     await uvdslSession.logout();
+    // Which pod a WebID lives in, and which of its containers exist, are facts
+    // about the identity that just went away.
+    resetPodSessionCaches();
     setIsLoggedIn(false);
     setWebId(undefined);
   };

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { profile } from '../utils/profiling';
 
 /**
  * Data with timestamp for conflict resolution
@@ -92,6 +93,30 @@ export interface SyncCoordinatorState<T extends TimestampedData> {
 }
 
 /**
+ * Longest we'll hold work waiting for a paint that may never come — a hidden
+ * tab gets no animation frames, and a packing list still has to reach the pod.
+ */
+const AFTER_PAINT_FALLBACK_MS = 100;
+
+/**
+ * Run `callback` once the browser has had the chance to paint, or after
+ * `AFTER_PAINT_FALLBACK_MS`, whichever comes first. The animation frame lands
+ * before the paint, so the timer inside it is what puts the work after it.
+ */
+function afterNextPaint(callback: () => void): void {
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    callback();
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => setTimeout(run, 0));
+  }
+  setTimeout(run, AFTER_PAINT_FALLBACK_MS);
+}
+
+/**
  * Hook to coordinate bidirectional sync between local state, local DB, and Pod
  *
  * Handles:
@@ -138,8 +163,10 @@ export function useSyncCoordinator<T extends TimestampedData>(
   const saveToLocalDbRef = useRef(saveToLocalDb);
   saveToLocalDbRef.current = saveToLocalDb;
 
-  // Track whether a save is currently in-progress (set before first await, cleared in finally)
-  const saveInProgressRef = useRef(false);
+  // How many saves are in-flight. A save counts as in-flight from before its
+  // first await until its background pod push settles, so overlapping saves
+  // (two quick edits) can't clear the guard out from under each other.
+  const savesInFlightRef = useRef(0);
 
   // Track the lastModified timestamp of the most recently saved data for echo detection
   const lastSavedTimestampRef = useRef<string | null>(null);
@@ -232,7 +259,7 @@ export function useSyncCoordinator<T extends TimestampedData>(
       }
 
       // Skip if a save operation is currently in-flight (set before first await)
-      if (saveInProgressRef.current) {
+      if (savesInFlightRef.current > 0) {
         console.log('Synced data from Pod - skipping because save is in-progress');
         return;
       }
@@ -259,7 +286,7 @@ export function useSyncCoordinator<T extends TimestampedData>(
       }
 
       // Compare the incoming data with what we last synced (to avoid unnecessary re-renders)
-      const incomingDataString = JSON.stringify(data);
+      const incomingDataString = profile('sync.stringify', () => JSON.stringify(data));
       if (lastSyncedDataRef.current === incomingDataString) {
         console.log('Synced data from Pod - timestamps indicate update, but data is identical (skipping re-render)');
         return;
@@ -274,7 +301,7 @@ export function useSyncCoordinator<T extends TimestampedData>(
       try {
         // Apply merge function if provided, otherwise use pod data as-is
         const resolved: T = mergeFunction && currentData
-          ? mergeFunction(currentData, data)
+          ? profile('sync.merge', () => mergeFunction(currentData, data))
           : { ...data };
 
         // Remove _rev to avoid conflicts with local database version
@@ -333,9 +360,11 @@ export function useSyncCoordinator<T extends TimestampedData>(
    */
   const saveWithSyncPrevention = useCallback(
     async (data: T, saveToPod: (data: T) => Promise<boolean>): Promise<T | null> => {
-      // Mark save as in-progress before any async work so handleSyncSuccess
+      // Count the save as in-flight before any async work so handleSyncSuccess
       // cannot slip through the unguarded window before isLocalChangeRef is set.
-      saveInProgressRef.current = true;
+      savesInFlightRef.current += 1;
+
+      let savedData: T;
       try {
         // Add monotonically increasing timestamp for conflict resolution.
         // Uses max(wallClock, maxSeen+1) so that saves are always strictly newer
@@ -352,33 +381,53 @@ export function useSyncCoordinator<T extends TimestampedData>(
         lastSavedTimestampRef.current = dataWithTimestamp.lastModified!;
 
         // Save to local database first (guaranteed)
-        const dbResult = await saveToLocalDbRef.current(dataWithTimestamp);
+        const dbResult = await profile('save.localDb', () => saveToLocalDbRef.current(dataWithTimestamp));
 
         // Update with new revision
-        const savedData = {
+        savedData = {
           ...dataWithTimestamp,
           _rev: dbResult.rev,
         } as T;
 
-        // Save to Pod (best effort)
-        isLocalChangeRef.current = true;
-        await saveToPod(savedData);
-
         // Update the last synced data ref
         lastSyncedDataRef.current = JSON.stringify(savedData);
-
-        // Reset the flag after the sync prevention window
-        setTimeout(() => {
-          isLocalChangeRef.current = false;
-        }, SYNC_PREVENTION_WINDOW_MS);
-
-        return savedData;
       } catch (err) {
         console.error('Error in saveWithSyncPrevention:', err);
+        savesInFlightRef.current -= 1;
         return null;
-      } finally {
-        saveInProgressRef.current = false;
       }
+
+      // Push to the Pod in the background. The local database is the guaranteed
+      // store and the caller renders from what we return here, so awaiting the
+      // Pod would make every edit cost a network round trip on screen — several,
+      // in fact, since a write resolves the Pod URL and checks the container
+      // before it writes. Failures still reach the user: usePodSync reports them
+      // through onSaveError.
+      //
+      // The save stays counted as in-flight until the push settles, so a Pod
+      // poll landing in the meantime can't apply its now-stale copy on top of
+      // the edit we have already shown.
+      isLocalChangeRef.current = true;
+      // Hold the push until the edit is on screen. Serialising the list to RDF
+      // is a solid chunk of main-thread work, and running it before the browser
+      // has painted is what makes a delete feel like a freeze rather than a
+      // wait.
+      afterNextPaint(() => {
+        profile('save.pod', () => saveToPod(savedData))
+          .catch((err: unknown) => {
+            console.error('Error saving to Pod:', err);
+            return false;
+          })
+          .finally(() => {
+            savesInFlightRef.current -= 1;
+            // Reset the flag after the sync prevention window
+            setTimeout(() => {
+              isLocalChangeRef.current = false;
+            }, SYNC_PREVENTION_WINDOW_MS);
+          });
+      });
+
+      return savedData;
     },
     []
   );
