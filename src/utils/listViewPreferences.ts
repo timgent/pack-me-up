@@ -14,7 +14,7 @@
  * different bag.
  */
 
-export type ListViewMode = 'person' | 'question'
+export type ListViewMode = 'person' | 'category'
 
 export interface ListViewPreferences {
     viewMode: ListViewMode
@@ -88,7 +88,9 @@ export function loadListViewPreferences(listId: string | undefined): ListViewPre
 
     const stored = parsed as Partial<Record<keyof ListViewPreferences, unknown>>
     return {
-        viewMode: stored.viewMode === 'question' ? 'question' : 'person',
+        // 'question' is what the category view was called before it was named
+        // after what it groups by. Lists left in it stay in it.
+        viewMode: stored.viewMode === 'category' || stored.viewMode === 'question' ? 'category' : 'person',
         showPacked: stored.showPacked === true,
         collapsedSections: stringsOnly(stored.collapsedSections),
         collapsedGroups: stringsOnly(stored.collapsedGroups),

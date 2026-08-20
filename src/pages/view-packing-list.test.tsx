@@ -326,7 +326,7 @@ describe('ViewPackingList category grouping', () => {
     })
 })
 
-describe('ViewPackingList person/question view toggle', () => {
+describe('ViewPackingList person/category view toggle', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
@@ -357,35 +357,340 @@ describe('ViewPackingList person/question view toggle', () => {
         expect(screen.getByText("Bob's Items")).toBeTruthy()
     })
 
-    it('switches to question view, showing category section titles grouped by person within', async () => {
+    it('switches to category view, showing category section titles', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
         // Top-level sections are now categories, not people
         expect(screen.queryByText("Alice's Items")).toBeNull()
         expect(screen.queryByText("Bob's Items")).toBeNull()
         expect(screen.getAllByText('Essentials').length).toBeGreaterThan(0)
         expect(screen.getByText('Hiking')).toBeTruthy()
-
-        // Within each category, items are grouped by person
-        expect(screen.getAllByRole('button', { name: /Collapse Alice/i }).length).toBeGreaterThan(0)
-        expect(screen.getByRole('button', { name: /Collapse Bob/i })).toBeTruthy()
         expect(screen.getByText('Toothbrush')).toBeTruthy()
         expect(screen.getByText('Nappies')).toBeTruthy()
+    })
+
+    it('writes each item once, with a column of checkboxes for the people', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
+
+        // Every card carries the same columns, in the same places, whoever has
+        // something in it — the grid is only readable if a person stays put.
+        const essentials = screen.getAllByTestId('list-section')[0]
+        expect(within(essentials).getAllByRole('columnheader').map(header => header.textContent))
+            .toEqual(['Item', expect.stringContaining('Alice'), expect.stringContaining('Bob')])
+
+        // Toothbrush is Alice's alone: she has a checkbox, Bob has a gap
+        expect(within(essentials).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
+        expect(within(essentials).queryByRole('checkbox', { name: 'Toothbrush for Bob' })).toBeNull()
+        expect(within(essentials).getByRole('checkbox', { name: 'Nappies for Bob' })).toBeTruthy()
+    })
+
+    it('packs an item from its cell', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
+
+        const cell = screen.getByRole('checkbox', { name: 'Toothbrush for Alice' }) as HTMLInputElement
+        fireEvent.click(cell)
+
+        await waitFor(() => expect(
+            (screen.getByRole('checkbox', { name: 'Toothbrush for Alice' }) as HTMLInputElement).checked,
+        ).toBe(true))
+    })
+
+    it('checks off everything one person has left in a category', async () => {
+        renderComponentMultiCategory()
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
+
+        fireEvent.click(screen.getByRole('button', { name: /Check off everything left for Alice in Essentials/i }))
+
+        // Alice's row is done, so with packed items hidden it goes; Bob's stays
+        await waitFor(() => expect(screen.queryByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeNull())
+        expect((screen.getByRole('checkbox', { name: 'Nappies for Bob' }) as HTMLInputElement).checked).toBe(false)
     })
 
     it('switches back to person view', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
         await waitFor(() => expect(screen.getByText('Hiking')).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Person View' }))
         expect(screen.getByText("Alice's Items")).toBeTruthy()
         expect(screen.getByText("Bob's Items")).toBeTruthy()
+    })
+})
+
+// ─── The category grid: an item down the side, the people across the top ────
+
+describe('ViewPackingList category grid', () => {
+    // Alice and Bob both need a toothbrush; only Bob has nappies. One name, two
+    // people, is the whole reason the grid exists.
+    const gridList = {
+        id: 'test-list-grid',
+        name: 'Grid Trip',
+        createdAt: '2026-01-01T00:00:00Z',
+        items: [
+            { id: 'tb-a', itemText: 'Toothbrush', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials', order: 0 },
+            { id: 'tb-b', itemText: 'Toothbrush', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials', order: 0 },
+            { id: 'np-b', itemText: 'Nappies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials', order: 1 },
+        ],
+    }
+
+    let db: { getPackingList: ReturnType<typeof vi.fn>; savePackingList: ReturnType<typeof vi.fn> }
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn(),
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    async function renderGrid(list: typeof gridList = gridList) {
+        db = {
+            getPackingList: vi.fn().mockResolvedValue(list),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        render(
+            <MemoryRouter initialEntries={[`/view-list/${list.id}`]}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await waitFor(() => expect(screen.getAllByText('Toothbrush').length).toBeGreaterThan(0))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
+    }
+
+    function checkbox(name: string): HTMLInputElement {
+        return screen.getByRole('checkbox', { name }) as HTMLInputElement
+    }
+
+    async function savedList() {
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        return db.savePackingList.mock.calls.at(-1)![0] as { items: PackingListItem[]; deletedItems?: PackingListItem[] }
+    }
+
+    it('writes a name shared by two people once, with a checkbox each', async () => {
+        await renderGrid()
+
+        expect(screen.getAllByText('Toothbrush')).toHaveLength(1)
+        expect(checkbox('Toothbrush for Alice')).toBeTruthy()
+        expect(checkbox('Toothbrush for Bob')).toBeTruthy()
+    })
+
+    describe('hiding packed items', () => {
+        it('keeps a half-packed row, so a packed cell never reads as one nobody needs', async () => {
+            await renderGrid()
+
+            fireEvent.click(checkbox('Toothbrush for Alice'))
+
+            // The row stays whole: Alice's cell is ticked and still on screen,
+            // where an empty cell would have said "Alice doesn't need one".
+            await waitFor(() => expect(checkbox('Toothbrush for Alice').checked).toBe(true))
+            expect(checkbox('Toothbrush for Bob')).toBeTruthy()
+        })
+
+        it('takes the row away once everyone on it is packed', async () => {
+            await renderGrid()
+
+            fireEvent.click(checkbox('Toothbrush for Alice'))
+            fireEvent.click(checkbox('Toothbrush for Bob'))
+
+            await waitFor(() => expect(screen.queryByText('Toothbrush')).toBeNull())
+            expect(checkbox('Nappies for Bob')).toBeTruthy()
+        })
+
+        it('counts what it is actually holding back, not every packed item', async () => {
+            await renderGrid()
+
+            fireEvent.click(checkbox('Toothbrush for Alice'))
+            fireEvent.click(checkbox('Toothbrush for Bob'))
+
+            // Two items hidden — Alice's and Bob's toothbrushes — and not the
+            // three a person-view count would have claimed.
+            await waitFor(() => expect(screen.getByText(/2 packed items hidden/)).toBeTruthy())
+        })
+    })
+
+    describe('the "who needs this?" panel', () => {
+        const openPanel = async (label: string) => {
+            fireEvent.click(screen.getByRole('button', { name: `${label} — who needs this?` }))
+            await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+            return within(screen.getByRole('dialog'))
+        }
+
+        it('opens from the item name and says who has it', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Nappies')
+            expect((panel.getByRole('checkbox', { name: 'Bob needs Nappies' }) as HTMLInputElement).checked).toBe(true)
+            expect((panel.getByRole('checkbox', { name: 'Alice needs Nappies' }) as HTMLInputElement).checked).toBe(false)
+        })
+
+        it('adds the item for somebody who does not have it', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Nappies')
+            fireEvent.click(panel.getByRole('checkbox', { name: 'Alice needs Nappies' }))
+
+            const saved = await savedList()
+            const added = saved.items.findLast(item => item.itemText === 'Nappies')!
+            expect(added.personName).toBe('Alice')
+            expect(added.personId).toBe('p1')
+            expect(added.category).toBe('Essentials')
+        })
+
+        it('takes it off one person without touching the others', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            fireEvent.click(panel.getByRole('checkbox', { name: 'Bob needs Toothbrush' }))
+
+            const saved = await savedList()
+            expect(saved.items.map(item => item.id)).toEqual(['tb-a', 'np-b'])
+            // Deleting an item the question set put there is remembered, so the
+            // user can be asked about it next time
+            expect(saved.deletedItems?.map(item => item.id)).toEqual(['tb-b'])
+        })
+
+        it('renames every copy at once, because one item spelled two ways is a bug', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            const field = panel.getByLabelText('Item') as HTMLInputElement
+            fireEvent.change(field, { target: { value: 'Tooth brush' } })
+            fireEvent.keyDown(field, { key: 'Enter' })
+
+            const saved = await savedList()
+            expect(saved.items.filter(item => item.itemText === 'Tooth brush').map(item => item.id))
+                .toEqual(['tb-a', 'tb-b'])
+        })
+
+        it('stays open on the row it was opened on after a rename', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            const field = panel.getByLabelText('Item') as HTMLInputElement
+            fireEvent.change(field, { target: { value: 'Tooth brush' } })
+            fireEvent.keyDown(field, { key: 'Enter' })
+
+            await waitFor(() => expect(
+                within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'Alice needs Tooth brush' }),
+            ).toBeTruthy())
+        })
+
+        it('sets a quantity for one person only', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            const quantity = panel.getByLabelText('Quantity for Alice')
+            fireEvent.change(quantity, { target: { value: '3' } })
+            fireEvent.blur(quantity)
+
+            const saved = await savedList()
+            expect(saved.items.find(item => item.id === 'tb-a')!.quantity).toBe(3)
+            expect(saved.items.find(item => item.id === 'tb-b')!.quantity).toBeUndefined()
+        })
+
+        it('marks one person\'s copy as last minute, leaving the other where it is', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            fireEvent.click(panel.getByRole('button', { name: /Mark Alice's Toothbrush as a last minute item/i }))
+
+            const saved = await savedList()
+            expect(saved.items.find(item => item.id === 'tb-a')!.lastMinute).toBe(true)
+            expect(saved.items.find(item => item.id === 'tb-b')!.lastMinute).toBeUndefined()
+        })
+
+        it('removes the whole row once the removal is confirmed, naming who it covers', async () => {
+            await renderGrid()
+
+            const panel = await openPanel('Toothbrush')
+            fireEvent.click(panel.getByRole('button', { name: 'Remove for all 2' }))
+
+            await waitFor(() => expect(screen.getByText('Remove Toothbrush for Alice, Bob?')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
+
+            const saved = await savedList()
+            expect(saved.items.map(item => item.id)).toEqual(['np-b'])
+        })
+    })
+
+    it('gives the unassigned items a column of their own, last', async () => {
+        await renderGrid({
+            ...gridList,
+            items: [
+                ...gridList.items,
+                { id: 'tr-x', itemText: 'Torch', personName: '', personId: '', questionId: '', optionId: '', packed: false, category: 'Essentials', order: 2 },
+            ],
+        })
+
+        expect(screen.getAllByRole('columnheader').map(header => header.textContent))
+            .toEqual(['Item', expect.stringContaining('Alice'), expect.stringContaining('Bob'), expect.stringContaining('Unassigned')])
+        expect(checkbox('Torch for Unassigned')).toBeTruthy()
+    })
+
+    it('lays the last minute card out as a grid too', async () => {
+        await renderGrid({
+            ...gridList,
+            items: gridList.items.map(item => item.id === 'tb-a' ? { ...item, lastMinute: true } : item),
+        })
+
+        const lastMinute = screen.getAllByTestId('list-section').find(section =>
+            within(section).queryByRole('button', { name: /Collapse the last minute items list/i }))!
+        expect(within(lastMinute).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
+    })
+
+    describe('on a phone', () => {
+        beforeEach(() => {
+            vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+                // Narrower than the sm breakpoint, and no reduced-motion preference
+                matches: false,
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }) as unknown as MediaQueryList)
+        })
+
+        it('keeps the columns and drops the names, decoding them once in a legend', async () => {
+            await renderGrid()
+
+            // The checkboxes still name their person, so nothing is lost to a
+            // screen reader by the header being an initial
+            expect(checkbox('Toothbrush for Alice')).toBeTruthy()
+            const legend = within(screen.getByTestId('grid-people-legend'))
+            expect(legend.getByText('Alice')).toBeTruthy()
+            expect(legend.getByText('Bob')).toBeTruthy()
+        })
     })
 })
 
@@ -1604,7 +1909,7 @@ describe('ViewPackingList shared (communal) section', () => {
     })
 })
 
-describe('ViewPackingList shared (communal) items in question view', () => {
+describe('ViewPackingList shared (communal) items in category view', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
@@ -1641,7 +1946,7 @@ describe('ViewPackingList shared (communal) items in question view', () => {
             </MemoryRouter>
         )
         await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
         return db
     }
 
@@ -1663,42 +1968,36 @@ describe('ViewPackingList shared (communal) items in question view', () => {
         expect(within(card('Essentials')).getByText('First aid kit')).toBeTruthy()
     })
 
-    it('groups shared items under Shared, ahead of the people', async () => {
+    it('gives a shared item one checkbox for the whole group, ahead of the rest', async () => {
         await renderInQuestionView()
 
-        const headings = within(card('Camping'))
-            .getAllByRole('button', { name: /^Collapse / })
-            .map(button => button.getAttribute('aria-label'))
-        expect(headings).toEqual(['Collapse Camping list', 'Collapse Shared', 'Collapse Alice'])
+        const camping = within(card('Camping'))
+        expect(camping.getByRole('checkbox', { name: 'Tent for the whole group' })).toBeTruthy()
+        // No column belongs to it, and it comes first — the shared card's place
+        // in person view, kept
+        expect(camping.getAllByTestId('grid-row')[0].textContent).toContain('Tent')
+        expect(camping.getByText('👥 For everyone')).toBeTruthy()
     })
 
-    it('counts shared items in the section and group totals', async () => {
+    it('counts shared items in the section total', async () => {
         await renderInQuestionView()
 
         const camping = within(card('Camping'))
         expect(camping.getByRole('button', { name: /collapse camping list/i }).textContent).toContain('0 / 2')
-        expect(camping.getByRole('button', { name: 'Collapse Shared' }).textContent).toContain('0 / 1')
     })
 
-    it('adds a shared item from the shared group of a section', async () => {
-        const db = await renderInQuestionView()
+    it('keeps a shared item apart from someone\'s own copy of the same thing', async () => {
+        await renderInQuestionView({
+            ...communalPackingList,
+            items: [
+                ...communalPackingList.items,
+                { id: 'item-a2', itemText: 'Tent', personName: 'Alice', personId: 'p1', questionId: 'q2', optionId: 'o2', packed: false, category: 'Camping' },
+            ],
+        })
 
         const camping = within(card('Camping'))
-        fireEvent.click(camping.getByRole('button', { name: /add item to camping for shared items/i }))
-        const composer = camping.getAllByTestId('add-item-composer')
-            .find(node => within(node).queryByLabelText(/add an item to camping for shared items/i))
-        expect(composer).toBeTruthy()
-        fireEvent.change(within(composer!).getByLabelText(/add an item to camping for shared items/i), {
-            target: { value: 'Camping stove' },
-        })
-        fireEvent.click(within(composer!).getByRole('button', { name: 'Add' }))
-
-        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
-        const saved = db.savePackingList.mock.calls[0][0]
-        const added = saved.items.find((i: { itemText: string }) => i.itemText === 'Camping stove')
-        expect(added.communal).toBe(true)
-        expect(added.category).toBe('Camping')
-        expect(added.personName).toBe('')
+        expect(camping.getByRole('checkbox', { name: 'Tent for the whole group' })).toBeTruthy()
+        expect(camping.getByRole('checkbox', { name: 'Tent for Alice' })).toBeTruthy()
     })
 
     it('offers Shared in a section\'s who-for picker, so shared items can be added without a shared card', async () => {
@@ -2080,11 +2379,11 @@ describe('ViewPackingList section completion celebration', () => {
         await waitFor(() => expect(screen.getByLabelText(/all packed for bob/i)).toBeTruthy())
     })
 
-    it('celebrates a fully packed category in question view', async () => {
+    it('celebrates a fully packed category in category view', async () => {
         renderList()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: /question view/i }))
+        fireEvent.click(screen.getByRole('button', { name: /category view/i }))
 
         // Documents (Passport) is fully packed; Toiletries (Toothbrush) is not
         expect(screen.getByText('Documents')).toBeTruthy()
@@ -2620,10 +2919,10 @@ describe('ViewPackingList adding items', () => {
         expect(screen.getByLabelText('Add an item to Other for Alice')).toBeTruthy()
     })
 
-    it('adds for someone with nothing in a section yet, from question view', async () => {
+    it('adds for someone with nothing in a section yet, from category view', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
         const { input, fields } = composerFor('Hiking')
         fireEvent.change(input, { target: { value: 'Walking poles' } })
@@ -2885,13 +3184,13 @@ describe('ViewPackingList folding sections away', () => {
         it('reopens in the view mode the user chose', async () => {
             const { unmount } = renderList()
             await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /question view/i }))
+            fireEvent.click(screen.getByRole('button', { name: /category view/i }))
             unmount()
 
             renderList()
             await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
-            expect(screen.getByRole('button', { name: /question view/i }).getAttribute('aria-pressed')).toBe('true')
+            expect(screen.getByRole('button', { name: /category view/i }).getAttribute('aria-pressed')).toBe('true')
         })
 
         it('reopens still showing packed items', async () => {
@@ -3337,14 +3636,14 @@ describe('ViewPackingList last minute items', () => {
         expect(screen.queryByText('Shared Items')).toBeNull()
     })
 
-    it('keeps a marked item out of its category card in question view', async () => {
+    it('keeps a marked item out of its category card in category view', async () => {
         renderLastMinuteList([
             { ...lastMinuteBaseItems[0], lastMinute: true },
             lastMinuteBaseItems[1],
         ])
 
         await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
         expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy()
         expect(screen.queryByText('Documents')).toBeNull()

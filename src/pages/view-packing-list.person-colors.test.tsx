@@ -129,17 +129,17 @@ describe('ViewPackingList person colours', () => {
             .not.toContain(pink.avatar)
     })
 
-    it('carries the colours into the section-grouped view', async () => {
+    it('carries the colours into the category grid\'s columns', async () => {
         renderList()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        // Each person's group inside a section card is marked the same way
-        const bobGroup = await screen.findByRole('button', { name: /Collapse Bob/ })
-        await waitFor(() => expect(within(bobGroup).getByTestId('person-avatar').className).toContain(pink.avatar))
-        const aliceGroup = screen.getByRole('button', { name: /Collapse Alice/ })
-        expect(within(aliceGroup).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
+        // Each column is headed by the same mark that person's card carries
+        const bobColumn = (await screen.findAllByRole('columnheader', { name: /Bob/ }))[0]
+        await waitFor(() => expect(within(bobColumn).getByTestId('person-avatar').className).toContain(pink.avatar))
+        const aliceColumn = screen.getAllByRole('columnheader', { name: /Alice/ })[0]
+        expect(within(aliceColumn).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
     })
 
     it('leaves the shared card unmarked — it belongs to nobody in particular', async () => {

@@ -297,6 +297,37 @@ body {
   animation: item-packed-tick 0.45s ease-out;
 }
 
+/* ── Category view's item x person grid ─────────────────────────────────────
+   The grid's rewards are the same as the list's, moved from a row to a cell:
+   the swell happens where the finger landed rather than across the whole row,
+   which at grid density is the difference between "that one" and "one of
+   those". Kept in step with ITEM_FLOURISH_MS. */
+@keyframes grid-cell-packed {
+  0% { transform: scale(1); background-color: transparent; }
+  30% { transform: scale(1.06); background-color: rgb(220 252 231); }
+  70% { transform: scale(1); background-color: rgb(220 252 231); }
+  100% { transform: scale(1); background-color: transparent; }
+}
+
+.grid-cell-packed {
+  animation: grid-cell-packed 0.45s ease-out;
+}
+
+/* With packed items hidden a finished row has to go, but not before the tick
+   that finished it has been seen — so it fades rather than blinking out from
+   under the finger. Opacity only: a table row is not a box you can move or
+   clip, and transforming one is a different shape in every browser. Kept in
+   step with ITEM_FLOURISH_MS. */
+@keyframes grid-row-leaving {
+  0% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.grid-row-leaving {
+  animation: grid-row-leaving 0.45s ease-in forwards;
+}
+
 /* Celebrations and waiting states are decorative — hold still for anyone who
    asked us to. */
 @media (prefers-reduced-motion: reduce) {
@@ -338,8 +369,15 @@ body {
   /* The check-off flourish is pure decoration. The component skips rendering the
      tick entirely in this mode; this is the belt to that pair of braces. */
   .item-row-packed,
-  .item-packed-tick {
+  .item-packed-tick,
+  .grid-cell-packed {
     animation: none;
+  }
+
+  /* The row still has to leave — it just doesn't make a show of going */
+  .grid-row-leaving {
+    animation: none;
+    opacity: 0;
   }
 }
 
