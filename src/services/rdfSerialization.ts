@@ -169,6 +169,7 @@ function packingListItemToThing(item: PackingListItem, itemUrl: string): Thing {
     if (item.quantity !== undefined) t = t.addInteger(PMU.quantity, item.quantity)
     if (item.category !== undefined) t = t.addStringNoLocale(PMU.category, item.category)
     if (item.reviewed !== undefined) t = t.addBoolean(PMU.reviewed, item.reviewed)
+    if (item.lastMinute !== undefined) t = t.addBoolean(PMU.lastMinute, item.lastMinute)
     if (item.order !== undefined) t = t.addInteger(PMU.order, item.order)
     if (item.lastModified !== undefined) t = t.addDatetime(PMU.itemLastModified, new Date(item.lastModified))
 
@@ -190,6 +191,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
     const quantity = getInteger(thing, PMU.quantity)
     const category = getStringNoLocale(thing, PMU.category) ?? undefined
     const reviewed = getBoolean(thing, PMU.reviewed)
+    const lastMinute = getBoolean(thing, PMU.lastMinute)
     const order = getInteger(thing, PMU.order)
     const itemLastModified = getDatetime(thing, PMU.itemLastModified)?.toISOString()
 
@@ -205,6 +207,7 @@ function thingToPackingListItem(thing: Thing | null, url: string): PackingListIt
         ...(quantity !== null ? { quantity } : {}),
         ...(category !== undefined ? { category } : {}),
         ...(reviewed !== null ? { reviewed } : {}),
+        ...(lastMinute !== null ? { lastMinute } : {}),
         ...(order !== null ? { order } : {}),
         ...(itemLastModified !== undefined ? { lastModified: itemLastModified } : {}),
     }

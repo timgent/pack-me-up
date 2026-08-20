@@ -51,6 +51,16 @@ const SHARED_SECTION_KEY = '__shared__'
 // section's card in question view, and in the "who for" picker.
 const SHARED_GROUP_LABEL = 'Shared'
 
+// Reserved key for the last minute section, for the same reason as the shared
+// one: a person can't be called this, so the two can never collide.
+const LAST_MINUTE_SECTION_KEY = '__last_minute__'
+
+// Some things can't go in a bag until you're walking out of the door. They are
+// collected in one card at the end of the list rather than sitting among the
+// items that can be packed now, whichever way the list is grouped.
+const LAST_MINUTE_TITLE = 'Last Minute'
+const LAST_MINUTE_HINT = 'Pack these just before you go.'
+
 // Long enough for the last (delayed) confetti piece to finish falling
 const CONFETTI_DURATION_MS = 4000
 
@@ -103,6 +113,9 @@ interface ListSection {
     communal?: boolean
     // True for question-centric top-level sections (grouped by category rather than person)
     isCategory?: boolean
+    // True for the one section holding the items that can only be packed on the
+    // way out of the door. Grouped by person, like a category section.
+    lastMinute?: boolean
 }
 
 // Generated items carry an `order` stamped from the question set; sort by it so
@@ -185,6 +198,15 @@ export function groupByPerson(items: PackingListItem[]): ItemGroup[] {
         }))
 }
 
+
+/**
+ * Which top-level card an item belongs to in person view. Last minute wins over
+ * everything: the point of marking an item is that it leaves the card it was in.
+ */
+function personViewSectionKey(item: PackingListItem): string {
+    if (item.lastMinute) return LAST_MINUTE_SECTION_KEY
+    return item.communal ? SHARED_SECTION_KEY : item.personName
+}
 
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
@@ -826,6 +848,55 @@ export function ViewPackingList() {
         }
     }
 
+    /**
+     * Move an item into the last minute card, or back out of it.
+     *
+     * The flag is deleted rather than set to false when it comes off: an item
+     * that was never marked and one that was unmarked are the same item, and
+     * carrying `lastMinute: false` around would only make them look different
+     * to the pod and to the merge.
+     */
+    const handleToggleLastMinute = async (item: PackingListItem) => {
+        if (!packingList) return
+        const nowLastMinute = !item.lastMinute
+
+        try {
+            setAutoSaveStatus('saving')
+            const now = new Date().toISOString()
+            const updatedItems = packingList.items.map(existing => {
+                if (existing.id !== item.id) return existing
+                const { lastMinute: _wasLastMinute, ...rest } = existing
+                return {
+                    ...rest,
+                    ...(nowLastMinute ? { lastMinute: true } : {}),
+                    lastModified: now,
+                }
+            })
+
+            // The item has just moved to the other end of the list, so open the
+            // card it landed in and mark the row — otherwise ticking the box
+            // reads as the item having been deleted.
+            if (nowLastMinute) {
+                setCollapsedSections(prev => {
+                    if (!prev.has(LAST_MINUTE_SECTION_KEY)) return prev
+                    const next = new Set(prev)
+                    next.delete(LAST_MINUTE_SECTION_KEY)
+                    return next
+                })
+            }
+            setRecentlyAddedItemId(item.id)
+            setTimeout(() => setRecentlyAddedItemId(null), 2000)
+
+            await persistPackingList({ ...packingList, items: updatedItems })
+
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
+        } catch (err) {
+            reportError(err, 'Error changing last minute status')
+            setAutoSaveStatus('error')
+        }
+    }
+
     const handleStartEdit = (item: PackingListItem) => {
         setEditingItemId(item.id)
         setEditingItemText(item.itemText)
@@ -891,6 +962,7 @@ export function ViewPackingList() {
                 optionId: '',
                 packed: false,
                 ...(target.communal ? { communal: true } : {}),
+                ...(target.lastMinute ? { lastMinute: true } : {}),
                 ...(target.category ? { category: target.category } : {}),
                 // A quantity of one is what an absent quantity already means.
                 ...(quantity && quantity > 1 ? { quantity } : {}),
@@ -903,21 +975,27 @@ export function ViewPackingList() {
             // Make sure the group the item lands in is expanded, so an item
             // filed into a collapsed section isn't added into thin air. The two
             // views key the same group the opposite way round.
-            const sectionKey = target.communal ? SHARED_SECTION_KEY : target.personName
+            const sectionKey = target.lastMinute
+                ? LAST_MINUTE_SECTION_KEY
+                : target.communal ? SHARED_SECTION_KEY : target.personName
             const categoryLabel = target.category ?? UNCATEGORISED_LABEL
             const groupKey = target.communal ? SHARED_SECTION_KEY : (target.personName || UNASSIGNED_LABEL)
             setCollapsedGroups(prev => {
-                const keysToExpand = [`${sectionKey}::${categoryLabel}`, `${categoryLabel}::${groupKey}`]
+                // A last minute item lands in the one card, grouped by person,
+                // whatever section it would otherwise have belonged to.
+                const keysToExpand = target.lastMinute
+                    ? [`${LAST_MINUTE_SECTION_KEY}::${groupKey}`]
+                    : [`${sectionKey}::${categoryLabel}`, `${categoryLabel}::${groupKey}`]
                 if (!keysToExpand.some(k => prev.has(k))) return prev
                 const next = new Set(prev)
                 for (const k of keysToExpand) next.delete(k)
                 return next
             })
             setCollapsedSections(prev => {
-                if (!prev.has(sectionKey) && !prev.has(categoryLabel)) return prev
+                const sectionsToExpand = target.lastMinute ? [sectionKey] : [sectionKey, categoryLabel]
+                if (!sectionsToExpand.some(key => prev.has(key))) return prev
                 const next = new Set(prev)
-                next.delete(sectionKey)
-                next.delete(categoryLabel)
+                for (const key of sectionsToExpand) next.delete(key)
                 return next
             })
 
@@ -1000,7 +1078,7 @@ export function ViewPackingList() {
     const sectionStats = useMemo(() => {
         const stats: Record<string, SectionStats> = {}
         for (const item of listItems ?? []) {
-            const key = item.communal ? SHARED_SECTION_KEY : item.personName
+            const key = personViewSectionKey(item)
             stats[key] ??= { packed: 0, total: 0 }
             stats[key].total++
             if (watchedItems[item.id]) stats[key].packed++
@@ -1014,7 +1092,9 @@ export function ViewPackingList() {
     const categoryStats = useMemo(() => {
         const stats: Record<string, SectionStats> = {}
         for (const item of listItems ?? []) {
-            const key = item.category ?? UNCATEGORISED_LABEL
+            // The last minute card is a section in both views, and its items
+            // are counted there rather than in the section they came from.
+            const key = item.lastMinute ? LAST_MINUTE_SECTION_KEY : (item.category ?? UNCATEGORISED_LABEL)
             stats[key] ??= { packed: 0, total: 0 }
             stats[key].total++
             if (watchedItems[item.id]) stats[key].packed++
@@ -1036,6 +1116,13 @@ export function ViewPackingList() {
         for (const item of listItems ?? []) {
             const category = item.category ?? UNCATEGORISED_LABEL
             const packed = !!watchedItems[item.id]
+            // The last minute card groups by person, and holds its items whole:
+            // they are not also counted under the section they were lifted from.
+            if (item.lastMinute) {
+                const personKey = item.communal ? SHARED_SECTION_KEY : (item.personName || UNASSIGNED_LABEL)
+                count(`${LAST_MINUTE_SECTION_KEY}::${personKey}`, packed)
+                continue
+            }
             if (item.communal) {
                 count(`${SHARED_SECTION_KEY}::${category}`, packed)
                 count(`${category}::${SHARED_SECTION_KEY}`, packed)
@@ -1070,9 +1157,7 @@ export function ViewPackingList() {
         if (listSeenBefore || hasSeededFoldRef.current || !listItems) return
         if (listItems.length <= FOLD_ON_OPEN_MIN_ITEMS) return
 
-        const sectionKeys = new Set(
-            listItems.map(item => (item.communal ? SHARED_SECTION_KEY : item.personName)),
-        )
+        const sectionKeys = new Set(listItems.map(personViewSectionKey))
         // Guests with nothing in them yet still have a card to fold
         for (const guest of packingList?.guests ?? []) sectionKeys.add(guest.name)
         // Nothing to fold *into* — one long section stays open, since folding it
@@ -1205,10 +1290,11 @@ export function ViewPackingList() {
     // Seed fully packed people too, so finishing someone off leaves a celebration
     // behind rather than silently removing their card along with their last item.
     for (const [name, stats] of Object.entries(sectionStats)) {
-        if (name !== SHARED_SECTION_KEY && isSectionComplete(stats)) groupedItems[name] ??= []
+        if (name === SHARED_SECTION_KEY || name === LAST_MINUTE_SECTION_KEY) continue
+        if (isSectionComplete(stats)) groupedItems[name] ??= []
     }
     for (const item of filteredItems) {
-        if (item.communal) continue
+        if (item.communal || item.lastMinute) continue
         if (!groupedItems[item.personName]) groupedItems[item.personName] = []
         groupedItems[item.personName].push(item)
     }
@@ -1217,8 +1303,8 @@ export function ViewPackingList() {
     // are the one part of the list that is nobody's. Question view has no use
     // for it: there the sections are the question set's, and a shared item
     // belongs to its section as much as anyone's does — see below.
-    const hasCommunalItems = packingList.items.some(i => i.communal)
-    const visibleCommunalItems = filteredItems.filter(i => i.communal)
+    const hasCommunalItems = packingList.items.some(i => i.communal && !i.lastMinute)
+    const visibleCommunalItems = filteredItems.filter(i => i.communal && !i.lastMinute)
     // Like person sections, the shared section disappears when all its items are
     // packed and packed items are hidden.
     const sharedSections: ListSection[] = (visibleCommunalItems.length > 0 || showSharedSection || isSectionComplete(sectionStats[SHARED_SECTION_KEY]))
@@ -1228,6 +1314,20 @@ export function ViewPackingList() {
             name: '',
             communal: true,
             items: visibleCommunalItems,
+        }]
+        : []
+
+    // The one card that outranks both groupings: whatever it is grouped by, an
+    // item you can't pack yet doesn't belong among the ones you can. It comes
+    // last, where it is read last — the final stop on the way out of the door.
+    const lastMinuteItems = packingList.items.filter(i => i.lastMinute)
+    const lastMinuteSections: ListSection[] = lastMinuteItems.length > 0
+        ? [{
+            key: LAST_MINUTE_SECTION_KEY,
+            title: LAST_MINUTE_TITLE,
+            name: '',
+            lastMinute: true,
+            items: filteredItems.filter(i => i.lastMinute),
         }]
         : []
 
@@ -1246,17 +1346,17 @@ export function ViewPackingList() {
                 guestId: g.id,
                 items: groupedItems[g.name] ?? [],
             }))
-        listSections = [...sharedSections, ...regularSections, ...guestSections]
+        listSections = [...sharedSections, ...regularSections, ...guestSections, ...lastMinuteSections]
     } else {
         // Communal items are filed by category here, same as everyone else's —
         // they sit in a shared group inside the section they belong to rather
         // than in a card of their own.
         const visibleByCategory = new Map(
-            groupByCategory(filteredItems, sectionOrder).map(({ label, items }) => [label, items])
+            groupByCategory(filteredItems.filter(i => !i.lastMinute), sectionOrder).map(({ label, items }) => [label, items])
         )
         // Categories come from every item, not just the visible ones, so a fully
         // packed category keeps its celebratory card instead of disappearing.
-        const categorySections: ListSection[] = groupByCategory(packingList.items, sectionOrder)
+        const categorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.lastMinute), sectionOrder)
             .filter(({ label }) => visibleByCategory.has(label) || isSectionComplete(categoryStats[label]))
             .map(({ label }) => ({
                 key: label,
@@ -1265,7 +1365,7 @@ export function ViewPackingList() {
                 items: visibleByCategory.get(label) ?? [],
                 isCategory: true,
             }))
-        listSections = categorySections
+        listSections = [...categorySections, ...lastMinuteSections]
     }
 
     const tripDates = formatTripDates(packingList.startDate, packingList.endDate)
@@ -1586,21 +1686,28 @@ export function ViewPackingList() {
                                 : (sectionStats[sectionKey] ?? { packed: 0, total: 0 })
                             const isGuest = guestId !== undefined
                             const isShared = section.communal === true
+                            const isLastMinute = section.lastMinute === true
                             const isComplete = isSectionComplete(stats)
-                            const completeLabel = isShared ? 'shared items' : isCategorySection ? title : section.name
-                            const collapseLabelTarget = isShared ? 'the shared items' : isCategorySection ? title : `${section.name}'s`
-                            const innerGroups: ItemGroup[] = (isShared || !isCategorySection)
-                                ? groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
-                                : groupByPerson(items)
+                            const completeLabel = isShared ? 'shared items' : (isCategorySection || isLastMinute) ? title : section.name
+                            const collapseLabelTarget = isShared ? 'the shared items' : isLastMinute ? 'the last minute items' : isCategorySection ? title : `${section.name}'s`
+                            // The last minute card holds everybody's, so it groups
+                            // by person the way a category card does.
+                            const innerGroups: ItemGroup[] = (isCategorySection || isLastMinute)
+                                ? groupByPerson(items)
+                                : groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
                             const isSectionCollapsed = collapsedSections.has(sectionKey)
                             // Only a card that belongs to one person can wear
                             // their colour: a category card holds everybody's.
-                            const sectionPersonColor = (isShared || isCategorySection)
+                            const sectionPersonColor = (isShared || isCategorySection || isLastMinute)
                                 ? undefined
                                 : personColor({ id: guestId ?? personIdByName.get(section.name) ?? '', name: section.name })
                             const sectionBorder = isComplete
                                 ? 'border-emerald-300 bg-emerald-50'
-                                : `bg-white ${sectionPersonColor?.border ?? (isShared ? 'border-blue-200' : 'border-gray-200')}`
+                                // Amber, because the card is a reminder rather than
+                                // a pile: nothing in it can be dealt with yet.
+                                : isLastMinute
+                                    ? 'border-amber-300 bg-amber-50'
+                                    : `bg-white ${sectionPersonColor?.border ?? (isShared ? 'border-blue-200' : 'border-gray-200')}`
                             return (
                             <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-4 shadow-sm mb-4 transition-colors duration-300 ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
                                 {/* The rule under the heading separates it from the items
@@ -1682,20 +1789,26 @@ export function ViewPackingList() {
                                     </div>
                                 </div>
                                 {!isSectionCollapsed && <div>
+                                    {/* The card is the only one whose items can't be dealt with
+                                        yet, so it says why rather than leaving that to the name. */}
+                                    {isLastMinute && (
+                                        <p className="-mt-2 mb-3 text-sm text-amber-800">{LAST_MINUTE_HINT}</p>
+                                    )}
                                     {/* Every card can be typed into directly. What varies is which
                                         part of the target the card already knows: a person's card
                                         knows who, and asks which section; a section's card knows
                                         which section, and asks who. */}
                                     <div className="mb-4 pb-4 border-b border-gray-200">
                                         <AddItemComposer
-                                            personName={isCategorySection ? '' : section.name}
-                                            personId={isCategorySection ? '' : (guestId ?? personIdByName.get(section.name) ?? '')}
+                                            personName={(isCategorySection || isLastMinute) ? '' : section.name}
+                                            personId={(isCategorySection || isLastMinute) ? '' : (guestId ?? personIdByName.get(section.name) ?? '')}
                                             communal={section.communal}
                                             category={isCategorySection ? categoryFromLabel(title) : undefined}
-                                            categoryOptions={isCategorySection ? undefined : sectionChoices}
-                                            peopleOptions={isCategorySection ? sectionPeopleChoices : undefined}
+                                            lastMinute={isLastMinute}
+                                            categoryOptions={(isCategorySection || isLastMinute) ? undefined : sectionChoices}
+                                            peopleOptions={(isCategorySection || isLastMinute) ? sectionPeopleChoices : undefined}
                                             suggestions={suggestionIndex}
-                                            targetLabel={isShared ? 'shared items' : isCategorySection ? title : `${section.name}'s items`}
+                                            targetLabel={isShared ? 'shared items' : isLastMinute ? 'last minute items' : isCategorySection ? title : `${section.name}'s items`}
                                             onAdd={handleComposerAdd}
                                         />
                                     </div>
@@ -1713,15 +1826,19 @@ export function ViewPackingList() {
                                         const groupStat = groupStats[categoryKey] ?? { packed: catItems.length, total: catItems.length }
                                         // Both views end up describing the same place; only which
                                         // half the card supplies changes.
-                                        const groupLabel = isCategorySection
+                                        const groupLabel = (isCategorySection || isLastMinute)
                                             ? `${title} for ${isSharedGroup ? 'shared items' : label}`
                                             : `${label} for ${isShared ? 'shared items' : section.name}`
-                                        const groupTarget = isCategorySection
+                                        const groupTarget: AddItemTarget = (isCategorySection || isLastMinute)
                                             ? {
                                                 personName: isSharedGroup ? '' : label,
                                                 personId: isSharedGroup ? '' : (personIdByName.get(label) ?? ''),
                                                 communal: isSharedGroup,
-                                                category: categoryFromLabel(title),
+                                                // A last minute item's section is
+                                                // the last minute card itself.
+                                                ...(isLastMinute
+                                                    ? { lastMinute: true }
+                                                    : { category: categoryFromLabel(title) }),
                                             }
                                             : {
                                                 personName: section.name,
@@ -1747,7 +1864,7 @@ export function ViewPackingList() {
                                                         {isSharedGroup && (
                                                             <span aria-hidden title="Packed once for the whole group">👥</span>
                                                         )}
-                                                        {isCategorySection && !isSharedGroup && label !== UNASSIGNED_LABEL && (
+                                                        {(isCategorySection || isLastMinute) && !isSharedGroup && label !== UNASSIGNED_LABEL && (
                                                             <PersonAvatar
                                                                 name={label}
                                                                 color={personColor({ id: personIdByName.get(label) ?? '', name: label })}
@@ -1791,6 +1908,7 @@ export function ViewPackingList() {
                                                             personId={groupTarget.personId}
                                                             communal={groupTarget.communal}
                                                             category={groupTarget.category}
+                                                            lastMinute={groupTarget.lastMinute}
                                                             suggestions={suggestionIndex}
                                                             targetLabel={groupLabel}
                                                             placeholder={`Add to ${label}...`}
@@ -1886,6 +2004,24 @@ export function ViewPackingList() {
                                                                             </span>
                                                                         )}
                                                                     </label>
+                                                                    {editingItemId !== item.id && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleToggleLastMinute(item)}
+                                                                            aria-pressed={item.lastMinute === true}
+                                                                            aria-label={item.lastMinute
+                                                                                ? `Remove ${item.itemText} from the last minute items`
+                                                                                : `Mark ${item.itemText} as a last minute item`}
+                                                                            title={item.lastMinute
+                                                                                ? 'Packed with everything else after all'
+                                                                                : "Can't be packed until just before you go"}
+                                                                            className={`ml-1 rounded-md p-1 transition-colors hover:bg-amber-50 hover:text-amber-600 ${item.lastMinute ? 'text-amber-600' : 'text-gray-400'}`}
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.5 2.5a1 1 0 101.414-1.414L11 9.586V6z" clipRule="evenodd" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    )}
                                                                     {editingItemId !== item.id && (
                                                                         <button
                                                                             type="button"

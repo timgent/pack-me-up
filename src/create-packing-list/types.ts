@@ -39,6 +39,10 @@ export interface PackingListItem {
     category?: string
     order?: number     // position in the question set at generation time; absent on legacy items (sorted alphabetically)
     reviewed?: boolean
+    // Can't go in the bag until you're walking out of the door — phone charger,
+    // toothbrush, passport in a pocket. Shown in a section of its own at the
+    // end of the list rather than among the items that can be packed now.
+    lastMinute?: boolean
     lastModified?: string // ISO timestamp; absent on legacy items
 }
 

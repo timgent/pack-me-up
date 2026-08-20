@@ -3197,3 +3197,181 @@ describe('ViewPackingList contextual sign-in to share', () => {
         expect(getPendingSignInAction()).toEqual({ type: 'share', listId: 'some-other-list' })
     })
 })
+
+// ── Last minute items ─────────────────────────────────────────────────────────
+
+// Some things can't go in the bag until you're walking out of the door — the
+// phone charger, the toothbrush, the passport in a pocket. Marking an item
+// "last minute" lifts it out of whoever's (or whatever section's) card it was
+// in and collects it in one card at the end of the list.
+
+const lastMinuteBaseItems: PackingListItem[] = [
+    { id: 'lm-1', itemText: 'Passport', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false, category: 'Documents' },
+    { id: 'lm-2', itemText: 'Toothbrush', personName: 'Alice', personId: 'p1', questionId: 'q2', optionId: 'o2', packed: false, category: 'Toiletries' },
+    { id: 'lm-3', itemText: 'Phone charger', personName: '', personId: '', questionId: 'q3', optionId: 'o3', packed: false, communal: true, category: 'Tech' },
+]
+
+function makeLastMinuteList(items: PackingListItem[]) {
+    return {
+        id: 'test-list-lm',
+        name: 'Last Minute Trip',
+        createdAt: '2026-01-01T00:00:00Z',
+        items,
+    }
+}
+
+function renderLastMinuteList(items: PackingListItem[] = lastMinuteBaseItems) {
+    const db = {
+        getPackingList: vi.fn().mockResolvedValue(makeLastMinuteList(items)),
+        savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+    }
+    mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+    render(
+        <MemoryRouter initialEntries={['/view-list/test-list-lm']}>
+            <Routes>
+                <Route path="/view-list/:id" element={<ViewPackingList />} />
+            </Routes>
+        </MemoryRouter>
+    )
+    return db
+}
+
+/** The section card whose heading is `title`. */
+function sectionCard(title: string): HTMLElement {
+    const card = screen.getAllByTestId('list-section').find(section => {
+        const heading = within(section).queryByText(title)
+        return heading !== null && heading.tagName !== 'INPUT'
+    })
+    if (!card) throw new Error(`No section card headed "${title}"`)
+    return card
+}
+
+/** The most recent list handed to the local database. */
+function savedItems(db: { savePackingList: ReturnType<typeof vi.fn> }): PackingListItem[] {
+    const calls = db.savePackingList.mock.calls
+    expect(calls.length).toBeGreaterThan(0)
+    return calls[calls.length - 1][0].items
+}
+
+describe('ViewPackingList last minute items', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockImplementation(async (data) => data),
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('has no last minute section until something is marked', async () => {
+        renderLastMinuteList()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        expect(screen.queryByText('Last Minute')).toBeNull()
+    })
+
+    it('collects a marked item in a last minute section instead of its own', async () => {
+        renderLastMinuteList([
+            { ...lastMinuteBaseItems[0], lastMinute: true },
+            lastMinuteBaseItems[1],
+        ])
+
+        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy()
+        expect(within(sectionCard("Alice's Items")).queryByText('Passport')).toBeNull()
+    })
+
+    it('says what the section is for', async () => {
+        renderLastMinuteList([{ ...lastMinuteBaseItems[0], lastMinute: true }])
+
+        await waitFor(() => expect(screen.getByText('Last Minute')).toBeTruthy())
+        expect(within(sectionCard('Last Minute')).getByText(/just before you (go|leave)/i)).toBeTruthy()
+    })
+
+    it('moves an item into the last minute section when it is marked', async () => {
+        const db = renderLastMinuteList()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /mark passport as .*last minute/i }))
+
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy())
+        expect(within(sectionCard("Alice's Items")).queryByText('Passport')).toBeNull()
+        expect(savedItems(db).find(item => item.id === 'lm-1')?.lastMinute).toBe(true)
+    })
+
+    it('sends an item back to its own section when it is unmarked', async () => {
+        const db = renderLastMinuteList([
+            { ...lastMinuteBaseItems[0], lastMinute: true },
+            lastMinuteBaseItems[1],
+        ])
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /remove passport from .*last minute/i }))
+
+        await waitFor(() => expect(within(sectionCard("Alice's Items")).getByText('Passport')).toBeTruthy())
+        expect(screen.queryByText('Last Minute')).toBeNull()
+        expect(savedItems(db).find(item => item.id === 'lm-1')?.lastMinute).toBeUndefined()
+    })
+
+    it('keeps a marked communal item out of the shared card', async () => {
+        renderLastMinuteList([
+            lastMinuteBaseItems[0],
+            { ...lastMinuteBaseItems[2], lastMinute: true },
+        ])
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        expect(within(sectionCard('Last Minute')).getByText('Phone charger')).toBeTruthy()
+        expect(screen.queryByText('Shared Items')).toBeNull()
+    })
+
+    it('keeps a marked item out of its category card in question view', async () => {
+        renderLastMinuteList([
+            { ...lastMinuteBaseItems[0], lastMinute: true },
+            lastMinuteBaseItems[1],
+        ])
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+
+        expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy()
+        expect(screen.queryByText('Documents')).toBeNull()
+        expect(within(sectionCard('Toiletries')).getByText('Toothbrush')).toBeTruthy()
+    })
+
+    it('groups the last minute section by person', async () => {
+        renderLastMinuteList([
+            { ...lastMinuteBaseItems[0], lastMinute: true },
+            { ...lastMinuteBaseItems[2], lastMinute: true },
+        ])
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        const card = sectionCard('Last Minute')
+        expect(within(card).getByRole('button', { name: /Collapse Alice$/i })).toBeTruthy()
+        expect(within(card).getByRole('button', { name: /Collapse Shared$/i })).toBeTruthy()
+    })
+
+    it('marks items added inside the last minute section as last minute', async () => {
+        const db = renderLastMinuteList([{ ...lastMinuteBaseItems[0], lastMinute: true }])
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        const card = sectionCard('Last Minute')
+        fireEvent.change(within(card).getAllByPlaceholderText(/add/i)[0], { target: { value: 'Contact lenses' } })
+        fireEvent.click(within(card).getAllByRole('button', { name: /^add$/i })[0])
+
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Contact lenses')).toBeTruthy())
+        expect(savedItems(db).find(item => item.itemText === 'Contact lenses')?.lastMinute).toBe(true)
+    })
+})

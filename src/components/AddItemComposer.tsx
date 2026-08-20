@@ -33,6 +33,8 @@ export interface AddItemTarget {
     communal?: boolean
     /** undefined = the catch-all section */
     category?: string
+    /** Packed on the way out of the door, so it belongs in the last minute card. */
+    lastMinute?: boolean
 }
 
 export interface PersonOption {
@@ -49,6 +51,8 @@ interface AddItemComposerProps {
     communal?: boolean
     /** Section the item lands in, and the initial value of the section picker. */
     category?: string
+    /** Set on the last minute card's composers: what they add is last minute too. */
+    lastMinute?: boolean
     /** Providing these turns on the section picker. */
     categoryOptions?: readonly string[]
     /** Providing these turns on the person picker. */
@@ -68,6 +72,7 @@ export const AddItemComposer = memo(function AddItemComposer({
     personId,
     communal,
     category,
+    lastMinute,
     categoryOptions,
     peopleOptions,
     suggestions,
@@ -100,6 +105,7 @@ export const AddItemComposer = memo(function AddItemComposer({
         category: categoryOptions
             ? (chosenCategory === UNCATEGORISED_LABEL ? undefined : chosenCategory)
             : category,
+        ...(lastMinute ? { lastMinute: true } : {}),
     }
 
     const ownerKey = ownerKeyFor(target)

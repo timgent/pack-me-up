@@ -262,4 +262,34 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await prompt.getByRole('button', { name: 'Dismiss sync prompt' }).click()
     await expect(prompt).toHaveCount(0)
   })
+
+  test('C14: a last minute item moves to its own section and survives a reload', async ({ freshPage: page }) => {
+    await runWizard(page)
+    // A name with no "last minute" in it, so the assertions below can't be
+    // satisfied by the list's own title.
+    await createList(page, 'Doorstep Trip')
+
+    const lastMinuteCard = page.getByTestId('list-section').filter({ hasText: 'Last Minute' })
+    const mark = page.getByRole('button', { name: /Mark .* as a last minute item/ }).first()
+    await expect(mark).toBeVisible({ timeout: 8_000 })
+    // Nothing is last minute yet, so there is no card for it
+    await expect(lastMinuteCard).toHaveCount(0)
+
+    const itemName = (await mark.getAttribute('aria-label'))!
+      .replace(/^Mark /, '').replace(/ as a last minute item$/, '')
+    await mark.click()
+
+    await expect(lastMinuteCard.getByText(itemName, { exact: true })).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText('Pack these just before you go.')).toBeVisible()
+
+    // The mark is saved, not just shown
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await page.reload()
+    await expect(lastMinuteCard.getByText(itemName, { exact: true })).toBeVisible({ timeout: 8_000 })
+
+    // And it goes back where it came from when unmarked
+    await page.getByRole('button', { name: `Remove ${itemName} from the last minute items` }).click()
+    await expect(lastMinuteCard).toHaveCount(0)
+    await expect(page.getByText(itemName, { exact: true })).toBeVisible()
+  })
 })

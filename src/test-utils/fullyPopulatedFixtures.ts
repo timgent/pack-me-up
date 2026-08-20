@@ -37,6 +37,7 @@ const fullyPopulatedItem: Required<PackingListItem> = {
     category: 'Toiletries',
     order: 2,
     reviewed: true,
+    lastMinute: true,
     lastModified: '2025-01-02T00:00:00.000Z',
 }
 
