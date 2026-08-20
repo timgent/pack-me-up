@@ -3363,6 +3363,22 @@ describe('ViewPackingList last minute items', () => {
         expect(within(card).getByRole('button', { name: /Collapse Shared$/i })).toBeTruthy()
     })
 
+    it('stays where the user is reading when an item is marked', async () => {
+        const scrollIntoView = vi.fn()
+        Element.prototype.scrollIntoView = scrollIntoView
+        renderLastMinuteList()
+
+        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: /mark passport as .*last minute/i }))
+
+        // The card is at the far end of a list being read down; the highlight
+        // says where the item went without taking the page with it.
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy())
+        expect(scrollIntoView).not.toHaveBeenCalled()
+        const row = within(sectionCard('Last Minute')).getByText('Passport').closest('div.rounded-lg')
+        expect(row?.className).toContain('ring-green-400')
+    })
+
     it('marks items added inside the last minute section as last minute', async () => {
         const db = renderLastMinuteList([{ ...lastMinuteBaseItems[0], lastMinute: true }])
 

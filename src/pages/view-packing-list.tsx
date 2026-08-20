@@ -281,7 +281,10 @@ export function ViewPackingList() {
     const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
     const [renamingGuestName, setRenamingGuestName] = useState('')
     const [guestToRemove, setGuestToRemove] = useState<string | null>(null)
-    const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<string | null>(null)
+    // The row worth pointing out for a moment because it has just landed
+    // somewhere: typed into a composer, or moved to the last minute card.
+    // `bringIntoView` separates the two — see the effect below.
+    const [highlightedItem, setHighlightedItem] = useState<{ id: string; bringIntoView: boolean } | null>(null)
     const itemRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     // One-off confetti when the final item is ticked
     const [showConfetti, setShowConfetti] = useState(false)
@@ -423,13 +426,18 @@ export function ViewPackingList() {
             .catch(() => {})
     }, [packingList?.id, foreignPodUrl, ownerWebIdFromUrl, db])
 
+    // An item typed into a composer is worth following to wherever it landed.
+    // An item *moved* is not: marking things last minute happens while reading
+    // down the list, and scrolling to the card at the far end of it takes the
+    // rows being worked through out from under the user. The highlight alone
+    // says where the item went, for whoever is looking that way.
     useEffect(() => {
-        if (!recentlyAddedItemId) return
+        if (!highlightedItem?.bringIntoView) return
         // 'nearest' rather than 'center': items are usually added in runs, and
         // centring a row that is already on screen drags the composer being
         // typed into out from under the cursor.
-        itemRowRefs.current.get(recentlyAddedItemId)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }, [recentlyAddedItemId])
+        itemRowRefs.current.get(highlightedItem.id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, [highlightedItem])
 
     // Everything the add-item composers need, derived once per list rather than
     // per composer: there is one on every card, and they re-render whenever an
@@ -874,8 +882,8 @@ export function ViewPackingList() {
             })
 
             // The item has just moved to the other end of the list, so open the
-            // card it landed in and mark the row — otherwise ticking the box
-            // reads as the item having been deleted.
+            // card it landed in and mark the row — but stay where the user is
+            // reading: they are working down the list, not following the item.
             if (nowLastMinute) {
                 setCollapsedSections(prev => {
                     if (!prev.has(LAST_MINUTE_SECTION_KEY)) return prev
@@ -884,8 +892,8 @@ export function ViewPackingList() {
                     return next
                 })
             }
-            setRecentlyAddedItemId(item.id)
-            setTimeout(() => setRecentlyAddedItemId(null), 2000)
+            setHighlightedItem({ id: item.id, bringIntoView: false })
+            setTimeout(() => setHighlightedItem(null), 2000)
 
             await persistPackingList({ ...packingList, items: updatedItems })
 
@@ -1004,8 +1012,8 @@ export function ViewPackingList() {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 2000)
 
-            setRecentlyAddedItemId(newItem.id)
-            setTimeout(() => setRecentlyAddedItemId(null), 2000)
+            setHighlightedItem({ id: newItem.id, bringIntoView: true })
+            setTimeout(() => setHighlightedItem(null), 2000)
         } catch (err) {
             reportError(err, 'Error adding item')
             setAutoSaveStatus('error')
@@ -1928,7 +1936,7 @@ export function ViewPackingList() {
                                                                     if (el) itemRowRefs.current.set(item.id, el)
                                                                     else itemRowRefs.current.delete(item.id)
                                                                 }}
-                                                                className={`relative rounded-lg p-3 transition-colors duration-1000 ${item.id === recentlyAddedItemId ? 'bg-green-100 ring-2 ring-green-400' : 'bg-gray-50'} ${item.id === flourish?.itemId ? 'item-row-packed' : ''}`}
+                                                                className={`relative rounded-lg p-3 transition-colors duration-1000 ${item.id === highlightedItem?.id ? 'bg-green-100 ring-2 ring-green-400' : 'bg-gray-50'} ${item.id === flourish?.itemId ? 'item-row-packed' : ''}`}
                                                             >
                                                                 {item.id === flourish?.itemId && (
                                                                     <span
