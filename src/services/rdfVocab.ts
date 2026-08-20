@@ -41,6 +41,9 @@ export const PMU = {
     tripEndDate: `${PMU_NS}tripEndDate`,
     category: `${PMU_NS}category`,
     reviewed: `${PMU_NS}reviewed`,
+    // Item that can only be packed on the way out of the door, kept in a
+    // section of its own at the end of the list
+    lastMinute: `${PMU_NS}lastMinute`,
     itemLastModified: `${PMU_NS}itemLastModified`,
     // Shared by PackingListItem and QuestionItem: item is packed once for the
     // whole group rather than per person
