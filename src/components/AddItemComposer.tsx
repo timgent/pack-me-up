@@ -38,6 +38,8 @@ export interface AddItemTarget {
 export interface PersonOption {
     name: string
     id: string
+    /** An option standing for the whole group rather than a person. */
+    communal?: boolean
 }
 
 interface AddItemComposerProps {
@@ -87,10 +89,14 @@ export const AddItemComposer = memo(function AddItemComposer({
         ?? peopleOptions?.[0]
         ?? { name: personName, id: personId }
 
+    // Either the composer belongs to a shared card, or the picker was pointed at
+    // the whole group — the item is the group's, and nobody's, both ways round.
+    const isCommunal = communal || person.communal === true
+
     const target: AddItemTarget = {
-        personName: communal ? '' : person.name,
-        personId: communal ? '' : person.id,
-        communal,
+        personName: isCommunal ? '' : person.name,
+        personId: isCommunal ? '' : person.id,
+        communal: isCommunal ? true : communal,
         category: categoryOptions
             ? (chosenCategory === UNCATEGORISED_LABEL ? undefined : chosenCategory)
             : category,

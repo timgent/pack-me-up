@@ -1604,6 +1604,151 @@ describe('ViewPackingList shared (communal) section', () => {
     })
 })
 
+describe('ViewPackingList shared (communal) items in question view', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...communalPackingList, _rev: '2' }),
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    async function renderInQuestionView(list = communalPackingList) {
+        const db = {
+            getPackingList: vi.fn().mockResolvedValue(list),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+        render(
+            <MemoryRouter initialEntries={[`/view-list/${list.id}`]}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
+        fireEvent.click(screen.getByRole('button', { name: 'Question View' }))
+        return db
+    }
+
+    /** The card for a category section, found by its own collapse control. */
+    function card(title: string): HTMLElement {
+        const match = screen.getAllByTestId('list-section').find(section =>
+            within(section).queryByRole('button', { name: new RegExp(`(Collapse|Expand) ${title} list`, 'i') })
+        )
+        if (!match) throw new Error(`No "${title}" card on the page`)
+        return match
+    }
+
+    it('files shared items into their section rather than a Shared Items card', async () => {
+        await renderInQuestionView()
+
+        expect(screen.queryByText('Shared Items')).toBeNull()
+        expect(within(card('Camping')).getByText('Tent')).toBeTruthy()
+        expect(within(card('Camping')).getByText('Sleeping bag')).toBeTruthy()
+        expect(within(card('Essentials')).getByText('First aid kit')).toBeTruthy()
+    })
+
+    it('groups shared items under Shared, ahead of the people', async () => {
+        await renderInQuestionView()
+
+        const headings = within(card('Camping'))
+            .getAllByRole('button', { name: /^Collapse / })
+            .map(button => button.getAttribute('aria-label'))
+        expect(headings).toEqual(['Collapse Camping list', 'Collapse Shared', 'Collapse Alice'])
+    })
+
+    it('counts shared items in the section and group totals', async () => {
+        await renderInQuestionView()
+
+        const camping = within(card('Camping'))
+        expect(camping.getByRole('button', { name: /collapse camping list/i }).textContent).toContain('0 / 2')
+        expect(camping.getByRole('button', { name: 'Collapse Shared' }).textContent).toContain('0 / 1')
+    })
+
+    it('adds a shared item from the shared group of a section', async () => {
+        const db = await renderInQuestionView()
+
+        const camping = within(card('Camping'))
+        fireEvent.click(camping.getByRole('button', { name: /add item to camping for shared items/i }))
+        const composer = camping.getAllByTestId('add-item-composer')
+            .find(node => within(node).queryByLabelText(/add an item to camping for shared items/i))
+        expect(composer).toBeTruthy()
+        fireEvent.change(within(composer!).getByLabelText(/add an item to camping for shared items/i), {
+            target: { value: 'Camping stove' },
+        })
+        fireEvent.click(within(composer!).getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const saved = db.savePackingList.mock.calls[0][0]
+        const added = saved.items.find((i: { itemText: string }) => i.itemText === 'Camping stove')
+        expect(added.communal).toBe(true)
+        expect(added.category).toBe('Camping')
+        expect(added.personName).toBe('')
+    })
+
+    it('offers Shared in a section\'s who-for picker, so shared items can be added without a shared card', async () => {
+        const listWithoutCommunal = { ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) }
+        const db = await renderInQuestionView(listWithoutCommunal)
+
+        const composer = within(card('Camping')).getByTestId('add-item-composer')
+        fireEvent.change(within(composer).getByLabelText(/add an item to camping/i), { target: { value: 'Camping stove' } })
+        fireEvent.change(within(composer).getByLabelText('Who for'), { target: { value: 'Shared' } })
+        fireEvent.click(within(composer).getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const saved = db.savePackingList.mock.calls[0][0]
+        const added = saved.items.find((i: { itemText: string }) => i.itemText === 'Camping stove')
+        expect(added.communal).toBe(true)
+        expect(added.category).toBe('Camping')
+        expect(added.personName).toBe('')
+    })
+
+    it('leaves the who-for picker on a person by default', async () => {
+        const db = await renderInQuestionView()
+
+        const composer = within(card('Camping')).getAllByTestId('add-item-composer')[0]
+        fireEvent.change(within(composer).getByLabelText(/add an item to camping/i), { target: { value: 'Head torch' } })
+        fireEvent.click(within(composer).getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const saved = db.savePackingList.mock.calls[0][0]
+        const added = saved.items.find((i: { itemText: string }) => i.itemText === 'Head torch')
+        expect(added.personName).toBe('Alice')
+        expect(added.communal).toBeUndefined()
+    })
+
+    it('hides the "+ Add Shared Items" reveal, which belongs to person view', async () => {
+        const listWithoutCommunal = { ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) }
+        await renderInQuestionView(listWithoutCommunal)
+
+        expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
+    })
+
+    it('keeps the Shared Items card in person view', async () => {
+        await renderInQuestionView()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Person View' }))
+
+        expect(screen.getByText('Shared Items')).toBeTruthy()
+        expect(screen.getByText('Tent')).toBeTruthy()
+    })
+})
+
 describe('grouping honours generated item order', () => {
     const mk = (over: Partial<PackingListItem>): PackingListItem => ({
         id: Math.random().toString(36).slice(2),

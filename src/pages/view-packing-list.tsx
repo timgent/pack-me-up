@@ -42,9 +42,14 @@ type FormData = {
     items: Record<string, boolean>
 }
 
-// Reserved section key for communal items — cannot collide with a person's
-// name used as a key for the other sections.
+// Reserved key for communal items — cannot collide with a person's name, which
+// is what keys the other sections (and, in question view, the groups inside a
+// section).
 const SHARED_SECTION_KEY = '__shared__'
+
+// What the shared group is called where it sits among people: inside a
+// section's card in question view, and in the "who for" picker.
+const SHARED_GROUP_LABEL = 'Shared'
 
 // Long enough for the last (delayed) confetti piece to finish falling
 const CONFETTI_DURATION_MS = 4000
@@ -145,18 +150,38 @@ function isSectionComplete(stats?: SectionStats): boolean {
 /** Where a custom item was added without saying whose it is. */
 export const UNASSIGNED_LABEL = 'Unassigned'
 
-export function groupByPerson(items: PackingListItem[]) {
+/** One group of items inside a section's card: a category, or a person, or the shared group. */
+interface ItemGroup {
+    /** Identifies the group in collapse state and stats; not shown to the user. */
+    key: string
+    label: string
+    items: PackingListItem[]
+    /** The group holding communal items — nobody's in particular, so everybody's. */
+    communal?: boolean
+}
+
+/**
+ * The people a section's items belong to, plus — since communal items belong to
+ * the section as much as anyone's do — a shared group, first, the way the shared
+ * card comes first in person view. Keyed rather than labelled so a person
+ * actually called "Shared" keeps their own group.
+ */
+export function groupByPerson(items: PackingListItem[]): ItemGroup[] {
     const map = new Map<string, PackingListItem[]>()
     for (const item of items) {
-        const person = item.personName || UNASSIGNED_LABEL
-        if (!map.has(person)) map.set(person, [])
-        map.get(person)!.push(item)
+        const key = item.communal ? SHARED_SECTION_KEY : (item.personName || UNASSIGNED_LABEL)
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(item)
     }
     return [...map.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([person, personItems]) => ({
-            label: person,
-            items: sortByItemOrder(personItems),
+        .sort(([a], [b]) => (
+            a === SHARED_SECTION_KEY ? -1 : b === SHARED_SECTION_KEY ? 1 : a.localeCompare(b)
+        ))
+        .map(([key, groupItems]) => ({
+            key,
+            label: key === SHARED_SECTION_KEY ? SHARED_GROUP_LABEL : key,
+            items: sortByItemOrder(groupItems),
+            ...(key === SHARED_SECTION_KEY ? { communal: true } : {}),
         }))
 }
 
@@ -880,8 +905,9 @@ export function ViewPackingList() {
             // views key the same group the opposite way round.
             const sectionKey = target.communal ? SHARED_SECTION_KEY : target.personName
             const categoryLabel = target.category ?? UNCATEGORISED_LABEL
+            const groupKey = target.communal ? SHARED_SECTION_KEY : (target.personName || UNASSIGNED_LABEL)
             setCollapsedGroups(prev => {
-                const keysToExpand = [`${sectionKey}::${categoryLabel}`, `${categoryLabel}::${target.personName}`]
+                const keysToExpand = [`${sectionKey}::${categoryLabel}`, `${categoryLabel}::${groupKey}`]
                 if (!keysToExpand.some(k => prev.has(k))) return prev
                 const next = new Set(prev)
                 for (const k of keysToExpand) next.delete(k)
@@ -982,11 +1008,12 @@ export function ViewPackingList() {
         return stats
     }, [listItems, watchedItems])
 
-    // Stats per category, used by question-centric top-level sections
+    // Stats per category, used by question-centric top-level sections. Communal
+    // items count here too: question view files them under their category
+    // alongside everyone else's, so a section's total has to include them.
     const categoryStats = useMemo(() => {
         const stats: Record<string, SectionStats> = {}
         for (const item of listItems ?? []) {
-            if (item.communal) continue
             const key = item.category ?? UNCATEGORISED_LABEL
             stats[key] ??= { packed: 0, total: 0 }
             stats[key].total++
@@ -997,8 +1024,8 @@ export function ViewPackingList() {
 
     // Stats for the groups *inside* a section. Both views are keyed here because
     // both are one toggle away: person view groups a person's items by category,
-    // question view groups a category's items by person, and the shared section
-    // groups by category whichever view is on.
+    // question view groups a category's items by person (communal items under
+    // the shared key), and the person-view shared card groups by category.
     const groupStats = useMemo(() => {
         const stats: Record<string, SectionStats> = {}
         const count = (key: string, packed: boolean) => {
@@ -1011,10 +1038,11 @@ export function ViewPackingList() {
             const packed = !!watchedItems[item.id]
             if (item.communal) {
                 count(`${SHARED_SECTION_KEY}::${category}`, packed)
+                count(`${category}::${SHARED_SECTION_KEY}`, packed)
                 continue
             }
             count(`${item.personName}::${category}`, packed)
-            count(`${category}::${item.personName || 'Unassigned'}`, packed)
+            count(`${category}::${item.personName || UNASSIGNED_LABEL}`, packed)
         }
         return stats
     }, [listItems, watchedItems])
@@ -1022,9 +1050,7 @@ export function ViewPackingList() {
     // Which top-level sections have nothing left to pack, keyed the way the
     // active view keys them. Sorted so the value is stable enough to compare.
     const completeSectionKeys = useMemo(() => {
-        const stats = viewMode === 'person'
-            ? sectionStats
-            : { ...categoryStats, [SHARED_SECTION_KEY]: sectionStats[SHARED_SECTION_KEY] }
+        const stats = viewMode === 'person' ? sectionStats : categoryStats
         return Object.entries(stats)
             .filter(([, sectionStat]) => isSectionComplete(sectionStat))
             .map(([key]) => key)
@@ -1167,6 +1193,11 @@ export function ViewPackingList() {
     const personIdByName = new Map(peopleOptions.map(person => [person.name, person.id]))
     // Only worth offering a section picker once the list has sections to pick.
     const sectionChoices = categoryOptions.length > 1 ? categoryOptions : undefined
+    // A section's card asks who an item is for, and "the whole group" is one of
+    // the answers — it is how a shared item gets added in question view, where
+    // there is no shared card to type into. Last, so the picker still opens on a
+    // person: most items are somebody's.
+    const sectionPeopleChoices: PersonOption[] = [...peopleOptions, { name: SHARED_GROUP_LABEL, id: '', communal: true }]
 
     // Build grouped item map, seeding guest names so their sections exist even when empty
     const groupedItems: Record<string, PackingListItem[]> = {}
@@ -1182,12 +1213,14 @@ export function ViewPackingList() {
         groupedItems[item.personName].push(item)
     }
 
-    // Shared section first (when the list has visible communal items), then
-    // either people (person-centric) or categories (question-centric). Like
-    // person sections, the shared section disappears when all its items are
-    // packed and packed items are hidden.
+    // Person view gives communal items a card of their own, first, because they
+    // are the one part of the list that is nobody's. Question view has no use
+    // for it: there the sections are the question set's, and a shared item
+    // belongs to its section as much as anyone's does — see below.
     const hasCommunalItems = packingList.items.some(i => i.communal)
     const visibleCommunalItems = filteredItems.filter(i => i.communal)
+    // Like person sections, the shared section disappears when all its items are
+    // packed and packed items are hidden.
     const sharedSections: ListSection[] = (visibleCommunalItems.length > 0 || showSharedSection || isSectionComplete(sectionStats[SHARED_SECTION_KEY]))
         ? [{
             key: SHARED_SECTION_KEY,
@@ -1215,12 +1248,15 @@ export function ViewPackingList() {
             }))
         listSections = [...sharedSections, ...regularSections, ...guestSections]
     } else {
+        // Communal items are filed by category here, same as everyone else's —
+        // they sit in a shared group inside the section they belong to rather
+        // than in a card of their own.
         const visibleByCategory = new Map(
-            groupByCategory(filteredItems.filter(i => !i.communal), sectionOrder).map(({ label, items }) => [label, items])
+            groupByCategory(filteredItems, sectionOrder).map(({ label, items }) => [label, items])
         )
         // Categories come from every item, not just the visible ones, so a fully
         // packed category keeps its celebratory card instead of disappearing.
-        const categorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.communal), sectionOrder)
+        const categorySections: ListSection[] = groupByCategory(packingList.items, sectionOrder)
             .filter(({ label }) => visibleByCategory.has(label) || isSectionComplete(categoryStats[label]))
             .map(({ label }) => ({
                 key: label,
@@ -1229,7 +1265,7 @@ export function ViewPackingList() {
                 items: visibleByCategory.get(label) ?? [],
                 isCategory: true,
             }))
-        listSections = [...sharedSections, ...categorySections]
+        listSections = categorySections
     }
 
     const tripDates = formatTripDates(packingList.startDate, packingList.endDate)
@@ -1283,7 +1319,10 @@ export function ViewPackingList() {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        {!foreignPodUrl && !hasCommunalItems && !showSharedSection && (
+                        {/* The reveal opens an empty shared *card*, which only
+                            person view has — question view offers "Shared" in
+                            each section's who-for picker instead. */}
+                        {!foreignPodUrl && viewMode === 'person' && !hasCommunalItems && !showSharedSection && (
                             <Button
                                 type="button"
                                 variant="secondary"
@@ -1550,8 +1589,8 @@ export function ViewPackingList() {
                             const isComplete = isSectionComplete(stats)
                             const completeLabel = isShared ? 'shared items' : isCategorySection ? title : section.name
                             const collapseLabelTarget = isShared ? 'the shared items' : isCategorySection ? title : `${section.name}'s`
-                            const innerGroups = (isShared || !isCategorySection)
-                                ? groupByCategory(items, sectionOrder)
+                            const innerGroups: ItemGroup[] = (isShared || !isCategorySection)
+                                ? groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
                                 : groupByPerson(items)
                             const isSectionCollapsed = collapsedSections.has(sectionKey)
                             // Only a card that belongs to one person can wear
@@ -1654,7 +1693,7 @@ export function ViewPackingList() {
                                             communal={section.communal}
                                             category={isCategorySection ? categoryFromLabel(title) : undefined}
                                             categoryOptions={isCategorySection ? undefined : sectionChoices}
-                                            peopleOptions={isCategorySection && peopleOptions.length > 0 ? peopleOptions : undefined}
+                                            peopleOptions={isCategorySection ? sectionPeopleChoices : undefined}
                                             suggestions={suggestionIndex}
                                             targetLabel={isShared ? 'shared items' : isCategorySection ? title : `${section.name}'s items`}
                                             onAdd={handleComposerAdd}
@@ -1665,8 +1704,8 @@ export function ViewPackingList() {
                                             Nothing left to pack 🎒
                                         </p>
                                     )}
-                                    {innerGroups.map(({ label, items: catItems }) => {
-                                        const categoryKey = `${sectionKey}::${label}`
+                                    {innerGroups.map(({ key: groupKey, label, items: catItems, communal: isSharedGroup }) => {
+                                        const categoryKey = `${sectionKey}::${groupKey}`
                                         const isCollapsed = collapsedGroups.has(categoryKey)
                                         // Counted over every item in the group, not the ones on
                                         // screen: with packed items hidden, "2" next to a group
@@ -1675,12 +1714,13 @@ export function ViewPackingList() {
                                         // Both views end up describing the same place; only which
                                         // half the card supplies changes.
                                         const groupLabel = isCategorySection
-                                            ? `${title} for ${label}`
+                                            ? `${title} for ${isSharedGroup ? 'shared items' : label}`
                                             : `${label} for ${isShared ? 'shared items' : section.name}`
                                         const groupTarget = isCategorySection
                                             ? {
-                                                personName: label,
-                                                personId: personIdByName.get(label) ?? '',
+                                                personName: isSharedGroup ? '' : label,
+                                                personId: isSharedGroup ? '' : (personIdByName.get(label) ?? ''),
+                                                communal: isSharedGroup,
                                                 category: categoryFromLabel(title),
                                             }
                                             : {
@@ -1702,8 +1742,12 @@ export function ViewPackingList() {
                                                         <span>{isCollapsed ? '▶' : '▼'}</span>
                                                         {/* A category card's groups are people, so each one
                                                             gets the same mark its owner's card would have.
-                                                            The catch-all group is nobody's. */}
-                                                        {isCategorySection && label !== UNASSIGNED_LABEL && (
+                                                            The catch-all and shared groups are nobody's —
+                                                            the shared one says so instead. */}
+                                                        {isSharedGroup && (
+                                                            <span aria-hidden title="Packed once for the whole group">👥</span>
+                                                        )}
+                                                        {isCategorySection && !isSharedGroup && label !== UNASSIGNED_LABEL && (
                                                             <PersonAvatar
                                                                 name={label}
                                                                 color={personColor({ id: personIdByName.get(label) ?? '', name: label })}
