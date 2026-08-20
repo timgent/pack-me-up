@@ -47,9 +47,18 @@ const mockUseForeignPod = vi.mocked(useForeignPod)
 
 const emptyQuestionSet = { _id: '1', _rev: '1', questions: [], people: [], alwaysNeededItems: [] }
 
-function renderQuestionsPage(getQuestionSet: () => Promise<unknown>) {
+const storedQuestionSet = {
+    _id: '1',
+    _rev: '1',
+    questions: [],
+    people: [{ id: 'p1', name: 'Alice', personSelections: [] }],
+    alwaysNeededItems: [],
+}
+
+function renderQuestionsPage(getQuestionSet: () => Promise<unknown>, databaseContext: Record<string, unknown> = {}) {
     mockUseDatabase.mockReturnValue({
         db: { getQuestionSet, saveQuestionSet: vi.fn() } as unknown as PackingAppDatabase,
+        ...databaseContext,
     })
     return render(
         <MemoryRouter>
@@ -90,5 +99,44 @@ describe('QuestionsPage loading state', () => {
 
         await waitFor(() => expect(screen.getByText('My Questions & Items')).toBeTruthy())
         expect(screen.queryByRole('status')).toBeNull()
+    })
+
+    // The pod → local sync at login walks the whole pod. Waiting for it before
+    // reading the device's own copy is seconds of skeleton for data the page
+    // already has.
+    it('shows the stored question set without waiting for the pod sync', async () => {
+        renderQuestionsPage(() => Promise.resolve(storedQuestionSet), { loginSyncInProgress: true, loginSyncVersion: 0 })
+
+        expect(await screen.findByText('My Questions & Items')).toBeTruthy()
+    })
+
+    it('flags that the pod is still being read', async () => {
+        renderQuestionsPage(() => Promise.resolve(storedQuestionSet), { loginSyncInProgress: true, loginSyncVersion: 0 })
+
+        await screen.findByText('My Questions & Items')
+        expect(screen.getByTestId('pod-sync-indicator')).toBeTruthy()
+    })
+
+    // Otherwise a fresh device tells the user their questions are gone, and
+    // invites them to redo a setup they have already done.
+    it('keeps waiting rather than showing an empty set while the pod is still being read', async () => {
+        renderQuestionsPage(
+            () => Promise.reject({ name: 'not_found' }),
+            { loginSyncInProgress: true, loginSyncVersion: 0 },
+        )
+
+        await waitFor(() => {
+            expect(screen.getByRole('status').textContent).toContain('Loading questions & items...')
+        })
+        expect(screen.queryByText('My Questions & Items')).toBeNull()
+    })
+
+    it('shows the empty set once the pod has been read', async () => {
+        renderQuestionsPage(
+            () => Promise.reject({ name: 'not_found' }),
+            { loginSyncInProgress: false, loginSyncVersion: 0 },
+        )
+
+        await waitFor(() => expect(screen.getByText('My Questions & Items')).toBeTruthy())
     })
 })

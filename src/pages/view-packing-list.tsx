@@ -6,11 +6,13 @@ import { useDatabase } from '../components/DatabaseContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { LoadingState } from '../components/LoadingState'
+import { PodSyncIndicator } from '../components/PodSyncIndicator'
 import { useForm, useWatch } from 'react-hook-form'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { reportError } from '../errorReporting'
 import { usePodSync } from '../hooks/usePodSync'
+import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName, deriveWebIdFromPodUrl } from '../services/solidPod'
 import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
@@ -356,7 +358,7 @@ export function ViewPackingList() {
     const isDesktop = useIsDesktop()
     const { isLoggedIn, session } = useSolidPod()
     const { showToast } = useToast()
-    const { db, loginSyncInProgress } = useDatabase()
+    const { db } = useDatabase()
     // Read from the question set on every visit, not copied onto the list when
     // it was generated — the order is one global setting, so changing it has to
     // reach the lists that already exist. See `useSectionOrder`.
@@ -617,14 +619,17 @@ export function ViewPackingList() {
         saveToPodRef.current = saveToPod
     }, [saveToPod])
 
-    useEffect(() => {
-        // The login sync (pod -> local) runs in the background while the app is
-        // already rendering, so reading local storage before it finishes would
-        // miss any list this device hasn't seen yet — a fresh browser, or a link
-        // to a list created on another device. Wait for it and keep the spinner
-        // up; the effect re-runs when the sync finishes. Same guard as
-        // create-packing-list and questions-page.
-        if (loginSyncInProgress) return
+    // The list is read from this device first and the pod catches up afterwards
+    // — see useLocalFirstLoad. A list already stored here is on screen in
+    // milliseconds instead of waiting on a sync that walks the whole pod.
+    const { isCheckingPod } = useLocalFirstLoad(() => {
+        // Once this list is on screen the per-list pod poll owns reconciliation:
+        // it merges through useSyncCoordinator, which preserves focus and
+        // in-flight edits. Re-reading here would reset the form under the
+        // user's fingers. The read the login sync triggers is only of use while
+        // there is still nothing to show — or while what is showing is another
+        // list, which is why this checks the id rather than a "have loaded" flag.
+        if (packingList?.id === id) return
 
         const fetchPackingList = async () => {
             try {
@@ -646,12 +651,14 @@ export function ViewPackingList() {
                 setLocalCopyChecked(true)
                 const isNotFound = typeof err === 'object' && err !== null && (err as { name?: string }).name === 'not_found'
                 if (isNotFound) {
-                    // Not an error: the list simply isn't on this device. On a
-                    // foreign pod the first poll hydrates it via
-                    // handleSyncSuccess, so hold the spinner. Otherwise the
-                    // login sync has already had its turn and the list really is
-                    // gone, so fall through to "Packing list not found" — but
-                    // never report it, a missing list is a normal outcome.
+                    // Not an error: the list simply isn't on this device — a
+                    // fresh browser, or a link to a list made on another one.
+                    // On a foreign pod the first poll is the only place it can
+                    // come from, so hold the spinner and let that poll (or its
+                    // error handler) end the wait. On our own pod the local read
+                    // is done, which is all isLoading tracks; whether that means
+                    // "gone" or "not here yet" is settled at render time. Never
+                    // reported either way — a missing list is a normal outcome.
                     if (!foreignPodUrl) setIsLoading(false)
                     return
                 }
@@ -660,8 +667,8 @@ export function ViewPackingList() {
             }
         }
 
-        fetchPackingList()
-    }, [db, id, setValue, foreignPodUrl, loginSyncInProgress])
+        return fetchPackingList()
+    }, [db, id, foreignPodUrl])
 
     const handleItemChange = useDebouncedCallback(async () => {
         if (!packingList) {
@@ -1235,7 +1242,12 @@ export function ViewPackingList() {
         return () => clearTimeout(timer)
     }, [completeSectionSignature, formHydrated, showPacked, allPacked])
 
-    if (isLoading) {
+    // Nothing to show yet, but somewhere still to hear from: the pod sync may
+    // be about to write this list locally. Calling it missing before then would
+    // be a lie the page has to take back a moment later.
+    const listStillOnItsWay = !packingList && isCheckingPod
+
+    if (isLoading || listStillOnItsWay) {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
                 <LoadingState message="Loading packing list..." rows={3} />
@@ -1486,6 +1498,15 @@ export function ViewPackingList() {
                     </div>
                 )}
             </div>
+
+            {/* What's below is this device's copy of the list. Say so while
+                the pod is still being read, so anything that changes under the
+                user a moment later makes sense. */}
+            {isCheckingPod && (
+                <div className="w-full max-w-screen-2xl">
+                    <PodSyncIndicator subject="this list" />
+                </div>
+            )}
 
             {/* Persistent "viewing someone else's list" indicator */}
             {foreignPodUrl && !foreignPodCtx && (

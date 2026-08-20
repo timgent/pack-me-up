@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import React from 'react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { ViewPackingList, groupByCategory, groupByPerson } from './view-packing-list'
 import type { PackingAppDatabase } from '../services/database'
 import type { PackingListItem } from '../create-packing-list/types'
@@ -1396,18 +1396,25 @@ describe('ViewPackingList when an own-pod list is not in local storage yet', () 
         expect(mockCaptureException).not.toHaveBeenCalled()
     })
 
-    it('does not read from local storage while the login sync is still running', async () => {
+    it('says the list is still on its way rather than missing while the login sync runs', async () => {
         const { getPackingList } = renderMissingLocally({ loginSyncInProgress: true })
 
-        await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Loading packing list...'))
-        expect(getPackingList).not.toHaveBeenCalled()
+        await waitFor(() => expect(getPackingList).toHaveBeenCalledWith('test-list-1'))
+        expect(screen.getByRole('status').textContent).toContain('Loading packing list...')
         expect(screen.queryByText('Packing list not found')).toBeNull()
     })
 
-    it('reads local storage once the login sync finishes', async () => {
+    it('says the list is not there once the login sync has finished', async () => {
+        const { getPackingList } = renderMissingLocally({ loginSyncInProgress: false })
+
+        await waitFor(() => expect(getPackingList).toHaveBeenCalled())
+        await waitFor(() => expect(screen.getByText('Packing list not found')).toBeTruthy())
+    })
+
+    it('looks again when the login sync lands something it had not seen', async () => {
         const getPackingList = vi.fn().mockRejectedValue({ name: 'not_found', message: 'Packing list not found' })
         const db = { ...makeDb(), getPackingList } as unknown as PackingAppDatabase
-        mockUseDatabase.mockReturnValue({ db, loginSyncInProgress: true })
+        mockUseDatabase.mockReturnValue({ db, loginSyncVersion: 0, loginSyncInProgress: true })
 
         const { rerender } = render(
             <MemoryRouter initialEntries={['/view-list/test-list-1']}>
@@ -1416,9 +1423,10 @@ describe('ViewPackingList when an own-pod list is not in local storage yet', () 
                 </Routes>
             </MemoryRouter>
         )
-        expect(getPackingList).not.toHaveBeenCalled()
+        await waitFor(() => expect(getPackingList).toHaveBeenCalledTimes(1))
 
-        mockUseDatabase.mockReturnValue({ db, loginSyncInProgress: false })
+        getPackingList.mockResolvedValue(testPackingList)
+        mockUseDatabase.mockReturnValue({ db, loginSyncVersion: 1, loginSyncInProgress: false })
         rerender(
             <MemoryRouter initialEntries={['/view-list/test-list-1']}>
                 <Routes>
@@ -1427,7 +1435,7 @@ describe('ViewPackingList when an own-pod list is not in local storage yet', () 
             </MemoryRouter>
         )
 
-        await waitFor(() => expect(getPackingList).toHaveBeenCalledWith('test-list-1'))
+        await waitFor(() => expect(screen.getByText('Test Trip')).toBeTruthy())
         expect(mockCaptureException).not.toHaveBeenCalled()
     })
 
@@ -1458,6 +1466,121 @@ describe('ViewPackingList when an own-pod list is not in local storage yet', () 
         )
 
         await waitFor(() => expect(mockCaptureException).toHaveBeenCalledWith(failure))
+    })
+})
+
+// Opening a list the device already holds must not wait on the pod. The login
+// sync walks the whole pod — every list, the question set, the tombstones — and
+// on a slow connection that is seconds of staring at a skeleton for data the
+// page already has locally.
+
+describe('ViewPackingList while the pod sync is still running', () => {
+    function renderWithSync(loginSyncInProgress: boolean, db = makeDb()) {
+        mockUseDatabase.mockReturnValue({
+            db: db as unknown as PackingAppDatabase,
+            loginSyncVersion: 0,
+            loginSyncInProgress,
+        })
+        return { ...renderComponent(), db }
+    }
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: { info: { isLoggedIn: true, webId: 'https://own.solidcommunity.net/profile/card#me' }, fetch: vi.fn() },
+            webId: 'https://own.solidcommunity.net/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+    })
+
+    it('shows a locally stored list without waiting for the pod', async () => {
+        renderWithSync(true)
+
+        expect(await screen.findByText('Test Trip')).toBeTruthy()
+        expect(screen.queryByText('Loading packing list...')).toBeNull()
+    })
+
+    it('flags that the pod is still being read', async () => {
+        renderWithSync(true)
+
+        await screen.findByText('Test Trip')
+        expect(screen.getByTestId('pod-sync-indicator')).toBeTruthy()
+    })
+
+    it('drops the flag once the pod has been read', async () => {
+        renderWithSync(false)
+
+        await screen.findByText('Test Trip')
+        expect(screen.queryByTestId('pod-sync-indicator')).toBeNull()
+    })
+
+    // The guard above must not turn into "this page has loaded something":
+    // moving between two lists keeps the same component mounted, and the second
+    // one has to be read.
+    it('reads the next list when the route moves to a different one', async () => {
+        const secondList = { ...testPackingList, id: 'test-list-2', name: 'Second Trip' }
+        const getPackingList = vi.fn(async (listId: string) => (
+            listId === 'test-list-2' ? secondList : testPackingList
+        ))
+        mockUseDatabase.mockReturnValue({
+            db: { ...makeDb(), getPackingList } as unknown as PackingAppDatabase,
+            loginSyncVersion: 0,
+            loginSyncInProgress: false,
+        })
+
+        function GoToSecondList() {
+            const navigate = useNavigate()
+            return <button onClick={() => navigate('/view-list/test-list-2')}>go to second</button>
+        }
+
+        render(
+            <MemoryRouter initialEntries={['/view-list/test-list-1']}>
+                <GoToSecondList />
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await screen.findByText('Test Trip')
+
+        fireEvent.click(screen.getByText('go to second'))
+
+        expect(await screen.findByText('Second Trip')).toBeTruthy()
+    })
+
+    // Once the list is on screen the per-list pod poll owns reconciliation: it
+    // merges through useSyncCoordinator, which preserves focus and in-flight
+    // edits. A raw re-read would reset the form under the user's fingers.
+    it('leaves the list on screen alone when the login sync lands', async () => {
+        const db = makeDb()
+        const { rerender } = renderWithSync(true, db)
+        await screen.findByText('Test Trip')
+        expect(db.getPackingList).toHaveBeenCalledTimes(1)
+
+        mockUseDatabase.mockReturnValue({
+            db: db as unknown as PackingAppDatabase,
+            loginSyncVersion: 1,
+            loginSyncInProgress: false,
+        })
+        rerender(
+            <MemoryRouter initialEntries={['/view-list/test-list-1']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+
+        await waitFor(() => expect(screen.queryByTestId('pod-sync-indicator')).toBeNull())
+        expect(db.getPackingList).toHaveBeenCalledTimes(1)
     })
 })
 

@@ -6,12 +6,14 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { LoadingState } from '../components/LoadingState'
+import { PodSyncIndicator } from '../components/PodSyncIndicator'
 import { Modal } from '../components/Modal'
 import { SyncAcrossDevicesPrompt } from '../components/SyncAcrossDevicesPrompt'
 import { getPrimaryPodUrl, saveRdfToPod, deleteFileFromPod, POD_CONTAINERS, POD_ERROR_MESSAGES, getCollaborators, isPubliclyAccessible, resolveOwnerDisplayName, buildSharedListPath } from '../services/solidPod'
 import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, deletedPackingListsToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
+import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { generateUUID } from '../utils/uuid'
 import { formatTripDates } from '../create-packing-list/tripDetails'
 
@@ -32,7 +34,7 @@ export function PackingLists() {
             .map(l => ({ id: l.id, podUrl: l.sharedFromPodUrl!, ownerWebId: l.ownerWebId })),
         session
     )
-    const { db, loginSyncVersion, loginSyncInProgress } = useDatabase()
+    const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
     const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
@@ -134,7 +136,9 @@ export function PackingLists() {
         }
     }
 
-    useEffect(() => {
+    // Local first: the lists on this device go up straight away and the pod
+    // catches up afterwards — see useLocalFirstLoad.
+    const { isCheckingPod } = useLocalFirstLoad(() => {
         const fetchPackingLists = async () => {
             try {
                 const lists = await db.getAllPackingLists()
@@ -145,8 +149,8 @@ export function PackingLists() {
                 setIsLoading(false)
             }
         }
-        fetchPackingLists()
-    }, [db, isLoggedIn, loginSyncVersion])
+        return fetchPackingLists()
+    }, [db, isLoggedIn])
 
     // Lazy-load sharing status badges for own lists only
     useEffect(() => {
@@ -169,13 +173,11 @@ export function PackingLists() {
         }).catch(() => {})
     }, [packingLists, isLoggedIn, session])
 
-    // The local PouchDB read is the only thing worth blocking on — it resolves in
-    // milliseconds. The pod sync runs for as long as the pod takes to answer, and
-    // the effect above re-fetches when loginSyncVersion bumps, so local lists can
-    // be shown straight away and quietly refreshed when the pod catches up. The
-    // one case that still has to wait is an empty device on first login: there is
-    // nothing local to show and "No packing lists found" would be a lie.
-    if (isLoading || (packingLists.length === 0 && loginSyncInProgress)) {
+    // The local read is the only thing worth blocking on — it resolves in
+    // milliseconds. The one case that still has to wait is an empty device on
+    // first login: there is nothing local to show and "No packing lists found"
+    // would be a lie until the pod has been read.
+    if (isLoading || (packingLists.length === 0 && isCheckingPod)) {
         // Keep the real header in place so only the list area changes when the
         // lists land.
         return (
@@ -204,17 +206,7 @@ export function PackingLists() {
 
             {/* The lists below are the local copy; say so while the pod is still
                 being read, so anything that appears or changes makes sense. */}
-            {loginSyncInProgress && (
-                <div
-                    data-testid="pod-sync-indicator"
-                    role="status"
-                    aria-live="polite"
-                    className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-600"
-                >
-                    <span aria-hidden="true" className="loading-suitcase text-base leading-none">🧳</span>
-                    Checking your Pod for changes...
-                </div>
-            )}
+            {isCheckingPod && <PodSyncIndicator />}
 
             {/* Only worth asking once there is something to sync */}
             {packingLists.length > 0 && <SyncAcrossDevicesPrompt />}

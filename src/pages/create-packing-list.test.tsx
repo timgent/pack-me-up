@@ -1524,6 +1524,51 @@ describe('CreatePackingList – loading state', () => {
         await waitFor(() => screen.getByText(/Answer the questions below/i))
         expect(screen.queryByRole('status')).toBeNull()
     })
+
+    // The pod → local sync at login walks the whole pod. Waiting for it before
+    // reading the device's own copy is seconds of skeleton for questions the
+    // page already has.
+    it('shows the stored questions without waiting for the pod sync', async () => {
+        mockUseDatabase.mockReturnValue({
+            db: makeDb(),
+            loginSyncVersion: 0,
+            loginSyncInProgress: true,
+        } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+        expect(screen.getByTestId('pod-sync-indicator')).toBeTruthy()
+    })
+
+    // Otherwise a device the sync hasn't reached invites the user to redo a
+    // setup they have already done.
+    it('keeps waiting rather than claiming there are no questions while the pod is still being read', async () => {
+        mockUseDatabase.mockReturnValue({
+            db: makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) }),
+            loginSyncVersion: 0,
+            loginSyncInProgress: true,
+        } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+
+        await waitFor(() => {
+            expect(screen.getByRole('status').textContent).toContain('Loading questions...')
+        })
+        expect(screen.queryByText(/No Questions Found/i)).toBeNull()
+    })
+
+    it('says there are no questions once the pod has been read', async () => {
+        mockUseDatabase.mockReturnValue({
+            db: makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) }),
+            loginSyncVersion: 0,
+            loginSyncInProgress: false,
+        } as ReturnType<typeof useDatabase>)
+
+        renderCreatePackingList()
+
+        await waitFor(() => expect(screen.getByText(/No Questions Found/i)).toBeTruthy())
+    })
 })
 
 // ─── CreatePackingList – landing on the new list ──────────────────────────────
