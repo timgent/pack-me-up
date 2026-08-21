@@ -1,17 +1,44 @@
 import * as Sentry from '@sentry/capacitor'
 import * as SentryReact from '@sentry/react'
 import type { ErrorEvent, Exception } from '@sentry/react'
+import { Capacitor } from '@capacitor/core'
 
 // Sentry DSNs are public identifiers, safe to ship in client-side code.
 const SENTRY_DSN = 'https://a331ffe142776c6dd8d5fcecfb2a4a97@o4511757730578432.ingest.de.sentry.io/4511757737525328'
 
-// Local dev and test runs report to the console instead of Sentry, so day-to-day
-// development doesn't fill the project's error quota with noise from work in progress.
-// Set VITE_SENTRY_ENABLED=true to opt a local dev build back in (e.g. to verify a
-// Sentry change end to end).
+/**
+ * Is this bundle being served by a developer machine's own web server?
+ *
+ * The build mode alone doesn't answer that: `npm run test:e2e` runs
+ * `npm run build` and serves the result with `vite preview`, so the E2E suite
+ * drives a *production* build — DSN, `environment: 'production'` and all. Every
+ * run, local and on every PR in CI, reported the suite's own failures into the
+ * live project; the Community Solid Server the tests talk to lives on
+ * localhost:4001 and is stopped between suites, which is where the stream of
+ * "Failed to fetch (localhost:4001)" issues came from.
+ *
+ * The native shell serves the bundle from localhost too (capacitor.config.ts
+ * sets an https scheme for both platforms), and those are real users' sessions —
+ * so a loopback origin only means "local" when we're not inside the native app.
+ */
+function isLocalWebServer() {
+  if (Capacitor.isNativePlatform()) return false
+  const { hostname } = window.location
+  return hostname === 'localhost'
+    || hostname.endsWith('.localhost')
+    || hostname === '::1'
+    || hostname === '[::1]'
+    || /^127\./.test(hostname)
+}
+
+// Local dev, test runs and E2E runs report to the console instead of Sentry, so
+// day-to-day development doesn't fill the project's error quota with noise from work
+// in progress. Set VITE_SENTRY_ENABLED=true to opt a local build back in (e.g. to
+// verify a Sentry change end to end, including against a preview build).
 function isSentryEnabled() {
   if (import.meta.env.VITE_SENTRY_ENABLED === 'true') return true
-  return import.meta.env.MODE !== 'development' && import.meta.env.MODE !== 'test'
+  if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') return false
+  return !isLocalWebServer()
 }
 
 /**
