@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const init = vi.fn()
+const mockIsNativePlatform = vi.fn(() => false)
+vi.mock('@capacitor/core', () => ({
+    Capacitor: { isNativePlatform: () => mockIsNativePlatform() },
+}))
 vi.mock('@sentry/capacitor', () => ({ init: (...args: unknown[]) => init(...args) }))
 vi.mock('@sentry/react', () => ({
     init: vi.fn(),
@@ -66,13 +70,26 @@ describe('isThirdPartyScriptError', () => {
 })
 
 describe('initSentry', () => {
+    let originalLocation: Location
+
     beforeEach(() => {
         init.mockClear()
+        mockIsNativePlatform.mockReturnValue(false)
+        originalLocation = window.location
+        servedFrom('packmeup.app')
     })
 
     afterEach(() => {
         vi.unstubAllEnvs()
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
     })
+
+    function servedFrom(hostname: string) {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { ...originalLocation, hostname },
+        })
+    }
 
     it('does not initialise Sentry in local dev', () => {
         vi.stubEnv('MODE', 'development')
@@ -102,6 +119,42 @@ describe('initSentry', () => {
     it('initialises Sentry in local dev when explicitly opted in', () => {
         vi.stubEnv('MODE', 'development')
         vi.stubEnv('VITE_SENTRY_ENABLED', 'true')
+
+        initSentry()
+
+        expect(init).toHaveBeenCalledOnce()
+    })
+
+    it.each(['localhost', '127.0.0.1', '[::1]'])(
+        'does not initialise Sentry for a production build served from %s',
+        hostname => {
+            // `npm run test:e2e` builds in production mode and serves the result with
+            // `vite preview`, so the E2E suite used to report its own failures — a stream
+            // of "Failed to fetch" from the test Solid server on localhost:4001 — into the
+            // production project, on every run and every PR in CI.
+            vi.stubEnv('MODE', 'production')
+            servedFrom(hostname)
+
+            initSentry()
+
+            expect(init).not.toHaveBeenCalled()
+        },
+    )
+
+    it('initialises Sentry in the native app, which also serves the bundle from localhost', () => {
+        vi.stubEnv('MODE', 'production')
+        mockIsNativePlatform.mockReturnValue(true)
+        servedFrom('localhost')
+
+        initSentry()
+
+        expect(init).toHaveBeenCalledOnce()
+    })
+
+    it('initialises Sentry on a local web server when explicitly opted in', () => {
+        vi.stubEnv('MODE', 'production')
+        vi.stubEnv('VITE_SENTRY_ENABLED', 'true')
+        servedFrom('localhost')
 
         initSentry()
 
