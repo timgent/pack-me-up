@@ -677,6 +677,84 @@ describe('ViewPackingList category grid', () => {
         expect(within(lastMinute).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
     })
 
+    describe('when there are more people than fit beside the names', () => {
+        // Seven people: the columns stop paying for themselves, so the item
+        // takes a line of its own and the people wrap underneath it.
+        const crowd = ['Ann', 'Ben', 'Cass', 'Dev', 'Eve', 'Fin', 'Gil']
+        const crowdedList = {
+            id: 'test-list-crowd',
+            name: 'Big Family',
+            createdAt: '2026-01-01T00:00:00Z',
+            items: [
+                ...crowd.map((name, index) => ({
+                    id: `tb-${index}`,
+                    itemText: 'Toothbrush',
+                    personName: name,
+                    personId: `p${index}`,
+                    questionId: 'q1',
+                    optionId: 'o1',
+                    packed: false,
+                    category: 'Essentials',
+                    order: 0,
+                })),
+                { id: 'np-1', itemText: 'Nappies', personName: 'Ben', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false, category: 'Essentials', order: 1 },
+            ],
+        }
+
+        beforeEach(() => {
+            // The columns only give way where there is no room for them, and
+            // the test environment is a desktop unless it is told otherwise.
+            vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+                matches: false,
+                media: query,
+                onchange: null,
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            }) as unknown as MediaQueryList)
+        })
+
+        const renderCrowd = () => renderGrid(crowdedList as typeof gridList)
+
+        it('drops the columns and gives every person a chip', async () => {
+            await renderCrowd()
+
+            expect(screen.queryByRole('columnheader')).toBeNull()
+            for (const name of crowd) {
+                expect(checkbox(`Toothbrush for ${name}`)).toBeTruthy()
+            }
+        })
+
+        it('keeps a place for someone who does not need it, so the chips still line up', async () => {
+            await renderCrowd()
+
+            // Ben is the only one with nappies; the other six keep their place
+            expect(checkbox('Nappies for Ben')).toBeTruthy()
+            expect(screen.queryByRole('checkbox', { name: 'Nappies for Ann' })).toBeNull()
+            expect(screen.getByTitle("Ann doesn't need this — open to change")).toBeTruthy()
+        })
+
+        it('packs from a chip', async () => {
+            await renderCrowd()
+
+            fireEvent.click(checkbox('Toothbrush for Cass'))
+
+            await waitFor(() => expect(checkbox('Toothbrush for Cass').checked).toBe(true))
+            expect(checkbox('Toothbrush for Dev').checked).toBe(false)
+        })
+
+        it('still offers each person their own check-all, in the strip above', async () => {
+            await renderCrowd()
+
+            fireEvent.click(screen.getByRole('button', { name: /Check off everything left for Gil in Essentials/i }))
+
+            await waitFor(() => expect(checkbox('Toothbrush for Gil').checked).toBe(true))
+            expect(checkbox('Toothbrush for Ann').checked).toBe(false)
+        })
+    })
+
     describe('on a phone', () => {
         beforeEach(() => {
             vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({

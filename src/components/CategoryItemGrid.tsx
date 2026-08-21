@@ -8,11 +8,17 @@
  * hard. Here the name is written once and the people are read across it, and
  * the gaps in a column are as much of an answer as the ticks.
  *
- * One table on every screen rather than a table and a phone-shaped
- * substitute: wrapping the people into chips would put each person somewhere
- * different on every row, which is precisely the reading the grid exists to
- * make possible. What gives on a narrow screen is the *names* — the header
- * keeps the coloured initial and the card carries a legend — not the columns.
+ * Columns for as long as they fit. What gives on a narrow screen is first the
+ * column *names* — the header keeps the coloured initial and the card carries a
+ * legend — and then, once the people no longer fit beside a name worth reading,
+ * the columns themselves: the item moves to a line of its own and the people
+ * wrap underneath it as chips.
+ *
+ * Wrapping only works because a chip is a fixed size. Pills carrying names are
+ * all different widths, so they put each person somewhere different on every
+ * row and destroy the one reading the grid exists for; identical 36px discs
+ * wrap into a grid that happens to have more than one line, and person five is
+ * under person one on every single item.
  *
  * Three cell weights, because two of them would lie: a filled tick (packed),
  * an empty box (still to pack), and a flat dot (not for this person). With
@@ -23,6 +29,7 @@ import type { PackingListItem } from '../create-packing-list/types'
 import type { GridColumn, GridRow } from '../utils/categoryItemGrid'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
 import { PersonAvatar } from './PersonAvatar'
+import { useMeasuredWidth } from '../hooks/useMeasuredWidth'
 
 export interface CategoryItemGridProps {
     /** Names the table for screen readers, e.g. "Toiletries". */
@@ -61,17 +68,28 @@ interface ColumnStat { packed: number; total: number }
 const PHONE_COLUMN_WIDTH = 40
 
 /**
- * How little room the names may be left with before the grid gives up on
- * fitting and scrolls instead.
+ * How much room the names need before the columns stop paying for themselves.
  *
- * At 390px a card has ~348px to spend, so six people (240px) still leave a
- * readable 108px of name. A seventh cannot be fitted at any width worth
- * reading, and squeezing the names to 28px to avoid a scrollbar would be
- * choosing the wrong thing to break — so past that the table keeps a wider
- * name column and scrolls sideways under a frozen first column.
+ * Not the least they can survive on — the least they are worth having. A
+ * column layout earns its extra density by keeping each item to one line; once
+ * the names are wrapping to three, the table is no shorter than chips under a
+ * full-width name and it is harder to read. At 390px a card has ~348px, so
+ * five people leave 148px of name and six leave 108px and start wrapping —
+ * which is where the item moves to a line of its own and the people wrap
+ * underneath it.
  */
-function nameFloor(peopleCount: number): number {
-    return peopleCount <= 6 ? 104 : 136
+const NAME_COMFORT = 132
+
+/**
+ * Whether the people still fit beside the names.
+ *
+ * `width` is 0 until the card has been measured (and wherever there is no
+ * ResizeObserver, which includes the tests), so the count alone decides until
+ * a real width arrives: five is what fits on the phone this was designed for.
+ */
+function columnsFit(peopleCount: number, width: number): boolean {
+    if (width === 0) return peopleCount <= 5
+    return NAME_COMFORT + peopleCount * PHONE_COLUMN_WIDTH <= width
 }
 
 /**
@@ -109,6 +127,11 @@ export function CategoryItemGrid({
     onOpenRow,
     onCheckColumn,
 }: CategoryItemGridProps) {
+    const { ref: containerRef, width } = useMeasuredWidth<HTMLDivElement>()
+    // Columns while they fit; chips under the name once they don't. Desktop
+    // always has the room, and its names in the header are worth keeping.
+    const stacked = !showColumnNames && !columnsFit(columns.length, width)
+
     const rowComplete = (row: GridRow) =>
         row.items.length > 0 && row.items.every(item => packedById[item.id])
 
@@ -152,6 +175,59 @@ export function CategoryItemGrid({
             )
             : null
     )
+
+    /**
+     * The item's name, and the way in to everything about the row that isn't
+     * ticking a box: renaming, quantities, and who it is for.
+     *
+     * Laid out as text rather than as a row of boxes, so the chevron follows the
+     * last word wherever the name wraps instead of floating at the edge of the
+     * column between two lines, belonging to neither. The padding is what makes
+     * a one-line row a 44px target.
+     */
+    const renderName = (row: GridRow, complete: boolean, padding = 'py-2.5') => {
+        const { head, lastWord } = splitLastWord(row.label)
+        return (
+            <button
+                type="button"
+                onClick={() => onOpenRow(row)}
+                aria-label={`Edit ${row.label}`}
+                title="Rename, quantities, and who needs it"
+                className={`group block w-full cursor-pointer rounded-md px-1 text-left transition-colors active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${padding}`}
+            >
+                <span className={`break-words ${complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}`}>
+                    {head && `${head} `}
+                    {/* The last word, the quantity and the chevron travel
+                        together, so the chevron is never left pointing at
+                        nothing from a line of its own. */}
+                    <span className="whitespace-nowrap">
+                        {lastWord}
+                        {row.quantity !== undefined && (
+                            <span className="ml-1.5 inline-block rounded-full bg-blue-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-blue-700">
+                                ×{row.quantity}
+                            </span>
+                        )}
+                        {/* Points, which is the whole message: there is somewhere
+                            to go from here. Grey enough to stay behind the
+                            checkboxes, dark enough to be seen without hovering —
+                            which is all a phone ever gets. */}
+                        <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="ml-1.5 inline-block h-3.5 w-3.5 align-[-0.15em] text-gray-500 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600"
+                        >
+                            <path d="M7.5 4.5 13 10l-5.5 5.5" />
+                        </svg>
+                    </span>
+                </span>
+            </button>
+        )
+    }
 
     const renderCell = (row: GridRow, column: GridColumn, item: PackingListItem | undefined) => {
         if (!item) {
@@ -200,6 +276,121 @@ export function CategoryItemGrid({
         )
     }
 
+    /**
+     * One person's cell, wrapped: their own coloured disc, which is also the
+     * checkbox. Filled with a tick once it is packed, outlined and carrying
+     * their initial until then — so the colour says whose it is in both states,
+     * which is what makes a wrapped grid readable at a glance.
+     */
+    const renderChip = (row: GridRow, column: GridColumn, item: PackingListItem) => {
+        const packed = !!packedById[item.id]
+        const color = personColor({ id: column.personId, name: column.name })
+        const quantity = item.quantity !== undefined && item.quantity > 1 ? item.quantity : undefined
+        return (
+            <label
+                key={column.key}
+                data-testid={`grid-cell-${item.id}`}
+                ref={(element) => registerCellRef(item.id, element)}
+                title={`${row.label} for ${column.name}`}
+                className={`relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+                    packed ? color.avatar : `border-2 bg-white ${color.border} ${color.text}`
+                } ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
+            >
+                <input
+                    type="checkbox"
+                    checked={packed}
+                    onChange={(e) => onToggleItem(item, e.target.checked)}
+                    aria-label={`${row.label} for ${column.name}`}
+                    className="sr-only"
+                />
+                <span aria-hidden="true">
+                    {packed ? '✓' : (column.unassigned ? '?' : column.name.charAt(0).toUpperCase())}
+                </span>
+                {row.mixedQuantities && quantity && (
+                    <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-blue-100 px-1 text-[10px] font-semibold text-blue-700">
+                        ×{quantity}
+                    </span>
+                )}
+                {renderFlourish(item)}
+            </label>
+        )
+    }
+
+    /**
+     * The same 36px of space, held empty. The chips only line up between one
+     * item and the next because nobody's place is ever skipped.
+     */
+    const renderChipGap = (row: GridRow, column: GridColumn) => (
+        <button
+            key={column.key}
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => onOpenRow(row)}
+            title={`${column.name} doesn't need this — open to change`}
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-blue-50"
+        >
+            <span className="block h-1 w-1 rounded-full bg-gray-200" />
+        </button>
+    )
+
+    const renderSharedChip = (row: GridRow) => {
+        const item = row.items[0]
+        const packed = !!packedById[item.id]
+        return (
+            <label
+                data-testid={`grid-cell-${item.id}`}
+                ref={(element) => registerCellRef(item.id, element)}
+                className={`relative flex h-8 cursor-pointer items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${packed ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-50 text-blue-800 hover:bg-blue-100'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
+            >
+                <input
+                    type="checkbox"
+                    checked={packed}
+                    onChange={(e) => onToggleItem(item, e.target.checked)}
+                    aria-label={`${row.label} for the whole group`}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="whitespace-nowrap">👥 Everyone</span>
+                {renderFlourish(item)}
+            </label>
+        )
+    }
+
+    /**
+     * Who is on the list, how far each of them has got, and a way to finish one
+     * of them off here. In the table this lives in the column headers; with the
+     * columns gone it is the only place the initials get decoded.
+     */
+    const renderPeopleStrip = () => (
+        <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-gray-100 pb-2">
+            {columns.map((column, index) => {
+                const { packed, total } = columnStats[index]
+                const done = total > 0 && packed === total
+                return (
+                    <button
+                        key={column.key}
+                        type="button"
+                        onClick={() => onCheckColumn(column, index)}
+                        disabled={done || total === 0}
+                        aria-label={`Check off everything left for ${column.name} in ${sectionTitle}`}
+                        title={done ? `${column.name} is done here` : `Check off everything ${column.name} still has in ${sectionTitle}`}
+                        className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:bg-blue-50'}`}
+                    >
+                        {!column.unassigned && (
+                            <PersonAvatar
+                                name={column.name}
+                                color={personColor({ id: column.personId, name: column.name })}
+                                size="sm"
+                            />
+                        )}
+                        <span>{column.name}</span>
+                        <span className="tabular-nums text-gray-400">{packed}/{total}</span>
+                    </button>
+                )
+            })}
+        </div>
+    )
+
     const renderSharedCell = (row: GridRow) => {
         const item = row.items[0]
         const packed = !!packedById[item.id]
@@ -224,13 +415,48 @@ export function CategoryItemGrid({
         )
     }
 
+    if (stacked) {
+        return (
+            <div ref={containerRef}>
+                {renderPeopleStrip()}
+                <ul className="divide-y divide-gray-100">
+                    {visibleRows.map(row => {
+                        const complete = rowComplete(row)
+                        return (
+                            <li
+                                key={row.key}
+                                data-testid="grid-row"
+                                className={`-mx-1 rounded-md px-1 py-1 transition-colors ${complete ? 'bg-emerald-50' : ''} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
+                            >
+                                {renderName(row, complete, 'py-1.5')}
+                                {/* Fixed-size chips in a fixed order, so person
+                                    five sits under person one on every item and
+                                    the wrap is still a grid to read down. */}
+                                <div role="group" aria-label={row.label} className="flex flex-wrap gap-1 pb-1 pl-1">
+                                    {row.communal
+                                        ? renderSharedChip(row)
+                                        : columns.map((column, index) => {
+                                            const item = row.cells[index]
+                                            return item
+                                                ? renderChip(row, column, item)
+                                                : renderChipGap(row, column)
+                                        })}
+                                </div>
+                            </li>
+                        )
+                    })}
+                </ul>
+            </div>
+        )
+    }
+
     return (
-        <div className="-mx-2 overflow-x-auto sm:-mx-1">
+        <div ref={containerRef} className="-mx-2 overflow-x-auto sm:-mx-1">
             <table
                 className={`w-full border-collapse text-sm ${showColumnNames ? '' : 'table-fixed'}`}
                 style={showColumnNames
                     ? undefined
-                    : { minWidth: `${nameFloor(columns.length) + columns.length * PHONE_COLUMN_WIDTH}px` }}
+                    : { minWidth: `${NAME_COMFORT + columns.length * PHONE_COLUMN_WIDTH}px` }}
             >
                 <caption className="sr-only">{sectionTitle}: what to pack, by person</caption>
                 {/* On a phone the people are told how much room they get and the
@@ -296,7 +522,6 @@ export function CategoryItemGrid({
                 <tbody>
                     {visibleRows.map(row => {
                         const complete = rowComplete(row)
-                        const { head, lastWord } = splitLastWord(row.label)
                         return (
                             <tr
                                 key={row.key}
@@ -308,58 +533,7 @@ export function CategoryItemGrid({
                                 className={`border-t border-gray-100 transition-colors ${complete ? 'bg-emerald-50' : `${surfaceClass} hover:bg-gray-50`} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
                             >
                                 <th scope="row" className="sticky left-0 z-10 bg-inherit px-1 py-1 text-left align-middle font-medium shadow-[2px_0_3px_-1px_rgba(15,23,42,0.08)] sm:shadow-none">
-                                    {/* The name is the biggest target on the row,
-                                        so it is the way in to everything that
-                                        isn't ticking a box: renaming, quantities,
-                                        and who the item is for.
-
-                                        Laid out as text rather than as a row of
-                                        boxes, so the chevron follows the last word
-                                        wherever the name wraps instead of floating
-                                        at the edge of the column between two lines,
-                                        belonging to neither. The padding is what
-                                        makes a one-line row a 44px target. */}
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpenRow(row)}
-                                        aria-label={`Edit ${row.label}`}
-                                        title="Rename, quantities, and who needs it"
-                                        className="group block w-full cursor-pointer rounded-md px-1 py-2.5 text-left transition-colors active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                                    >
-                                        <span className={`break-words ${complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}`}>
-                                            {head && `${head} `}
-                                            {/* The last word, the quantity and the
-                                                chevron travel together, so the chevron
-                                                is never left pointing at nothing from
-                                                a line of its own. */}
-                                            <span className="whitespace-nowrap">
-                                                {lastWord}
-                                                {row.quantity !== undefined && (
-                                                    <span className="ml-1.5 inline-block rounded-full bg-blue-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-blue-700">
-                                                        ×{row.quantity}
-                                                    </span>
-                                                )}
-                                                {/* Points, which is the whole message:
-                                                    there is somewhere to go from here.
-                                                    Grey enough to stay behind the
-                                                    checkboxes, dark enough to be seen
-                                                    without hovering — which is all a
-                                                    phone ever gets. */}
-                                                <svg
-                                                    aria-hidden="true"
-                                                    viewBox="0 0 20 20"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth={2.5}
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    className="ml-1.5 inline-block h-3.5 w-3.5 align-[-0.15em] text-gray-500 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600"
-                                                >
-                                                    <path d="M7.5 4.5 13 10l-5.5 5.5" />
-                                                </svg>
-                                            </span>
-                                        </span>
-                                    </button>
+                                    {renderName(row, complete)}
                                 </th>
                                 {row.communal ? (
                                     <td colSpan={Math.max(columns.length, 1)} className="px-1 py-1 text-center align-middle sm:px-2">
