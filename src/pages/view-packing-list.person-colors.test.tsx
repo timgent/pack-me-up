@@ -129,17 +129,17 @@ describe('ViewPackingList person colours', () => {
             .not.toContain(pink.avatar)
     })
 
-    it('carries the colours into the category grid\'s columns', async () => {
+    it('carries the colours into the category grid', async () => {
         renderList()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        // Each column is headed by the same mark that person's card carries
-        const bobColumn = (await screen.findAllByRole('columnheader', { name: /Bob/ }))[0]
-        await waitFor(() => expect(within(bobColumn).getByTestId('person-avatar').className).toContain(pink.avatar))
-        const aliceColumn = screen.getAllByRole('columnheader', { name: /Alice/ })[0]
-        expect(within(aliceColumn).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
+        // Everyone is marked the same way here as on their own card
+        const bob = (await screen.findAllByRole('button', { name: /everything left for Bob/i }))[0]
+        await waitFor(() => expect(within(bob).getByTestId('person-avatar').className).toContain(pink.avatar))
+        const alice = screen.getAllByRole('button', { name: /everything left for Alice/i })[0]
+        expect(within(alice).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
     })
 
     it('leaves the shared card unmarked — it belongs to nobody in particular', async () => {

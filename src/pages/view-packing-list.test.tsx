@@ -372,21 +372,24 @@ describe('ViewPackingList person/category view toggle', () => {
         expect(screen.getByText('Nappies')).toBeTruthy()
     })
 
-    it('writes each item once, with a column of checkboxes for the people', async () => {
+    it('writes each item once, with a chip per person', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        // Every card carries the same columns, in the same places, whoever has
+        // Every card names the same people, in the same order, whoever has
         // something in it — the grid is only readable if a person stays put.
         const essentials = screen.getAllByTestId('list-section')[0]
-        expect(within(essentials).getAllByRole('columnheader').map(header => header.textContent))
-            .toEqual(['Item', expect.stringContaining('Alice'), expect.stringContaining('Bob')])
+        expect(within(within(essentials).getByTestId('grid-people-legend'))
+            .getAllByRole('button')
+            .map(person => person.textContent))
+            .toEqual([expect.stringContaining('Alice'), expect.stringContaining('Bob')])
 
-        // Toothbrush is Alice's alone: she has a checkbox, Bob has a gap
+        // Toothbrush is Alice's alone: she has a chip, Bob has a gap
         expect(within(essentials).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
         expect(within(essentials).queryByRole('checkbox', { name: 'Toothbrush for Bob' })).toBeNull()
+        expect(within(essentials).getByTitle("Bob doesn't need this — open to change")).toBeTruthy()
         expect(within(essentials).getByRole('checkbox', { name: 'Nappies for Bob' })).toBeTruthy()
     })
 
@@ -652,7 +655,7 @@ describe('ViewPackingList category grid', () => {
         })
     })
 
-    it('gives the unassigned items a column of their own, last', async () => {
+    it('gives the unassigned items a place of their own, last', async () => {
         await renderGrid({
             ...gridList,
             items: [
@@ -661,8 +664,14 @@ describe('ViewPackingList category grid', () => {
             ],
         })
 
-        expect(screen.getAllByRole('columnheader').map(header => header.textContent))
-            .toEqual(['Item', expect.stringContaining('Alice'), expect.stringContaining('Bob'), expect.stringContaining('Unassigned')])
+        expect(within(screen.getByTestId('grid-people-legend'))
+            .getAllByRole('button')
+            .map(person => person.textContent))
+            .toEqual([
+                expect.stringContaining('Alice'),
+                expect.stringContaining('Bob'),
+                expect.stringContaining('Unassigned'),
+            ])
         expect(checkbox('Torch for Unassigned')).toBeTruthy()
     })
 
@@ -755,7 +764,7 @@ describe('ViewPackingList category grid', () => {
         })
     })
 
-    describe('on a phone', () => {
+    describe('however wide the screen', () => {
         beforeEach(() => {
             vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
                 // Narrower than the sm breakpoint, and no reduced-motion preference
@@ -770,11 +779,11 @@ describe('ViewPackingList category grid', () => {
             }) as unknown as MediaQueryList)
         })
 
-        it('keeps the columns and drops the names, decoding them once in a legend', async () => {
+        it('names everyone in the strip, since the chips themselves carry initials', async () => {
             await renderGrid()
 
-            // The checkboxes still name their person, so nothing is lost to a
-            // screen reader by the header being an initial
+            // The chips still name their person, so nothing is lost to a screen
+            // reader by their showing an initial
             expect(checkbox('Toothbrush for Alice')).toBeTruthy()
             const legend = within(screen.getByTestId('grid-people-legend'))
             expect(legend.getByText('Alice')).toBeTruthy()
@@ -2067,7 +2076,7 @@ describe('ViewPackingList shared (communal) items in category view', () => {
         // No column belongs to it, and it comes first — the shared card's place
         // in person view, kept
         expect(camping.getAllByTestId('grid-row')[0].textContent).toContain('Tent')
-        expect(camping.getByText('👥 For everyone')).toBeTruthy()
+        expect(camping.getByText('👥 Everyone')).toBeTruthy()
     })
 
     it('counts shared items in the section total', async () => {

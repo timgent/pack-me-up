@@ -1813,26 +1813,6 @@ export function ViewPackingList() {
                 </div>
             )}
 
-            {/* On a narrow screen the grid's columns are initials, because four
-                names across a phone leaves no room for the items. They are
-                decoded once here rather than card by card. */}
-            {viewMode === 'category' && !isDesktop && gridColumns.length > 0 && (
-                <div data-testid="grid-people-legend" className="w-full max-w-screen-2xl mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {gridColumns.map(column => (
-                        <span key={column.key} className="flex items-center gap-1 text-xs font-medium text-gray-600">
-                            {!column.unassigned && (
-                                <PersonAvatar
-                                    name={column.name}
-                                    color={personColor({ id: column.personId, name: column.name })}
-                                    size="sm"
-                                />
-                            )}
-                            {column.name}
-                        </span>
-                    ))}
-                </div>
-            )}
-
             {/* Hidden packed items banner — at 100% it's just noise next to the
                 celebration, and the Show Packed button is right there anyway */}
             {hiddenPackedCount > 0 && !allPacked && (
@@ -2047,10 +2027,6 @@ export function ViewPackingList() {
                                             // The names go when there isn't room
                                             // for them; the legend above the
                                             // cards decodes the initials instead.
-                                            showColumnNames={isDesktop}
-                                            // What the frozen name column sits on
-                                            // when the grid scrolls sideways.
-                                            surfaceClass={isComplete ? 'bg-emerald-50' : isLastMinute ? 'bg-amber-50' : 'bg-white'}
                                             hidePacked={!showPacked}
                                             flourish={flourish}
                                             highlightedItemId={highlightedItem?.id}

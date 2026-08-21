@@ -214,18 +214,20 @@ test.describe('C – Packing Lists', () => {
 
     await page.getByRole('button', { name: 'Category View' }).click()
 
-    // A column each, in every card
+    // Both of them named on every card, whoever has something in it
     const firstCard = page.getByTestId('list-section').first()
-    await expect(firstCard.getByRole('columnheader', { name: /Alice/ })).toBeVisible()
-    await expect(firstCard.getByRole('columnheader', { name: /Bob/ })).toBeVisible()
+    await expect(firstCard.getByRole('button', { name: /everything left for Alice/i })).toBeVisible()
+    await expect(firstCard.getByRole('button', { name: /everything left for Bob/i })).toBeVisible()
 
     // A name both of them need is written once and ticked twice
     const shared = firstCard.getByRole('checkbox', { name: /for Alice$/ }).first()
     const label = (await shared.getAttribute('aria-label'))!.replace(/ for Alice$/, '')
     await expect(firstCard.getByRole('button', { name: `Edit ${label}` })).toHaveCount(1)
 
-    // Ticking one person's cell leaves the other's alone, and it survives a reload
-    await shared.click()
+    // Ticking one person's chip leaves the other's alone, and it survives a
+    // reload. The checkbox itself is behind the chip, so the chip is what gets
+    // clicked — same as a finger would.
+    await firstCard.getByTitle(`${label} for Alice`).click()
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await page.reload()
     await page.getByRole('button', { name: 'Show Packed' }).click()
@@ -261,15 +263,15 @@ test.describe('C – Packing Lists', () => {
     // Off: Bob's cell goes, Alice's stays
     await panel.getByRole('checkbox', { name: `Bob needs ${label}` }).uncheck()
     await expect(page.getByRole('checkbox', { name: `${label} for Bob` })).toHaveCount(0, { timeout: 8_000 })
-    await expect(page.getByRole('checkbox', { name: `${label} for Alice` }).first()).toBeVisible()
+    await expect(page.getByTitle(`${label} for Alice`).first()).toBeVisible()
 
     // And back on, where it stays put across a reload
     await panel.getByRole('checkbox', { name: `Bob needs ${label}` }).check()
     await panel.getByRole('button', { name: 'Done' }).click()
-    await expect(page.getByRole('checkbox', { name: `${label} for Bob` }).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByTitle(`${label} for Bob`).first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await page.reload()
-    await expect(page.getByRole('checkbox', { name: `${label} for Bob` }).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByTitle(`${label} for Bob`).first()).toBeVisible({ timeout: 8_000 })
   })
 })
 
