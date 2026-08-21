@@ -198,6 +198,82 @@ test.describe('C – Packing Lists', () => {
     await expect(card.getByTestId('person-avatar')).toHaveClass(/bg-fuchsia-500/)
     await expect(card).toHaveClass(/border-fuchsia-300/)
   })
+  test('C15: category view writes each item once, with a checkbox per person', async ({ freshPage: page }) => {
+    // Two people, because a grid with one column is just a list
+    await page.goto('/#/wizard')
+    await page.fill('[name="people.0.name"]', 'Alice')
+    await fillPersonRequiredFields(page, 0)
+    await page.getByRole('button', { name: /Add Another Person/i }).click()
+    await page.fill('[name="people.1.name"]', 'Bob')
+    await fillPersonRequiredFields(page, 1)
+    await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /Create My First Packing List/i }).click()
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
+    await createList(page, 'Grid Trip')
+
+    await page.getByRole('button', { name: 'Category View' }).click()
+
+    // One key for the page, naming whose initial is whose
+    const key = page.getByTestId('people-key')
+    await expect(key.getByText('Alice')).toBeVisible()
+    await expect(key.getByText('Bob')).toBeVisible()
+    const firstCard = page.getByTestId('list-section').first()
+
+    // A name both of them need is written once and ticked twice
+    const shared = firstCard.getByRole('checkbox', { name: /for Alice$/ }).first()
+    const label = (await shared.getAttribute('aria-label'))!.replace(/ for Alice$/, '')
+    await expect(firstCard.getByRole('button', { name: `Edit ${label}` })).toHaveCount(1)
+
+    // Ticking one person's chip leaves the other's alone, and it survives a
+    // reload. The checkbox itself is behind the chip, so the chip is what gets
+    // clicked — same as a finger would.
+    await firstCard.getByTitle(`${label} for Alice`).click()
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await page.reload()
+    await page.getByRole('button', { name: 'Show Packed' }).click()
+    await expect(page.getByRole('checkbox', { name: `${label} for Alice` })).toBeChecked()
+    const bobs = page.getByRole('checkbox', { name: `${label} for Bob` })
+    if (await bobs.count() > 0) await expect(bobs.first()).not.toBeChecked()
+  })
+
+  test('C16: the row panel takes an item off one person and gives it back', async ({ freshPage: page }) => {
+    await page.goto('/#/wizard')
+    await page.fill('[name="people.0.name"]', 'Alice')
+    await fillPersonRequiredFields(page, 0)
+    await page.getByRole('button', { name: /Add Another Person/i }).click()
+    await page.fill('[name="people.1.name"]', 'Bob')
+    await fillPersonRequiredFields(page, 1)
+    await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /Create My First Packing List/i }).click()
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
+    await createList(page, 'Panel Trip')
+    await page.getByRole('button', { name: 'Category View' }).click()
+
+    // A row both of them are on, so it can lose one and get them back
+    const card = page.getByTestId('list-section').first()
+    const bobsCell = card.getByRole('checkbox', { name: /for Bob$/ }).first()
+    await expect(bobsCell).toBeVisible({ timeout: 8_000 })
+    const label = (await bobsCell.getAttribute('aria-label'))!.replace(/ for Bob$/, '')
+
+    await card.getByRole('button', { name: `Edit ${label}` }).click()
+    const panel = page.getByRole('dialog')
+    await expect(panel).toBeVisible()
+
+    // Off: Bob's cell goes, Alice's stays
+    await panel.getByRole('checkbox', { name: `Bob needs ${label}` }).uncheck()
+    await expect(page.getByRole('checkbox', { name: `${label} for Bob` })).toHaveCount(0, { timeout: 8_000 })
+    await expect(page.getByTitle(`${label} for Alice`).first()).toBeVisible()
+
+    // And back on, where it stays put across a reload
+    await panel.getByRole('checkbox', { name: `Bob needs ${label}` }).check()
+    await panel.getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByTitle(`${label} for Bob`).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
+    await page.reload()
+    await expect(page.getByTitle(`${label} for Bob`).first()).toBeVisible({ timeout: 8_000 })
+  })
 })
 
 test.describe('C – Contextual sign-in prompts (logged out)', () => {

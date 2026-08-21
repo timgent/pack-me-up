@@ -27,14 +27,14 @@ describe('listViewPreferences', () => {
 
         it('reads back what was saved', () => {
             saveListViewPreferences('list-1', {
-                viewMode: 'question',
+                viewMode: 'category',
                 showPacked: true,
                 collapsedSections: ['Alice', '__shared__'],
                 collapsedGroups: ['Alice::Clothes'],
             })
 
             expect(loadListViewPreferences('list-1')).toEqual({
-                viewMode: 'question',
+                viewMode: 'category',
                 showPacked: true,
                 collapsedSections: ['Alice', '__shared__'],
                 collapsedGroups: ['Alice::Clothes'],
@@ -59,6 +59,12 @@ describe('listViewPreferences', () => {
             localStorage.setItem(listViewPreferencesKey('list-1'), '"just a string"')
 
             expect(loadListViewPreferences('list-1')).toEqual(DEFAULT_LIST_VIEW_PREFERENCES)
+        })
+
+        it('reads a list left in the old "question" view as the category view', () => {
+            localStorage.setItem(listViewPreferencesKey('list-1'), JSON.stringify({ viewMode: 'question' }))
+
+            expect(loadListViewPreferences('list-1').viewMode).toBe('category')
         })
 
         it('ignores a view mode it does not recognise', () => {

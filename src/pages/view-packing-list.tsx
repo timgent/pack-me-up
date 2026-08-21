@@ -35,6 +35,9 @@ import { clearPendingSignInAction, getPendingSignInAction, setPendingSignInActio
 import { usePersonColors } from '../hooks/usePersonColors'
 import { PersonAvatar } from '../components/PersonAvatar'
 import { AddItemComposer, UNCATEGORISED_LABEL, type AddItemTarget, type PersonOption } from '../components/AddItemComposer'
+import { CategoryItemGrid } from '../components/CategoryItemGrid'
+import { ItemRowPanel } from '../components/ItemRowPanel'
+import { buildCategoryRows, buildGridColumns, type GridRow } from '../utils/categoryItemGrid'
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, type ListViewMode } from '../utils/listViewPreferences'
@@ -113,8 +116,12 @@ interface ListSection {
     name: string
     guestId?: string
     communal?: boolean
-    // True for question-centric top-level sections (grouped by category rather than person)
+    // True for category-centric top-level sections (grouped by category rather than person)
     isCategory?: boolean
+    // Category view's arrangement of this section: a row per item, a column per
+    // person. Built from every item in the section, packed ones included — see
+    // `buildCategoryRows`.
+    rows?: GridRow[]
     // True for the one section holding the items that can only be packed on the
     // way out of the door. Grouped by person, like a category section.
     lastMinute?: boolean
@@ -259,6 +266,14 @@ export function ViewPackingList() {
     // heading on the page, which is what the list already pays for in item rows.
     const [openComposerKey, setOpenComposerKey] = useState<string | null>(null)
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
+    // Which row of the category grid has its "who needs this?" panel open, held
+    // as keys rather than as the row itself: the row is rebuilt whenever the
+    // list changes, and a panel holding the old one would keep showing the state
+    // before the change it was used to make.
+    const [openRowKeys, setOpenRowKeys] = useState<{ sectionKey: string; rowKey: string; anchorItemId?: string } | null>(null)
+    // A row can hold one item or one each for four people; removing the second
+    // kind is worth naming who it affects.
+    const [rowToDelete, setRowToDelete] = useState<{ label: string; items: PackingListItem[]; who: string } | null>(null)
     const [editingItemId, setEditingItemId] = useState<string | null>(null)
     const [editingItemText, setEditingItemText] = useState<string>('')
     const [editingItemQuantity, setEditingItemQuantity] = useState<string>('')
@@ -287,7 +302,7 @@ export function ViewPackingList() {
     // somewhere: typed into a composer, or moved to the last minute card.
     // `bringIntoView` separates the two — see the effect below.
     const [highlightedItem, setHighlightedItem] = useState<{ id: string; bringIntoView: boolean } | null>(null)
-    const itemRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+    const itemRowRefs = useRef<Map<string, HTMLElement>>(new Map())
     // One-off confetti when the final item is ticked
     const [showConfetti, setShowConfetti] = useState(false)
     // 'exiting' plays the fold-away animation, 'packed-away' has removed the cards
@@ -475,6 +490,15 @@ export function ViewPackingList() {
     // nobody else here is wearing.
     const personColor = usePersonColors(db, peopleOptions)
 
+    // The columns every category card uses — the whole list's people, not the
+    // ones a particular category happens to mention, so a person is in the same
+    // place on every card and a column of gaps is an answer rather than an
+    // absence: nobody has packed a thing for the baby in here.
+    const gridColumns = useMemo(
+        () => buildGridColumns(peopleOptions, packingList?.items ?? []),
+        [peopleOptions, packingList?.items],
+    )
+
 
     const { register, setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
@@ -484,6 +508,27 @@ export function ViewPackingList() {
 
     // Use useWatch instead of watch() for proper re-renders on form changes
     const watchedItems = useWatch({ control, name: 'items', defaultValue: {} })
+
+    /**
+     * The grid's checkboxes are driven from the form's values rather than
+     * registered against it.
+     *
+     * A registered checkbox reads its initial state from the form's *default*
+     * values, which `setValue` doesn't update — so a registered box that
+     * unmounts and comes back renders unchecked while the form still says
+     * packed, and the next save writes the lie down. The grid mounts and
+     * unmounts cells constantly (a row leaves when it is finished, columns
+     * change with the list), so it reads `watchedItems` instead and can't drift.
+     */
+    const handleGridToggle = useCallback((item: PackingListItem, checked: boolean) => {
+        setValue(`items.${item.id}`, checked)
+        handleItemToggle(item.id, checked)
+    }, [setValue, handleItemToggle])
+
+    const registerCellRef = useCallback((itemId: string, element: HTMLElement | null) => {
+        if (element) itemRowRefs.current.set(itemId, element)
+        else itemRowRefs.current.delete(itemId)
+    }, [])
 
     // The finale belongs to the *moment* the list is finished, so it fires on the
     // transition into "everything packed" and is anchored to the viewport rather
@@ -958,6 +1003,92 @@ export function ViewPackingList() {
         }
     }
 
+    /**
+     * Everything a row of the category grid can be asked to do, in one place.
+     *
+     * Each of these rewrites the whole list once. Calling the single-item
+     * handlers in a loop would not: they each close over `packingList` and each
+     * persist a fresh copy of it, so three calls in one tick all start from the
+     * same snapshot and the last one to land is the only one that survives.
+     */
+    const persistItemChanges = async (
+        change: (list: PackingList) => PackingList,
+        errorContext: string,
+    ) => {
+        if (!packingList) return
+        try {
+            setAutoSaveStatus('saving')
+            await persistPackingList(change(packingList))
+            setAutoSaveStatus('saved')
+            setTimeout(() => setAutoSaveStatus('idle'), 2000)
+        } catch (err) {
+            reportError(err, errorContext)
+            setAutoSaveStatus('error')
+        }
+    }
+
+    /**
+     * The name belongs to the row rather than to any one copy of it: the same
+     * item spelled two ways for two people is a mistake, not a distinction.
+     * Quantities are the opposite — they're per person by construction — so this
+     * touches nothing but the text.
+     */
+    const handleRenameRow = (row: GridRow, text: string) => {
+        const trimmed = text.trim()
+        if (!trimmed || trimmed === row.label) return
+        const ids = new Set(row.items.map(item => item.id))
+        const now = new Date().toISOString()
+        return persistItemChanges(
+            list => ({
+                ...list,
+                items: list.items.map(item => ids.has(item.id) ? { ...item, itemText: trimmed, lastModified: now } : item),
+            }),
+            'Error renaming item',
+        )
+    }
+
+    const handleSetItemQuantity = (target: PackingListItem, quantity: number | undefined) => {
+        const now = new Date().toISOString()
+        return persistItemChanges(
+            list => ({
+                ...list,
+                items: list.items.map(item => {
+                    if (item.id !== target.id) return item
+                    // Absent rather than 1: an explicit 1 says nothing the default
+                    // doesn't, and it would travel to the pod saying it.
+                    const { quantity: _previous, ...rest } = item
+                    return { ...rest, ...(quantity !== undefined && quantity > 1 ? { quantity } : {}), lastModified: now }
+                }),
+            }),
+            'Error saving quantity',
+        )
+    }
+
+    /** Removing every copy on a row, which is one write however many people it covers. */
+    const handleDeleteRowItems = (rowItems: PackingListItem[]) => {
+        const ids = new Set(rowItems.map(item => item.id))
+        const deletedAt = new Date().toISOString()
+        const currentFormValues = getValues('items')
+        for (const id of ids) delete currentFormValues[id]
+        setValue('items', currentFormValues)
+        return persistItemChanges(
+            list => ({
+                ...list,
+                items: list.items.filter(item => !ids.has(item.id)),
+                // Same bookkeeping as deleting one: items that came from the
+                // question set are remembered, so the user can be asked about
+                // them the next time the list is updated from their questions.
+                deletedItems: [
+                    ...(list.deletedItems ?? []),
+                    ...rowItems
+                        .filter(item => item.questionId !== '')
+                        .map(item => ({ ...item, reviewed: false, lastModified: deletedAt })),
+                ],
+            }),
+            'Error removing items',
+        )
+    }
+
     const handleAddItem = async (target: AddItemTarget, itemText: string, quantity?: number) => {
         if (!packingList) return
 
@@ -1172,9 +1303,16 @@ export function ViewPackingList() {
         if (listSeenBefore || hasSeededFoldRef.current || !listItems) return
         if (listItems.length <= FOLD_ON_OPEN_MIN_ITEMS) return
 
-        const sectionKeys = new Set(listItems.map(personViewSectionKey))
+        // Keyed the way the view the list is about to open in keys them —
+        // folding people away while the page is showing categories folds
+        // nothing at all.
+        const sectionKeys = new Set(listItems.map(item => viewMode === 'category'
+            ? (item.lastMinute ? LAST_MINUTE_SECTION_KEY : (item.category ?? UNCATEGORISED_LABEL))
+            : personViewSectionKey(item)))
         // Guests with nothing in them yet still have a card to fold
-        for (const guest of packingList?.guests ?? []) sectionKeys.add(guest.name)
+        if (viewMode === 'person') {
+            for (const guest of packingList?.guests ?? []) sectionKeys.add(guest.name)
+        }
         // Nothing to fold *into* — one long section stays open, since folding it
         // would leave the user looking at a single closed box.
         if (sectionKeys.size < 2) return
@@ -1182,6 +1320,7 @@ export function ViewPackingList() {
         hasSeededFoldRef.current = true
         setCollapsedSections(prev => new Set([...prev, ...sectionKeys]))
         setFoldedOnOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewMode is read once, when the list first opens
     }, [listSeenBefore, listItems, packingList?.guests])
 
     // Showing packed items is a request to see everything, so it hands back the
@@ -1270,10 +1409,6 @@ export function ViewPackingList() {
         return !watchedItems[item.id]
     })
 
-    const hiddenPackedCount = !showPacked
-        ? packingList.items.filter(item => watchedItems[item.id]).length
-        : 0
-
     const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
     // A sliver of fill so the first item packed is visibly worth something, but
     // nothing at all while the list is untouched
@@ -1347,7 +1482,12 @@ export function ViewPackingList() {
             title: LAST_MINUTE_TITLE,
             name: '',
             lastMinute: true,
+            // Person view reads the filtered items directly; the grid takes all
+            // of them and decides row by row what to show — see below.
             items: filteredItems.filter(i => i.lastMinute),
+            ...(viewMode === 'category'
+                ? { rows: buildCategoryRows(lastMinuteItems, gridColumns) }
+                : {}),
         }]
         : []
 
@@ -1369,24 +1509,57 @@ export function ViewPackingList() {
         listSections = [...sharedSections, ...regularSections, ...guestSections, ...lastMinuteSections]
     } else {
         // Communal items are filed by category here, same as everyone else's —
-        // they sit in a shared group inside the section they belong to rather
-        // than in a card of their own.
-        const visibleByCategory = new Map(
-            groupByCategory(filteredItems.filter(i => !i.lastMinute), sectionOrder).map(({ label, items }) => [label, items])
-        )
-        // Categories come from every item, not just the visible ones, so a fully
-        // packed category keeps its celebratory card instead of disappearing.
+        // they sit among the rows of the section they belong to rather than in a
+        // card of their own.
+        //
+        // Every item goes into the grid, packed ones included: a cell that
+        // disappeared when it was ticked would leave a gap indistinguishable
+        // from a person who never needed the item, and telling those two apart
+        // is the whole of what the grid is for. Hiding what's packed is decided
+        // a row at a time, inside the grid.
         const categorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.lastMinute), sectionOrder)
-            .filter(({ label }) => visibleByCategory.has(label) || isSectionComplete(categoryStats[label]))
-            .map(({ label }) => ({
+            .map(({ label, items }) => ({
                 key: label,
                 title: label,
                 name: '',
-                items: visibleByCategory.get(label) ?? [],
+                items,
                 isCategory: true,
+                rows: buildCategoryRows(items, gridColumns),
             }))
         listSections = [...categorySections, ...lastMinuteSections]
     }
+
+    // How much of the list the grid is holding back: the items on rows where
+    // every cell is already packed, which are the only ones it hides.
+    const hiddenGridItemCount = showPacked || viewMode === 'person'
+        ? 0
+        : listSections.reduce((count, section) => count + (section.rows ?? []).reduce(
+            (rowCount, row) =>
+                rowCount + (row.items.length > 0 && row.items.every(item => watchedItems[item.id]) ? row.items.length : 0),
+            0,
+        ), 0)
+
+    // What the banner offers to bring back has to be what is actually missing.
+    // Person view hides every packed item; category view hides a row only once
+    // every cell on it is packed, so most of a half-packed list is still on
+    // screen and counting all of it would send the user looking for items that
+    // are right in front of them.
+    const hiddenPackedCount = showPacked
+        ? 0
+        : viewMode === 'person'
+            ? packingList.items.filter(item => watchedItems[item.id]).length
+            : hiddenGridItemCount
+
+    // The panel shows a row that is rebuilt from the list on every render, so it
+    // has to be found again each time rather than held. By key first; by one of
+    // the items it opened on when the key has moved under it — renaming a row
+    // changes its key, and the panel is where renaming happens.
+    const openRowSection = openRowKeys ? listSections.find(section => section.key === openRowKeys.sectionKey) : undefined
+    const openRow = openRowKeys
+        ? openRowSection?.rows?.find(row => row.key === openRowKeys.rowKey)
+            ?? openRowSection?.rows?.find(row => row.items.some(item => item.id === openRowKeys.anchorItemId))
+            ?? null
+        : null
 
     const tripDates = formatTripDates(packingList.startDate, packingList.endDate)
 
@@ -1418,7 +1591,7 @@ export function ViewPackingList() {
 
     return (
         <>
-        <div className="w-full flex flex-col items-center py-8 px-4">
+        <div className="w-full flex flex-col items-center py-8 px-0 sm:px-4">
             {/* Non-sticky header: name, actions */}
             <div className="w-full max-w-screen-2xl mb-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1440,7 +1613,7 @@ export function ViewPackingList() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         {/* The reveal opens an empty shared *card*, which only
-                            person view has — question view offers "Shared" in
+                            person view has — category view offers "Shared" in
                             each section's who-for picker instead. */}
                         {!foreignPodUrl && viewMode === 'person' && !hasCommunalItems && !showSharedSection && (
                             <Button
@@ -1584,12 +1757,12 @@ export function ViewPackingList() {
                                     </button>
                                     <button
                                         type="button"
-                                        aria-pressed={viewMode === 'question'}
-                                        aria-label="Question View"
-                                        onClick={() => setViewMode('question')}
-                                        className={`px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors border-l border-gray-300 ${viewMode === 'question' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                                        aria-pressed={viewMode === 'category'}
+                                        aria-label="Category View"
+                                        onClick={() => setViewMode('category')}
+                                        className={`px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors border-l border-gray-300 ${viewMode === 'category' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                                     >
-                                        {isDesktop ? 'Question View' : 'Question'}
+                                        {isDesktop ? 'Category View' : 'Category'}
                                     </button>
                                 </div>
                                 <Button
@@ -1601,6 +1774,31 @@ export function ViewPackingList() {
                                 </Button>
                             </div>
                         </div>
+                        {/* Which coloured initial is whose, written once and kept
+                            in view rather than repeated on every card — a key is
+                            only any use while you are looking at the thing it
+                            explains. Nothing here is pressable: the one thing it
+                            could do is pack somebody's whole category on a stray
+                            tap, and person view has a button that says so. */}
+                        {viewMode === 'category' && gridColumns.length > 0 && (
+                            <div
+                                data-testid="people-key"
+                                className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-1.5"
+                            >
+                                {gridColumns.map(column => (
+                                    <span key={column.key} className="flex items-center gap-1 text-[11px] font-medium text-gray-600">
+                                        {!column.unassigned && (
+                                            <PersonAvatar
+                                                name={column.name}
+                                                color={personColor({ id: column.personId, name: column.name })}
+                                                size="sm"
+                                            />
+                                        )}
+                                        {column.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1703,9 +1901,13 @@ export function ViewPackingList() {
                         celebrations, so they fold away and leave the banner as the
                         last thing standing — the fold itself is the celebration.
                         Showing packed items brings them straight back. */}
+                    {/* Person view's cards are narrow and ragged, so they flow
+                        into masonry columns. A grid card is a table that has to
+                        be read across, so category view stacks them instead —
+                        two abreast once there is room for two tables. */}
                     {!sectionsPackedAway && <div
-                        className={sectionsExiting ? 'sections-packing-away' : undefined}
-                        style={{ columnWidth: '300px', columnGap: '1rem' }}
+                        className={`${sectionsExiting ? 'sections-packing-away' : ''} ${viewMode === 'category' ? 'grid grid-cols-1 items-start gap-4 xl:grid-cols-2' : ''}`}
+                        style={viewMode === 'category' ? undefined : { columnWidth: '300px', columnGap: '1rem' }}
                     >
                         {listSections.map((section) => {
                             const { key: sectionKey, title, items, guestId } = section
@@ -1721,9 +1923,16 @@ export function ViewPackingList() {
                             const collapseLabelTarget = isShared ? 'the shared items' : isLastMinute ? 'the last minute items' : isCategorySection ? title : `${section.name}'s`
                             // The last minute card holds everybody's, so it groups
                             // by person the way a category card does.
-                            const innerGroups: ItemGroup[] = (isCategorySection || isLastMinute)
-                                ? groupByPerson(items)
-                                : groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
+                            // Category view arranges a section as a grid; person
+                            // view still folds each card into groups, and so does
+                            // the last minute card while it is being read by
+                            // person.
+                            const isGridSection = viewMode === 'category' && (isCategorySection || isLastMinute)
+                            const innerGroups: ItemGroup[] = isGridSection
+                                ? []
+                                : (isCategorySection || isLastMinute)
+                                    ? groupByPerson(items)
+                                    : groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
                             const isSectionCollapsed = collapsedSections.has(sectionKey)
                             // Only a card that belongs to one person can wear
                             // their colour: a category card holds everybody's.
@@ -1738,7 +1947,7 @@ export function ViewPackingList() {
                                     ? 'border-amber-300 bg-amber-50'
                                     : `bg-white ${sectionPersonColor?.border ?? (isShared ? 'border-blue-200' : 'border-gray-200')}`
                             return (
-                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-4 shadow-sm mb-4 transition-colors duration-300 ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
+                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-3 shadow-sm transition-colors duration-300 sm:p-4 ${viewMode === 'category' ? '' : 'mb-4'} ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
                                 {/* The rule under the heading separates it from the items
                                     below; a folded card has none, so it would just be a
                                     line ruling off empty space. */}
@@ -1841,12 +2050,29 @@ export function ViewPackingList() {
                                             onAdd={handleComposerAdd}
                                         />
                                     </div>
-                                    {isComplete && items.length === 0 && (
+                                    {isComplete && items.length === 0 && !isGridSection && (
                                         <p className="text-sm font-medium text-emerald-700">
                                             Nothing left to pack 🎒
                                         </p>
                                     )}
-                                    {innerGroups.map(({ key: groupKey, label, items: catItems, communal: isSharedGroup }) => {
+                                    {isGridSection && (
+                                        <CategoryItemGrid
+                                            columns={gridColumns}
+                                            rows={section.rows ?? []}
+                                            personColor={personColor}
+                                            packedById={watchedItems}
+                                            // The names go when there isn't room
+                                            // for them; the legend above the
+                                            // cards decodes the initials instead.
+                                            hidePacked={!showPacked}
+                                            flourish={flourish}
+                                            highlightedItemId={highlightedItem?.id}
+                                            onToggleItem={handleGridToggle}
+                                            registerCellRef={registerCellRef}
+                                            onOpenRow={(row) => setOpenRowKeys({ sectionKey, rowKey: row.key, anchorItemId: row.items[0]?.id })}
+                                        />
+                                    )}
+                                    {!isGridSection && innerGroups.map(({ key: groupKey, label, items: catItems, communal: isSharedGroup }) => {
                                         const categoryKey = `${sectionKey}::${groupKey}`
                                         const isCollapsed = collapsedGroups.has(categoryKey)
                                         // Counted over every item in the group, not the ones on
@@ -2113,6 +2339,50 @@ export function ViewPackingList() {
             onConfirm={() => { handleDeleteItem(itemToDelete!); setItemToDelete(null) }}
             title="Remove item"
             message="Are you sure you want to remove this item?"
+            confirmText="Remove"
+            confirmVariant="danger"
+        />
+        <ItemRowPanel
+            isOpen={openRow !== null}
+            onClose={() => setOpenRowKeys(null)}
+            row={openRow}
+            columns={gridColumns}
+            sectionTitle={openRowSection?.title ?? ''}
+            personColor={personColor}
+            packedById={watchedItems}
+            onRename={handleRenameRow}
+            onSetQuantity={handleSetItemQuantity}
+            onToggleLastMinute={handleToggleLastMinute}
+            onAddFor={(row, column) => handleAddItem({
+                personName: column.unassigned ? '' : column.name,
+                personId: column.unassigned ? '' : column.personId,
+                // A category card's section *is* the category. The last minute
+                // card's isn't: its items keep the section they came from, so a
+                // copy made there takes it from the item beside it.
+                category: openRowSection?.isCategory
+                    ? categoryFromLabel(openRowSection.title)
+                    : row.items[0]?.category,
+                lastMinute: openRowSection?.lastMinute,
+            }, row.label, row.quantity)}
+            onRemove={(item) => handleDeleteItem(item.id)}
+            onDeleteRow={(row) => {
+                setOpenRowKeys(null)
+                if (row.items.length === 1) { setItemToDelete(row.items[0].id); return }
+                setRowToDelete({
+                    label: row.label,
+                    items: row.items,
+                    who: row.items.map(item => item.personName || UNASSIGNED_LABEL).join(', '),
+                })
+            }}
+        />
+        <ConfirmationDialog
+            isOpen={rowToDelete !== null}
+            onClose={() => setRowToDelete(null)}
+            onConfirm={() => { if (rowToDelete) handleDeleteRowItems(rowToDelete.items); setRowToDelete(null) }}
+            title="Remove item"
+            message={rowToDelete
+                ? `Remove ${rowToDelete.label} for ${rowToDelete.who}?`
+                : ''}
             confirmText="Remove"
             confirmVariant="danger"
         />
