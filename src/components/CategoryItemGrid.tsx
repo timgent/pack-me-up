@@ -195,6 +195,17 @@ export function CategoryItemGrid({
     // on all of them — which is the whole of what makes this a grid.
     const chipBlockWidth = chipsPerLine(shownIndices.length, width) * CHIP_PITCH
 
+    /**
+     * Filtered to one person there is no grid left to line up — one chip a row,
+     * and the column it used to hold its place in is now a hand's width of empty
+     * paper between the name and the only control on the row.
+     *
+     * So it stops being a table: the chip leads, the name follows it, and the
+     * card reads as the checklist it now is. Two or more people and the columns
+     * come back, because then the alignment is the point again.
+     */
+    const asChecklist = shownIndices.length === 1
+
     const renderFlourish = (item: PackingListItem) => (
         item.id === flourish?.itemId
             ? (
@@ -283,7 +294,7 @@ export function CategoryItemGrid({
                 data-testid={`grid-cell-${item.id}`}
                 ref={(element) => registerCellRef(item.id, element)}
                 title={`${row.label} for ${column.name}`}
-                className={`relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+                className={`relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold transition-colors before:absolute before:-inset-1.5 before:content-[''] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
                     packed ? color.avatar : `border-2 bg-white ${color.border} ${color.text}`
                 } ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
             >
@@ -366,19 +377,16 @@ export function CategoryItemGrid({
                             data-testid="grid-row"
                             className={`flex items-start gap-1 rounded-md transition-colors ${complete ? 'bg-emerald-50' : 'hover:bg-gray-50'} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
                         >
-                            {/* Capped, so a wide card doesn't strand the chips
-                                an inch and a half from the name they belong to. */}
-                            <span className="min-w-0 flex-1" style={{ maxWidth: `${NAME_MAX_WIDTH}px` }}>
-                                {renderName(row, complete)}
-                            </span>
                             {/* A block of the same width on every row, so a
                                 person keeps their place down the whole card
-                                however many lines the chips take. */}
+                                however many lines the chips take. Leading and
+                                unpadded when there is only one of them — see
+                                `asChecklist`. */}
                             <div
                                 role="group"
                                 aria-label={row.label}
-                                className="flex shrink-0 flex-wrap gap-1 py-2"
-                                style={{ width: `${chipBlockWidth}px` }}
+                                className={`flex shrink-0 flex-wrap gap-1 py-2 ${asChecklist ? 'order-first' : ''}`}
+                                style={asChecklist ? undefined : { width: `${chipBlockWidth}px` }}
                             >
                                 {row.communal
                                     ? renderSharedChip(row)
@@ -390,6 +398,11 @@ export function CategoryItemGrid({
                                             : renderChipGap(row, column)
                                     })}
                             </div>
+                            {/* Capped, so a wide card doesn't strand the chips
+                                an inch and a half from the name they belong to. */}
+                            <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
+                                {renderName(row, complete)}
+                            </span>
                         </li>
                     )
                 })}

@@ -172,6 +172,7 @@ export function ItemRowPanel({
                                         {!column.unassigned && (
                                             <PersonAvatar
                                                 name={column.name}
+                                                initial={column.initial}
                                                 color={personColor({ id: column.personId, name: column.name })}
                                                 size="sm"
                                             />

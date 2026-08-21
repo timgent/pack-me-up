@@ -2758,7 +2758,7 @@ describe('ViewPackingList adding items', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /^Bob/ }))
         // Bob has nothing in Hiking, so the card is off the page until asked for
-        fireEvent.click(screen.getByRole('button', { name: /^show them$/ }))
+        fireEvent.click(screen.getByRole('button', { name: /empty — show$/ }))
         const { input } = composerFor('Hiking')
         fireEvent.change(input, { target: { value: 'ten' } })
         fireEvent.click(screen.getByRole('option', { name: /Tent/ }))
@@ -3532,7 +3532,9 @@ describe('ViewPackingList people filter', () => {
         id: 'test-list-filter',
         name: 'Filter Trip',
         createdAt: '2026-01-01T00:00:00Z',
+        guests: [{ id: 'g1', name: 'Zoe' }],
         items: [
+            { id: 'f6', itemText: 'Armbands', personName: 'Zoe', personId: 'g1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
             { id: 'f1', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
             { id: 'f2', itemText: 'Wellies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
             { id: 'f3', itemText: 'Toothbrush', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: false },
@@ -3649,14 +3651,29 @@ describe('ViewPackingList people filter', () => {
             fireEvent.click(chip('Bob'))
 
             expect(screen.queryByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeNull()
-            expect(screen.getByText(/2 categories have nothing for Bob/)).toBeTruthy()
+            // Said beside the filter that caused it, not at the foot of a page
+            // three thousand pixels down
+            expect(screen.getByRole('button', { name: '2 empty — show' })).toBeTruthy()
+        })
+
+        it('puts the empty sections away again, having offered to show them', async () => {
+            await renderList()
+            fireEvent.click(chip('Bob'))
+
+            fireEvent.click(screen.getByRole('button', { name: '2 empty — show' }))
+            expect(screen.getByRole('button', { name: 'Hide 2 empty' })).toBeTruthy()
+
+            fireEvent.click(screen.getByRole('button', { name: 'Hide 2 empty' }))
+
+            expect(screen.queryByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeNull()
+            expect(screen.getByRole('button', { name: '2 empty — show' })).toBeTruthy()
         })
 
         it('puts the dropped sections back when asked', async () => {
             await renderList()
             fireEvent.click(chip('Bob'))
 
-            fireEvent.click(screen.getByRole('button', { name: /^show them$/ }))
+            fireEvent.click(screen.getByRole('button', { name: /empty — show$/ }))
 
             expect(screen.getByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeTruthy()
         })
@@ -3706,6 +3723,46 @@ describe('ViewPackingList people filter', () => {
                 undefined,
                 expect.objectContaining({ label: 'Undo' }),
             )
+        })
+
+        it('keeps the filter on a guest who has just been renamed', async () => {
+            // The filter holds names. Leave the old one in it and the page is
+            // filtered to somebody no chip names — every card empty, no chip
+            // pressed, and nothing on screen to undo it.
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+            const field = screen.getByRole('textbox', { name: 'Rename Zoe' })
+            fireEvent.change(field, { target: { value: 'Zoey' } })
+            fireEvent.blur(field)
+
+            await waitFor(() => expect(chip('Zoey').getAttribute('aria-pressed')).toBe('true'))
+            expect(row('Armbands')).toBeTruthy()
+        })
+
+        it('goes back to everybody when the filtered guest is removed', async () => {
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+            // The bar's button opens the confirmation; the dialog's does it
+            const dialog = within(await screen.findByRole('dialog'))
+            fireEvent.click(dialog.getByRole('button', { name: 'Remove' }))
+
+            // Not left filtered to a person who no longer exists
+            await waitFor(() => expect(row('Wellies')).toBeTruthy())
+        })
+
+        it('marks a bag that is finished rather than leaving a name on its own', async () => {
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: "Pack all 1 of Zoe's" }))
+
+            await waitFor(() => expect(screen.getByText(/Zoe's bag is packed/)).toBeTruthy())
+            // The trip's own celebration is still the trip's
+            expect(screen.queryByTestId('completion-banner')).toBeNull()
         })
 
         it('says nothing about packing for two people at once', async () => {

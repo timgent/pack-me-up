@@ -16,6 +16,7 @@
  * one-handed. Scrolling also keeps a chip where the user last saw it, which
  * wrapping does not: a chip that changes width on selection reflows the line.
  */
+import { useEffect, useRef } from 'react'
 import { PersonAvatar } from './PersonAvatar'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
 import type { GridColumn } from '../utils/categoryItemGrid'
@@ -41,24 +42,52 @@ export function PeopleFilterBar({
     onClear,
     controlsId,
 }: PeopleFilterBarProps) {
+    const scroller = useRef<HTMLDivElement>(null)
+
+    // A chip pressed off screen leaves the list filtered by a control the user
+    // can't see — which is what happens as soon as the group outgrows the strip.
+    const lastSelected = [...selected].join('\u0000')
+    useEffect(() => {
+        const box = scroller.current
+        if (!box) return
+        const target = selected.size > 0
+            ? box.querySelector<HTMLElement>('[aria-pressed="true"]')
+            : box.firstElementChild as HTMLElement | null
+        target?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+    }, [lastSelected, selected.size])
+
     // One person is not a choice, and neither is nobody.
     if (columns.length <= 1) return null
 
     return (
         <div className="mt-1.5 flex items-center gap-2 border-t border-gray-100 pt-1.5">
-            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            {/* The words are worth 87px of a 390px screen, which is most of a
+                chip — so the phone gets the funnel and the room instead. */}
+            <span aria-hidden="true" className="shrink-0 text-gray-400 sm:hidden">
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                    <path fillRule="evenodd" d="M2.6 4.2A1 1 0 0 1 3.5 3.6h13a1 1 0 0 1 .77 1.64l-4.77 5.6v4.2a1 1 0 0 1-.55.9l-2.4 1.2a1 1 0 0 1-1.45-.9v-5.4L2.33 5.24a1 1 0 0 1 .27-1.04Z" clipRule="evenodd" />
+                </svg>
+            </span>
+            <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 sm:inline">
                 Packing for
             </span>
+            {/* Faded at the trailing edge, so a group that runs off the end
+                looks like it continues rather than like it stops there. */}
+            <div className="relative min-w-0 flex-1">
             <div
+                ref={scroller}
                 role="group"
                 aria-label="Filter by person"
                 aria-controls={controlsId}
-                className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex items-center gap-1.5 overflow-x-auto scroll-smooth pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
                 {columns.map(column => {
                     const isSelected = selected.has(column.key)
-                    const stat = totals.get(column.key)
-                    const done = stat !== undefined && stat.total > 0 && stat.packed === stat.total
+                    // Somebody with nothing of their own still has a total, and
+                    // it is worth saying: a bare chip where every other selected
+                    // chip carries numbers reads as a chip that failed to load.
+                    const stat = totals.get(column.key) ?? { packed: 0, total: 0 }
+                    const done = stat.total > 0 && stat.packed === stat.total
                     const color = personColor({ id: column.personId, name: column.name })
                     return (
                         <button
@@ -66,7 +95,7 @@ export function PeopleFilterBar({
                             type="button"
                             aria-pressed={isSelected}
                             onClick={() => onToggle(column.key)}
-                            className={`flex shrink-0 snap-start items-center gap-1.5 rounded-full border py-1.5 pl-1.5 pr-2.5 text-xs font-medium transition-colors ${
+                            className={`flex min-h-[44px] shrink-0 snap-start items-center gap-1.5 rounded-full border py-1.5 pl-1.5 pr-2.5 text-xs font-medium transition-colors ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
                                     : done
@@ -83,7 +112,7 @@ export function PeopleFilterBar({
                                 for a figure nobody is reading, and a chip that
                                 grows when pressed moves the one beside it out
                                 from under the finger going there next. */}
-                            {isSelected && stat !== undefined && (
+                            {isSelected && (
                                 <span className="whitespace-nowrap tabular-nums opacity-90">
                                     {stat.packed}/{stat.total}
                                 </span>
@@ -92,19 +121,24 @@ export function PeopleFilterBar({
                         </button>
                     )
                 })}
-            </div>
-            {/* Held open whether or not it is showing, so the chips don't shift
-                sideways the moment the first one is pressed. */}
-            <div className="w-14 shrink-0 text-right">
+                {/* Last in the scroller rather than in a gutter of its own: a
+                    reserved 56px is a chip's worth of a phone screen spent on
+                    nothing, and coming after every chip it can appear without
+                    moving one of them. */}
                 {selected.size > 0 && (
                     <button
                         type="button"
                         onClick={onClear}
-                        className="rounded-md px-1.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+                        className="ml-0.5 min-h-[44px] shrink-0 rounded-full px-2.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
                     >
                         Clear
                     </button>
                 )}
+            </div>
+            <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white to-transparent"
+            />
             </div>
         </div>
     )

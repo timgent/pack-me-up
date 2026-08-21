@@ -1181,6 +1181,16 @@ export function ViewPackingList() {
         if (!trimmed) return
         const oldGuest = (packingList.guests ?? []).find(g => g.id === guestId)
         if (!oldGuest || trimmed === oldGuest.name) return
+        // The filter holds names. Leave the old one in it and the page stays
+        // filtered to somebody no chip names any more — every card empty, no
+        // chip pressed, and nothing on screen to undo it.
+        setSelectedPeople(prev => {
+            if (!prev.has(oldGuest.name)) return prev
+            const next = new Set(prev)
+            next.delete(oldGuest.name)
+            next.add(trimmed)
+            return next
+        })
         await persistPackingList({
             ...packingList,
             guests: (packingList.guests ?? []).map(g => g.id === guestId ? { ...g, name: trimmed } : g),
@@ -1191,6 +1201,15 @@ export function ViewPackingList() {
 
     const handleRemoveGuest = async (guestId: string) => {
         if (!packingList) return
+        const guest = (packingList.guests ?? []).find(g => g.id === guestId)
+        if (guest) {
+            setSelectedPeople(prev => {
+                if (!prev.has(guest.name)) return prev
+                const next = new Set(prev)
+                next.delete(guest.name)
+                return next
+            })
+        }
         await persistPackingList({
             ...packingList,
             guests: (packingList.guests ?? []).filter(g => g.id !== guestId),
@@ -1442,6 +1461,7 @@ export function ViewPackingList() {
     // would be a worse list, not a simpler app. What is missing is said in one
     // line under the cards instead, and that line puts them back.
     const emptyForFilter = filtering ? allCategorySections.filter(section => !hasSomethingForFilter(section)) : []
+    const emptyCategoriesShown = filtering && showEmptyCategories && emptyForFilter.length > 0
     const categorySections = filtering && !showEmptyCategories
         ? allCategorySections.filter(hasSomethingForFilter)
         : allCategorySections
@@ -1450,11 +1470,11 @@ export function ViewPackingList() {
     const soleGuest = solePerson === undefined
         ? undefined
         : (packingList.guests ?? []).find(guest => guest.name === solePerson.name)
-    const solePersonUnpacked = solePerson === undefined
-        ? 0
-        : packingList.items.filter(
-            item => !item.communal && item.personName === solePerson.name && !watchedItems[item.id],
-        ).length
+    const solePersonItems = solePerson === undefined
+        ? []
+        : packingList.items.filter(item => !item.communal && item.personName === solePerson.name)
+    const solePersonTotal = solePersonItems.length
+    const solePersonUnpacked = solePersonItems.filter(item => !watchedItems[item.id]).length
     const filterAnnouncement = filterSummary(selectedPeople, categorySections.length, allCategorySections.length)
 
     /** " for Alice" — what makes a filtered count a number about somebody. */
@@ -1715,14 +1735,16 @@ export function ViewPackingList() {
                                 controlsId={LIST_SECTIONS_ID}
                             />
                         </div>
-                        {/* Held open whether or not it has anything in it: it
-                            appears as the selection crosses one person, under a
-                            sticky header, with the user's finger on the chips —
-                            and a page that jumps a row on every tap is worse
-                            than one that keeps an empty line. */}
-                        {gridColumns.length > 1 && (
-                            <div className="mt-1.5 flex min-h-[2.25rem] flex-wrap items-center gap-2 border-t border-gray-100 pt-1.5">
-                                {solePerson !== undefined ? (
+                        {/* Only while a filter is on: unfiltered it held a line
+                            of grey text restating the strip above it, which is a
+                            36th of a phone screen spent on nothing. Within a
+                            filter its height doesn't change, so moving between
+                            people never shifts the cards. It scrolls rather than
+                            wraps for the same reason the strip does — a guest's
+                            row of controls is wider than a phone. */}
+                        {filtering && (
+                            <div className="mt-1.5 flex min-h-[2.75rem] items-center gap-2 overflow-x-auto border-t border-gray-100 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                {solePerson !== undefined && (
                                     <>
                                         {soleGuest && renamingGuestId === soleGuest.id ? (
                                             <input
@@ -1736,19 +1758,27 @@ export function ViewPackingList() {
                                                 }}
                                                 onBlur={() => handleRenameGuest(soleGuest.id, renamingGuestName)}
                                                 autoFocus
-                                                className="w-40 rounded-md border border-blue-400 px-2 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-40 shrink-0 rounded-md border border-blue-400 px-2 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         ) : (
-                                            <span className="text-xs font-semibold text-gray-700">{solePerson.name}</span>
+                                            <span className="shrink-0 text-xs font-semibold text-gray-700">{solePerson.name}</span>
                                         )}
-                                        {soleGuest && (
-                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Guest</span>
+                                        {soleGuest && renamingGuestId !== soleGuest.id && (
+                                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Guest</span>
                                         )}
-                                        {solePersonUnpacked > 0 && (
+                                        {/* One person finishing their bag is a
+                                            real thing to have done. The trip's
+                                            own celebration stays for the trip,
+                                            but this shouldn't pass in silence. */}
+                                        {solePersonUnpacked === 0 && solePersonTotal > 0 ? (
+                                            <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                🎉 {solePerson.name}'s bag is packed!
+                                            </span>
+                                        ) : solePersonUnpacked > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => handlePackAllFor(solePerson.name)}
-                                                className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                                                className="shrink-0 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
                                             >
                                                 {/* The number is in the button, where it
                                                     is read before the tap rather than in a
@@ -1761,24 +1791,35 @@ export function ViewPackingList() {
                                                 <button
                                                     type="button"
                                                     onClick={() => { setRenamingGuestId(soleGuest.id); setRenamingGuestName(soleGuest.name) }}
-                                                    className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                                                 >
                                                     Rename
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setGuestToRemove(soleGuest.id)}
-                                                    className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700"
                                                 >
                                                     Remove
                                                 </button>
                                             </>
                                         )}
                                     </>
-                                ) : (
-                                    <span className="text-xs text-gray-400">
-                                        {filtering ? 'Packing for more than one person' : 'Everyone\u2019s items'}
-                                    </span>
+                                )}
+                                {/* Cards vanishing is an alarming thing for a
+                                    packing list to do, and the explanation used
+                                    to sit three thousand pixels below the cause.
+                                    It belongs where the filter is. */}
+                                {emptyForFilter.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowEmptyCategories(shown => !shown)}
+                                        className="ml-auto shrink-0 whitespace-nowrap rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                                    >
+                                        {emptyCategoriesShown
+                                            ? `Hide ${emptyForFilter.length} empty`
+                                            : `${emptyForFilter.length} empty — show`}
+                                    </button>
                                 )}
                             </div>
                         )}
@@ -2025,24 +2066,6 @@ export function ViewPackingList() {
                             </div>
                         )})}
                     </div>}
-                    {/* What the filter took off the page, said once. The grid's
-                        fixed columns exist so that a gap is an answer — nobody
-                        has packed a thing for the baby in here — and dropping
-                        nine cards silently would throw that answer away. */}
-                    {!sectionsPackedAway && emptyForFilter.length > 0 && (
-                        <p className="mt-3 text-sm text-gray-500">
-                            {emptyForFilter.length} {emptyForFilter.length === 1 ? 'category has' : 'categories have'} nothing
-                            {filterQualifier}
-                            {' — '}
-                            <button
-                                type="button"
-                                onClick={() => setShowEmptyCategories(true)}
-                                className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900"
-                            >
-                                show {emptyForFilter.length === 1 ? 'it' : 'them'}
-                            </button>
-                        </p>
-                    )}
                 </div>
             </div>
         </div>
