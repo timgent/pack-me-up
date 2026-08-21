@@ -15,6 +15,12 @@
  * to be any use, and the moment you scroll into a long category it isn't —
  * whereas identity that travels with the control can't scroll away from it.
  *
+ * Which initial is whose is written once, in the page's sticky strip, where it
+ * stays in view for every card. It is a key and nothing else: nothing in it can
+ * be pressed, because the only thing a key could plausibly *do* — pack
+ * everything of one person's — is nine items changed by one stray tap, with no
+ * undo. That job has a home in person view, on a button that says so.
+ *
  * Wrapping only works because a chip is a fixed size. Pills carrying names are
  * all different widths, so they put each person somewhere different on every
  * row and destroy the one reading the grid exists for; identical 32px discs sit
@@ -31,12 +37,9 @@
 import type { PackingListItem } from '../create-packing-list/types'
 import type { GridColumn, GridRow } from '../utils/categoryItemGrid'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
-import { PersonAvatar } from './PersonAvatar'
 import { useMeasuredWidth } from '../hooks/useMeasuredWidth'
 
 export interface CategoryItemGridProps {
-    /** Names the grid for screen readers, e.g. "Toiletries". */
-    sectionTitle: string
     columns: readonly GridColumn[]
     rows: readonly GridRow[]
     personColor: PersonColorLookup
@@ -52,10 +55,7 @@ export interface CategoryItemGridProps {
     registerCellRef: (itemId: string, element: HTMLElement | null) => void
     /** Opens the row's "who needs this?" panel — rename, quantities, who it is for. */
     onOpenRow: (row: GridRow) => void
-    onCheckColumn: (column: GridColumn, columnIndex: number) => void
 }
-
-interface ColumnStat { packed: number; total: number }
 
 /** A 32px disc and the 4px after it. */
 const CHIP_PITCH = 36
@@ -110,7 +110,6 @@ function splitLastWord(label: string): { head: string; lastWord: string } {
 }
 
 export function CategoryItemGrid({
-    sectionTitle,
     columns,
     rows,
     personColor,
@@ -121,7 +120,6 @@ export function CategoryItemGrid({
     onToggleItem,
     registerCellRef,
     onOpenRow,
-    onCheckColumn,
 }: CategoryItemGridProps) {
     const { ref: containerRef, width } = useMeasuredWidth<HTMLDivElement>()
 
@@ -138,21 +136,6 @@ export function CategoryItemGrid({
     if (visibleRows.length === 0) {
         return <p className="text-sm font-medium text-emerald-700">Nothing left to pack 🎒</p>
     }
-
-    // Counted over every item in the category rather than the visible rows: with
-    // packed items hidden, "1" beside a person two thirds done reads as a person
-    // who has barely started.
-    const columnStats: ColumnStat[] = columns.map((_column, index) => {
-        let packed = 0
-        let total = 0
-        for (const row of rows) {
-            const item = row.cells[index]
-            if (!item) continue
-            total++
-            if (packedById[item.id]) packed++
-        }
-        return { packed, total }
-    })
 
     // One width for every row in the card, so the chips land in the same places
     // on all of them — which is the whole of what makes this a grid.
@@ -313,51 +296,8 @@ export function CategoryItemGrid({
         )
     }
 
-    /**
-     * Who is on the list, how far each of them has got, and a way to finish one
-     * of them off here.
-     *
-     * Not a legend the chips depend on — they carry their own colour and
-     * initial — so it can scroll away without taking the reading with it. What
-     * it is for is the progress, and the "I've just done all of Cara's
-     * toiletries" that used to live in a column header.
-     */
-    const renderPeopleStrip = () => (
-        <div
-            data-testid="grid-people-legend"
-            className="mb-2 flex flex-wrap items-center gap-1 border-b border-gray-100 pb-2"
-        >
-            {columns.map((column, index) => {
-                const { packed, total } = columnStats[index]
-                const done = total > 0 && packed === total
-                return (
-                    <button
-                        key={column.key}
-                        type="button"
-                        onClick={() => onCheckColumn(column, index)}
-                        disabled={done || total === 0}
-                        aria-label={`Check off everything left for ${column.name} in ${sectionTitle}`}
-                        title={done ? `${column.name} is done here` : `Check off everything ${column.name} still has in ${sectionTitle}`}
-                        className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-600 hover:bg-blue-50'}`}
-                    >
-                        {!column.unassigned && (
-                            <PersonAvatar
-                                name={column.name}
-                                color={personColor({ id: column.personId, name: column.name })}
-                                size="sm"
-                            />
-                        )}
-                        <span>{column.name}</span>
-                        <span className="tabular-nums text-gray-400">{packed}/{total}</span>
-                    </button>
-                )
-            })}
-        </div>
-    )
-
     return (
         <div ref={containerRef}>
-            {renderPeopleStrip()}
             <ul className="divide-y divide-gray-100">
                 {visibleRows.map(row => {
                     const complete = rowComplete(row)

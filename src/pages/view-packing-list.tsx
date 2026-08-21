@@ -523,14 +523,6 @@ export function ViewPackingList() {
         handleItemToggle(item.id, checked)
     }, [setValue, handleItemToggle])
 
-    /** Everything one person still has to pack in one category, ticked off at once. */
-    const handleCheckColumn = useCallback((rows: readonly GridRow[], columnIndex: number) => {
-        for (const row of rows) {
-            const item = row.cells[columnIndex]
-            if (item) setValue(`items.${item.id}`, true)
-        }
-    }, [setValue])
-
     const registerCellRef = useCallback((itemId: string, element: HTMLElement | null) => {
         if (element) itemRowRefs.current.set(itemId, element)
         else itemRowRefs.current.delete(itemId)
@@ -1761,6 +1753,31 @@ export function ViewPackingList() {
                                 </Button>
                             </div>
                         </div>
+                        {/* Which coloured initial is whose, written once and kept
+                            in view rather than repeated on every card — a key is
+                            only any use while you are looking at the thing it
+                            explains. Nothing here is pressable: the one thing it
+                            could do is pack somebody's whole category on a stray
+                            tap, and person view has a button that says so. */}
+                        {viewMode === 'category' && gridColumns.length > 0 && (
+                            <div
+                                data-testid="people-key"
+                                className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-1.5"
+                            >
+                                {gridColumns.map(column => (
+                                    <span key={column.key} className="flex items-center gap-1 text-[11px] font-medium text-gray-600">
+                                        {!column.unassigned && (
+                                            <PersonAvatar
+                                                name={column.name}
+                                                color={personColor({ id: column.personId, name: column.name })}
+                                                size="sm"
+                                            />
+                                        )}
+                                        {column.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -2019,7 +2036,6 @@ export function ViewPackingList() {
                                     )}
                                     {isGridSection && (
                                         <CategoryItemGrid
-                                            sectionTitle={title}
                                             columns={gridColumns}
                                             rows={section.rows ?? []}
                                             personColor={personColor}
@@ -2033,7 +2049,6 @@ export function ViewPackingList() {
                                             onToggleItem={handleGridToggle}
                                             registerCellRef={registerCellRef}
                                             onOpenRow={(row) => setOpenRowKeys({ sectionKey, rowKey: row.key, anchorItemId: row.items[0]?.id })}
-                                            onCheckColumn={(_column, index) => handleCheckColumn(section.rows ?? [], index)}
                                         />
                                     )}
                                     {!isGridSection && innerGroups.map(({ key: groupKey, label, items: catItems, communal: isSharedGroup }) => {

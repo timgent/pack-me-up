@@ -378,15 +378,13 @@ describe('ViewPackingList person/category view toggle', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        // Every card names the same people, in the same order, whoever has
-        // something in it — the grid is only readable if a person stays put.
-        const essentials = screen.getAllByTestId('list-section')[0]
-        expect(within(within(essentials).getByTestId('grid-people-legend'))
-            .getAllByRole('button')
-            .map(person => person.textContent))
-            .toEqual([expect.stringContaining('Alice'), expect.stringContaining('Bob')])
+        // One key for the page, naming everyone in the order the chips sit in
+        const key = within(screen.getByTestId('people-key'))
+        expect(key.getByText('Alice')).toBeTruthy()
+        expect(key.getByText('Bob')).toBeTruthy()
 
         // Toothbrush is Alice's alone: she has a chip, Bob has a gap
+        const essentials = screen.getAllByTestId('list-section')[0]
         expect(within(essentials).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
         expect(within(essentials).queryByRole('checkbox', { name: 'Toothbrush for Bob' })).toBeNull()
         expect(within(essentials).getByTitle("Bob doesn't need this — open to change")).toBeTruthy()
@@ -406,16 +404,15 @@ describe('ViewPackingList person/category view toggle', () => {
         ).toBe(true))
     })
 
-    it('checks off everything one person has left in a category', async () => {
+    it('keeps the key to itself — nothing in it can be pressed', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
         fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        fireEvent.click(screen.getByRole('button', { name: /Check off everything left for Alice in Essentials/i }))
-
-        // Alice's row is done, so with packed items hidden it goes; Bob's stays
-        await waitFor(() => expect(screen.queryByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeNull())
-        expect((screen.getByRole('checkbox', { name: 'Nappies for Bob' }) as HTMLInputElement).checked).toBe(false)
+        // A key that packs a person's whole category on a stray tap is a
+        // hazard, not a shortcut; person view has a labelled button for that.
+        expect(within(screen.getByTestId('people-key')).queryAllByRole('button')).toEqual([])
+        expect(within(screen.getByTestId('people-key')).queryAllByRole('checkbox')).toEqual([])
     })
 
     it('switches back to person view', async () => {
@@ -664,14 +661,9 @@ describe('ViewPackingList category grid', () => {
             ],
         })
 
-        expect(within(screen.getByTestId('grid-people-legend'))
-            .getAllByRole('button')
-            .map(person => person.textContent))
-            .toEqual([
-                expect.stringContaining('Alice'),
-                expect.stringContaining('Bob'),
-                expect.stringContaining('Unassigned'),
-            ])
+        const key = within(screen.getByTestId('people-key'))
+        expect(['Alice', 'Bob', 'Unassigned'].map(name => !!key.queryByText(name)))
+            .toEqual([true, true, true])
         expect(checkbox('Torch for Unassigned')).toBeTruthy()
     })
 
@@ -754,13 +746,11 @@ describe('ViewPackingList category grid', () => {
             expect(checkbox('Toothbrush for Dev').checked).toBe(false)
         })
 
-        it('still offers each person their own check-all, in the strip above', async () => {
+        it('names all seven in the key, however the chips wrap', async () => {
             await renderCrowd()
 
-            fireEvent.click(screen.getByRole('button', { name: /Check off everything left for Gil in Essentials/i }))
-
-            await waitFor(() => expect(checkbox('Toothbrush for Gil').checked).toBe(true))
-            expect(checkbox('Toothbrush for Ann').checked).toBe(false)
+            const key = within(screen.getByTestId('people-key'))
+            expect(crowd.map(name => !!key.queryByText(name))).toEqual(crowd.map(() => true))
         })
     })
 
@@ -779,15 +769,15 @@ describe('ViewPackingList category grid', () => {
             }) as unknown as MediaQueryList)
         })
 
-        it('names everyone in the strip, since the chips themselves carry initials', async () => {
+        it('names everyone in the key, since the chips themselves carry initials', async () => {
             await renderGrid()
 
             // The chips still name their person, so nothing is lost to a screen
             // reader by their showing an initial
             expect(checkbox('Toothbrush for Alice')).toBeTruthy()
-            const legend = within(screen.getByTestId('grid-people-legend'))
-            expect(legend.getByText('Alice')).toBeTruthy()
-            expect(legend.getByText('Bob')).toBeTruthy()
+            const key = within(screen.getByTestId('people-key'))
+            expect(key.getByText('Alice')).toBeTruthy()
+            expect(key.getByText('Bob')).toBeTruthy()
         })
     })
 })

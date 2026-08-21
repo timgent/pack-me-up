@@ -214,10 +214,11 @@ test.describe('C – Packing Lists', () => {
 
     await page.getByRole('button', { name: 'Category View' }).click()
 
-    // Both of them named on every card, whoever has something in it
+    // One key for the page, naming whose initial is whose
+    const key = page.getByTestId('people-key')
+    await expect(key.getByText('Alice')).toBeVisible()
+    await expect(key.getByText('Bob')).toBeVisible()
     const firstCard = page.getByTestId('list-section').first()
-    await expect(firstCard.getByRole('button', { name: /everything left for Alice/i })).toBeVisible()
-    await expect(firstCard.getByRole('button', { name: /everything left for Bob/i })).toBeVisible()
 
     // A name both of them need is written once and ticked twice
     const shared = firstCard.getByRole('checkbox', { name: /for Alice$/ }).first()

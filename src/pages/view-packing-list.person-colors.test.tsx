@@ -135,10 +135,11 @@ describe('ViewPackingList person colours', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        // Everyone is marked the same way here as on their own card
-        const bob = (await screen.findAllByRole('button', { name: /everything left for Bob/i }))[0]
+        // Everyone is marked the same way in the key as on their own card
+        const key = within(await screen.findByTestId('people-key'))
+        const bob = key.getByText('Bob').closest('span')!
         await waitFor(() => expect(within(bob).getByTestId('person-avatar').className).toContain(pink.avatar))
-        const alice = screen.getAllByRole('button', { name: /everything left for Alice/i })[0]
+        const alice = key.getByText('Alice').closest('span')!
         expect(within(alice).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
     })
 
