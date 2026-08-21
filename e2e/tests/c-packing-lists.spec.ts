@@ -222,7 +222,7 @@ test.describe('C – Packing Lists', () => {
     // A name both of them need is written once and ticked twice
     const shared = firstCard.getByRole('checkbox', { name: /for Alice$/ }).first()
     const label = (await shared.getAttribute('aria-label'))!.replace(/ for Alice$/, '')
-    await expect(firstCard.getByText(label, { exact: true })).toHaveCount(1)
+    await expect(firstCard.getByRole('button', { name: `Edit ${label}` })).toHaveCount(1)
 
     // Ticking one person's cell leaves the other's alone, and it survives a reload
     await shared.click()
@@ -254,7 +254,7 @@ test.describe('C – Packing Lists', () => {
     await expect(bobsCell).toBeVisible({ timeout: 8_000 })
     const label = (await bobsCell.getAttribute('aria-label'))!.replace(/ for Bob$/, '')
 
-    await card.getByRole('button', { name: `${label} — who needs this?` }).click()
+    await card.getByRole('button', { name: `Edit ${label}` }).click()
     const panel = page.getByRole('dialog')
     await expect(panel).toBeVisible()
 

@@ -49,6 +49,25 @@ export interface CategoryItemGridProps {
 
 interface ColumnStat { packed: number; total: number }
 
+/**
+ * The name, split so that its last word and the chevron can be held together.
+ *
+ * A line can break in front of an inline-block whether or not there is a space
+ * there, and neither `white-space: nowrap` on the button nor a non-breaking
+ * space in front of the chevron stops it — so on a phone any name that fills
+ * its line drops the chevron onto a line of its own, pointing at nothing. Only
+ * putting the two inside one `whitespace-nowrap` box holds them together.
+ *
+ * The cost is that the name is two text nodes, so `getByText('Water bottle')`
+ * will not find it — query the row by its button instead (`Edit Water bottle`).
+ */
+function splitLastWord(label: string): { head: string; lastWord: string } {
+    const parts = label.trim().split(/\s+/)
+    const lastWord = parts.pop() ?? ''
+    return { head: parts.join(' '), lastWord }
+}
+
+
 export function CategoryItemGrid({
     sectionTitle,
     columns,
@@ -110,13 +129,24 @@ export function CategoryItemGrid({
 
     const renderCell = (row: GridRow, column: GridColumn, item: PackingListItem | undefined) => {
         if (!item) {
-            // Flat and untouchable. An empty cell is the most common thing on
-            // the grid and the least worth pressing — putting an "add this for
-            // them" button in every one of them would surround each checkbox
-            // with taps that create data instead of ticking it off. Filling a
-            // gap in is a job for the row's panel, where it can be undone.
+            // Flat, and it creates nothing when pressed — an "add one for them"
+            // button in every empty cell would ring each checkbox with taps that
+            // write data instead of ticking something off. But "Cara needs one
+            // too" is exactly the thought this cell provokes, and a dot that
+            // swallows the tap is worse than one that opens the panel where that
+            // can be said. Pointer only: the row's name button is the same door,
+            // and it is the one in the tab order.
             return (
-                <span aria-hidden="true" className="mx-auto block h-1 w-1 rounded-full bg-gray-200" />
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onClick={() => onOpenRow(row)}
+                    title={`${column.name} doesn't need this — open to change`}
+                    className="mx-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-blue-50"
+                >
+                    <span className="block h-1 w-1 rounded-full bg-gray-200" />
+                </button>
             )
         }
         const packed = !!packedById[item.id]
@@ -223,6 +253,7 @@ export function CategoryItemGrid({
                 <tbody>
                     {visibleRows.map(row => {
                         const complete = rowComplete(row)
+                        const { head, lastWord } = splitLastWord(row.label)
                         return (
                             <tr
                                 key={row.key}
@@ -233,30 +264,53 @@ export function CategoryItemGrid({
                                     {/* The name is the biggest target on the row,
                                         so it is the way in to everything that
                                         isn't ticking a box: renaming, quantities,
-                                        and who the item is for. */}
+                                        and who the item is for.
+
+                                        Laid out as text rather than as a row of
+                                        boxes, so the chevron follows the last word
+                                        wherever the name wraps instead of floating
+                                        at the edge of the column between two lines,
+                                        belonging to neither. The padding is what
+                                        makes a one-line row a 44px target. */}
                                     <button
                                         type="button"
                                         onClick={() => onOpenRow(row)}
-                                        aria-label={`${row.label} — who needs this?`}
-                                        title="Who needs this?"
-                                        className="group flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left transition-colors hover:bg-blue-50"
+                                        aria-label={`Edit ${row.label}`}
+                                        title="Rename, quantities, and who needs it"
+                                        className="group block w-full cursor-pointer rounded-md px-1 py-2.5 text-left transition-colors active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                     >
-                                        <span className={complete ? 'text-gray-400 line-through' : 'text-gray-800'}>
-                                            {row.label}
-                                        </span>
-                                        {row.quantity !== undefined && (
-                                            <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
-                                                ×{row.quantity}
+                                        <span className={complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}>
+                                            {head && `${head} `}
+                                            {/* The last word, the quantity and the
+                                                chevron travel together, so the chevron
+                                                is never left pointing at nothing from
+                                                a line of its own. */}
+                                            <span className="whitespace-nowrap">
+                                                {lastWord}
+                                                {row.quantity !== undefined && (
+                                                    <span className="ml-1.5 inline-block rounded-full bg-blue-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-blue-700">
+                                                        ×{row.quantity}
+                                                    </span>
+                                                )}
+                                                {/* Points, which is the whole message:
+                                                    there is somewhere to go from here.
+                                                    Grey enough to stay behind the
+                                                    checkboxes, dark enough to be seen
+                                                    without hovering — which is all a
+                                                    phone ever gets. */}
+                                                <svg
+                                                    aria-hidden="true"
+                                                    viewBox="0 0 20 20"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2.5}
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    className="ml-1.5 inline-block h-3.5 w-3.5 align-[-0.15em] text-gray-500 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600"
+                                                >
+                                                    <path d="M7.5 4.5 13 10l-5.5 5.5" />
+                                                </svg>
                                             </span>
-                                        )}
-                                        {/* Sits with the name rather than out at
-                                            the far edge of the column, where it
-                                            would read as another cell. */}
-                                        <span
-                                            aria-hidden="true"
-                                            className="shrink-0 text-xs text-gray-300 transition-colors group-hover:text-blue-500"
-                                        >
-                                            ⋯
                                         </span>
                                     </button>
                                 </th>

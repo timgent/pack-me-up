@@ -538,7 +538,7 @@ describe('ViewPackingList category grid', () => {
 
     describe('the "who needs this?" panel', () => {
         const openPanel = async (label: string) => {
-            fireEvent.click(screen.getByRole('button', { name: `${label} — who needs this?` }))
+            fireEvent.click(screen.getByRole('button', { name: `Edit ${label}` }))
             await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
             return within(screen.getByRole('dialog'))
         }
@@ -549,6 +549,17 @@ describe('ViewPackingList category grid', () => {
             const panel = await openPanel('Nappies')
             expect((panel.getByRole('checkbox', { name: 'Bob needs Nappies' }) as HTMLInputElement).checked).toBe(true)
             expect((panel.getByRole('checkbox', { name: 'Alice needs Nappies' }) as HTMLInputElement).checked).toBe(false)
+        })
+
+        it('opens from a gap in the row, where "Cara needs one too" is thought', async () => {
+            await renderGrid()
+
+            // Pointer-only, and hidden from screen readers: the row's own button
+            // is the same door and it is the one in the tab order.
+            fireEvent.click(screen.getByTitle("Alice doesn't need this — open to change"))
+
+            await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+            expect(within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'Alice needs Nappies' })).toBeTruthy()
         })
 
         it('adds the item for somebody who does not have it', async () => {
@@ -581,7 +592,7 @@ describe('ViewPackingList category grid', () => {
             await renderGrid()
 
             const panel = await openPanel('Toothbrush')
-            const field = panel.getByLabelText('Item') as HTMLInputElement
+            const field = panel.getByLabelText('Name') as HTMLInputElement
             fireEvent.change(field, { target: { value: 'Tooth brush' } })
             fireEvent.keyDown(field, { key: 'Enter' })
 
@@ -594,7 +605,7 @@ describe('ViewPackingList category grid', () => {
             await renderGrid()
 
             const panel = await openPanel('Toothbrush')
-            const field = panel.getByLabelText('Item') as HTMLInputElement
+            const field = panel.getByLabelText('Name') as HTMLInputElement
             fireEvent.change(field, { target: { value: 'Tooth brush' } })
             fireEvent.keyDown(field, { key: 'Enter' })
 
@@ -1962,10 +1973,12 @@ describe('ViewPackingList shared (communal) items in category view', () => {
     it('files shared items into their section rather than a Shared Items card', async () => {
         await renderInQuestionView()
 
+        // By the row's button rather than by its text: a row's name is split so
+        // its last word can hold on to the chevron — see `splitLastWord`.
         expect(screen.queryByText('Shared Items')).toBeNull()
-        expect(within(card('Camping')).getByText('Tent')).toBeTruthy()
-        expect(within(card('Camping')).getByText('Sleeping bag')).toBeTruthy()
-        expect(within(card('Essentials')).getByText('First aid kit')).toBeTruthy()
+        expect(within(card('Camping')).getByRole('button', { name: 'Edit Tent' })).toBeTruthy()
+        expect(within(card('Camping')).getByRole('button', { name: 'Edit Sleeping bag' })).toBeTruthy()
+        expect(within(card('Essentials')).getByRole('button', { name: 'Edit First aid kit' })).toBeTruthy()
     })
 
     it('gives a shared item one checkbox for the whole group, ahead of the rest', async () => {

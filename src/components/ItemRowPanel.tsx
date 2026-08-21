@@ -105,11 +105,20 @@ export function ItemRowPanel({
     )
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Who needs this?">
-            <div className="space-y-4">
+        // Titled by the item, and told plainly what is in here. Someone who
+        // opens this once by accident should come away knowing where renaming,
+        // quantities and deleting live — that one accident is the cheapest
+        // lesson the grid will ever get to teach.
+        <Modal isOpen={isOpen} onClose={onClose} title={row.label}>
+            {/* The modal centres its content on a phone, which is right for a
+                message and wrong for a form. */}
+            <div className="space-y-4 text-left">
+                <p className="-mt-2 text-sm text-gray-500">
+                    In {sectionTitle} · rename it, choose who needs one and how many, or remove it.
+                </p>
                 <div>
                     <label htmlFor="item-row-name" className="block text-sm font-medium text-gray-700">
-                        Item
+                        Name
                     </label>
                     <input
                         id="item-row-name"
@@ -123,10 +132,11 @@ export function ItemRowPanel({
                         }}
                         className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                        In {sectionTitle}
-                        {row.items.length > 1 && ' · renaming changes it for everyone below'}
-                    </p>
+                    {row.items.length > 1 && (
+                        <p className="mt-1 text-xs text-gray-500">
+                            Renaming changes it for everyone below
+                        </p>
+                    )}
                 </div>
 
                 {row.communal ? (
