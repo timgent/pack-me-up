@@ -12,6 +12,7 @@ import { PackingListQuestionSet, Person, Item, Option, Question, QuestionType, n
 import { Link } from 'react-router-dom'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
 import { usePodSync } from '../hooks/usePodSync'
+import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { mergeQuestionSets } from '../utils/mergeQuestionSets'
 import { POD_CONTAINERS } from '../services/solidPod'
 import { questionSetToDataset, datasetToQuestionSet } from '../services/rdfSerialization'
@@ -20,6 +21,7 @@ import { useForeignPod } from '../components/ForeignPodContext'
 import { AgePromotionCard } from '../components/AgePromotionCard'
 import { TemplateUpdatesCard } from '../components/TemplateUpdatesCard'
 import { LoadingState } from '../components/LoadingState'
+import { PodSyncIndicator } from '../components/PodSyncIndicator'
 import { AgeTransition } from '../edit-questions/age-derivation'
 import { appendItemToSection, applyItemEdit, tombstoneRemovedItems, withQuestionOptions } from '../edit-questions/item-edits'
 import { ItemInlineEditor } from '../components/ItemInlineEditor'
@@ -1485,7 +1487,7 @@ function QuestionModal({ question, onSave, onClose }: {
 }
 
 export function QuestionsPage() {
-    const { db, loginSyncInProgress } = useDatabase()
+    const { db } = useDatabase()
     const { isLoggedIn } = useSolidPod()
     const foreignPodCtx = useForeignPod()
     const foreignPodUrl = foreignPodCtx?.foreignPodUrl
@@ -1497,6 +1499,9 @@ export function QuestionsPage() {
     // changes, which is what lets the memoized QuestionSections skip renders.
     const dataRef = useRef<PackingListQuestionSet | null>(null)
     dataRef.current = data
+    // Whether a question set was actually read off this device, as opposed to
+    // the empty one stood up when there is nothing stored yet.
+    const hasStoredSetRef = useRef(false)
     const [rev, setRev] = useState<string | undefined>(undefined)
     const [error, setError] = useState<string | null>(null)
     const [questionModal, setQuestionModal] = useState<{ question: Question | null } | null>(null)
@@ -1533,26 +1538,36 @@ export function QuestionsPage() {
     // Keep saveToPodRef in sync so useSyncCoordinator can push merge results back to pod
     useEffect(() => { saveToPodRef.current = saveToPod }, [saveToPod])
 
-    useEffect(() => {
-        if (loginSyncInProgress) return
+    // Local first: the question set stored on this device goes up straight away
+    // and the pod catches up afterwards — see useLocalFirstLoad.
+    const { isCheckingPod } = useLocalFirstLoad(() => {
+        // Once a stored set is on screen the pod poll owns reconciliation: it
+        // merges through useSyncCoordinator rather than replacing what the user
+        // may be part-way through editing. The read the login sync triggers is
+        // only of use to a device that had nothing of its own to show.
+        if (hasStoredSetRef.current) return
+
         const load = async () => {
             try {
                 const migration = await DatabaseMigration.checkMigrationNeeded(db)
                 if (migration.needed) await DatabaseMigration.performMigration(db)
                 const d = await db.getQuestionSet()
+                hasStoredSetRef.current = true
                 setData(d)
                 setRev(d._rev)
             } catch (err: unknown) {
                 if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'not_found') {
+                    // Nothing stored here yet. An empty set is something to work
+                    // with, but it is not this device's answer — leave the ref
+                    // alone so the login sync's read still gets its turn.
                     setData({ _id: '1', questions: [], people: [], alwaysNeededItems: [] })
                 } else {
                     setError(String(err))
                 }
             }
         }
-        load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loginSyncInProgress])
+        return load()
+    }, [db])
 
     const saveData = useCallback(async (updated: PackingListQuestionSet) => {
         const previous = dataRef.current
@@ -1899,7 +1914,12 @@ export function QuestionsPage() {
     const activeAlwaysNeededItems = useMemo(() => (data?.alwaysNeededItems ?? []).filter(i => !i.deletedAt), [data])
 
     if (error) return <div className="p-8 text-red-600">Error: {error}</div>
-    if (!data) return (
+    // An empty set on a device that has never synced isn't an answer yet: the
+    // login sync may be about to bring the user's real questions. Showing them
+    // "you have no questions" first, and a full set a moment later, would read
+    // as their questions having been lost.
+    const nothingStoredYet = people.length === 0 && activeQuestions.length === 0 && activeAlwaysNeededItems.length === 0
+    if (!data || (nothingStoredYet && isCheckingPod)) return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="w-full max-w-3xl">
                 <LoadingState message="Loading questions & items..." rows={3} />
@@ -1910,6 +1930,9 @@ export function QuestionsPage() {
     return (
         <div className="w-full flex flex-col items-center py-8 px-4">
             <div className="w-full max-w-3xl space-y-4">
+                {/* What's below is this device's copy; say so while the pod is
+                    still being read, so anything that changes makes sense. */}
+                {isCheckingPod && <PodSyncIndicator />}
                 <div className="mb-2">
                     <h1 className="text-2xl font-bold text-gray-900">{isForeign ? 'Questions & Items' : 'My Questions & Items'}</h1>
                     <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>

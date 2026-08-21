@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
@@ -12,11 +12,13 @@ import { reportError } from '../errorReporting'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 import { getPrimaryPodUrl, saveRdfToPod, POD_CONTAINERS, loadMultipleRdfFromPod } from '../services/solidPod'
 import { usePodSync } from '../hooks/usePodSync'
+import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { questionSetToDataset, datasetToQuestionSet, packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { useForeignPod } from '../components/ForeignPodContext'
 import { generateQuestionBasedItems, generateAlwaysNeededItems, withItemOrder } from '../create-packing-list/generatePackingListItems'
 import { AgePromotionCard } from '../components/AgePromotionCard'
 import { LoadingState } from '../components/LoadingState'
+import { PodSyncIndicator } from '../components/PodSyncIndicator'
 import { tripDatesOutOfOrder } from '../create-packing-list/tripDetails'
 import { deduplicateItems } from '../create-packing-list/deduplicate'
 import { PersonAvatar } from '../components/PersonAvatar'
@@ -307,13 +309,16 @@ export function CreatePackingList() {
     const [allPackingLists, setAllPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [noQuestionsFound, setNoQuestionsFound] = useState(false)
+    // Whether a question set was actually read off this device. A device that
+    // has none keeps looking each time the login sync lands something.
+    const hasStoredSetRef = useRef(false)
     const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([])
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const [isDeletionSuggestionDismissed, setIsDeletionSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
     const { isLoggedIn, login, session } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const { db, loginSyncInProgress } = useDatabase()
+    const { db } = useDatabase()
     const navigate = useNavigate()
     const foreignPodCtx = useForeignPod()
     const foreignPodUrl = foreignPodCtx?.foreignPodUrl ?? null
@@ -360,17 +365,22 @@ export function CreatePackingList() {
         onSyncSuccess: handleQuestionSetPodSync,
     })
 
-    useEffect(() => {
+    // Local first: the question set stored on this device goes up straight away
+    // and the pod catches up afterwards — see useLocalFirstLoad.
+    const { isCheckingPod } = useLocalFirstLoad(() => {
         if (foreignPodUrl) {
             // Questions come from usePodSync onSyncSuccess; just load past lists from the foreign pod.
             if (!session) return
-            loadMultipleRdfFromPod(session, `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}`, datasetToPackingList)
+            return loadMultipleRdfFromPod(session, `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}`, datasetToPackingList)
                 .then(({ data }) => setAllPackingLists(data))
                 .catch(err => console.error('Error loading foreign packing lists for suggestions:', err))
-            return
         }
 
-        if (loginSyncInProgress) return
+        // Once a stored set is on screen, re-reading it when the login sync
+        // lands would throw away the people the user has since picked. The read
+        // the sync triggers is only of use to a device that had nothing of its
+        // own to show.
+        if (hasStoredSetRef.current) return
 
         const fetchQuestionSet = async () => {
             if (!db) {
@@ -384,6 +394,7 @@ export function CreatePackingList() {
                     db.getQuestionSet(),
                     db.getAllPackingLists(),
                 ])
+                hasStoredSetRef.current = true
                 setQuestionSet(doc)
                 setAllPackingLists(lists)
                 setNoQuestionsFound(false)
@@ -401,8 +412,8 @@ export function CreatePackingList() {
                 setIsLoading(false)
             }
         }
-        fetchQuestionSet()
-    }, [db, showToast, loginSyncInProgress, foreignPodUrl, session])
+        return fetchQuestionSet()
+    }, [db, foreignPodUrl, session])
 
     const suggestions = useMemo(
         () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],
@@ -659,7 +670,10 @@ export function CreatePackingList() {
         }
     }
 
-    if (isLoading) {
+    // "No Questions Found" on a device the login sync hasn't reached yet is a
+    // lie the page has to take back — and one that invites the user to redo a
+    // setup they have already done. Keep waiting until the pod has been read.
+    if (isLoading || (noQuestionsFound && isCheckingPod)) {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
                 <LoadingState message="Loading questions..." rows={3} />
@@ -746,6 +760,10 @@ export function CreatePackingList() {
                 <h1 className="text-2xl font-bold text-gray-900">Create New Packing List</h1>
                 <p className="mt-2 text-gray-600">Answer the questions below to create your packing list.</p>
             </div>
+
+            {/* The questions below are this device's copy; say so while the pod
+                is still being read, so anything that changes makes sense. */}
+            {isCheckingPod && <PodSyncIndicator />}
 
             {!foreignPodUrl && (
                 <div className="mb-6 empty:hidden">
