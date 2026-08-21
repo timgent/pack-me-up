@@ -1587,7 +1587,7 @@ export function ViewPackingList() {
 
     return (
         <>
-        <div className="w-full flex flex-col items-center py-8 px-4">
+        <div className="w-full flex flex-col items-center py-8 px-0 sm:px-4">
             {/* Non-sticky header: name, actions */}
             <div className="w-full max-w-screen-2xl mb-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1929,7 +1929,7 @@ export function ViewPackingList() {
                                     ? 'border-amber-300 bg-amber-50'
                                     : `bg-white ${sectionPersonColor?.border ?? (isShared ? 'border-blue-200' : 'border-gray-200')}`
                             return (
-                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-4 shadow-sm transition-colors duration-300 ${viewMode === 'category' ? '' : 'mb-4'} ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
+                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-3 shadow-sm transition-colors duration-300 sm:p-4 ${viewMode === 'category' ? '' : 'mb-4'} ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
                                 {/* The rule under the heading separates it from the items
                                     below; a folded card has none, so it would just be a
                                     line ruling off empty space. */}
@@ -2048,6 +2048,9 @@ export function ViewPackingList() {
                                             // for them; the legend above the
                                             // cards decodes the initials instead.
                                             showColumnNames={isDesktop}
+                                            // What the frozen name column sits on
+                                            // when the grid scrolls sideways.
+                                            surfaceClass={isComplete ? 'bg-emerald-50' : isLastMinute ? 'bg-amber-50' : 'bg-white'}
                                             hidePacked={!showPacked}
                                             flourish={flourish}
                                             highlightedItemId={highlightedItem?.id}

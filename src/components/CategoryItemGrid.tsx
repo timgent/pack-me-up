@@ -33,6 +33,8 @@ export interface CategoryItemGridProps {
     packedById: Record<string, boolean>
     /** Whether a name is on screen beside each column's avatar. */
     showColumnNames: boolean
+    /** The card's own background, which the frozen name column sits on. */
+    surfaceClass: string
     /** Packed items are hidden, so a row with nothing left on it is on its way out. */
     hidePacked: boolean
     /** The item taking its bow; the nonce replays the tick when the same one is re-checked. */
@@ -48,6 +50,29 @@ export interface CategoryItemGridProps {
 }
 
 interface ColumnStat { packed: number; total: number }
+
+/**
+ * How much of a phone's width one person's column takes.
+ *
+ * A checkbox is 20px and wants a target around it; 40 is what leaves a name
+ * column worth reading once four or five people are on the list. Below that the
+ * grid stops being readable before it stops fitting — see the scroll fallback.
+ */
+const PHONE_COLUMN_WIDTH = 40
+
+/**
+ * How little room the names may be left with before the grid gives up on
+ * fitting and scrolls instead.
+ *
+ * At 390px a card has ~348px to spend, so six people (240px) still leave a
+ * readable 108px of name. A seventh cannot be fitted at any width worth
+ * reading, and squeezing the names to 28px to avoid a scrollbar would be
+ * choosing the wrong thing to break — so past that the table keeps a wider
+ * name column and scrolls sideways under a frozen first column.
+ */
+function nameFloor(peopleCount: number): number {
+    return peopleCount <= 6 ? 104 : 136
+}
 
 /**
  * The name, split so that its last word and the chevron can be held together.
@@ -75,6 +100,7 @@ export function CategoryItemGrid({
     personColor,
     packedById,
     showColumnNames,
+    surfaceClass,
     hidePacked,
     flourish,
     highlightedItemId,
@@ -143,7 +169,7 @@ export function CategoryItemGrid({
                     aria-hidden="true"
                     onClick={() => onOpenRow(row)}
                     title={`${column.name} doesn't need this — open to change`}
-                    className="mx-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-blue-50"
+                    className="mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-blue-50 sm:h-10 sm:w-10"
                 >
                     <span className="block h-1 w-1 rounded-full bg-gray-200" />
                 </button>
@@ -155,7 +181,7 @@ export function CategoryItemGrid({
             <label
                 data-testid={`grid-cell-${item.id}`}
                 ref={(element) => registerCellRef(item.id, element)}
-                className={`relative mx-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-colors ${packed ? 'bg-emerald-100' : 'hover:bg-blue-50'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
+                className={`relative mx-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition-colors sm:h-10 sm:w-10 ${packed ? 'bg-emerald-100' : 'hover:bg-blue-50'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
             >
                 <input
                     type="checkbox"
@@ -199,22 +225,39 @@ export function CategoryItemGrid({
     }
 
     return (
-        <div className="-mx-1 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+        <div className="-mx-2 overflow-x-auto sm:-mx-1">
+            <table
+                className={`w-full border-collapse text-sm ${showColumnNames ? '' : 'table-fixed'}`}
+                style={showColumnNames
+                    ? undefined
+                    : { minWidth: `${nameFloor(columns.length) + columns.length * PHONE_COLUMN_WIDTH}px` }}
+            >
                 <caption className="sr-only">{sectionTitle}: what to pack, by person</caption>
+                {/* On a phone the people are told how much room they get and the
+                    name takes what is left, so a fifth person makes the names
+                    narrower instead of pushing the grid off the side of the
+                    screen. On a desktop there is room to let the names ask. */}
+                {!showColumnNames && (
+                    <colgroup>
+                        <col />
+                        {columns.map(column => (
+                            <col key={column.key} style={{ width: `${PHONE_COLUMN_WIDTH}px` }} />
+                        ))}
+                    </colgroup>
+                )}
                 <thead>
-                    <tr>
+                    <tr className={surfaceClass}>
                         {/* Takes the slack, so the person columns stay as narrow
                             as they need to be — which is what lets four of them
                             fit beside an item name on a phone. */}
-                        <th scope="col" className="w-full px-1 pb-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        <th scope="col" className="sticky left-0 z-20 w-full bg-inherit px-1 pb-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                             Item
                         </th>
                         {columns.map((column, index) => {
                             const { packed, total } = columnStats[index]
                             const done = total > 0 && packed === total
                             return (
-                                <th key={column.key} scope="col" className="px-1 pb-2 align-bottom sm:px-2">
+                                <th key={column.key} scope="col" className="px-0 pb-2 align-bottom sm:px-2">
                                     <span className="flex flex-col items-center gap-0.5">
                                         <span className="flex items-center gap-1.5">
                                             {!column.unassigned && (
@@ -258,9 +301,13 @@ export function CategoryItemGrid({
                             <tr
                                 key={row.key}
                                 data-testid="grid-row"
-                                className={`border-t border-gray-100 transition-colors ${complete ? 'bg-emerald-50' : 'hover:bg-gray-50'} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
+                                // An opaque background of its own, because the
+                                // name cell inherits it to sit over the columns
+                                // sliding underneath when the grid is wider than
+                                // the screen.
+                                className={`border-t border-gray-100 transition-colors ${complete ? 'bg-emerald-50' : `${surfaceClass} hover:bg-gray-50`} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
                             >
-                                <th scope="row" className="px-1 py-1 text-left align-middle font-medium">
+                                <th scope="row" className="sticky left-0 z-10 bg-inherit px-1 py-1 text-left align-middle font-medium shadow-[2px_0_3px_-1px_rgba(15,23,42,0.08)] sm:shadow-none">
                                     {/* The name is the biggest target on the row,
                                         so it is the way in to everything that
                                         isn't ticking a box: renaming, quantities,
@@ -279,7 +326,7 @@ export function CategoryItemGrid({
                                         title="Rename, quantities, and who needs it"
                                         className="group block w-full cursor-pointer rounded-md px-1 py-2.5 text-left transition-colors active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                                     >
-                                        <span className={complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}>
+                                        <span className={`break-words ${complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}`}>
                                             {head && `${head} `}
                                             {/* The last word, the quantity and the
                                                 chevron travel together, so the chevron
@@ -320,7 +367,7 @@ export function CategoryItemGrid({
                                     </td>
                                 ) : (
                                     columns.map((column, index) => (
-                                        <td key={column.key} className="px-1 py-1 text-center align-middle sm:px-2">
+                                        <td key={column.key} className="px-0 py-1 text-center align-middle sm:px-2">
                                             {renderCell(row, column, row.cells[index])}
                                         </td>
                                     ))
