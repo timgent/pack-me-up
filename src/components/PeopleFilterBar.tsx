@@ -28,7 +28,6 @@ export interface PeopleFilterBarProps {
     totals: Map<string, PersonStat>
     personColor: PersonColorLookup
     onToggle: (name: string) => void
-    onClear: () => void
     /** Names the region the strip filters, for assistive tech. */
     controlsId: string
 }
@@ -39,7 +38,6 @@ export function PeopleFilterBar({
     totals,
     personColor,
     onToggle,
-    onClear,
     controlsId,
 }: PeopleFilterBarProps) {
     const scroller = useRef<HTMLDivElement>(null)
@@ -79,7 +77,7 @@ export function PeopleFilterBar({
                 role="group"
                 aria-label="Filter by person"
                 aria-controls={controlsId}
-                className="flex items-center gap-1.5 overflow-x-auto scroll-smooth pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex items-center gap-1.5 overflow-x-auto scroll-pr-6 scroll-smooth pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
                 {columns.map(column => {
                     const isSelected = selected.has(column.key)
@@ -121,19 +119,6 @@ export function PeopleFilterBar({
                         </button>
                     )
                 })}
-                {/* Last in the scroller rather than in a gutter of its own: a
-                    reserved 56px is a chip's worth of a phone screen spent on
-                    nothing, and coming after every chip it can appear without
-                    moving one of them. */}
-                {selected.size > 0 && (
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="ml-0.5 min-h-[44px] shrink-0 rounded-full px-2.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
-                    >
-                        Clear
-                    </button>
-                )}
             </div>
             <span
                 aria-hidden="true"

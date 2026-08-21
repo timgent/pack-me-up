@@ -3532,7 +3532,7 @@ describe('ViewPackingList people filter', () => {
         id: 'test-list-filter',
         name: 'Filter Trip',
         createdAt: '2026-01-01T00:00:00Z',
-        guests: [{ id: 'g1', name: 'Zoe' }],
+        guests: [{ id: 'g1', name: 'Zoe' }, { id: 'g2', name: 'Dan' }],
         items: [
             { id: 'f6', itemText: 'Armbands', personName: 'Zoe', personId: 'g1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
             { id: 'f1', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
@@ -3772,6 +3772,41 @@ describe('ViewPackingList people filter', () => {
             fireEvent.click(chip('Bob'))
 
             expect(screen.queryByRole('button', { name: /^Pack all/ })).toBeNull()
+        })
+
+        it('counts by headcount past one person, rather than listing names', async () => {
+            // A comma-joined list beside a fraction reads as a truncated list,
+            // and on a phone it runs straight under the button beside it. The
+            // strip above is what says which people.
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(chip('Bob'))
+
+            expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
+                .toContain('for 2 people')
+        })
+
+        it('keeps Clear reachable, out of the strip that scrolls', async () => {
+            // Inside the strip it was pushed off the end of a phone by the
+            // fifth person, so the one control that undoes the filter never
+            // reached the screen.
+            await renderList()
+            fireEvent.click(chip('Alice'))
+
+            const clear = screen.getByRole('button', { name: 'Clear' })
+            expect(clear.closest('[aria-label="Filter by person"]')).toBeNull()
+        })
+
+        it('offers a way in when the filter leaves nothing on the page', async () => {
+            // Every composer lives inside a card, and a fresh guest's cards
+            // have all been dropped — so without this there is no way to give
+            // them their first item, and the page just looks broken.
+            await renderList()
+
+            fireEvent.click(chip('Dan'))
+
+            expect(screen.getByText(/Nothing on this list is for Dan yet/)).toBeTruthy()
         })
     })
 })

@@ -1477,10 +1477,18 @@ export function ViewPackingList() {
     const solePersonUnpacked = solePersonItems.filter(item => !watchedItems[item.id]).length
     const filterAnnouncement = filterSummary(selectedPeople, categorySections.length, allCategorySections.length)
 
-    /** " for Alice" — what makes a filtered count a number about somebody. */
-    const filterQualifier = filtering
-        ? ` for ${[...selectedPeople].sort((a, b) => a.localeCompare(b)).join(', ')}`
-        : ''
+    /**
+     * " for Alice" — what makes a filtered count a number about somebody.
+     *
+     * Only ever one name: past that it says how many, because a comma-joined
+     * list beside a fraction reads as a truncated list, and on a phone it runs
+     * straight under the button beside it. The strip above says which people.
+     */
+    const filterQualifier = !filtering
+        ? ''
+        : selectedPeople.size === 1
+            ? ` for ${[...selectedPeople][0]}`
+            : ` for ${selectedPeople.size} people`
 
     /**
      * What "Check all" on a card ticks: what the card is showing. Under a
@@ -1731,7 +1739,6 @@ export function ViewPackingList() {
                                 totals={peopleTotals}
                                 personColor={personColor}
                                 onToggle={handleTogglePerson}
-                                onClear={handleClearFilter}
                                 controlsId={LIST_SECTIONS_ID}
                             />
                         </div>
@@ -1744,6 +1751,13 @@ export function ViewPackingList() {
                             row of controls is wider than a phone. */}
                         {filtering && (
                             <div className="mt-1.5 flex min-h-[2.75rem] items-center gap-2 overflow-x-auto border-t border-gray-100 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <button
+                                    type="button"
+                                    onClick={handleClearFilter}
+                                    className="shrink-0 rounded-full border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+                                >
+                                    Clear
+                                </button>
                                 {solePerson !== undefined && (
                                     <>
                                         {soleGuest && renamingGuestId === soleGuest.id ? (
@@ -2066,6 +2080,16 @@ export function ViewPackingList() {
                             </div>
                         )})}
                     </div>}
+                    {!sectionsPackedAway && listSections.length === 0 && filtering && (
+                        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center">
+                            <p className="text-sm font-medium text-gray-700">
+                                Nothing on this list is{filterQualifier} yet.
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Show the empty sections above to add the first thing, or pick somebody else.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

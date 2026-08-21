@@ -74,8 +74,15 @@ export interface CategoryItemGridProps {
     onOpenRow: (row: GridRow) => void
 }
 
-/** A 32px disc and the 4px after it. */
-const CHIP_PITCH = 36
+/**
+ * A 32px disc and the 12px after it.
+ *
+ * The gap is what the disc's tap target grows into. At 4px a 44px target
+ * overlapped its neighbour's *visible* edge, so the right rim of one person's
+ * circle packed the next person's item; 12px is the room the target needs to
+ * reach 44px and stop there.
+ */
+const CHIP_PITCH = 44
 
 /**
  * The most room a name is given on a wide card.
@@ -351,7 +358,7 @@ export function CategoryItemGrid({
             <label
                 data-testid={`grid-cell-${item.id}`}
                 ref={(element) => registerCellRef(item.id, element)}
-                className={`relative flex h-8 cursor-pointer items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${packed ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-50 text-blue-800 hover:bg-blue-100'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
+                className={`relative flex h-8 cursor-pointer items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${packed ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-50 text-blue-800 hover:bg-blue-100'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
             >
                 <input
                     type="checkbox"
@@ -377,15 +384,21 @@ export function CategoryItemGrid({
                             data-testid="grid-row"
                             className={`flex items-start gap-1 rounded-md transition-colors ${complete ? 'bg-emerald-50' : 'hover:bg-gray-50'} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
                         >
+                            {/* Capped, so a wide card doesn't strand the chips
+                                an inch and a half from the name they belong to. */}
+                            <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
+                                {renderName(row, complete)}
+                            </span>
                             {/* A block of the same width on every row, so a
                                 person keeps their place down the whole card
                                 however many lines the chips take. Leading and
                                 unpadded when there is only one of them — see
-                                `asChecklist`. */}
+                                `asChecklist`. The flip is visual only: the name
+                                is still what a screen reader reaches first. */}
                             <div
                                 role="group"
                                 aria-label={row.label}
-                                className={`flex shrink-0 flex-wrap gap-1 py-2 ${asChecklist ? 'order-first' : ''}`}
+                                className={`flex shrink-0 flex-wrap gap-3 py-2 ${asChecklist ? 'order-first' : ''}`}
                                 style={asChecklist ? undefined : { width: `${chipBlockWidth}px` }}
                             >
                                 {row.communal
@@ -398,11 +411,6 @@ export function CategoryItemGrid({
                                             : renderChipGap(row, column)
                                     })}
                             </div>
-                            {/* Capped, so a wide card doesn't strand the chips
-                                an inch and a half from the name they belong to. */}
-                            <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
-                                {renderName(row, complete)}
-                            </span>
                         </li>
                     )
                 })}
@@ -430,10 +438,14 @@ export function CategoryItemGrid({
                                     data-testid="grid-row"
                                     className="flex items-start gap-1 rounded-md transition-colors hover:bg-gray-50"
                                 >
-                                    <span className="min-w-0 flex-1" style={{ maxWidth: `${NAME_MAX_WIDTH}px` }}>
+                                    <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
                                         {renderName(row, rowComplete(row))}
                                     </span>
-                                    <div role="group" aria-label={row.label} className="flex shrink-0 flex-wrap gap-1 py-2">
+                                    <div
+                                        role="group"
+                                        aria-label={row.label}
+                                        className={`flex shrink-0 flex-wrap gap-3 py-2 ${asChecklist ? 'order-first' : ''}`}
+                                    >
                                         {renderSharedChip(row)}
                                     </div>
                                 </li>
