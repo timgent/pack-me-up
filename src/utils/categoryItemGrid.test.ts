@@ -206,3 +206,38 @@ describe('buildCategoryRows', () => {
         })
     })
 })
+
+describe('column initials', () => {
+    const initialsOf = (people: { name: string; id: string }[], items: PackingListItem[] = []) =>
+        buildGridColumns(people, items).map(column => column.initial)
+
+    it('uses a single letter when that is enough to tell everyone apart', () => {
+        expect(initialsOf([alice, bob])).toEqual(['A', 'B'])
+    })
+
+    it('grows the initial when two people share a first letter', () => {
+        expect(initialsOf([alice, { name: 'Amy', id: 'p3' }])).toEqual(['Al', 'Am'])
+    })
+
+    it('keeps every initial the same length, so the chips stay one size', () => {
+        const initials = initialsOf([alice, { name: 'Amy', id: 'p3' }, bob])
+
+        expect(initials).toEqual(['Al', 'Am', 'Bo'])
+    })
+
+    it('prefers first and last initials for someone with two names', () => {
+        expect(initialsOf([{ name: 'Alice Smith', id: 'p1' }, { name: 'Alice Jones', id: 'p2' }]))
+            .toEqual(['AS', 'AJ'])
+    })
+
+    it('goes to three letters when two will not do', () => {
+        expect(initialsOf([{ name: 'Alan', id: 'p1' }, { name: 'Alba', id: 'p2' }]))
+            .toEqual(['Ala', 'Alb'])
+    })
+
+    it('leaves the unassigned column its question mark', () => {
+        const columns = buildGridColumns([alice], [item({ id: '1', itemText: 'Torch' })])
+
+        expect(columns[1].initial).toBe('?')
+    })
+})

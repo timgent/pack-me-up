@@ -212,9 +212,8 @@ test.describe('C – Packing Lists', () => {
     await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
     await createList(page, 'Grid Trip')
 
-    await page.getByRole('button', { name: 'Category View' }).click()
-
-    // One key for the page, naming whose initial is whose
+    // One strip for the page, naming whose initial is whose — and the control
+    // for narrowing the cards to one of them
     const key = page.getByTestId('people-key')
     await expect(key.getByText('Alice')).toBeVisible()
     await expect(key.getByText('Bob')).toBeVisible()
@@ -237,6 +236,44 @@ test.describe('C – Packing Lists', () => {
     if (await bobs.count() > 0) await expect(bobs.first()).not.toBeChecked()
   })
 
+  test('C15b: the people strip narrows the whole list to one person', async ({ freshPage: page }) => {
+    await page.goto('/#/wizard')
+    await page.fill('[name="people.0.name"]', 'Alice')
+    await fillPersonRequiredFields(page, 0)
+    await page.getByRole('button', { name: /Add Another Person/i }).click()
+    await page.fill('[name="people.1.name"]', 'Bob')
+    await fillPersonRequiredFields(page, 1)
+    await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    await expect(page.getByRole('heading', { name: /Questions Generated Successfully/i })).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /Create My First Packing List/i }).click()
+    await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
+    await createList(page, 'Filter Trip')
+
+    const alice = page.getByTestId('people-key').getByRole('button', { name: /^Alice/ })
+    await expect(alice).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible()
+
+    // Packing Alice's bag: Bob leaves the page entirely, chips and all
+    await alice.click()
+    await expect(alice).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('checkbox', { name: /for Bob$/ })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: /for Alice$/ }).first()).toBeVisible()
+
+    // Her own progress rides on her chip while she is the one being packed for
+    await expect(alice).toContainText('/')
+
+    // And Clear puts the list back — a filter is something you are doing, not
+    // how this list is kept, so it is never restored on the next visit either
+    await page.getByRole('button', { name: 'Clear' }).click()
+    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible()
+
+    await alice.click()
+    await page.reload()
+    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByTestId('people-key').getByRole('button', { name: /^Alice/ }))
+      .toHaveAttribute('aria-pressed', 'false')
+  })
+
   test('C16: the row panel takes an item off one person and gives it back', async ({ freshPage: page }) => {
     await page.goto('/#/wizard')
     await page.fill('[name="people.0.name"]', 'Alice')
@@ -249,7 +286,6 @@ test.describe('C – Packing Lists', () => {
     await page.getByRole('button', { name: /Create My First Packing List/i }).click()
     await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
     await createList(page, 'Panel Trip')
-    await page.getByRole('button', { name: 'Category View' }).click()
 
     // A row both of them are on, so it can lose one and get them back
     const card = page.getByTestId('list-section').first()

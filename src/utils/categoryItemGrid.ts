@@ -41,6 +41,11 @@ export interface GridColumn {
     personId: string
     /** Nobody's in particular — items added without a person. */
     unassigned?: boolean
+    /**
+     * What the chip says when there is no room for the name — the shortest
+     * label that tells this person apart from everyone else in the list.
+     */
+    initial: string
 }
 
 export interface GridRow {
@@ -99,16 +104,66 @@ export function buildGridColumns(
     }
 
     const columns: GridColumn[] = [
-        ...people.map(person => ({ key: person.name, name: person.name, personId: person.id })),
+        ...people.map(person => ({ key: person.name, name: person.name, personId: person.id, initial: '' })),
         ...[...strangers.entries()]
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([name, personId]) => ({ key: name, name, personId })),
+            .map(([name, personId]) => ({ key: name, name, personId, initial: '' })),
     ]
     // Last, because it is where the eye should end up rather than start.
     if (anyUnassigned) {
-        columns.push({ key: UNASSIGNED_COLUMN_KEY, name: UNASSIGNED_COLUMN_LABEL, personId: '', unassigned: true })
+        columns.push({ key: UNASSIGNED_COLUMN_KEY, name: UNASSIGNED_COLUMN_LABEL, personId: '', unassigned: true, initial: '?' })
     }
-    return columns
+    return withInitials(columns)
+}
+
+/**
+ * The labels the chips wear.
+ *
+ * A chip carries a colour and a letter, and the letter is what a user who
+ * can't separate two colours has to read. One letter puts Alice and Amy in the
+ * same chip, and there is no longer a person view to fall back to — so the
+ * label grows until it tells everyone apart.
+ *
+ * Everyone grows together. Chips are one fixed size on purpose (see the note in
+ * `CategoryItemGrid`), and a list where one person wears two letters and the
+ * rest wear one is a list of chips that are not the same size.
+ *
+ * Three letters is the ceiling: past that the label stops fitting the disc, and
+ * the pair it would separate — Alice and Alison on one trip — still have their
+ * colours and their full names in every accessible label.
+ */
+const MAX_INITIAL_LENGTH = 3
+
+function candidateInitial(name: string, level: number): string {
+    const compact = name.replace(/\s+/g, ' ').trim()
+    if (compact === '') return '?'
+    const words = compact.split(' ')
+    if (level <= 0) return compact.slice(0, 1).toUpperCase()
+    // Someone with two names is better told apart by both of them than by the
+    // first two letters of the first: Alice Smith and Alice Jones share "Al".
+    if (level === 1 && words.length > 1) {
+        return (words[0]!.slice(0, 1) + words[words.length - 1]!.slice(0, 1)).toUpperCase()
+    }
+    const length = Math.min(level + 1, compact.length)
+    return compact.slice(0, 1).toUpperCase() + compact.slice(1, length).toLowerCase()
+}
+
+function withInitials(columns: GridColumn[]): GridColumn[] {
+    // The unassigned column is a '?' at every level, so it never forces the
+    // people's labels to grow and never collides with one of them.
+    const people = columns.filter(column => !column.unassigned)
+
+    for (let level = 0; level < MAX_INITIAL_LENGTH; level++) {
+        const labels = people.map(column => candidateInitial(column.name, level))
+        if (new Set(labels).size === labels.length) return applyLevel(columns, level)
+    }
+    return applyLevel(columns, MAX_INITIAL_LENGTH - 1)
+}
+
+function applyLevel(columns: GridColumn[], level: number): GridColumn[] {
+    return columns.map(column => (
+        column.unassigned ? column : { ...column, initial: candidateInitial(column.name, level) }
+    ))
 }
 
 /**

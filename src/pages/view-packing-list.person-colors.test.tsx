@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ViewPackingList } from './view-packing-list'
@@ -75,9 +75,14 @@ function renderList() {
 }
 
 /** The card whose heading names this person. */
-function cardFor(name: string): HTMLElement {
-    const heading = screen.getByRole('button', { name: new RegExp(`Collapse ${name}'s list`) })
-    return heading.closest('[data-testid="list-section"]') as HTMLElement
+/** A person's chip in the "Packing for" strip. */
+function chipFor(name: string): HTMLElement {
+    return screen.getByRole('button', { name: new RegExp(`^${name}`) })
+}
+
+/** A row of the grid, by the button carrying its name. */
+function row(itemText: string) {
+    return screen.getByRole('button', { name: `Edit ${itemText}` })
 }
 
 const pink = PERSON_COLORS.find(c => c.id === 'pink')!
@@ -98,58 +103,46 @@ beforeEach(() => {
 })
 
 describe('ViewPackingList person colours', () => {
-    it('marks each person’s card with their coloured initial', async () => {
+    it('marks each person in the filter strip with their coloured initial', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         await waitFor(() =>
-            expect(within(cardFor('Bob')).getByTestId('person-avatar').className).toContain(pink.avatar))
-        expect(within(cardFor('Alice')).getByTestId('person-avatar').className)
+            expect(within(chipFor('Bob')).getByTestId('person-avatar').className).toContain(pink.avatar))
+        expect(within(chipFor('Alice')).getByTestId('person-avatar').className)
             .toContain(personColorAt(0).avatar)
     })
 
-    it('outlines the card in the same colour', async () => {
+    it('carries the same colour onto that person’s cells in the grid', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Nappies')).toBeTruthy())
+        await waitFor(() => expect(row('Nappies')).toBeTruthy())
 
-        await waitFor(() => expect(cardFor('Bob').className).toContain(pink.border))
-        expect(cardFor('Alice').className).toContain(personColorAt(0).border)
+        // Unpacked, so the disc is outlined in their colour rather than filled
+        await waitFor(() => expect(screen.getByTestId('grid-cell-i2').className).toContain(pink.border))
+        expect(screen.getByTestId('grid-cell-i1').className).toContain(personColorAt(0).border)
     })
 
     it('gives a guest a colour nobody else on the list is wearing', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Sun hat')).toBeTruthy())
+        await waitFor(() => expect(row('Sun hat')).toBeTruthy())
 
         // Alice holds position 0 and Bob chose pink, so the first colour going
         // spare is position 1's.
         await waitFor(() =>
-            expect(within(cardFor('Zoe')).getByTestId('person-avatar').className)
+            expect(within(chipFor('Zoe')).getByTestId('person-avatar').className)
                 .toContain(personColorAt(1).avatar))
-        expect(within(cardFor('Zoe')).getByTestId('person-avatar').className)
+        expect(within(chipFor('Zoe')).getByTestId('person-avatar').className)
             .not.toContain(pink.avatar)
     })
 
-    it('carries the colours into the category grid', async () => {
+    it('tells two people who share a first letter apart by more than colour', async () => {
+        // Colour alone is no answer for someone who cannot separate two of them,
+        // and with person view gone there is no list of names to fall back to.
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-
-        // Everyone is marked the same way in the key as on their own card
-        const key = within(await screen.findByTestId('people-key'))
-        const bob = key.getByText('Bob').closest('span')!
-        await waitFor(() => expect(within(bob).getByTestId('person-avatar').className).toContain(pink.avatar))
-        const alice = key.getByText('Alice').closest('span')!
-        expect(within(alice).getByTestId('person-avatar').className).toContain(personColorAt(0).avatar)
-    })
-
-    it('leaves the shared card unmarked — it belongs to nobody in particular', async () => {
-        renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: /Add Shared Items/i }))
-        const sharedHeading = await screen.findByRole('button', { name: /Collapse the shared items list/ })
-        const sharedCard = sharedHeading.closest('[data-testid="list-section"]') as HTMLElement
-        expect(within(sharedCard).queryByTestId('person-avatar')).toBeNull()
+        expect(within(chipFor('Alice')).getByTestId('person-avatar').textContent).toBe('A')
+        expect(within(chipFor('Bob')).getByTestId('person-avatar').textContent).toBe('B')
+        expect(within(chipFor('Zoe')).getByTestId('person-avatar').textContent).toBe('Z')
     })
 })

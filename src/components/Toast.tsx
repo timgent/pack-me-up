@@ -9,9 +9,11 @@ interface ToastProps {
     onClose: () => void;
     duration?: number;
     details?: string;
+    /** Takes back what the toast is reporting — see `action` in ToastContext. */
+    action?: { label: string; onAction: () => void };
 }
 
-export function Toast({ message, type, onClose, duration = 3000, details }: ToastProps) {
+export function Toast({ message, type, onClose, duration = 3000, details, action }: ToastProps) {
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -37,6 +39,14 @@ export function Toast({ message, type, onClose, duration = 3000, details }: Toas
     return (
         <div className={`fixed top-4 right-4 ${styles} text-white px-6 py-4 rounded-2xl flex items-center gap-3 min-w-[250px] animate-slide-down backdrop-blur-sm`}>
             <span className="flex-1 font-semibold">{message}</span>
+            {action && (
+                <button
+                    onClick={() => { action.onAction(); onClose(); }}
+                    className="rounded-lg bg-white/20 px-3 py-1 text-sm font-bold transition-colors hover:bg-white/30"
+                >
+                    {action.label}
+                </button>
+            )}
             {details && (
                 <button
                     onClick={handleCopy}
