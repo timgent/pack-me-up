@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { togglePerson, isFiltered, filterSummary, personTotals } from './peopleFilter'
+import {
+    togglePerson,
+    isFiltered,
+    filterSummary,
+    personTotals,
+    filterNames,
+    filterLabel,
+    sharedTotal,
+    SHARED_FILTER_KEY,
+} from './peopleFilter'
 import type { PackingListItem } from '../create-packing-list/types'
 
 function item(overrides: Partial<PackingListItem> & { id: string; itemText: string }): PackingListItem {
@@ -89,5 +98,51 @@ describe('filterSummary', () => {
     it('uses commas past two', () => {
         expect(filterSummary(new Set(['Alice', 'Bob', 'Cara']), 9, 12))
             .toBe("Showing Alice, Bob and Cara's items. 9 of 12 categories.")
+    })
+})
+
+describe('filterNames', () => {
+    it('is empty when nothing is selected', () => {
+        expect(filterNames(new Set())).toBe('')
+    })
+
+    it('names one person', () => {
+        expect(filterNames(new Set(['Alice']))).toBe('Alice')
+    })
+
+    it('joins two with "and", so the bar reads as a sentence', () => {
+        expect(filterNames(new Set(['Bob', 'Alice']))).toBe('Alice and Bob')
+    })
+
+    it('calls the shared chip the group, and puts it last', () => {
+        expect(filterNames(new Set([SHARED_FILTER_KEY, 'Alice']))).toBe('Alice and the group')
+        expect(filterNames(new Set([SHARED_FILTER_KEY]))).toBe('the group')
+    })
+})
+
+describe('filterLabel', () => {
+    // Beside a count, where a comma-joined list would read as a truncated one
+    it('names one person', () => {
+        expect(filterLabel(new Set(['Alice']))).toBe('Alice')
+    })
+
+    it('stops at a headcount past one', () => {
+        expect(filterLabel(new Set(['Alice', 'Bob']))).toBe('2 people')
+    })
+
+    it('calls the shared chip on its own "shared items"', () => {
+        expect(filterLabel(new Set([SHARED_FILTER_KEY]))).toBe('shared items')
+    })
+})
+
+describe('sharedTotal', () => {
+    it('counts the group’s items and nobody else’s', () => {
+        const items = [
+            item({ id: '1', itemText: 'Tent', communal: true, packed: true }),
+            item({ id: '2', itemText: 'Stove', communal: true }),
+            item({ id: '3', itemText: 'Socks', personName: 'Alice' }),
+        ]
+
+        expect(sharedTotal(items, { '1': true })).toEqual({ packed: 1, total: 2 })
     })
 })

@@ -109,6 +109,21 @@ export function personTotals(
 }
 
 /**
+ * The selection written out — "Alice", "Alice and Bob", "Bob and the group".
+ *
+ * The long form, for the places with a line to spare: the bar under the strip,
+ * and what a screen reader is told. Beside a count it is `filterLabel` instead,
+ * which stops at a headcount.
+ */
+export function filterNames(selected: PeopleFilter): string {
+    const names = [...selected].filter(key => key !== SHARED_FILTER_KEY).sort((a, b) => a.localeCompare(b))
+    if (sharedSelected(selected)) names.push('the group')
+    if (names.length === 0) return ''
+    if (names.length === 1) return names[0]!
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
+}
+
+/**
  * What a screen reader is told when the filter changes.
  *
  * Names are joined rather than reduced to one, and no pronoun is inferred from
@@ -118,10 +133,5 @@ export function personTotals(
  */
 export function filterSummary(selected: PeopleFilter, shownCategories: number, totalCategories: number): string {
     if (!isFiltered(selected)) return ''
-    const names = [...selected].filter(key => key !== SHARED_FILTER_KEY).sort((a, b) => a.localeCompare(b))
-    if (sharedSelected(selected)) names.push('the group')
-    const joined = names.length === 1
-        ? names[0]!
-        : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
-    return `Showing ${joined}'s items. ${shownCategories} of ${totalCategories} categories.`
+    return `Showing ${filterNames(selected)}'s items. ${shownCategories} of ${totalCategories} categories.`
 }

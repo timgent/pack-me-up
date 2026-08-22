@@ -15,6 +15,14 @@
  * screen in the one situation this is for — packing a bag in a hallway,
  * one-handed. Scrolling also keeps a chip where the user last saw it, which
  * wrapping does not: a chip that changes width on selection reflows the line.
+ *
+ * On a phone the chips are faces and nothing else. Four names and "Shared"
+ * come to about 370px of chips in about 340px of room, so a family of four
+ * scrolled — and a control you have to scroll to find is one you don't know is
+ * there. The names are worth roughly a third of that width, and they are the
+ * part the grid below already says twice over in colour and initial. Who is
+ * selected is written out in the bar underneath instead, where there is a whole
+ * line for it.
  */
 import { useEffect, useRef } from 'react'
 import { PersonAvatar } from './PersonAvatar'
@@ -103,7 +111,7 @@ export function PeopleFilterBar({
                             type="button"
                             aria-pressed={isSelected}
                             onClick={() => onToggle(column.key)}
-                            className={`flex min-h-[44px] shrink-0 snap-start items-center gap-1.5 rounded-full border py-1.5 pl-1.5 pr-2.5 text-xs font-medium transition-colors ${
+                            className={`flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
                                     : done
@@ -112,16 +120,17 @@ export function PeopleFilterBar({
                             }`}
                         >
                             {column.unassigned
-                                ? <span aria-hidden="true" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600">?</span>
-                                : <PersonAvatar name={column.name} color={color} size="sm" initial={column.initial} />}
-                            <span className="whitespace-nowrap">{column.name}</span>
-                            {/* Only the selected chip carries its numbers. Every
-                                chip carrying them makes the strip twice as long
-                                for a figure nobody is reading, and a chip that
-                                grows when pressed moves the one beside it out
-                                from under the finger going there next. */}
+                                ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">?</span>
+                                : <PersonAvatar name={column.name} color={color} initial={column.initial} />}
+                            <span className="hidden whitespace-nowrap sm:inline">{column.name}</span>
+                            {/* Only the selected chip carries its numbers, and
+                                only where there is room for them. Every chip
+                                carrying them makes the strip twice as long for a
+                                figure nobody is reading, and a chip that grows
+                                when pressed moves the one beside it out from
+                                under the finger going there next. */}
                             {isSelected && (
-                                <span className="whitespace-nowrap tabular-nums opacity-90">
+                                <span className="hidden whitespace-nowrap tabular-nums opacity-90 sm:inline">
                                     {stat.packed}/{stat.total}
                                 </span>
                             )}
@@ -139,7 +148,7 @@ export function PeopleFilterBar({
                             type="button"
                             aria-pressed={isSelected}
                             onClick={() => onToggle(SHARED_FILTER_KEY)}
-                            className={`flex min-h-[44px] shrink-0 snap-start items-center gap-1.5 rounded-full border py-1.5 pl-2 pr-2.5 text-xs font-medium transition-colors ${
+                            className={`flex min-h-[44px] min-w-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
                                     : done
@@ -148,9 +157,9 @@ export function PeopleFilterBar({
                             }`}
                         >
                             <span aria-hidden="true">👥</span>
-                            <span className="whitespace-nowrap">Shared</span>
+                            <span className="hidden whitespace-nowrap sm:inline">Shared</span>
                             {isSelected && (
-                                <span className="whitespace-nowrap tabular-nums opacity-90">
+                                <span className="hidden whitespace-nowrap tabular-nums opacity-90 sm:inline">
                                     {sharedStat.packed}/{sharedStat.total}
                                 </span>
                             )}

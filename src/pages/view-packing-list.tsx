@@ -38,7 +38,7 @@ import { CategoryItemGrid } from '../components/CategoryItemGrid'
 import { ItemRowPanel } from '../components/ItemRowPanel'
 import { buildCategoryRows, buildGridColumns, UNASSIGNED_COLUMN_KEY, type GridRow } from '../utils/categoryItemGrid'
 import { PeopleFilterBar } from '../components/PeopleFilterBar'
-import { togglePerson, isFiltered, personTotals, filterSummary, sharedTotal, sharedSelected, filterLabel } from '../utils/peopleFilter'
+import { togglePerson, isFiltered, personTotals, filterSummary, sharedTotal, sharedSelected, filterLabel, filterNames } from '../utils/peopleFilter'
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, hasStalePersonViewSections } from '../utils/listViewPreferences'
@@ -1788,7 +1788,16 @@ export function ViewPackingList() {
                                                 className="w-40 shrink-0 rounded-md border border-blue-400 px-2 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         ) : (
-                                            <span className="shrink-0 text-xs font-semibold text-gray-700">{solePerson.name}</span>
+                                            <>
+                                                <span className="shrink-0 text-xs font-semibold text-gray-700">{solePerson.name}</span>
+                                                {/* On a phone the chips are faces
+                                                    with no names on them, so the
+                                                    numbers come off the chip and
+                                                    land here beside the name. */}
+                                                <span className="shrink-0 text-xs tabular-nums text-gray-500 sm:hidden">
+                                                    {solePersonTotal - solePersonUnpacked}/{solePersonTotal}
+                                                </span>
+                                            </>
                                         )}
                                         {soleGuest && renamingGuestId !== soleGuest.id && (
                                             <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Guest</span>
@@ -1832,6 +1841,14 @@ export function ViewPackingList() {
                                             </>
                                         )}
                                     </>
+                                )}
+                                {/* Which faces are pressed, in words. The strip
+                                    above says it in colour, which is no answer
+                                    on a phone where the chips carry no names. */}
+                                {solePerson === undefined && (
+                                    <span className="shrink-0 text-xs font-semibold text-gray-700">
+                                        {filterNames(selectedPeople)}
+                                    </span>
                                 )}
                                 {/* Cards vanishing is an alarming thing for a
                                     packing list to do, and the explanation used
