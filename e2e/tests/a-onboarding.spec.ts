@@ -94,7 +94,10 @@ test.describe('A – Onboarding & Wizard', () => {
     await waitForWizardSuccess(page)
     await page.getByRole('button', { name: /Refine My Packing List Questions/i }).click()
     await page.waitForURL(/#\/manage-questions/, { timeout: 8_000 })
-    await page.waitForLoadState('networkidle')
+    // Wait for the saved group to be readable, not merely for the network to go
+    // quiet: the question set is written to IndexedDB, so "no requests in
+    // flight" says nothing about whether the wizard's next read will find it.
+    await expect(page.getByText('Alice', { exact: false }).first()).toBeVisible({ timeout: 10_000 })
 
     // Second run: the wizard starts from the family set up the first time
     await page.goto('/#/wizard')
