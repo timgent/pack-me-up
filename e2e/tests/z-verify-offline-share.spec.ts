@@ -52,8 +52,14 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         await page.getByRole('button', { name: /share publicly/i }).click()
 
         // ── 6. Assert: no error shown, link is present ─────────────────────
-        const errorText = await page.locator('.text-red-600').first().textContent().catch(() => '')
-        expect(errorText.trim(), 'No error should appear in the modal').toBe('')
+        // Scoped to the modal, and given a timeout so that "no error element at
+        // all" resolves rather than waiting for one to appear. Unscoped, the
+        // first red thing on the page used to be an item row's delete button —
+        // an icon, so its text was empty and this passed without ever looking
+        // at the modal.
+        const errorText = await page.getByRole('dialog').locator('.text-red-600').first()
+            .textContent({ timeout: 2_000 }).catch(() => '')
+        expect(errorText?.trim() ?? '', 'No error should appear in the modal').toBe('')
 
         const linkInput = page.getByRole('textbox', { name: /shareable link/i })
         await expect(linkInput).toBeVisible({ timeout: 12_000 })
