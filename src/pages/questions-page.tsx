@@ -28,27 +28,15 @@ import { ItemInlineEditor } from '../components/ItemInlineEditor'
 import { AddQuestionItem } from '../components/AddQuestionItem'
 import { ALWAYS_LIST_KEY, buildQuestionSetSuggestions, listKeyFor } from '../edit-questions/item-suggestions'
 import { buildIndexOf, type SuggestionIndex } from '../utils/itemSuggestions'
-import {
-    rateLabel,
-    quantityTitle,
-} from '../components/ItemEditorControls'
-import { PERSON_COLOR_OFF, personColorFor, type PersonColorId } from '../edit-questions/person-colors'
+import { ItemRow } from '../components/ItemRow'
+import { ItemSearchBar, ItemSearchResults } from '../components/ItemSearch'
+import { isSearchQuery } from '../edit-questions/item-search'
+import { personColorFor, type PersonColorId } from '../edit-questions/person-colors'
 import { PersonColorSwatches } from '../components/PersonColorPicker'
 
 // Stable empty default for the optional inline-editing props, so a section that
 // isn't editable doesn't hand its memoized children a new array every render.
 const NO_NAMES: string[] = []
-
-function PersonDot({ person, index, selected }: { person: Person; index: number; selected: boolean }) {
-    return (
-        <span
-            title={person.name}
-            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold select-none shrink-0 ${selected ? personColorFor(person, index).avatar : PERSON_COLOR_OFF}`}
-        >
-            {person.name.charAt(0).toUpperCase()}
-        </span>
-    )
-}
 
 const PersonLegend = memo(function PersonLegend({ people, onEdit }: { people: Person[]; onEdit?: () => void }) {
     if (people.length < 2 && !onEdit) return null
@@ -78,84 +66,6 @@ const PersonLegend = memo(function PersonLegend({ people, onEdit }: { people: Pe
                 </button>
             )}
         </div>
-    )
-})
-
-/**
- * One item, read-only. When `onOpen` is supplied the whole row becomes the
- * target that opens the inline editor — the affordance that used to be missing,
- * and the reason changing one word meant scrolling back to the option's pencil
- * and reopening the whole list in a modal.
- */
-const ItemRow = memo(function ItemRow({ item, people, index, isOpen, onOpen }: {
-    item: Item
-    people: Person[]
-    index: number
-    isOpen?: boolean
-    onOpen?: (index: number) => void
-}) {
-    const showDots = people.length > 1
-    const content = (
-        <>
-            <span className={`flex-1 min-w-0 text-left ${item.text ? 'text-gray-700' : 'text-gray-400 italic'}`}>
-                {item.text || 'no text'}
-            </span>
-            {item.communal && (
-                <span
-                    title="Shared — packed once for the whole group"
-                    className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-blue-100 text-blue-700 select-none shrink-0"
-                >
-                    👥
-                </span>
-            )}
-            {item.perNight !== undefined && (
-                <span
-                    title={quantityTitle(item)}
-                    className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 select-none shrink-0"
-                >
-                    ×{rateLabel(item).replace(' per ', '/')}
-                </span>
-            )}
-            {showDots && (
-                <div className="flex gap-0.5 shrink-0">
-                    {people.map((person, i) => (
-                        <PersonDot
-                            key={person.id}
-                            person={person}
-                            index={i}
-                            selected={item.personSelections?.[i]?.selected ?? false}
-                        />
-                    ))}
-                </div>
-            )}
-        </>
-    )
-    if (!onOpen) {
-        return <div className="flex items-center gap-2 py-0.5 px-2 text-sm">{content}</div>
-    }
-    return (
-        <button
-            type="button"
-            data-testid="item-row"
-            onClick={() => onOpen(index)}
-            aria-expanded={isOpen ?? false}
-            title={`Edit ${item.text || 'item'}`}
-            className={`group w-full flex items-center gap-2 py-1 px-2 text-sm rounded transition-colors ${isOpen ? 'bg-primary-50' : 'hover:bg-gray-100'}`}
-        >
-            {content}
-            {/* Decorative, not a button of its own: the whole row is the target,
-                and a second hit area inside it would only make the real one
-                harder to hit. Sits last so it lines up down the right edge —
-                a column of pencils is what says the rows are editable. */}
-            <svg
-                data-testid="item-edit-icon"
-                aria-hidden="true"
-                className={`w-3.5 h-3.5 shrink-0 transition-colors ${isOpen ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-700'}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-        </button>
     )
 })
 
@@ -1573,6 +1483,10 @@ export function QuestionsPage() {
     const [questionModal, setQuestionModal] = useState<{ question: Question | null } | null>(null)
     const [optionModal, setOptionModal] = useState<{ questionId: string; option: Option | null } | null>(null)
     const [peopleModal, setPeopleModal] = useState(false)
+    // What is being searched for, and whether that is yet enough to search on.
+    // The page below stays put until it is — see ItemSearchBar.
+    const [query, setQuery] = useState('')
+    const searching = isSearchQuery(query)
     const [sectionOrderModal, setSectionOrderModal] = useState(false)
     // Bracket changes made by hand in the people modal; offered the same
     // item-review flow as birthday-driven transitions, then cleared.
@@ -2050,52 +1964,73 @@ export function QuestionsPage() {
                 )}
                 {!isForeign && <TemplateUpdatesCard questionSet={data} onApply={saveData} />}
                 <PersonLegend people={people} onEdit={openPeopleModal} />
-                <SectionOrderLegend labels={sectionLabels} onEdit={openSectionOrderModal} />
-                <AlwaysSection
-                    items={activeAlwaysNeededItems}
-                    people={people}
-                    emptySections={data.alwaysNeededEmptySections}
-                    allItemNames={allItemNames}
-                    sectionNames={suggestedSectionNames}
-                    suggestions={suggestions}
-                    onItemChange={handleAlwaysItemChange}
-                    onItemAdd={handleAlwaysItemAdd}
-                    onItemDelete={handleAlwaysItemDelete}
-                    onSectionAdd={handleAlwaysSectionAdd}
-                    onSectionRemove={handleAlwaysSectionRemove}
-                    onReorder={handleAlwaysReorder}
-                />
-                {activeQuestions.map((q, qi) => (
-                    <QuestionSection
-                        key={q.id}
-                        question={q}
+                {/* The legend stays above it: the person dots on a result row
+                    mean nothing without the names they stand for. */}
+                <ItemSearchBar value={query} onChange={setQuery} />
+                {searching && (
+                    <ItemSearchResults
+                        questionSet={data}
+                        query={query}
                         people={people}
-                        canMoveUp={qi > 0}
-                        canMoveDown={qi < activeQuestions.length - 1}
+                        allItemNames={allItemNames}
+                        sectionNames={suggestedSectionNames}
+                        onOptionItemChange={handleOptionItemChange}
+                        onOptionItemDelete={handleOptionItemDelete}
+                        onAlwaysItemChange={handleAlwaysItemChange}
+                        onAlwaysItemDelete={handleAlwaysItemDelete}
+                    />
+                )}
+                {/* Hidden rather than unmounted while searching: which questions
+                    and answers you had open is where you were on this page, and
+                    a search you clear should put you back there. */}
+                <div data-testid="questions-list" className={searching ? 'hidden' : 'space-y-4'}>
+                    <SectionOrderLegend labels={sectionLabels} onEdit={openSectionOrderModal} />
+                    <AlwaysSection
+                        items={activeAlwaysNeededItems}
+                        people={people}
+                        emptySections={data.alwaysNeededEmptySections}
                         allItemNames={allItemNames}
                         sectionNames={suggestedSectionNames}
                         suggestions={suggestions}
-                        onEdit={openEditQuestion}
-                        onDelete={handleDeleteQuestion}
-                        onAddOption={openAddOption}
-                        onEditOption={openEditOption}
-                        onDeleteOption={handleDeleteOption}
-                        onMove={handleMoveQuestion}
-                        onItemChange={handleOptionItemChange}
-                        onItemAdd={handleOptionItemAdd}
-                        onItemDelete={handleOptionItemDelete}
-                        onSectionAdd={handleOptionSectionAdd}
-                        onSectionRemove={handleOptionSectionRemove}
-                        onReorder={handleOptionReorder}
+                        onItemChange={handleAlwaysItemChange}
+                        onItemAdd={handleAlwaysItemAdd}
+                        onItemDelete={handleAlwaysItemDelete}
+                        onSectionAdd={handleAlwaysSectionAdd}
+                        onSectionRemove={handleAlwaysSectionRemove}
+                        onReorder={handleAlwaysReorder}
                     />
-                ))}
-                <button
-                    type="button"
-                    onClick={() => setQuestionModal({ question: null })}
-                    className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                >
-                    + Add Question
-                </button>
+                    {activeQuestions.map((q, qi) => (
+                        <QuestionSection
+                            key={q.id}
+                            question={q}
+                            people={people}
+                            canMoveUp={qi > 0}
+                            canMoveDown={qi < activeQuestions.length - 1}
+                            allItemNames={allItemNames}
+                            sectionNames={suggestedSectionNames}
+                            suggestions={suggestions}
+                            onEdit={openEditQuestion}
+                            onDelete={handleDeleteQuestion}
+                            onAddOption={openAddOption}
+                            onEditOption={openEditOption}
+                            onDeleteOption={handleDeleteOption}
+                            onMove={handleMoveQuestion}
+                            onItemChange={handleOptionItemChange}
+                            onItemAdd={handleOptionItemAdd}
+                            onItemDelete={handleOptionItemDelete}
+                            onSectionAdd={handleOptionSectionAdd}
+                            onSectionRemove={handleOptionSectionRemove}
+                            onReorder={handleOptionReorder}
+                        />
+                    ))}
+                    <button
+                        type="button"
+                        onClick={() => setQuestionModal({ question: null })}
+                        className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                    >
+                        + Add Question
+                    </button>
+                </div>
             </div>
             {questionModal !== null && (
                 <QuestionModal

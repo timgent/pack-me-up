@@ -449,6 +449,32 @@ test.describe('B – Editing Questions', () => {
     await expect(page.getByRole('button', { name: 'Organise items' })).toHaveCount(0)
   })
 
+  test('B17: find an item by name, wherever in the set it lives', async ({ freshPage: page }) => {
+    // Without this the only way to answer "have I got sunscreen in here?" is to
+    // open questions one at a time until one of them turns out to have it.
+    await setupWizardAndGoToQuestions(page)
+    await page.getByLabel('Search items').fill('sunscr')
+
+    const results = page.getByTestId('item-search-results')
+    await expect(results).toBeVisible({ timeout: 5_000 })
+    const row = results.getByTestId('item-row').filter({ hasText: 'Sunscreen' }).first()
+    await expect(row).toBeVisible({ timeout: 5_000 })
+    // The trail is the point: it says which question and answer hold the item,
+    // and which section it will land in on the packing list.
+    await expect(results.getByTestId('search-group-crumbs').first()).toContainText('What weather do you expect?')
+    await expect(results.getByTestId('search-section-label').first()).toContainText('Day Bag')
+    // The list itself is out of the way while a search is on screen.
+    await expect(page.getByRole('button', { name: '+ Add Question' })).not.toBeVisible()
+
+    // A result is a real row: it opens the same editor as the list does.
+    await row.click()
+    await expect(page.getByTestId('item-inline-editor')).toBeVisible({ timeout: 3_000 })
+
+    await page.getByRole('button', { name: 'Clear search' }).click()
+    await expect(results).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '+ Add Question' })).toBeVisible()
+  })
+
   test('B12: an answer with no items can take its first one', async ({ freshPage: page }) => {
     // Before, an empty answer had no expander and no input at all: its only way
     // in was the option modal.
