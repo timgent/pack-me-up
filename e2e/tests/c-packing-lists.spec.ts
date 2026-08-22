@@ -198,7 +198,9 @@ test.describe('C – Packing Lists', () => {
     // grid's chips are where the colour has to show.
     await page.goto('/#/create-packing-list')
     await createList(page, 'Colourful Trip')
-    const cell = page.locator('[data-testid^="grid-cell-"]').first()
+    // One of theirs, not the first chip on the page: shared items lead a card
+    // and their chip belongs to nobody, so it wears nobody's colour.
+    const cell = chipsForPerson(page, 'Me').first()
     await expect(cell).toBeVisible({ timeout: 8_000 })
     // Unpacked, so the disc is outlined in their colour rather than filled
     await expect(cell).toHaveClass(/border-fuchsia-300/)
@@ -399,7 +401,8 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await firstRow.click()
     const panel = page.getByRole('dialog')
     await panel.getByRole('button', { name: /as a last minute item$/ }).click()
-    await panel.getByRole('button', { name: 'Close' }).click()
+    // The item has moved to another card and the panel has gone with its row
+    await expect(panel).toBeHidden({ timeout: 8_000 })
 
     await expect(lastMinuteCard.getByRole('button', { name: `Edit ${itemName}` })).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('Pack these just before you go.')).toBeVisible()
@@ -412,7 +415,7 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     // And it goes back where it came from when unmarked
     await lastMinuteCard.getByRole('button', { name: `Edit ${itemName}` }).click()
     await page.getByRole('dialog').getByRole('button', { name: /with everything else$/ }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 8_000 })
     await expect(lastMinuteCard).toHaveCount(0)
     await expect(rowFor(itemName)).toBeVisible()
   })
