@@ -69,16 +69,54 @@ describe('LandingPage', () => {
         expect(screen.queryByRole('link', { name: /create a new packing list/i })).toBeNull()
     })
 
-    it('displays the correct h1 heading', () => {
+    it('leads with the travel and sharing benefit in the h1', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        expect(screen.getByRole('heading', { level: 1, name: /smart packing lists, made simple/i })).toBeTruthy()
+        const heading = screen.getByRole('heading', { level: 1 })
+        expect(heading.textContent).toMatch(/packing lists for couples and families/i)
     })
 
-    it('does not show a separate tagline below the h1', () => {
+    it('does not mention Solid Pod or data ownership above the fold', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        expect(screen.queryByText(/smart packing lists for every trip/i)).toBeNull()
+        const heading = screen.getByRole('heading', { level: 1 })
+        const hero = heading.parentElement as HTMLElement
+        expect(hero.textContent).not.toMatch(/solid pod/i)
+        expect(hero.textContent).not.toMatch(/own your data/i)
+    })
+
+    it('supports the h1 with a sharing-focused subheadline', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        expect(screen.getByText(/share one list, pack as a team/i)).toBeTruthy()
+    })
+
+    it('renders the primary CTA before the "How it works" section so it is above the fold', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const cta = screen.getByRole('link', { name: /get started with the wizard/i })
+        const howItWorks = screen.getByRole('heading', { name: /how it works/i })
+        expect(
+            cta.compareDocumentPosition(howItWorks) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+    })
+
+    it('renders the "View Packing Lists" CTA before the "How it works" section too', () => {
+        mockUseHasQuestions.mockReturnValue(true)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const cta = screen.getByRole('link', { name: /view packing lists/i })
+        const howItWorks = screen.getByRole('heading', { name: /how it works/i })
+        expect(
+            cta.compareDocumentPosition(howItWorks) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+    })
+
+    it('frames the data-ownership section as a benefit rather than a mechanism', () => {
+        mockUseHasQuestions.mockReturnValue(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const trustSection = screen.getByRole('heading', { name: /own your data/i })
+            .closest('div') as HTMLElement
+        expect(trustSection.textContent).toMatch(/your lists live in storage you control/i)
     })
 
     it('renders the Solid Pod section after the CTA in the DOM', () => {
