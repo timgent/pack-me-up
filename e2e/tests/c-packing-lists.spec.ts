@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
+import { chipInput, chipsForPerson, expandAllSections, firstItemChip } from '../helpers/packing-list'
 
 async function runWizard(page: import('@playwright/test').Page) {
   await page.goto('/#/wizard')
@@ -17,6 +18,8 @@ async function createList(page: import('@playwright/test').Page, name: string) {
   await page.getByRole('button', { name: 'Create Packing List' }).click()
   // Navigates to /view-lists/:id
   await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })
+  // A list long enough to arrive as a wall of cards opens folded
+  await expandAllSections(page)
 }
 
 test.describe('C – Packing Lists', () => {
@@ -60,32 +63,32 @@ test.describe('C – Packing Lists', () => {
   test('C2: check item as packed persists on reload', async ({ freshPage: page }) => {
     await runWizard(page)
     await createList(page, 'Test Trip')
-    // Click the first checkbox (use click() not check() - item hides after packing, making check() stale)
-    await page.locator('input[type="checkbox"]').first().click()
+    // Click the chip, not the input inside it: the input is screen-reader-only
+    await firstItemChip(page).click()
     // Wait for auto-save indicator
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     // Reload and show packed items to verify the item is still checked
     await page.reload()
     await page.getByRole('button', { name: 'Show Packed' }).click()
-    await expect(page.locator('input[type="checkbox"]').first()).toBeChecked()
+    await expect(chipInput(firstItemChip(page))).toBeChecked()
   })
 
   test('C3: uncheck a packed item', async ({ freshPage: page }) => {
     await runWizard(page)
     await createList(page, 'Test Trip 2')
-    // Click the first checkbox to pack the item
-    await page.locator('input[type="checkbox"]').first().click()
+    // Click the chip to pack the item
+    await firstItemChip(page).click()
     // Wait for auto-save to complete and indicator to disappear
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 5_000 })
     // Show packed items, then uncheck
     await page.getByRole('button', { name: 'Show Packed' }).click()
-    await page.locator('input[type="checkbox"]').first().click()
+    await firstItemChip(page).click()
     // Wait for the unpack auto-save to complete
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 5_000 })
     await page.reload()
-    await expect(page.locator('input[type="checkbox"]').first()).not.toBeChecked()
+    await expect(chipInput(firstItemChip(page))).not.toBeChecked()
   })
 
   test('C4: rename a packing list', async ({ freshPage: page }) => {
@@ -161,11 +164,10 @@ test.describe('C – Packing Lists', () => {
     // The item now appears on the list
     await expect(page.getByText('GadgetTest')).toBeVisible({ timeout: 5_000 })
 
-    // Delete it, then update again — it must not be re-suggested
-    await page.getByText('GadgetTest', { exact: true })
-      .locator('xpath=ancestor::label[1]/..')
-      .getByTitle('Delete item')
-      .click()
+    // Delete it, then update again — it must not be re-suggested. Removing an
+    // item is the row panel's job, reached through the row's own name.
+    await page.getByRole('button', { name: 'Edit GadgetTest' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: /^Remove item$/ }).click()
     await page.getByRole('button', { name: /^Remove$/ }).click()
     await expect(page.getByText('GadgetTest')).not.toBeVisible({ timeout: 5_000 })
 
@@ -191,12 +193,15 @@ test.describe('C – Packing Lists', () => {
     // Give the async IndexedDB write time to commit
     await page.waitForTimeout(800)
 
-    // A list made afterwards shows that colour on their card
+    // A list made afterwards wears that colour on their cells. There is one
+    // person on this list, so there is no filter strip to wear it in — the
+    // grid's chips are where the colour has to show.
     await page.goto('/#/create-packing-list')
     await createList(page, 'Colourful Trip')
-    const card = page.locator('[data-testid="list-section"]').filter({ hasText: "Me's Items" })
-    await expect(card.getByTestId('person-avatar')).toHaveClass(/bg-fuchsia-500/)
-    await expect(card).toHaveClass(/border-fuchsia-300/)
+    const cell = page.locator('[data-testid^="grid-cell-"]').first()
+    await expect(cell).toBeVisible({ timeout: 8_000 })
+    // Unpacked, so the disc is outlined in their colour rather than filled
+    await expect(cell).toHaveClass(/border-fuchsia-300/)
   })
   test('C15: category view writes each item once, with a checkbox per person', async ({ freshPage: page }) => {
     // Two people, because a grid with one column is just a list
@@ -251,13 +256,13 @@ test.describe('C – Packing Lists', () => {
 
     const alice = page.getByTestId('people-key').getByRole('button', { name: /^Alice/ })
     await expect(alice).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible()
+    await expect(chipsForPerson(page, 'Bob').first()).toBeVisible()
 
     // Packing Alice's bag: Bob leaves the page entirely, chips and all
     await alice.click()
     await expect(alice).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByRole('checkbox', { name: /for Bob$/ })).toHaveCount(0)
-    await expect(page.getByRole('checkbox', { name: /for Alice$/ }).first()).toBeVisible()
+    await expect(chipsForPerson(page, 'Bob')).toHaveCount(0)
+    await expect(chipsForPerson(page, 'Alice').first()).toBeVisible()
 
     // Her own progress rides on her chip while she is the one being packed for
     await expect(alice).toContainText('/')
@@ -265,11 +270,11 @@ test.describe('C – Packing Lists', () => {
     // And Clear puts the list back — a filter is something you are doing, not
     // how this list is kept, so it is never restored on the next visit either
     await page.getByRole('button', { name: 'Clear' }).click()
-    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible()
+    await expect(chipsForPerson(page, 'Bob').first()).toBeVisible()
 
     await alice.click()
     await page.reload()
-    await expect(page.getByRole('checkbox', { name: /for Bob$/ }).first()).toBeVisible({ timeout: 8_000 })
+    await expect(chipsForPerson(page, 'Bob').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.getByTestId('people-key').getByRole('button', { name: /^Alice/ }))
       .toHaveAttribute('aria-pressed', 'false')
   })
@@ -289,9 +294,9 @@ test.describe('C – Packing Lists', () => {
 
     // A row both of them are on, so it can lose one and get them back
     const card = page.getByTestId('list-section').first()
-    const bobsCell = card.getByRole('checkbox', { name: /for Bob$/ }).first()
+    const bobsCell = card.locator('[data-testid^="grid-cell-"][title$="for Bob"]').first()
     await expect(bobsCell).toBeVisible({ timeout: 8_000 })
-    const label = (await bobsCell.getAttribute('aria-label'))!.replace(/ for Bob$/, '')
+    const label = (await bobsCell.getAttribute('title'))!.replace(/ for Bob$/, '')
 
     await card.getByRole('button', { name: `Edit ${label}` }).click()
     const panel = page.getByRole('dialog')
@@ -382,26 +387,33 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await createList(page, 'Doorstep Trip')
 
     const lastMinuteCard = page.getByTestId('list-section').filter({ hasText: 'Last Minute' })
-    const mark = page.getByRole('button', { name: /Mark .* as a last minute item/ }).first()
-    await expect(mark).toBeVisible({ timeout: 8_000 })
+    // Marking lives in the row's panel, reached through the row's own name
+    const firstRow = page.getByRole('button', { name: /^Edit / }).first()
+    await expect(firstRow).toBeVisible({ timeout: 8_000 })
+    const itemName = (await firstRow.getAttribute('aria-label'))!.replace(/^Edit /, '')
+    const rowFor = (name: string) => page.getByRole('button', { name: `Edit ${name}` })
+
     // Nothing is last minute yet, so there is no card for it
     await expect(lastMinuteCard).toHaveCount(0)
 
-    const itemName = (await mark.getAttribute('aria-label'))!
-      .replace(/^Mark /, '').replace(/ as a last minute item$/, '')
-    await mark.click()
+    await firstRow.click()
+    const panel = page.getByRole('dialog')
+    await panel.getByRole('button', { name: /as a last minute item$/ }).click()
+    await panel.getByRole('button', { name: 'Close' }).click()
 
-    await expect(lastMinuteCard.getByText(itemName, { exact: true })).toBeVisible({ timeout: 8_000 })
+    await expect(lastMinuteCard.getByRole('button', { name: `Edit ${itemName}` })).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('Pack these just before you go.')).toBeVisible()
 
     // The mark is saved, not just shown
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await page.reload()
-    await expect(lastMinuteCard.getByText(itemName, { exact: true })).toBeVisible({ timeout: 8_000 })
+    await expect(lastMinuteCard.getByRole('button', { name: `Edit ${itemName}` })).toBeVisible({ timeout: 8_000 })
 
     // And it goes back where it came from when unmarked
-    await page.getByRole('button', { name: `Remove ${itemName} from the last minute items` }).click()
+    await lastMinuteCard.getByRole('button', { name: `Edit ${itemName}` }).click()
+    await page.getByRole('dialog').getByRole('button', { name: /with everything else$/ }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
     await expect(lastMinuteCard).toHaveCount(0)
-    await expect(page.getByText(itemName, { exact: true })).toBeVisible()
+    await expect(rowFor(itemName)).toBeVisible()
   })
 })

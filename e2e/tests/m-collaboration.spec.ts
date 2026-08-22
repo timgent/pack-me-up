@@ -12,6 +12,7 @@ import {
     COLLAB_PASSWORD,
     COLLAB_POD_NAME,
 } from '../../playwright.config'
+import { expandAllSections, firstItemChip } from '../helpers/packing-list'
 
 // M tests use two pod users. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -51,9 +52,10 @@ test.describe('M – Full pod collaboration', () => {
         await pageA.getByPlaceholder('Enter a name for your packing list').fill(listName)
         await pageA.getByRole('button', { name: 'Create Packing List' }).click()
         await pageA.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
+        await expandAllSections(pageA)
 
         // Wait for pod sync indicator
-        const firstCheckbox = pageA.locator('input[type="checkbox"]').first()
+        const firstCheckbox = firstItemChip(pageA)
         await firstCheckbox.waitFor({ timeout: 10_000 })
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })

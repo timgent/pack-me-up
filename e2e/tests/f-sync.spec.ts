@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, FUSER_EMAIL, FUSER_PASSWORD } from '../../playwright.config'
+import { chipByTestId, chipInput, firstItemChip, itemChips, packedChips } from '../helpers/packing-list'
 
 // All F tests share the same pod user and write to overlapping resources.
 // Serial mode gives each test exclusive pod access.
@@ -67,7 +68,7 @@ test.describe('F – Solid Pod Sync', () => {
   // The green indicator disappearing confirms the pod PUT completed — no extra waitForTimeout needed.
   async function syncListToPod() {
     await openAllSections()
-    await page.locator('input[type="checkbox"]').first().click()
+    await firstItemChip(page).click()
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
   }
@@ -132,12 +133,14 @@ test.describe('F – Solid Pod Sync', () => {
     await openAllSections()
     await page.getByRole('button', { name: 'Show Packed' }).click()
 
-    const checkboxes = page.locator('input[type="checkbox"]')
-    await expect(checkboxes.first()).toBeVisible()
+    const chips = itemChips(page)
+    await expect(chips.first()).toBeVisible()
 
-    // Capture stable name attributes for post-reload assertions
-    const box0Name = await checkboxes.nth(0).getAttribute('name')
-    const box1Name = await checkboxes.nth(1).getAttribute('name')
+    // The grid's inputs are driven by the form rather than registered against
+    // it, so they carry no `name` to hold on to — the item's id in the chip's
+    // test id is what survives a reload.
+    const box0Id = (await chips.nth(0).getAttribute('data-testid'))!
+    const box1Id = (await chips.nth(1).getAttribute('data-testid'))!
 
     // Add artificial latency to pod PUT requests.
     // This opens the stale-_rev window: local DB save completes in <50 ms (advances _rev),
@@ -151,10 +154,10 @@ test.describe('F – Solid Pod Sync', () => {
     })
 
     try {
-      await checkboxes.nth(0).click()
+      await chips.nth(0).click()
       // Wait for first debounce + local DB save (~850ms) but not pod PUT (~2300ms)
       await page.waitForTimeout(1000)
-      await checkboxes.nth(1).click()
+      await chips.nth(1).click()
 
       await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 15_000 })
       await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
@@ -164,8 +167,8 @@ test.describe('F – Solid Pod Sync', () => {
       // The list reopens as it was left, so packed items are already showing —
       // clicking "Show Packed" again would be clicking "Hide Packed".
       await expect(page.getByRole('button', { name: 'Hide Packed' })).toBeVisible({ timeout: 10_000 })
-      await expect(page.locator(`input[name="${box0Name}"]`)).toBeChecked({ timeout: 5_000 })
-      await expect(page.locator(`input[name="${box1Name}"]`)).toBeChecked({ timeout: 5_000 })
+      await expect(chipInput(chipByTestId(page, box0Id))).toBeChecked({ timeout: 5_000 })
+      await expect(chipInput(chipByTestId(page, box1Id))).toBeChecked({ timeout: 5_000 })
     } finally {
       await page.unrouteAll()
     }
@@ -175,7 +178,7 @@ test.describe('F – Solid Pod Sync', () => {
     await createList(`Suggestion Save Trip ${Date.now()}`)
     await openAllSections()
     // Confirm list content is loaded before interacting (waitForURL fires on URL match, not content render)
-    await expect(page.locator('input[type="checkbox"]').first()).toBeVisible({ timeout: 15_000 })
+    await expect(firstItemChip(page)).toBeVisible({ timeout: 15_000 })
 
     const customItemName = 'super special sunscreen'
     const addItemInput = page.getByPlaceholder('Add new item...').first()
@@ -224,7 +227,7 @@ test.describe('F – Solid Pod Sync', () => {
     // Fresh context, so this is a first open here too — the list arrives folded
     await openAllSections(page2)
     await page2.getByRole('button', { name: /Show Packed/i }).click()
-    await expect(page2.locator('input[type="checkbox"]:checked').first()).toBeVisible({ timeout: 10_000 })
+    await expect(packedChips(page2).first()).toBeVisible({ timeout: 10_000 })
     await context2.close()
   })
 
