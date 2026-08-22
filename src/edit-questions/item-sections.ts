@@ -430,6 +430,21 @@ export function addEmptySection(
 }
 
 /**
+ * Stop recording a section that has just been removed.
+ *
+ * The mirror of `addEmptySection`, and deliberately not `reconcileEmptySections`:
+ * that one *keeps* a section whose items merely left, which is right for a
+ * delete or a drag and exactly wrong for "remove this section".
+ */
+export function forgetEmptySection(
+    emptySections: string[] | undefined,
+    label: string,
+): string[] | undefined {
+    const remaining = emptySections?.filter(name => name !== label)
+    return remaining?.length ? remaining : undefined
+}
+
+/**
  * Move items into a section (or back to the default section with `undefined`).
  * Only items whose category actually changes get a fresh `lastModified`, so a
  * no-op drag doesn't churn sync or win unrelated merges.

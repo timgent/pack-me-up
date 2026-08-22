@@ -402,6 +402,43 @@ test.describe('B – Editing Questions', () => {
     await expect(afterReload.getByText('BoardingPassTest')).toBeVisible({ timeout: 5_000 })
   })
 
+  test('B16: delete a section from its heading, keeping its items', async ({ freshPage: page }) => {
+    // Getting rid of a section used to mean opening Organise items and finding
+    // its Remove — and a section holding one item could not be removed at all,
+    // since the reorder view only opens once a list has two.
+    await setupWizardAndGoToQuestions(page)
+    await openAlwaysNeeded(page)
+
+    await page.getByRole('button', { name: '+ Add section' }).first().click()
+    const nameField = page.getByLabel('New section name')
+    await expect(nameField).toBeVisible({ timeout: 3_000 })
+    await nameField.fill('Paperwork')
+    await nameField.press('Enter')
+
+    const paperwork = page.getByTestId('item-section').filter({ hasText: 'Paperwork' }).first()
+    await expect(paperwork).toBeVisible({ timeout: 5_000 })
+    await paperwork.getByTestId('add-to-section').click()
+    const field = page.getByLabel('New item in Paperwork')
+    await field.fill('BoardingPassTest')
+    await field.press('Enter')
+    await expect(paperwork.getByText('BoardingPassTest')).toBeVisible({ timeout: 5_000 })
+
+    // Its one item is what makes this worth checking: it must survive.
+    await paperwork.getByTestId('delete-section').click()
+    await expect(page.getByRole('heading', { name: /Delete .Paperwork/ })).toBeVisible({ timeout: 3_000 })
+    await page.getByRole('button', { name: 'Delete section', exact: true }).click()
+
+    await expect(page.getByTestId('item-section').filter({ hasText: 'Paperwork' })).toHaveCount(0)
+    await expect(page.getByText('BoardingPassTest')).toBeVisible()
+
+    // And it stayed deleted — the name is dropped, not kept as an empty section.
+    await page.waitForTimeout(800)
+    await page.reload()
+    await openAlwaysNeeded(page)
+    await expect(page.getByText('BoardingPassTest')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByTestId('item-section').filter({ hasText: 'Paperwork' })).toHaveCount(0)
+  })
+
   test('B15: editing an option asks for its name and nothing else', async ({ freshPage: page }) => {
     // The modal used to carry a whole second item editor.
     await setupWizardAndGoToQuestions(page)
