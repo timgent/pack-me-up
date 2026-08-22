@@ -9,10 +9,16 @@ import type { PersonColor } from '../edit-questions/person-colors'
  * beside it, so announcing the initial as well would only make a screen
  * reader say "A, Alice's Items".
  */
-export function PersonAvatar({ name, color, size = 'md' }: {
+export function PersonAvatar({ name, color, size = 'md', initial }: {
     name: string
     color: PersonColor
     size?: 'sm' | 'md'
+    /**
+     * Overrides the first letter, for the places that have already worked out
+     * what tells this person apart from everyone else on the list — Alice and
+     * Amy are both "A". See `buildGridColumns`.
+     */
+    initial?: string
 }) {
     const dimensions = size === 'sm' ? 'w-5 h-5 text-[10px]' : 'w-7 h-7 text-xs'
     return (
@@ -22,7 +28,7 @@ export function PersonAvatar({ name, color, size = 'md' }: {
             aria-hidden="true"
             className={`inline-flex items-center justify-center rounded-full font-bold select-none shrink-0 ${dimensions} ${color.avatar}`}
         >
-            {name.charAt(0).toUpperCase() || '?'}
+            {initial ?? (name.charAt(0).toUpperCase() || '?')}
         </span>
     )
 }

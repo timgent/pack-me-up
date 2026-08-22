@@ -1,6 +1,6 @@
 /**
- * How the user last left a particular packing list: which view they were in,
- * whether packed items were showing, and which sections they had folded away.
+ * How the user last left a particular packing list: whether packed items were
+ * showing, and which sections they had folded away.
  *
  * A big family list is only manageable once you can put away the parts you
  * aren't packing right now — and that's worthless if the app forgets the moment
@@ -14,19 +14,15 @@
  * different bag.
  */
 
-export type ListViewMode = 'person' | 'category'
-
 export interface ListViewPreferences {
-    viewMode: ListViewMode
     showPacked: boolean
-    /** Keys of folded top-level sections — a person, a category, or the shared section. */
+    /** Keys of folded top-level sections — a category, or the last minute section. */
     collapsedSections: string[]
     /** Keys of folded groups within a section, in `sectionKey::groupLabel` form. */
     collapsedGroups: string[]
 }
 
 export const DEFAULT_LIST_VIEW_PREFERENCES: ListViewPreferences = {
-    viewMode: 'person',
     showPacked: false,
     collapsedSections: [],
     collapsedGroups: [],
@@ -88,13 +84,32 @@ export function loadListViewPreferences(listId: string | undefined): ListViewPre
 
     const stored = parsed as Partial<Record<keyof ListViewPreferences, unknown>>
     return {
-        // 'question' is what the category view was called before it was named
-        // after what it groups by. Lists left in it stay in it.
-        viewMode: stored.viewMode === 'category' || stored.viewMode === 'question' ? 'category' : 'person',
+        // Entries written before the person/category toggle was removed carry a
+        // `viewMode`. It is read by nothing now and simply dropped — there is
+        // one view, so there is nothing for it to choose between.
         showPacked: stored.showPacked === true,
         collapsedSections: stringsOnly(stored.collapsedSections),
         collapsedGroups: stringsOnly(stored.collapsedGroups),
     }
+}
+
+/**
+ * Whether this list's stored fold state was written by the old person view.
+ *
+ * The person/category toggle defaulted to person, so the grid was opt-in and
+ * most lists were never seen in it. Their stored `collapsedSections` are
+ * people's names, which match no card now: a user who had folded four of five
+ * people away opens a fully expanded wall of category cards instead, and the
+ * fold-on-open seeding won't rescue them because it only runs on a list's first
+ * open. Recognising those entries lets the page seed the fold once more.
+ */
+export function hasStalePersonViewSections(
+    prefs: ListViewPreferences,
+    currentSectionKeys: readonly string[],
+): boolean {
+    if (prefs.collapsedSections.length === 0) return false
+    const current = new Set(currentSectionKeys)
+    return !prefs.collapsedSections.some(key => current.has(key))
 }
 
 export function saveListViewPreferences(listId: string | undefined, prefs: ListViewPreferences): void {

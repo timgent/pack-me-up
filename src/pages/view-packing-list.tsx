@@ -33,14 +33,15 @@ import { CATEGORY_ORDER } from '../edit-questions/item-sections'
 import { useSectionOrder } from '../hooks/useSectionOrder'
 import { clearPendingSignInAction, getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
 import { usePersonColors } from '../hooks/usePersonColors'
-import { PersonAvatar } from '../components/PersonAvatar'
 import { AddItemComposer, UNCATEGORISED_LABEL, type AddItemTarget, type PersonOption } from '../components/AddItemComposer'
 import { CategoryItemGrid } from '../components/CategoryItemGrid'
 import { ItemRowPanel } from '../components/ItemRowPanel'
-import { buildCategoryRows, buildGridColumns, type GridRow } from '../utils/categoryItemGrid'
+import { buildCategoryRows, buildGridColumns, UNASSIGNED_COLUMN_KEY, type GridRow } from '../utils/categoryItemGrid'
+import { PeopleFilterBar } from '../components/PeopleFilterBar'
+import { togglePerson, isFiltered, personTotals, filterSummary, sharedTotal, sharedSelected, filterLabel, filterNames } from '../utils/peopleFilter'
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
-import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, type ListViewMode } from '../utils/listViewPreferences'
+import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, hasStalePersonViewSections } from '../utils/listViewPreferences'
 import { profile, profileEvent } from '../utils/profiling'
 
 type FormData = {
@@ -208,14 +209,8 @@ export function groupByPerson(items: PackingListItem[]): ItemGroup[] {
 }
 
 
-/**
- * Which top-level card an item belongs to in person view. Last minute wins over
- * everything: the point of marking an item is that it leaves the card it was in.
- */
-function personViewSectionKey(item: PackingListItem): string {
-    if (item.lastMinute) return LAST_MINUTE_SECTION_KEY
-    return item.communal ? SHARED_SECTION_KEY : item.personName
-}
+/** Ties the people filter to the cards it narrows, for assistive tech. */
+const LIST_SECTIONS_ID = 'packing-list-sections'
 
 export function ViewPackingList() {
     const { id } = useParams<{ id: string }>()
@@ -259,12 +254,14 @@ export function ViewPackingList() {
     // one moment worth explaining, and only until the user touches anything.
     const [foldedOnOpen, setFoldedOnOpen] = useState(false)
     const [showPacked, setShowPacked] = useState(storedPreferences.showPacked)
-    const [viewMode, setViewMode] = useState<ListViewMode>(storedPreferences.viewMode)
+    /**
+     * Who the user is packing for. Empty means everyone, which is where a list
+     * always opens: unlike a folded section, a filter is a thing you are doing
+     * rather than a way you keep this list, and one restored a week later is a
+     * list that looks like it has lost two thirds of itself.
+     */
+    const [selectedPeople, setSelectedPeople] = useState<ReadonlySet<string>>(() => new Set<string>())
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-    // Which section has an add-item composer open inside it. Only one is mounted
-    // at a time: a composer per group would put an input in front of every
-    // heading on the page, which is what the list already pays for in item rows.
-    const [openComposerKey, setOpenComposerKey] = useState<string | null>(null)
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
     // Which row of the category grid has its "who needs this?" panel open, held
     // as keys rather than as the row itself: the row is rebuilt whenever the
@@ -274,12 +271,9 @@ export function ViewPackingList() {
     // A row can hold one item or one each for four people; removing the second
     // kind is worth naming who it affects.
     const [rowToDelete, setRowToDelete] = useState<{ label: string; items: PackingListItem[]; who: string } | null>(null)
-    const [editingItemId, setEditingItemId] = useState<string | null>(null)
-    const [editingItemText, setEditingItemText] = useState<string>('')
-    const [editingItemQuantity, setEditingItemQuantity] = useState<string>('')
     // Groups within a section, keyed `sectionKey::groupLabel`
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(storedPreferences.collapsedGroups))
-    // Top-level sections: a person, a category, or the shared section
+    // Top-level sections: a category, or the last minute card
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set(storedPreferences.collapsedSections))
     // Sections this page folded away on the user's behalf once everything in
     // them was packed. Tracked apart from the folded set so a section is only
@@ -293,7 +287,6 @@ export function ViewPackingList() {
     const [showAddGuest, setShowAddGuest] = useState(false)
     // Reveals an empty Shared Items section on lists that have no communal
     // items yet; once an item is added the section persists from the data.
-    const [showSharedSection, setShowSharedSection] = useState(false)
     const [newGuestName, setNewGuestName] = useState('')
     const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
     const [renamingGuestName, setRenamingGuestName] = useState('')
@@ -342,20 +335,12 @@ export function ViewPackingList() {
     // by killing the tab is remembered just as well as one navigated away from.
     useEffect(() => {
         saveListViewPreferences(id, {
-            viewMode,
             showPacked,
             collapsedSections: [...collapsedSections],
             collapsedGroups: [...collapsedGroups],
         })
-    }, [id, viewMode, showPacked, collapsedSections, collapsedGroups])
+    }, [id, showPacked, collapsedSections, collapsedGroups])
 
-
-    const toggleGroup = (key: string) =>
-        setCollapsedGroups(prev => {
-            const next = new Set(prev)
-            if (next.has(key)) { next.delete(key) } else { next.add(key) }
-            return next
-        })
 
     const toggleSection = (sectionKey: string) => {
         // Once the user has arranged the list themselves, the note explaining
@@ -464,15 +449,6 @@ export function ViewPackingList() {
         [packingList?.items, packingList?.deletedItems],
     )
 
-    // The sections a new item can be filed into: the ones this list already
-    // shows, in the order it shows them, plus the catch-all. Offering sections
-    // the list doesn't use would invent cards no one asked for — new sections
-    // belong to the question set, where they can be arranged.
-    const categoryOptions = useMemo(() => {
-        const labels = groupByCategory(packingList?.items ?? [], sectionOrder).map(group => group.label)
-        return labels.includes(UNCATEGORISED_LABEL) ? labels : [...labels, UNCATEGORISED_LABEL]
-    }, [packingList?.items, sectionOrder])
-
     const peopleOptions = useMemo<PersonOption[]>(() => {
         const byName = new Map<string, string>()
         for (const guest of packingList?.guests ?? []) byName.set(guest.name, guest.id)
@@ -499,8 +475,35 @@ export function ViewPackingList() {
         [peopleOptions, packingList?.items],
     )
 
+    const filtering = isFiltered(selectedPeople)
+    /**
+     * Whose chips the cards draw. Handed to the grid and to nothing else: the
+     * rows themselves, and the row panel that says who needs what, are built
+     * from the full column set, because which cells exist is a fact about the
+     * list rather than about what is on screen.
+     */
+    const visibleColumnKeys = filtering ? selectedPeople : undefined
 
-    const { register, setValue, getValues, control, reset } = useForm<FormData>({
+    const handleTogglePerson = useCallback((name: string) => {
+        setSelectedPeople(prev => togglePerson(prev, name))
+    }, [])
+    const handleClearFilter = useCallback(() => {
+        setSelectedPeople(new Set<string>())
+    }, [])
+
+    /**
+     * The column the filter is down to, when it is down to exactly one person.
+     *
+     * The unassigned column is never one: "Unassigned" is a useful thing to
+     * filter by — it is every item nobody has claimed yet — but it is not
+     * somebody to rename, remove, or pack a bag for.
+     */
+    const solePerson = selectedPeople.size === 1 && !sharedSelected(selectedPeople)
+        ? gridColumns.find(column => column.key === [...selectedPeople][0] && !column.unassigned)
+        : undefined
+
+
+    const { setValue, getValues, control, reset } = useForm<FormData>({
         defaultValues: {
             items: {}
         }
@@ -524,6 +527,44 @@ export function ViewPackingList() {
         setValue(`items.${item.id}`, checked)
         handleItemToggle(item.id, checked)
     }, [setValue, handleItemToggle])
+
+    // What each person still has to pack, over the whole list — the figure sits
+    // on their chip, which is readable from anywhere, so it has to mean the same
+    // thing from anywhere.
+    const peopleTotals = useMemo(
+        () => personTotals(packingList?.items ?? [], watchedItems),
+        [packingList?.items, watchedItems],
+    )
+    const sharedStat = useMemo(
+        () => sharedTotal(packingList?.items ?? [], watchedItems),
+        [packingList?.items, watchedItems],
+    )
+
+    /**
+     * Everything of one person's, packed in a stroke.
+     *
+     * The old key was deliberately inert because the one thing it could do was
+     * this, and doing it by accident is nine items changed with no way back. A
+     * labelled button behind a filter answers the accident; the undo answers the
+     * rest, which a confirmation dialog never did — a dialog you meet often is a
+     * dialog you learn to dismiss.
+     */
+    const handlePackAllFor = useCallback((personName: string) => {
+        const before = { ...getValues('items') }
+        const toPack = (packingList?.items ?? []).filter(
+            item => !item.communal && item.personName === personName && !before[item.id],
+        )
+        if (toPack.length === 0) return
+        // The effect watching the form's values does the saving; setting them
+        // here is the whole of the change.
+        for (const item of toPack) setValue(`items.${item.id}`, true)
+        showToast(`Packed ${toPack.length} of ${personName}'s items`, 'success', undefined, {
+            label: 'Undo',
+            onAction: () => {
+                for (const item of toPack) setValue(`items.${item.id}`, before[item.id] === true)
+            },
+        })
+    }, [getValues, packingList?.items, setValue, showToast])
 
     const registerCellRef = useCallback((itemId: string, element: HTMLElement | null) => {
         if (element) itemRowRefs.current.set(itemId, element)
@@ -957,52 +998,6 @@ export function ViewPackingList() {
         }
     }
 
-    const handleStartEdit = (item: PackingListItem) => {
-        setEditingItemId(item.id)
-        setEditingItemText(item.itemText)
-        setEditingItemQuantity(item.quantity !== undefined ? String(item.quantity) : '')
-    }
-
-    const handleCancelEdit = () => {
-        setEditingItemId(null)
-        setEditingItemText('')
-        setEditingItemQuantity('')
-    }
-
-    const handleSaveEdit = async (itemId: string) => {
-        const trimmed = editingItemText.trim()
-        if (!trimmed) {
-            handleCancelEdit()
-            return
-        }
-        if (!packingList) return
-
-        const parsedQuantity = parseInt(editingItemQuantity, 10)
-        const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : undefined
-
-        try {
-            setAutoSaveStatus('saving')
-
-            const now = new Date().toISOString()
-            const updatedItems = packingList.items.map(item =>
-                item.id === itemId
-                    ? { ...item, itemText: trimmed, quantity, lastModified: now }
-                    : item
-            )
-            await persistPackingList({ ...packingList, items: updatedItems })
-
-            setAutoSaveStatus('saved')
-            setTimeout(() => setAutoSaveStatus('idle'), 2000)
-        } catch (err) {
-            reportError(err, 'Error saving item name')
-            setAutoSaveStatus('error')
-        } finally {
-            setEditingItemId(null)
-            setEditingItemText('')
-            setEditingItemQuantity('')
-        }
-    }
-
     /**
      * Everything a row of the category grid can be asked to do, in one place.
      *
@@ -1167,8 +1162,6 @@ export function ViewPackingList() {
         (target: AddItemTarget, itemText: string, quantity?: number) => {
             addItemRef.current(target, itemText, quantity)
         }, [])
-    const closeComposer = useCallback(() => setOpenComposerKey(null), [])
-
     const handleAddGuest = async () => {
         if (!packingList || !newGuestName.trim()) return
         const guest = { id: crypto.randomUUID(), name: newGuestName.trim() }
@@ -1188,6 +1181,16 @@ export function ViewPackingList() {
         if (!trimmed) return
         const oldGuest = (packingList.guests ?? []).find(g => g.id === guestId)
         if (!oldGuest || trimmed === oldGuest.name) return
+        // The filter holds names. Leave the old one in it and the page stays
+        // filtered to somebody no chip names any more — every card empty, no
+        // chip pressed, and nothing on screen to undo it.
+        setSelectedPeople(prev => {
+            if (!prev.has(oldGuest.name)) return prev
+            const next = new Set(prev)
+            next.delete(oldGuest.name)
+            next.add(trimmed)
+            return next
+        })
         await persistPackingList({
             ...packingList,
             guests: (packingList.guests ?? []).map(g => g.id === guestId ? { ...g, name: trimmed } : g),
@@ -1198,6 +1201,15 @@ export function ViewPackingList() {
 
     const handleRemoveGuest = async (guestId: string) => {
         if (!packingList) return
+        const guest = (packingList.guests ?? []).find(g => g.id === guestId)
+        if (guest) {
+            setSelectedPeople(prev => {
+                if (!prev.has(guest.name)) return prev
+                const next = new Set(prev)
+                next.delete(guest.name)
+                return next
+            })
+        }
         await persistPackingList({
             ...packingList,
             guests: (packingList.guests ?? []).filter(g => g.id !== guestId),
@@ -1218,20 +1230,6 @@ export function ViewPackingList() {
     // nothing on a list that is in fact half done.
     const formHydrated = totalCount === 0 || Object.keys(watchedItems).length > 0
 
-    // Per-section and per-group stats are wanted by the auto-fold effect as well
-    // as by the rendering below, so they're derived here rather than inline in
-    // the JSX — effects can't live after the early returns.
-    const sectionStats = useMemo(() => {
-        const stats: Record<string, SectionStats> = {}
-        for (const item of listItems ?? []) {
-            const key = personViewSectionKey(item)
-            stats[key] ??= { packed: 0, total: 0 }
-            stats[key].total++
-            if (watchedItems[item.id]) stats[key].packed++
-        }
-        return stats
-    }, [listItems, watchedItems])
-
     // Stats per category, used by question-centric top-level sections. Communal
     // items count here too: question view files them under their category
     // alongside everyone else's, so a section's total has to include them.
@@ -1248,47 +1246,19 @@ export function ViewPackingList() {
         return stats
     }, [listItems, watchedItems])
 
-    // Stats for the groups *inside* a section. Both views are keyed here because
-    // both are one toggle away: person view groups a person's items by category,
-    // question view groups a category's items by person (communal items under
-    // the shared key), and the person-view shared card groups by category.
-    const groupStats = useMemo(() => {
-        const stats: Record<string, SectionStats> = {}
-        const count = (key: string, packed: boolean) => {
-            stats[key] ??= { packed: 0, total: 0 }
-            stats[key].total++
-            if (packed) stats[key].packed++
-        }
-        for (const item of listItems ?? []) {
-            const category = item.category ?? UNCATEGORISED_LABEL
-            const packed = !!watchedItems[item.id]
-            // The last minute card groups by person, and holds its items whole:
-            // they are not also counted under the section they were lifted from.
-            if (item.lastMinute) {
-                const personKey = item.communal ? SHARED_SECTION_KEY : (item.personName || UNASSIGNED_LABEL)
-                count(`${LAST_MINUTE_SECTION_KEY}::${personKey}`, packed)
-                continue
-            }
-            if (item.communal) {
-                count(`${SHARED_SECTION_KEY}::${category}`, packed)
-                count(`${category}::${SHARED_SECTION_KEY}`, packed)
-                continue
-            }
-            count(`${item.personName}::${category}`, packed)
-            count(`${category}::${item.personName || UNASSIGNED_LABEL}`, packed)
-        }
-        return stats
-    }, [listItems, watchedItems])
-
     // Which top-level sections have nothing left to pack, keyed the way the
     // active view keys them. Sorted so the value is stable enough to compare.
     const completeSectionKeys = useMemo(() => {
-        const stats = viewMode === 'person' ? sectionStats : categoryStats
-        return Object.entries(stats)
+        // A filter narrows a card to one person's part of it, and one person
+        // finishing their share of Toiletries is not Toiletries being done.
+        // Folding on it would also write the fold to storage, so a filter used
+        // once would leave the list folded up for good.
+        if (filtering) return []
+        return Object.entries(categoryStats)
             .filter(([, sectionStat]) => isSectionComplete(sectionStat))
             .map(([key]) => key)
             .sort()
-    }, [viewMode, sectionStats, categoryStats])
+    }, [filtering, categoryStats])
     // Depending on the joined form rather than the array keeps the fold timer
     // below from being cancelled and restarted by every unrelated re-render.
     const completeSectionSignature = completeSectionKeys.join(KEY_SEPARATOR)
@@ -1300,19 +1270,24 @@ export function ViewPackingList() {
     // alone: a freshly generated list is a thing worth showing someone, and
     // folding it would trade the payoff for tidiness it doesn't need.
     useLayoutEffect(() => {
-        if (listSeenBefore || hasSeededFoldRef.current || !listItems) return
+        if (hasSeededFoldRef.current || !listItems) return
         if (listItems.length <= FOLD_ON_OPEN_MIN_ITEMS) return
 
         // Keyed the way the view the list is about to open in keys them —
         // folding people away while the page is showing categories folds
         // nothing at all.
-        const sectionKeys = new Set(listItems.map(item => viewMode === 'category'
-            ? (item.lastMinute ? LAST_MINUTE_SECTION_KEY : (item.category ?? UNCATEGORISED_LABEL))
-            : personViewSectionKey(item)))
-        // Guests with nothing in them yet still have a card to fold
-        if (viewMode === 'person') {
-            for (const guest of packingList?.guests ?? []) sectionKeys.add(guest.name)
-        }
+        const sectionKeys = new Set(listItems.map(item => (
+            item.lastMinute ? LAST_MINUTE_SECTION_KEY : (item.category ?? UNCATEGORISED_LABEL)
+        )))
+
+        // A list last left in the old person view has people's names folded
+        // away, and not one of them names a card any more — so it would open as
+        // a wall of everything, which is exactly what the fold exists to spare
+        // the user. Seeding once more puts it back the way they left it in the
+        // only sense that survives: folded.
+        const foldingAfterPersonView = listSeenBefore
+            && hasStalePersonViewSections(storedPreferences, [...sectionKeys])
+        if (listSeenBefore && !foldingAfterPersonView) return
         // Nothing to fold *into* — one long section stays open, since folding it
         // would leave the user looking at a single closed box.
         if (sectionKeys.size < 2) return
@@ -1320,8 +1295,7 @@ export function ViewPackingList() {
         hasSeededFoldRef.current = true
         setCollapsedSections(prev => new Set([...prev, ...sectionKeys]))
         setFoldedOnOpen(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewMode is read once, when the list first opens
-    }, [listSeenBefore, listItems, packingList?.guests])
+    }, [listSeenBefore, listItems, storedPreferences])
 
     // Showing packed items is a request to see everything, so it hands back the
     // sections this page folded away — but not the ones the user folded, which
@@ -1429,48 +1403,12 @@ export function ViewPackingList() {
     const foldPending = allPacked && wasAllPackedRef.current === false && !showPacked
     const bannerHidden = sectionsExiting || foldPending
 
-    const guestNames = new Set((packingList.guests ?? []).map(g => g.name))
-    const personIdByName = new Map(peopleOptions.map(person => [person.name, person.id]))
-    // Only worth offering a section picker once the list has sections to pick.
-    const sectionChoices = categoryOptions.length > 1 ? categoryOptions : undefined
     // A section's card asks who an item is for, and "the whole group" is one of
     // the answers — it is how a shared item gets added in question view, where
     // there is no shared card to type into. Last, so the picker still opens on a
     // person: most items are somebody's.
     const sectionPeopleChoices: PersonOption[] = [...peopleOptions, { name: SHARED_GROUP_LABEL, id: '', communal: true }]
 
-    // Build grouped item map, seeding guest names so their sections exist even when empty
-    const groupedItems: Record<string, PackingListItem[]> = {}
-    for (const guest of (packingList.guests ?? [])) groupedItems[guest.name] = []
-    // Seed fully packed people too, so finishing someone off leaves a celebration
-    // behind rather than silently removing their card along with their last item.
-    for (const [name, stats] of Object.entries(sectionStats)) {
-        if (name === SHARED_SECTION_KEY || name === LAST_MINUTE_SECTION_KEY) continue
-        if (isSectionComplete(stats)) groupedItems[name] ??= []
-    }
-    for (const item of filteredItems) {
-        if (item.communal || item.lastMinute) continue
-        if (!groupedItems[item.personName]) groupedItems[item.personName] = []
-        groupedItems[item.personName].push(item)
-    }
-
-    // Person view gives communal items a card of their own, first, because they
-    // are the one part of the list that is nobody's. Question view has no use
-    // for it: there the sections are the question set's, and a shared item
-    // belongs to its section as much as anyone's does — see below.
-    const hasCommunalItems = packingList.items.some(i => i.communal && !i.lastMinute)
-    const visibleCommunalItems = filteredItems.filter(i => i.communal && !i.lastMinute)
-    // Like person sections, the shared section disappears when all its items are
-    // packed and packed items are hidden.
-    const sharedSections: ListSection[] = (visibleCommunalItems.length > 0 || showSharedSection || isSectionComplete(sectionStats[SHARED_SECTION_KEY]))
-        ? [{
-            key: SHARED_SECTION_KEY,
-            title: 'Shared Items',
-            name: '',
-            communal: true,
-            items: visibleCommunalItems,
-        }]
-        : []
 
     // The one card that outranks both groupings: whatever it is grouped by, an
     // item you can't pack yet doesn't belong among the ones you can. It comes
@@ -1482,73 +1420,129 @@ export function ViewPackingList() {
             title: LAST_MINUTE_TITLE,
             name: '',
             lastMinute: true,
-            // Person view reads the filtered items directly; the grid takes all
-            // of them and decides row by row what to show — see below.
             items: filteredItems.filter(i => i.lastMinute),
-            ...(viewMode === 'category'
-                ? { rows: buildCategoryRows(lastMinuteItems, gridColumns) }
-                : {}),
+            rows: buildCategoryRows(lastMinuteItems, gridColumns),
         }]
         : []
 
-    let listSections: ListSection[]
-    if (viewMode === 'person') {
-        // Regular people (from question set) alphabetically, then guests in add-order
-        const regularSections: ListSection[] = Object.entries(groupedItems)
-            .filter(([name]) => !guestNames.has(name))
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([name, items]) => ({ key: name, title: `${name}'s Items`, name, items }))
-        const guestSections: ListSection[] = (packingList.guests ?? [])
-            .map(g => ({
-                key: g.name,
-                title: `${g.name}'s Items`,
-                name: g.name,
-                guestId: g.id,
-                items: groupedItems[g.name] ?? [],
-            }))
-        listSections = [...sharedSections, ...regularSections, ...guestSections, ...lastMinuteSections]
-    } else {
-        // Communal items are filed by category here, same as everyone else's —
-        // they sit among the rows of the section they belong to rather than in a
-        // card of their own.
-        //
-        // Every item goes into the grid, packed ones included: a cell that
-        // disappeared when it was ticked would leave a gap indistinguishable
-        // from a person who never needed the item, and telling those two apart
-        // is the whole of what the grid is for. Hiding what's packed is decided
-        // a row at a time, inside the grid.
-        const categorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.lastMinute), sectionOrder)
-            .map(({ label, items }) => ({
-                key: label,
-                title: label,
-                name: '',
-                items,
-                isCategory: true,
-                rows: buildCategoryRows(items, gridColumns),
-            }))
-        listSections = [...categorySections, ...lastMinuteSections]
+    // Communal items are filed by category, same as everyone else's — they sit
+    // among the rows of the section they belong to rather than in a card of
+    // their own.
+    //
+    // Every item goes into the grid, packed ones included: a cell that
+    // disappeared when it was ticked would leave a gap indistinguishable from a
+    // person who never needed the item, and telling those two apart is the whole
+    // of what the grid is for. Hiding what's packed is decided a row at a time,
+    // inside the grid.
+    const allCategorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.lastMinute), sectionOrder)
+        .map(({ label, items }) => ({
+            key: label,
+            title: label,
+            name: '',
+            items,
+            isCategory: true,
+            rows: buildCategoryRows(items, gridColumns),
+        }))
+
+    /**
+     * A category holds something for the people being packed for.
+     *
+     * Shared items don't count. "What is left for the baby in Camping?" is not
+     * a question the group's tent answers, and a card kept alive by one is a
+     * card the user opens to find nothing of what they were looking for.
+     */
+    const hasSomethingForFilter = (section: ListSection) => !filtering || (section.rows ?? []).some(row => (
+        row.communal
+            ? sharedSelected(selectedPeople)
+            : row.items.some(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
+    ))
+
+    // Under a filter the empty ones go rather than staying as muted headers.
+    // Person view used to answer "what is left for Alice?" with one card; the
+    // same question answered with three real cards adrift in nine empty ones
+    // would be a worse list, not a simpler app. What is missing is said in one
+    // line under the cards instead, and that line puts them back.
+    const categorySections = filtering ? allCategorySections.filter(hasSomethingForFilter) : allCategorySections
+    const listSections: ListSection[] = [...categorySections, ...lastMinuteSections]
+
+    const soleGuest = solePerson === undefined
+        ? undefined
+        : (packingList.guests ?? []).find(guest => guest.name === solePerson.name)
+    const solePersonItems = solePerson === undefined
+        ? []
+        : packingList.items.filter(item => !item.communal && item.personName === solePerson.name)
+    const solePersonTotal = solePersonItems.length
+    const solePersonUnpacked = solePersonItems.filter(item => !watchedItems[item.id]).length
+    const filterAnnouncement = filterSummary(selectedPeople, categorySections.length, allCategorySections.length)
+
+    /**
+     * " for Alice" — what makes a filtered count a number about somebody.
+     *
+     * Only ever one name: past that it says how many, because a comma-joined
+     * list beside a fraction reads as a truncated list, and on a phone it runs
+     * straight under the button beside it. The strip above says which people.
+     */
+    const filterQualifier = filtering ? ` for ${filterLabel(selectedPeople)}` : ''
+
+    /**
+     * What "Check all" on a card ticks: what the card is showing. Under a
+     * filter that is the selected people's items and not the group's tent —
+     * packing Alice's bag should never quietly pack for everyone.
+     */
+    const checkableItemsOf = (section: ListSection) => (section.rows ?? []).flatMap(row => (
+        row.communal
+            ? (!filtering || sharedSelected(selectedPeople) ? row.items : [])
+            : row.items.filter(item => !filtering || selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
+    ))
+
+    /** What a card holds for the people being packed for, not for everybody. */
+    const filteredStatsFor = (section: ListSection) => {
+        let packed = 0
+        let total = 0
+        for (const row of section.rows ?? []) {
+            // Shared items belong to no one person, so counting them against a
+            // person would put the tent in Alice's total and in Bob's. Counted
+            // only when the group's own chip is what is asking.
+            if (row.communal) {
+                if (!sharedSelected(selectedPeople)) continue
+                for (const item of row.items) {
+                    total += 1
+                    if (watchedItems[item.id]) packed += 1
+                }
+                continue
+            }
+            for (const item of row.items) {
+                if (!selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY)) continue
+                total += 1
+                if (watchedItems[item.id]) packed += 1
+            }
+        }
+        return { packed, total }
     }
 
     // How much of the list the grid is holding back: the items on rows where
     // every cell is already packed, which are the only ones it hides.
-    const hiddenGridItemCount = showPacked || viewMode === 'person'
+    const hiddenGridItemCount = showPacked
         ? 0
         : listSections.reduce((count, section) => count + (section.rows ?? []).reduce(
-            (rowCount, row) =>
-                rowCount + (row.items.length > 0 && row.items.every(item => watchedItems[item.id]) ? row.items.length : 0),
+            (rowCount, row) => {
+                // Counted the way the grid hides them: over the cells actually
+                // on screen, so a filter's numbers describe the filter.
+                const shown = !filtering
+                    ? row.items
+                    : row.communal
+                        ? (sharedSelected(selectedPeople) ? row.items : [])
+                        : row.items.filter(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
+                return rowCount + (shown.length > 0 && shown.every(item => watchedItems[item.id]) ? shown.length : 0)
+            },
             0,
         ), 0)
 
     // What the banner offers to bring back has to be what is actually missing.
-    // Person view hides every packed item; category view hides a row only once
-    // every cell on it is packed, so most of a half-packed list is still on
-    // screen and counting all of it would send the user looking for items that
-    // are right in front of them.
-    const hiddenPackedCount = showPacked
-        ? 0
-        : viewMode === 'person'
-            ? packingList.items.filter(item => watchedItems[item.id]).length
-            : hiddenGridItemCount
+    // A row is hidden only once every cell on it is packed, so most of a
+    // half-packed list is still on screen and counting all of it would send the
+    // user looking for items that are right in front of them.
+    const hiddenPackedCount = showPacked ? 0 : hiddenGridItemCount
 
     // The panel shows a row that is rebuilt from the list on every render, so it
     // has to be found again each time rather than held. By key first; by one of
@@ -1612,18 +1606,6 @@ export function ViewPackingList() {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        {/* The reveal opens an empty shared *card*, which only
-                            person view has — category view offers "Shared" in
-                            each section's who-for picker instead. */}
-                        {!foreignPodUrl && viewMode === 'person' && !hasCommunalItems && !showSharedSection && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => setShowSharedSection(true)}
-                            >
-                                + Add Shared Items
-                            </Button>
-                        )}
                         {!foreignPodUrl && (
                             <Button
                                 type="button"
@@ -1742,29 +1724,6 @@ export function ViewPackingList() {
                                         {everySectionFolded ? (isDesktop ? 'Expand all' : 'Expand') : (isDesktop ? 'Collapse all' : 'Collapse')}
                                     </button>
                                 )}
-                                {/* "View" is what the group is labelled; repeating it in both
-                                    buttons is what pushes this row off a 390px screen. The
-                                    accessible name keeps the full wording either way. */}
-                                <div className="flex shrink-0 items-center rounded-md border border-gray-300 overflow-hidden" role="group" aria-label="View mode">
-                                    <button
-                                        type="button"
-                                        aria-pressed={viewMode === 'person'}
-                                        aria-label="Person View"
-                                        onClick={() => setViewMode('person')}
-                                        className={`px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${viewMode === 'person' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                                    >
-                                        {isDesktop ? 'Person View' : 'Person'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-pressed={viewMode === 'category'}
-                                        aria-label="Category View"
-                                        onClick={() => setViewMode('category')}
-                                        className={`px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors border-l border-gray-300 ${viewMode === 'category' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                                    >
-                                        {isDesktop ? 'Category View' : 'Category'}
-                                    </button>
-                                </div>
                                 <Button
                                     type="button"
                                     variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
@@ -1774,31 +1733,120 @@ export function ViewPackingList() {
                                 </Button>
                             </div>
                         </div>
-                        {/* Which coloured initial is whose, written once and kept
-                            in view rather than repeated on every card — a key is
-                            only any use while you are looking at the thing it
-                            explains. Nothing here is pressable: the one thing it
-                            could do is pack somebody's whole category on a stray
-                            tap, and person view has a button that says so. */}
-                        {viewMode === 'category' && gridColumns.length > 0 && (
-                            <div
-                                data-testid="people-key"
-                                className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-1.5"
-                            >
-                                {gridColumns.map(column => (
-                                    <span key={column.key} className="flex items-center gap-1 text-[11px] font-medium text-gray-600">
-                                        {!column.unassigned && (
-                                            <PersonAvatar
-                                                name={column.name}
-                                                color={personColor({ id: column.personId, name: column.name })}
-                                                size="sm"
+                        {/* Which coloured initial is whose — and, since it already
+                            names everyone the cards can show, which of them the
+                            user is packing for. */}
+                        <div data-testid="people-key">
+                            <PeopleFilterBar
+                                columns={gridColumns}
+                                selected={selectedPeople}
+                                totals={peopleTotals}
+                                sharedStat={sharedStat.total > 0 ? sharedStat : undefined}
+                                personColor={personColor}
+                                onToggle={handleTogglePerson}
+                                controlsId={LIST_SECTIONS_ID}
+                            />
+                        </div>
+                        {/* Only while a filter is on: unfiltered it held a line
+                            of grey text restating the strip above it, which is a
+                            36th of a phone screen spent on nothing. Within a
+                            filter its height doesn't change, so moving between
+                            people never shifts the cards. It scrolls rather than
+                            wraps for the same reason the strip does — a guest's
+                            row of controls is wider than a phone. */}
+                        {filtering && (
+                            <div className="mt-1.5 flex min-h-[2.75rem] items-center gap-2 overflow-x-auto border-t border-gray-100 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <button
+                                    type="button"
+                                    onClick={handleClearFilter}
+                                    className="shrink-0 rounded-full border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+                                >
+                                    Clear
+                                </button>
+                                {solePerson !== undefined && (
+                                    <>
+                                        {soleGuest && renamingGuestId === soleGuest.id ? (
+                                            <input
+                                                type="text"
+                                                aria-label={`Rename ${soleGuest.name}`}
+                                                value={renamingGuestName}
+                                                onChange={(e) => setRenamingGuestName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') { e.preventDefault(); handleRenameGuest(soleGuest.id, renamingGuestName) }
+                                                    if (e.key === 'Escape') { setRenamingGuestId(null); setRenamingGuestName('') }
+                                                }}
+                                                onBlur={() => handleRenameGuest(soleGuest.id, renamingGuestName)}
+                                                autoFocus
+                                                className="w-40 shrink-0 rounded-md border border-blue-400 px-2 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
+                                        ) : (
+                                            <>
+                                                <span className="shrink-0 text-xs font-semibold text-gray-700">{solePerson.name}</span>
+                                                {/* On a phone the chips are faces
+                                                    with no names on them, so the
+                                                    numbers come off the chip and
+                                                    land here beside the name. */}
+                                                <span className="shrink-0 text-xs tabular-nums text-gray-500 sm:hidden">
+                                                    {solePersonTotal - solePersonUnpacked}/{solePersonTotal}
+                                                </span>
+                                            </>
                                         )}
-                                        {column.name}
+                                        {soleGuest && renamingGuestId !== soleGuest.id && (
+                                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Guest</span>
+                                        )}
+                                        {/* One person finishing their bag is a
+                                            real thing to have done. The trip's
+                                            own celebration stays for the trip,
+                                            but this shouldn't pass in silence. */}
+                                        {solePersonUnpacked === 0 && solePersonTotal > 0 ? (
+                                            <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                🎉 {solePerson.name}'s bag is packed!
+                                            </span>
+                                        ) : solePersonUnpacked > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePackAllFor(solePerson.name)}
+                                                className="shrink-0 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                                            >
+                                                {/* The number is in the button, where it
+                                                    is read before the tap rather than in a
+                                                    dialog after it. */}
+                                                Pack all {solePersonUnpacked} of {solePerson.name}'s
+                                            </button>
+                                        )}
+                                        {soleGuest && !foreignPodUrl && renamingGuestId !== soleGuest.id && (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setRenamingGuestId(soleGuest.id); setRenamingGuestName(soleGuest.name) }}
+                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                                                >
+                                                    Rename
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setGuestToRemove(soleGuest.id)}
+                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                                {/* Which faces are pressed, in words. The strip
+                                    above says it in colour, which is no answer
+                                    on a phone where the chips carry no names. */}
+                                {solePerson === undefined && (
+                                    <span className="shrink-0 text-xs font-semibold text-gray-700">
+                                        {filterNames(selectedPeople)}
                                     </span>
-                                ))}
+                                )}
                             </div>
                         )}
+                        {/* Announced rather than shown: the strip above says the
+                            same thing in colour and position. */}
+                        <p role="status" aria-live="polite" className="sr-only">{filterAnnouncement}</p>
                     </div>
                 </div>
             </div>
@@ -1901,128 +1949,87 @@ export function ViewPackingList() {
                         celebrations, so they fold away and leave the banner as the
                         last thing standing — the fold itself is the celebration.
                         Showing packed items brings them straight back. */}
-                    {/* Person view's cards are narrow and ragged, so they flow
-                        into masonry columns. A grid card is a table that has to
-                        be read across, so category view stacks them instead —
+                    {/* A grid card is a table that has to be read across, so the
+                        cards stack rather than flowing into masonry columns —
                         two abreast once there is room for two tables. */}
                     {!sectionsPackedAway && <div
-                        className={`${sectionsExiting ? 'sections-packing-away' : ''} ${viewMode === 'category' ? 'grid grid-cols-1 items-start gap-4 xl:grid-cols-2' : ''}`}
-                        style={viewMode === 'category' ? undefined : { columnWidth: '300px', columnGap: '1rem' }}
+                        id={LIST_SECTIONS_ID}
+                        className={`${sectionsExiting ? 'sections-packing-away' : ''} grid grid-cols-1 items-start gap-4 xl:grid-cols-2`}
                     >
                         {listSections.map((section) => {
-                            const { key: sectionKey, title, items, guestId } = section
-                            const isCategorySection = section.isCategory === true
-                            const stats = isCategorySection
-                                ? (categoryStats[sectionKey] ?? { packed: 0, total: 0 })
-                                : (sectionStats[sectionKey] ?? { packed: 0, total: 0 })
-                            const isGuest = guestId !== undefined
-                            const isShared = section.communal === true
+                            const { key: sectionKey, title, items } = section
+                            const unfilteredStats = categoryStats[sectionKey] ?? { packed: 0, total: 0 }
+                            // A card says what is on it. Under a filter that is
+                            // one person's part of the category, so the count
+                            // says whose — an unqualified "2 / 5" beside a page
+                            // total of "24 / 58" is a number with no referent.
+                            const stats = filtering ? filteredStatsFor(section) : unfilteredStats
                             const isLastMinute = section.lastMinute === true
+                            // A card is finished when the part of it on screen
+                            // is finished — packing for Alice, Toiletries is
+                            // done when hers are, whatever Bob still owes. The
+                            // fold-away is the one part of the celebration a
+                            // filter doesn't get: folding writes to storage, and
+                            // a filter used once would leave the list folded up
+                            // for good (see `completeSectionKeys`).
                             const isComplete = isSectionComplete(stats)
-                            const completeLabel = isShared ? 'shared items' : (isCategorySection || isLastMinute) ? title : section.name
-                            const collapseLabelTarget = isShared ? 'the shared items' : isLastMinute ? 'the last minute items' : isCategorySection ? title : `${section.name}'s`
-                            // The last minute card holds everybody's, so it groups
-                            // by person the way a category card does.
-                            // Category view arranges a section as a grid; person
-                            // view still folds each card into groups, and so does
-                            // the last minute card while it is being read by
-                            // person.
-                            const isGridSection = viewMode === 'category' && (isCategorySection || isLastMinute)
-                            const innerGroups: ItemGroup[] = isGridSection
-                                ? []
-                                : (isCategorySection || isLastMinute)
-                                    ? groupByPerson(items)
-                                    : groupByCategory(items, sectionOrder).map(({ label, items: groupItems }) => ({ key: label, label, items: groupItems }))
+                            const completeLabel = title
+                            const collapseLabelTarget = isLastMinute ? 'the last minute items' : title
+                            // Every card is a grid now: the name down the side,
+                            // the people across it. There are no groups folded
+                            // inside one any more — the people filter above the
+                            // cards is what narrows a card to somebody.
+                            const isGridSection = true
                             const isSectionCollapsed = collapsedSections.has(sectionKey)
-                            // Only a card that belongs to one person can wear
-                            // their colour: a category card holds everybody's.
-                            const sectionPersonColor = (isShared || isCategorySection || isLastMinute)
-                                ? undefined
-                                : personColor({ id: guestId ?? personIdByName.get(section.name) ?? '', name: section.name })
                             const sectionBorder = isComplete
                                 ? 'border-emerald-300 bg-emerald-50'
                                 // Amber, because the card is a reminder rather than
                                 // a pile: nothing in it can be dealt with yet.
                                 : isLastMinute
                                     ? 'border-amber-300 bg-amber-50'
-                                    : `bg-white ${sectionPersonColor?.border ?? (isShared ? 'border-blue-200' : 'border-gray-200')}`
+                                    : 'bg-white border-gray-200'
                             return (
-                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-3 shadow-sm transition-colors duration-300 sm:p-4 ${viewMode === 'category' ? '' : 'mb-4'} ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
+                            <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-3 shadow-sm transition-colors duration-300 sm:p-4 ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
                                 {/* The rule under the heading separates it from the items
                                     below; a folded card has none, so it would just be a
                                     line ruling off empty space. */}
                                 <div className={isSectionCollapsed ? undefined : 'mb-4 pb-2 border-b border-gray-200'}>
                                     <div className="flex flex-wrap items-center gap-1 min-h-[2rem]">
-                                        {isGuest && renamingGuestId === guestId ? (
-                                            <>
-                                                <span className="text-sm text-gray-400 px-1" aria-hidden>▼</span>
-                                                <input
-                                                    type="text"
-                                                    value={renamingGuestName}
-                                                    onChange={(e) => setRenamingGuestName(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') { e.preventDefault(); handleRenameGuest(guestId, renamingGuestName) }
-                                                        if (e.key === 'Escape') { setRenamingGuestId(null); setRenamingGuestName('') }
-                                                    }}
-                                                    onBlur={() => handleRenameGuest(guestId, renamingGuestName)}
-                                                    autoFocus
-                                                    className="flex-1 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-semibold text-gray-800"
-                                                />
-                                            </>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                aria-label={`${isSectionCollapsed ? 'Expand' : 'Collapse'} ${collapseLabelTarget} list`}
-                                                onClick={() => toggleSection(sectionKey)}
-                                                className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                                            >
-                                                <span className="shrink-0 text-sm text-gray-400">{isSectionCollapsed ? '▶' : '▼'}</span>
-                                                {sectionPersonColor && (
-                                                    <PersonAvatar name={section.name} color={sectionPersonColor} />
-                                                )}
-                                                <span className="text-xl font-semibold text-gray-800">{title}</span>
-                                                {/* Never let a count break across lines — "9 /" above "9" is
-                                                    a fraction the eye has to reassemble. */}
-                                                <span className="ml-1 shrink-0 whitespace-nowrap text-sm font-normal text-gray-500">{stats.packed} / {stats.total}</span>
-                                            </button>
-                                        )}
+                                        <button
+                                            type="button"
+                                            aria-label={`${isSectionCollapsed ? 'Expand' : 'Collapse'} ${collapseLabelTarget} list`}
+                                            onClick={() => toggleSection(sectionKey)}
+                                            className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                                        >
+                                            <span className="shrink-0 text-sm text-gray-400">{isSectionCollapsed ? '▶' : '▼'}</span>
+                                            <span className="text-xl font-semibold text-gray-800">{title}</span>
+                                            {/* Never let a count break across lines — "9 /" above "9" is
+                                                a fraction the eye has to reassemble. */}
+                                            <span className="ml-1 shrink-0 whitespace-nowrap text-sm font-normal text-gray-500">
+                                                {stats.packed} / {stats.total}{filterQualifier}
+                                            </span>
+                                        </button>
                                         {isComplete && (
                                             <span
-                                                aria-label={`All packed for ${completeLabel}`}
+                                                aria-label={`All packed for ${completeLabel}${filterQualifier}`}
                                                 className="animate-pop-in text-xs font-semibold text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0"
                                             >
                                                 🎉 All packed!
                                             </span>
                                         )}
-                                        {isShared && (
-                                            <span className="text-xs font-medium text-blue-700 bg-blue-100 rounded-full px-2 py-0.5 shrink-0" title="Packed once for the whole group">
-                                                👥 For everyone
-                                            </span>
-                                        )}
-                                        {isGuest && renamingGuestId !== guestId && (
-                                            <>
-                                                <span className="text-xs font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5 shrink-0">Guest</span>
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Rename ${section.name}`}
-                                                    onClick={() => { setRenamingGuestId(guestId); setRenamingGuestName(section.name) }}
-                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Remove ${section.name}`}
-                                                    onClick={() => setGuestToRemove(guestId)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                    </svg>
-                                                </button>
-                                            </>
+                                        {/* Used to sit on each folded group inside a card. The
+                                            groups have gone, so it works on the card — and with
+                                            the filter above, "check all of Alice's toiletries"
+                                            is this button with Alice selected. */}
+                                        {!isSectionCollapsed && stats.packed < stats.total && (
+                                            <button
+                                                type="button"
+                                                aria-label={`Check all${filterQualifier} in ${title}`}
+                                                onClick={() => handleCheckAll(checkableItemsOf(section))}
+                                                className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                                            >
+                                                Check all
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -2037,16 +2044,20 @@ export function ViewPackingList() {
                                         knows who, and asks which section; a section's card knows
                                         which section, and asks who. */}
                                     <div className="mb-4 pb-4 border-b border-gray-200">
+                                        {/* The card knows which section it is;
+                                            who it is for follows the filter when
+                                            the filter names one person, so an
+                                            item typed while packing Alice's bag
+                                            doesn't land somewhere she can't see
+                                            it. */}
                                         <AddItemComposer
-                                            personName={(isCategorySection || isLastMinute) ? '' : section.name}
-                                            personId={(isCategorySection || isLastMinute) ? '' : (guestId ?? personIdByName.get(section.name) ?? '')}
-                                            communal={section.communal}
-                                            category={isCategorySection ? categoryFromLabel(title) : undefined}
+                                            personName={solePerson?.name ?? ''}
+                                            personId={solePerson?.personId ?? ''}
+                                            category={isLastMinute ? undefined : categoryFromLabel(title)}
                                             lastMinute={isLastMinute}
-                                            categoryOptions={(isCategorySection || isLastMinute) ? undefined : sectionChoices}
-                                            peopleOptions={(isCategorySection || isLastMinute) ? sectionPeopleChoices : undefined}
+                                            peopleOptions={sectionPeopleChoices}
                                             suggestions={suggestionIndex}
-                                            targetLabel={isShared ? 'shared items' : isLastMinute ? 'last minute items' : isCategorySection ? title : `${section.name}'s items`}
+                                            targetLabel={isLastMinute ? 'last minute items' : title}
                                             onAdd={handleComposerAdd}
                                         />
                                     </div>
@@ -2058,6 +2069,7 @@ export function ViewPackingList() {
                                     {isGridSection && (
                                         <CategoryItemGrid
                                             columns={gridColumns}
+                                            visibleColumnKeys={visibleColumnKeys}
                                             rows={section.rows ?? []}
                                             personColor={personColor}
                                             packedById={watchedItems}
@@ -2072,247 +2084,20 @@ export function ViewPackingList() {
                                             onOpenRow={(row) => setOpenRowKeys({ sectionKey, rowKey: row.key, anchorItemId: row.items[0]?.id })}
                                         />
                                     )}
-                                    {!isGridSection && innerGroups.map(({ key: groupKey, label, items: catItems, communal: isSharedGroup }) => {
-                                        const categoryKey = `${sectionKey}::${groupKey}`
-                                        const isCollapsed = collapsedGroups.has(categoryKey)
-                                        // Counted over every item in the group, not the ones on
-                                        // screen: with packed items hidden, "2" next to a group
-                                        // seven-ninths done reads as a group barely started.
-                                        const groupStat = groupStats[categoryKey] ?? { packed: catItems.length, total: catItems.length }
-                                        // Both views end up describing the same place; only which
-                                        // half the card supplies changes.
-                                        const groupLabel = (isCategorySection || isLastMinute)
-                                            ? `${title} for ${isSharedGroup ? 'shared items' : label}`
-                                            : `${label} for ${isShared ? 'shared items' : section.name}`
-                                        const groupTarget: AddItemTarget = (isCategorySection || isLastMinute)
-                                            ? {
-                                                personName: isSharedGroup ? '' : label,
-                                                personId: isSharedGroup ? '' : (personIdByName.get(label) ?? ''),
-                                                communal: isSharedGroup,
-                                                // A last minute item's section is
-                                                // the last minute card itself.
-                                                ...(isLastMinute
-                                                    ? { lastMinute: true }
-                                                    : { category: categoryFromLabel(title) }),
-                                            }
-                                            : {
-                                                personName: section.name,
-                                                personId: guestId ?? personIdByName.get(section.name) ?? '',
-                                                communal: section.communal,
-                                                category: categoryFromLabel(label),
-                                            }
-                                        const composerOpen = openComposerKey === categoryKey
-                                        return (
-                                            <div key={categoryKey} className="mb-3">
-                                                <div className="flex items-center justify-between gap-2 py-1 mb-1">
-                                                    <button
-                                                        type="button"
-                                                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${label}`}
-                                                        onClick={() => toggleGroup(categoryKey)}
-                                                        className="flex items-center gap-1 text-left text-sm font-semibold text-gray-600 hover:text-gray-900"
-                                                    >
-                                                        <span>{isCollapsed ? '▶' : '▼'}</span>
-                                                        {/* A category card's groups are people, so each one
-                                                            gets the same mark its owner's card would have.
-                                                            The catch-all and shared groups are nobody's —
-                                                            the shared one says so instead. */}
-                                                        {isSharedGroup && (
-                                                            <span aria-hidden title="Packed once for the whole group">👥</span>
-                                                        )}
-                                                        {(isCategorySection || isLastMinute) && !isSharedGroup && label !== UNASSIGNED_LABEL && (
-                                                            <PersonAvatar
-                                                                name={label}
-                                                                color={personColor({ id: personIdByName.get(label) ?? '', name: label })}
-                                                                size="sm"
-                                                            />
-                                                        )}
-                                                        <span>{label}</span>
-                                                        <span className="ml-1 shrink-0 whitespace-nowrap text-xs font-normal text-gray-400">{groupStat.packed} / {groupStat.total}</span>
-                                                    </button>
-                                                    {!isCollapsed && (
-                                                        <div className="flex shrink-0 items-center gap-2">
-                                                            {/* Adding straight into a group is the whole point: the
-                                                                item lands where it was typed instead of falling
-                                                                into the catch-all section. */}
-                                                            <button
-                                                                type="button"
-                                                                aria-label={`Add item to ${groupLabel}`}
-                                                                aria-expanded={composerOpen}
-                                                                onClick={() => setOpenComposerKey(composerOpen ? null : categoryKey)}
-                                                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${composerOpen ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                                                            >
-                                                                {/* A section name is what the heading is for; on a
-                                                                    phone the word "Add" is what pushes it off. */}
-                                                                {isDesktop ? '+ Add' : '+'}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                aria-label="Check all"
-                                                                onClick={() => handleCheckAll(catItems)}
-                                                                className="text-xs text-blue-600 hover:text-blue-800"
-                                                            >
-                                                                Check all
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {!isCollapsed && composerOpen && (
-                                                    <div className="mb-2">
-                                                        <AddItemComposer
-                                                            personName={groupTarget.personName}
-                                                            personId={groupTarget.personId}
-                                                            communal={groupTarget.communal}
-                                                            category={groupTarget.category}
-                                                            lastMinute={groupTarget.lastMinute}
-                                                            suggestions={suggestionIndex}
-                                                            targetLabel={groupLabel}
-                                                            placeholder={`Add to ${label}...`}
-                                                            onAdd={handleComposerAdd}
-                                                            onClose={closeComposer}
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                )}
-                                                {!isCollapsed && (
-                                                    <div className="space-y-2">
-                                                        {catItems.map((item) => (
-                                                            <div
-                                                                key={`${item.id}-${sectionKey}`}
-                                                                data-testid={`item-row-${item.id}`}
-                                                                ref={(el) => {
-                                                                    if (el) itemRowRefs.current.set(item.id, el)
-                                                                    else itemRowRefs.current.delete(item.id)
-                                                                }}
-                                                                className={`relative rounded-lg p-3 transition-colors duration-1000 ${item.id === highlightedItem?.id ? 'bg-green-100 ring-2 ring-green-400' : 'bg-gray-50'} ${item.id === flourish?.itemId ? 'item-row-packed' : ''}`}
-                                                            >
-                                                                {item.id === flourish?.itemId && (
-                                                                    <span
-                                                                        key={flourish.nonce}
-                                                                        data-testid={`item-tick-${item.id}`}
-                                                                        aria-hidden="true"
-                                                                        // Themed green rather than text-green-600 — that class is the
-                                                                        // "Saved" indicator's, and the e2e suite waits on it by selector
-                                                                        // Anchored over the checkbox; the animation owns the transform,
-                                                                        // so no translate utilities here. Themed green rather than
-                                                                        // text-green-600 — that class belongs to the "Saved" indicator,
-                                                                        // which the e2e suite waits on by selector.
-                                                                        className="item-packed-tick pointer-events-none absolute left-[22px] top-1/2 z-10 text-xl font-bold text-success-600"
-                                                                    >
-                                                                        ✓
-                                                                    </span>
-                                                                )}
-                                                                <div className="flex items-center justify-between">
-                                                                    <label className="flex items-center space-x-3 cursor-pointer flex-1 min-w-0">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            {...register(`items.${item.id}`, {
-                                                                                onChange: (e) => handleItemToggle(item.id, e.target.checked),
-                                                                            })}
-                                                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                                                        />
-                                                                        {editingItemId === item.id ? (
-                                                                            <span
-                                                                                className="flex items-center gap-1 flex-1 min-w-0"
-                                                                                onBlur={(e) => {
-                                                                                    // Only save when focus leaves both the name and quantity inputs
-                                                                                    if (!e.currentTarget.contains(e.relatedTarget)) handleSaveEdit(item.id)
-                                                                                }}
-                                                                            >
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={editingItemText}
-                                                                                    onChange={(e) => setEditingItemText(e.target.value)}
-                                                                                    onKeyDown={(e) => {
-                                                                                        if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
-                                                                                        if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
-                                                                                    }}
-                                                                                    autoFocus
-                                                                                    aria-label="Edit item name"
-                                                                                    className="flex-1 min-w-0 px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
-                                                                                />
-                                                                                <input
-                                                                                    type="number"
-                                                                                    min={1}
-                                                                                    value={editingItemQuantity}
-                                                                                    onChange={(e) => setEditingItemQuantity(e.target.value)}
-                                                                                    onKeyDown={(e) => {
-                                                                                        if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(item.id) }
-                                                                                        if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit() }
-                                                                                    }}
-                                                                                    placeholder="Qty"
-                                                                                    aria-label="Edit item quantity"
-                                                                                    title="How many to pack (leave blank for no quantity)"
-                                                                                    className="w-12 sm:w-16 shrink-0 px-1.5 sm:px-2 py-1 border border-blue-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-700"
-                                                                                />
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span
-                                                                                className={watchedItems[item.id] ? 'text-gray-400 line-through' : 'text-gray-700'}
-                                                                                onDoubleClick={() => handleStartEdit(item)}
-                                                                            >
-                                                                                {item.itemText}
-                                                                                {item.quantity !== undefined && item.quantity > 1 && (
-                                                                                    <span className="ml-1.5 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full px-1.5 py-0.5 align-middle">
-                                                                                        ×{item.quantity}
-                                                                                    </span>
-                                                                                )}
-                                                                            </span>
-                                                                        )}
-                                                                    </label>
-                                                                    {editingItemId !== item.id && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleToggleLastMinute(item)}
-                                                                            aria-pressed={item.lastMinute === true}
-                                                                            aria-label={item.lastMinute
-                                                                                ? `Remove ${item.itemText} from the last minute items`
-                                                                                : `Mark ${item.itemText} as a last minute item`}
-                                                                            title={item.lastMinute
-                                                                                ? 'Packed with everything else after all'
-                                                                                : "Can't be packed until just before you go"}
-                                                                            className={`ml-1 rounded-md p-1 transition-colors hover:bg-amber-50 hover:text-amber-600 ${item.lastMinute ? 'text-amber-600' : 'text-gray-400'}`}
-                                                                        >
-                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.5 2.5a1 1 0 101.414-1.414L11 9.586V6z" clipRule="evenodd" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    )}
-                                                                    {editingItemId !== item.id && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleStartEdit(item)}
-                                                                            className="ml-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1 transition-colors"
-                                                                            title="Edit item"
-                                                                        >
-                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    )}
-                                                                    {editingItemId !== item.id && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setItemToDelete(item.id)}
-                                                                        className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md p-1 transition-colors"
-                                                                        title="Delete item"
-                                                                    >
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                                        </svg>
-                                                                    </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
                                 </div>}
                             </div>
                         )})}
                     </div>}
+                    {!sectionsPackedAway && listSections.length === 0 && filtering && (
+                        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center">
+                            <p className="text-sm font-medium text-gray-700">
+                                Nothing on this list is{filterQualifier} yet.
+                            </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Clear the filter to add the first thing{filterQualifier}, or pick somebody else.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

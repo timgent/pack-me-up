@@ -87,10 +87,17 @@ export const AddItemComposer = memo(function AddItemComposer({
     const [chosenCategory, setChosenCategory] = useState(category ?? UNCATEGORISED_LABEL)
     // Held by name, not id: custom items carry no person id, so a name is the
     // only thing that identifies a person on every list.
-    const [chosenPersonName, setChosenPersonName] = useState(personName)
+    //
+    // Null until the picker is used, so that until then the composer follows
+    // whoever the page says it is for. The list view moves that with the people
+    // filter, and a composer that had latched onto the person named at mount
+    // would file an item for the wrong one — silently, since a filtered-out item
+    // has nowhere on screen to appear.
+    const [chosenPersonName, setChosenPersonName] = useState<string | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    const person: PersonOption = peopleOptions?.find(p => p.name === chosenPersonName)
+    const wantedName = chosenPersonName ?? personName
+    const person: PersonOption = peopleOptions?.find(p => p.name === wantedName)
         ?? peopleOptions?.[0]
         ?? { name: personName, id: personId }
 

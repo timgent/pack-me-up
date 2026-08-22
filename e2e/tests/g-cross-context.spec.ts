@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, GUSER_EMAIL, GUSER_PASSWORD } from '../../playwright.config'
+import { expandAllSections, firstItemChip } from '../helpers/packing-list'
 
 // G tests share the same pod user. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -44,11 +45,14 @@ test.describe('G – Cross-context Pod Sync', () => {
     await page.getByPlaceholder('Enter a name for your packing list').fill(name)
     await page.getByRole('button', { name: 'Create Packing List' }).click()
     await page.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
+    // The cards are categories now, so even a one-person list is long enough
+    // to arrive folded — and a folded card holds no chips to click.
+    await expandAllSections(page)
   }
 
   // Sync to Pod by checking an item. Green indicator disappearing confirms pod PUT is done.
   async function syncToPod() {
-    await page.locator('input[type="checkbox"]').first().click()
+    await firstItemChip(page).click()
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
   }

@@ -5,6 +5,7 @@ import {
     saveListViewPreferences,
     listViewPreferencesKey,
     hasStoredListViewPreferences,
+    hasStalePersonViewSections,
 } from './listViewPreferences'
 
 describe('listViewPreferences', () => {
@@ -27,17 +28,15 @@ describe('listViewPreferences', () => {
 
         it('reads back what was saved', () => {
             saveListViewPreferences('list-1', {
-                viewMode: 'category',
                 showPacked: true,
-                collapsedSections: ['Alice', '__shared__'],
-                collapsedGroups: ['Alice::Clothes'],
+                collapsedSections: ['Toiletries', '__last_minute__'],
+                collapsedGroups: ['Toiletries::Alice'],
             })
 
             expect(loadListViewPreferences('list-1')).toEqual({
-                viewMode: 'category',
                 showPacked: true,
-                collapsedSections: ['Alice', '__shared__'],
-                collapsedGroups: ['Alice::Clothes'],
+                collapsedSections: ['Toiletries', '__last_minute__'],
+                collapsedGroups: ['Toiletries::Alice'],
             })
         })
 
@@ -61,16 +60,18 @@ describe('listViewPreferences', () => {
             expect(loadListViewPreferences('list-1')).toEqual(DEFAULT_LIST_VIEW_PREFERENCES)
         })
 
-        it('reads a list left in the old "question" view as the category view', () => {
-            localStorage.setItem(listViewPreferencesKey('list-1'), JSON.stringify({ viewMode: 'question' }))
+        it('drops the view mode entries written before the toggle was removed', () => {
+            localStorage.setItem(
+                listViewPreferencesKey('list-1'),
+                JSON.stringify({ viewMode: 'person', showPacked: true, collapsedSections: ['Toiletries'] }),
+            )
 
-            expect(loadListViewPreferences('list-1').viewMode).toBe('category')
-        })
+            const prefs = loadListViewPreferences('list-1')
 
-        it('ignores a view mode it does not recognise', () => {
-            localStorage.setItem(listViewPreferencesKey('list-1'), JSON.stringify({ viewMode: 'sideways' }))
-
-            expect(loadListViewPreferences('list-1').viewMode).toBe('person')
+            expect(prefs).not.toHaveProperty('viewMode')
+            // Everything alongside it still survives the read.
+            expect(prefs.showPacked).toBe(true)
+            expect(prefs.collapsedSections).toEqual(['Toiletries'])
         })
 
         it('ignores collapsed keys that are not strings', () => {
@@ -158,5 +159,25 @@ describe('listViewPreferences', () => {
 
             expect(hasStoredListViewPreferences('list-1')).toBe(false)
         })
+    })
+})
+
+describe('hasStalePersonViewSections', () => {
+    const sections = ['Toiletries', 'Clothes', '__last_minute__']
+
+    it('spots fold state left behind by the old person view', () => {
+        const prefs = { ...DEFAULT_LIST_VIEW_PREFERENCES, collapsedSections: ['Alice', 'Bob'] }
+
+        expect(hasStalePersonViewSections(prefs, sections)).toBe(true)
+    })
+
+    it('leaves alone fold state that still names a card', () => {
+        const prefs = { ...DEFAULT_LIST_VIEW_PREFERENCES, collapsedSections: ['Alice', 'Clothes'] }
+
+        expect(hasStalePersonViewSections(prefs, sections)).toBe(false)
+    })
+
+    it('is not stale when nothing was folded — that is a choice, not a leftover', () => {
+        expect(hasStalePersonViewSections(DEFAULT_LIST_VIEW_PREFERENCES, sections)).toBe(false)
     })
 })

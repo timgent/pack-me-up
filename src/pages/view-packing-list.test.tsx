@@ -112,105 +112,27 @@ function renderComponent() {
     )
 }
 
-// The list view remembers how it was left (folded sections, view mode, whether
-// packed items are showing) per list id in localStorage. Tests reuse the same
+/**
+ * A row of the category grid, by the button carrying its name.
+ *
+ * Not `getByText`: a row's name is split so that its last word can hold on to
+ * the chevron (see `splitLastWord`), so any name of more than one word is more
+ * than one text node.
+ */
+function row(itemText: string) {
+    return screen.getByRole('button', { name: `Edit ${itemText}` })
+}
+
+/** The chip that packs one person's copy of an item — the grid's checkbox. */
+function chipFor(itemText: string, person: string) {
+    return screen.getByRole('checkbox', { name: `${itemText} for ${person}` })
+}
+
+// The list view remembers how it was left (folded sections, whether packed
+// items are showing) per list id in localStorage. Tests reuse the same
 // ids, so without this each one inherits the last one's folded sections.
 beforeEach(() => {
     localStorage.clear()
-})
-
-describe('ViewPackingList item deletion confirmation', () => {
-    beforeEach(() => {
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: false,
-            session: null,
-            webId: undefined,
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockUsePodSync.mockReturnValue({
-            saveToPod: vi.fn(),
-        })
-        mockUseSyncCoordinator.mockReturnValue({
-            syncingFromPod: false,
-            handleSyncSuccess: vi.fn(),
-            handleSyncError: vi.fn(),
-            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
-        })
-        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
-    })
-
-    afterEach(() => {
-        vi.restoreAllMocks()
-    })
-
-    it('does not immediately delete item when X is clicked', async () => {
-        renderComponent()
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Delete item'))
-
-        expect(screen.getByText('Passport')).toBeTruthy()
-    })
-
-    it('shows confirmation dialog when X is clicked', async () => {
-        renderComponent()
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Delete item'))
-
-        expect(screen.getByText('Are you sure you want to remove this item?')).toBeTruthy()
-    })
-
-    it('does not delete item when Cancel is clicked in confirmation dialog', async () => {
-        renderComponent()
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Delete item'))
-        fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
-
-        expect(screen.getByText('Passport')).toBeTruthy()
-        expect(screen.queryByText('Are you sure you want to remove this item?')).toBeNull()
-    })
-
-    it('deletes item when Remove is clicked in confirmation dialog', async () => {
-        renderComponent()
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Delete item'))
-        fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
-
-        await waitFor(() => {
-            expect(screen.queryByText('Passport')).toBeNull()
-        })
-    })
-
-    it('removes the row without waiting for the save to come back', async () => {
-        // A save that never settles — stands in for a slow phone, or a pod on
-        // the end of a bad connection. The row still has to go straight away.
-        mockUseDatabase.mockReturnValue({
-            db: {
-                ...makeDb(),
-                savePackingList: vi.fn(() => new Promise(() => {})),
-            } as unknown as PackingAppDatabase,
-        })
-
-        renderComponent()
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Delete item'))
-        fireEvent.click(screen.getByRole('button', { name: /^remove$/i }))
-
-        await waitFor(() => {
-            expect(screen.queryByText('Passport')).toBeNull()
-        })
-    })
 })
 
 const multiCategoryPackingList = {
@@ -268,14 +190,14 @@ describe('ViewPackingList category grouping', () => {
 
     it('renders category headings within a person card', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
         expect(screen.getAllByRole('button', { name: /Collapse Essentials/i }).length).toBeGreaterThan(0)
         expect(screen.getByRole('button', { name: /Collapse Hiking/i })).toBeTruthy()
     })
 
     it('shows items without category under "Other"', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Legacy item')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Legacy item' })).toBeTruthy())
         expect(screen.getByRole('button', { name: /Collapse Other/i })).toBeTruthy()
     })
 
@@ -301,7 +223,7 @@ describe('ViewPackingList category grouping', () => {
 
     it('shows a "Check all" button per category section', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
         // 3 expanded categories (Essentials for Alice, Hiking, Other) plus Essentials for Bob = 4
         const checkAllButtons = screen.getAllByRole('button', { name: /check all/i })
         expect(checkAllButtons.length).toBeGreaterThanOrEqual(1)
@@ -318,117 +240,18 @@ describe('ViewPackingList category grouping', () => {
         })
     })
 
-    it('renders Essentials category independently for each person', async () => {
+    it('gives a category one card, with everyone who needs something in it on it', async () => {
+        // Two people both have an Essentials item. The old person view gave the
+        // category a heading inside each of their cards; the grid writes the
+        // name once and puts the people across it.
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        const essentialsToggles = screen.getAllByRole('button', { name: /Collapse Essentials/i })
-        expect(essentialsToggles.length).toBe(2)
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
+
+        expect(screen.getAllByRole('button', { name: /Collapse Essentials/i }).length).toBe(1)
+        expect(screen.getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
+        expect(screen.getByRole('checkbox', { name: 'Nappies for Bob' })).toBeTruthy()
     })
 })
-
-describe('ViewPackingList person/category view toggle', () => {
-    beforeEach(() => {
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: false,
-            session: null,
-            webId: undefined,
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
-        mockUseSyncCoordinator.mockReturnValue({
-            syncingFromPod: false,
-            handleSyncSuccess: vi.fn(),
-            handleSyncError: vi.fn(),
-            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...multiCategoryPackingList, _rev: '2' }),
-        })
-        mockUseDatabase.mockReturnValue({ db: makeDbMultiCategory() as unknown as PackingAppDatabase })
-    })
-
-    afterEach(() => {
-        vi.restoreAllMocks()
-    })
-
-    it('defaults to person view, showing person section titles', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        expect(screen.getByText("Alice's Items")).toBeTruthy()
-        expect(screen.getByText("Bob's Items")).toBeTruthy()
-    })
-
-    it('switches to category view, showing category section titles', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-
-        // Top-level sections are now categories, not people
-        expect(screen.queryByText("Alice's Items")).toBeNull()
-        expect(screen.queryByText("Bob's Items")).toBeNull()
-        expect(screen.getAllByText('Essentials').length).toBeGreaterThan(0)
-        expect(screen.getByText('Hiking')).toBeTruthy()
-        expect(screen.getByText('Toothbrush')).toBeTruthy()
-        expect(screen.getByText('Nappies')).toBeTruthy()
-    })
-
-    it('writes each item once, with a chip per person', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-
-        // One key for the page, naming everyone in the order the chips sit in
-        const key = within(screen.getByTestId('people-key'))
-        expect(key.getByText('Alice')).toBeTruthy()
-        expect(key.getByText('Bob')).toBeTruthy()
-
-        // Toothbrush is Alice's alone: she has a chip, Bob has a gap
-        const essentials = screen.getAllByTestId('list-section')[0]
-        expect(within(essentials).getByRole('checkbox', { name: 'Toothbrush for Alice' })).toBeTruthy()
-        expect(within(essentials).queryByRole('checkbox', { name: 'Toothbrush for Bob' })).toBeNull()
-        expect(within(essentials).getByTitle("Bob doesn't need this — open to change")).toBeTruthy()
-        expect(within(essentials).getByRole('checkbox', { name: 'Nappies for Bob' })).toBeTruthy()
-    })
-
-    it('packs an item from its cell', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-
-        const cell = screen.getByRole('checkbox', { name: 'Toothbrush for Alice' }) as HTMLInputElement
-        fireEvent.click(cell)
-
-        await waitFor(() => expect(
-            (screen.getByRole('checkbox', { name: 'Toothbrush for Alice' }) as HTMLInputElement).checked,
-        ).toBe(true))
-    })
-
-    it('keeps the key to itself — nothing in it can be pressed', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-
-        // A key that packs a person's whole category on a stray tap is a
-        // hazard, not a shortcut; person view has a labelled button for that.
-        expect(within(screen.getByTestId('people-key')).queryAllByRole('button')).toEqual([])
-        expect(within(screen.getByTestId('people-key')).queryAllByRole('checkbox')).toEqual([])
-    })
-
-    it('switches back to person view', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
-        await waitFor(() => expect(screen.getByText('Hiking')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: 'Person View' }))
-        expect(screen.getByText("Alice's Items")).toBeTruthy()
-        expect(screen.getByText("Bob's Items")).toBeTruthy()
-    })
-})
-
-// ─── The category grid: an item down the side, the people across the top ────
 
 describe('ViewPackingList category grid', () => {
     // Alice and Bob both need a toothbrush; only Bob has nappies. One name, two
@@ -482,7 +305,6 @@ describe('ViewPackingList category grid', () => {
             </MemoryRouter>
         )
         await waitFor(() => expect(screen.getAllByText('Toothbrush').length).toBeGreaterThan(0))
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
     }
 
     function checkbox(name: string): HTMLInputElement {
@@ -792,8 +614,7 @@ describe('ViewPackingList hidden items banner', () => {
             { id: 'item-2', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false },
         ],
     }
-    const checkPassport = () =>
-        fireEvent.click(screen.getByText('Passport').closest('label')!.querySelector('input')!)
+    const checkPassport = () => fireEvent.click(chipFor('Passport', 'Alice'))
 
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
@@ -966,24 +787,39 @@ describe('progress indicators', () => {
         expect(screen.getByText(/2 \/ 4 packed \(50%\)/)).toBeTruthy()
     })
 
-    it('shows per-person packed count in each column header', async () => {
+    it("shows a person's own progress on their chip once they are the one being packed for", async () => {
         renderProgressComponent()
-        await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
+        await waitFor(() => expect(row('Sunscreen')).toBeTruthy())
 
-        // The groups inside each card carry counts of their own, so the
-        // assertion is scoped to the section headers themselves.
-        expect(screen.getByRole('button', { name: /collapse alice's list/i }).textContent).toContain('1 / 2')
-        expect(screen.getByRole('button', { name: /collapse bob's list/i }).textContent).toContain('1 / 2')
+        // Unselected chips carry no numbers: every chip carrying them makes the
+        // strip twice as long, and a chip that grows when pressed moves the one
+        // beside it out from under the finger going there next.
+        expect(screen.getByRole('button', { name: /^Alice/ }).textContent).not.toContain('1/2')
+
+        fireEvent.click(screen.getByRole('button', { name: /^Alice/ }))
+
+        expect(screen.getByRole('button', { name: /^Alice/ }).textContent).toContain('1/2')
     })
 
-    it('counts every item in a group, not just the ones on screen', async () => {
+    it('counts every item in a section, not just the ones on screen', async () => {
         renderProgressComponent()
-        await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
+        await waitFor(() => expect(row('Sunscreen')).toBeTruthy())
 
-        // Alice's packed Passport is hidden, but her "Other" group is still
-        // half done — showing "1" there would read as a group barely started.
-        const aliceGroup = screen.getAllByRole('button', { name: /collapse other/i })[0]
-        expect(aliceGroup.textContent).toContain('1 / 2')
+        // The packed items are hidden, but the section is still half done —
+        // showing "0 / 2" there would read as a section barely started.
+        expect(screen.getByRole('button', { name: /collapse other list/i }).textContent).toContain('2 / 4')
+    })
+
+    it('counts only the filtered person once the list is narrowed to them', async () => {
+        renderProgressComponent()
+        await waitFor(() => expect(row('Sunscreen')).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: /^Alice/ }))
+
+        // And says whose: an unqualified "1 / 2" beside a page total of "2 / 4"
+        // is a number with no referent.
+        expect(screen.getByRole('button', { name: /collapse other list/i }).textContent)
+            .toContain('1 / 2 for Alice')
     })
 })
 
@@ -1062,7 +898,7 @@ describe('packing progress bar and milestones', () => {
 
     it('leaves the bar empty when nothing is packed', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
 
         expect(screen.getByTestId('packing-progress-fill').style.width).toBe('0%')
     })
@@ -1079,7 +915,7 @@ describe('packing progress bar and milestones', () => {
 
     it('grows the bar as items are packed', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 4)
@@ -1089,7 +925,7 @@ describe('packing progress bar and milestones', () => {
 
     it('says nothing encouraging before the first milestone', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 1)
@@ -1100,7 +936,7 @@ describe('packing progress bar and milestones', () => {
 
     it('cheers the user on at each milestone', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 2)
@@ -1115,7 +951,7 @@ describe('packing progress bar and milestones', () => {
 
     it('does not flicker the milestone when a single item is toggled around the boundary', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 2)
@@ -1135,7 +971,7 @@ describe('packing progress bar and milestones', () => {
 
     it('drops the milestone once progress falls well below it', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 2)
@@ -1149,7 +985,7 @@ describe('packing progress bar and milestones', () => {
 
     it('hands over to the all-packed treatment at 100%', async () => {
         setup(eightItemList)
-        await waitFor(() => expect(screen.getByText('Item 0')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Item 0' })).toBeTruthy())
         keepPackedItemsVisible()
 
         toggleItems(0, 8)
@@ -1196,8 +1032,8 @@ describe('ViewPackingList checked item styling', () => {
         fireEvent.click(screen.getByRole('checkbox'))
 
         await waitFor(() => {
-            const span = screen.getByText('Passport')
-            expect(span.className).toContain('line-through')
+            // The name's own span, inside the button that opens the row panel
+            expect(row('Passport').querySelector('span')!.className).toContain('line-through')
         })
     })
 
@@ -1245,9 +1081,10 @@ describe('ViewPackingList new item feedback', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
         await waitFor(() => {
-            const span = screen.getByText('Sunscreen')
-            const row = span.closest('div.rounded-lg')
-            expect(row?.className).toContain('ring-green-400')
+            const added = screen.getAllByTestId(/^grid-cell-/).find(
+                cell => cell.getAttribute('title') === 'Sunscreen for Alice',
+            )
+            expect(added!.className).toContain('ring-green-400')
         })
     })
 
@@ -1273,101 +1110,6 @@ describe('ViewPackingList new item feedback', () => {
 
         await waitFor(() => expect(screen.getByText('Sunscreen')).toBeTruthy())
         await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
-    })
-})
-
-describe('ViewPackingList inline item editing', () => {
-    let db: ReturnType<typeof makeDb>
-
-    beforeEach(() => {
-        db = makeDb()
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: false,
-            session: null,
-            webId: undefined,
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockUsePodSync.mockReturnValue({
-            saveToPod: vi.fn(),
-        })
-        mockUseSyncCoordinator.mockReturnValue({
-            syncingFromPod: false,
-            handleSyncSuccess: vi.fn(),
-            handleSyncError: vi.fn(),
-            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
-        })
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
-    })
-
-    afterEach(() => {
-        vi.restoreAllMocks()
-    })
-
-    it('double-clicking item text enters edit mode with current value', async () => {
-        renderComponent()
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.dblClick(screen.getByText('Passport'))
-
-        const input = screen.getByRole('textbox', { name: /edit item name/i })
-        expect(input).toBeTruthy()
-        expect((input as HTMLInputElement).value).toBe('Passport')
-    })
-
-    it('clicking pencil icon enters edit mode', async () => {
-        renderComponent()
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Edit item'))
-
-        expect(screen.getByRole('textbox', { name: /edit item name/i })).toBeTruthy()
-    })
-
-    it('pressing Enter saves renamed item and exits edit mode', async () => {
-        renderComponent()
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Edit item'))
-        const input = screen.getByRole('textbox', { name: /edit item name/i })
-        fireEvent.change(input, { target: { value: 'Sunscreen SPF50' } })
-        fireEvent.keyDown(input, { key: 'Enter' })
-
-        await waitFor(() => expect(screen.getByText('Sunscreen SPF50')).toBeTruthy())
-        expect(db.savePackingList).toHaveBeenCalledWith(
-            expect.objectContaining({
-                items: expect.arrayContaining([
-                    expect.objectContaining({ id: 'item-1', itemText: 'Sunscreen SPF50' }),
-                ]),
-            })
-        )
-    })
-
-    it('pressing Escape cancels edit and restores original name', async () => {
-        renderComponent()
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Edit item'))
-        const input = screen.getByRole('textbox', { name: /edit item name/i })
-        fireEvent.change(input, { target: { value: 'Bogus' } })
-        fireEvent.keyDown(input, { key: 'Escape' })
-
-        expect(screen.getByText('Passport')).toBeTruthy()
-        expect(db.savePackingList).not.toHaveBeenCalled()
-    })
-
-    it('clearing all text and pressing Enter does not save and restores original name', async () => {
-        renderComponent()
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-
-        fireEvent.click(screen.getByTitle('Edit item'))
-        const input = screen.getByRole('textbox', { name: /edit item name/i })
-        fireEvent.change(input, { target: { value: '' } })
-        fireEvent.keyDown(input, { key: 'Enter' })
-
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        expect(db.savePackingList).not.toHaveBeenCalled()
     })
 })
 
@@ -1439,14 +1181,16 @@ describe('ViewPackingList item quantities', () => {
 
     it('edit mode pre-fills the quantity and saves an updated value', async () => {
         renderComponent()
-        await waitFor(() => expect(screen.getByText('Socks')).toBeTruthy())
+        await waitFor(() => expect(row('Socks')).toBeTruthy())
 
-        fireEvent.dblClick(screen.getByText('Socks'))
-        const quantityInput = screen.getByRole('spinbutton', { name: /edit item quantity/i })
+        // Quantities live in the row's panel, reached through its name
+        fireEvent.click(row('Socks'))
+        const quantityInput = screen.getByRole('spinbutton', { name: /quantity for alice/i })
         expect((quantityInput as HTMLInputElement).value).toBe('3')
 
         fireEvent.change(quantityInput, { target: { value: '5' } })
         fireEvent.keyDown(quantityInput, { key: 'Enter' })
+        fireEvent.blur(quantityInput)
 
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -1459,24 +1203,25 @@ describe('ViewPackingList item quantities', () => {
 
     it('clearing the quantity removes it from the item', async () => {
         renderComponent()
-        await waitFor(() => expect(screen.getByText('Socks')).toBeTruthy())
+        await waitFor(() => expect(row('Socks')).toBeTruthy())
 
-        fireEvent.dblClick(screen.getByText('Socks'))
-        const quantityInput = screen.getByRole('spinbutton', { name: /edit item quantity/i })
+        // Quantities live in the row's panel, reached through its name
+        fireEvent.click(row('Socks'))
+        const quantityInput = screen.getByRole('spinbutton', { name: /quantity for alice/i })
         fireEvent.change(quantityInput, { target: { value: '' } })
         fireEvent.keyDown(quantityInput, { key: 'Enter' })
+        fireEvent.blur(quantityInput)
 
-        await waitFor(() => expect(db.savePackingList).toHaveBeenCalledWith(
-            expect.objectContaining({
-                items: expect.arrayContaining([
-                    expect.objectContaining({ id: 'item-socks', quantity: undefined }),
-                ]),
-            })
-        ))
+        // The panel drops the key rather than storing an undefined against it
+        await waitFor(() => {
+            const saved = db.savePackingList.mock.calls.at(-1)![0] as { items: PackingListItem[] }
+            const socks = saved.items.find(item => item.id === 'item-socks')!
+            expect(socks).not.toHaveProperty('quantity')
+        })
     })
 })
 
-describe('ViewPackingList expandable person sections', () => {
+describe('ViewPackingList expandable sections', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
@@ -1500,43 +1245,48 @@ describe('ViewPackingList expandable person sections', () => {
         vi.restoreAllMocks()
     })
 
-    it('person sections are expanded by default', async () => {
+    it('sections are expanded by default', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        expect(screen.getByText('Toothbrush')).toBeTruthy()
-        expect(screen.getByText('Nappies')).toBeTruthy()
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
+        expect(screen.getByRole('button', { name: 'Edit Nappies' })).toBeTruthy()
     })
 
-    it('clicking person header collapses that person section', async () => {
+    it('clicking a section header collapses that section', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
-        expect(screen.queryByText('Toothbrush')).toBeNull()
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: /collapse essentials list/i }))
+
+        expect(screen.queryByRole('button', { name: 'Edit Toothbrush' })).toBeNull()
     })
 
-    it('collapsing one person section does not affect another', async () => {
+    it('collapsing one section does not affect another', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
-        expect(screen.getByText('Nappies')).toBeTruthy()
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Tent' })).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: /collapse essentials list/i }))
+
+        expect(screen.getByRole('button', { name: 'Edit Tent' })).toBeTruthy()
     })
 
-    it('clicking a collapsed person header expands their section', async () => {
+    it('clicking a collapsed section header expands it again', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
-        fireEvent.click(screen.getByRole('button', { name: /expand alice's list/i }))
-        expect(screen.getByText('Toothbrush')).toBeTruthy()
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
+
+        fireEvent.click(screen.getByRole('button', { name: /collapse essentials list/i }))
+        fireEvent.click(screen.getByRole('button', { name: /expand essentials list/i }))
+
+        expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy()
     })
 
-    it('add-item input is hidden when person section is collapsed', async () => {
+    it('hides the add-item input when the section is collapsed', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        const addInputs = screen.getAllByPlaceholderText('Add new item...')
-        expect(addInputs.length).toBeGreaterThan(0)
-        fireEvent.click(screen.getByRole('button', { name: /collapse alice's list/i }))
-        const remainingInputs = screen.getAllByPlaceholderText('Add new item...')
-        expect(remainingInputs.length).toBeLessThan(addInputs.length)
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
+        const before = screen.getAllByPlaceholderText('Add new item...').length
+
+        fireEvent.click(screen.getByRole('button', { name: /collapse essentials list/i }))
+
+        expect(screen.getAllByPlaceholderText('Add new item...').length).toBeLessThan(before)
     })
 })
 
@@ -1988,139 +1738,7 @@ const communalPackingList = {
     ],
 }
 
-describe('ViewPackingList shared (communal) section', () => {
-    beforeEach(() => {
-        mockUseSolidPod.mockReturnValue({
-            isLoggedIn: false,
-            session: null,
-            webId: undefined,
-            isLoading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-        })
-        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
-        mockUseSyncCoordinator.mockReturnValue({
-            syncingFromPod: false,
-            handleSyncSuccess: vi.fn(),
-            handleSyncError: vi.fn(),
-            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...communalPackingList, _rev: '2' }),
-        })
-    })
-
-    afterEach(() => {
-        vi.restoreAllMocks()
-    })
-
-    function renderCommunal(list = communalPackingList) {
-        const db = {
-            getPackingList: vi.fn().mockResolvedValue(list),
-            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
-        }
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
-        render(
-            <MemoryRouter initialEntries={[`/view-list/${list.id}`]}>
-                <Routes>
-                    <Route path="/view-list/:id" element={<ViewPackingList />} />
-                </Routes>
-            </MemoryRouter>
-        )
-        return db
-    }
-
-    it('renders communal items in a Shared Items section', async () => {
-        renderCommunal()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        expect(screen.getByText('Shared Items')).toBeTruthy()
-        expect(screen.getByText('First aid kit')).toBeTruthy()
-        // Per-person items still appear under the person
-        expect(screen.getByText("Alice's Items")).toBeTruthy()
-        expect(screen.getByText('Sleeping bag')).toBeTruthy()
-    })
-
-    it('celebrates the Shared Items section when all communal items are packed', async () => {
-        renderCommunal({
-            ...communalPackingList,
-            items: communalPackingList.items.map(i => i.communal ? { ...i, packed: true } : i),
-        })
-        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
-        // Packed items are hidden by default, but the fully-packed shared section
-        // stays put with its celebration, just like a fully-packed person's section
-        expect(screen.getByText('Shared Items')).toBeTruthy()
-        expect(screen.getByLabelText(/all packed for shared items/i)).toBeTruthy()
-
-        // Showing packed items reveals the items themselves again
-        fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-        expect(screen.getByText('Tent')).toBeTruthy()
-    })
-
-    it('does not render a Shared Items section when there are no communal items', async () => {
-        renderCommunal({ ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) })
-        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
-        expect(screen.queryByText('Shared Items')).toBeNull()
-    })
-
-    it('shows shared packed stats in the section header', async () => {
-        renderCommunal()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        const header = screen.getByRole('button', { name: /collapse the shared items list/i })
-        expect(header.textContent).toContain('0 / 2')
-    })
-
-    it('collapsing the shared section hides its items but not person items', async () => {
-        renderCommunal()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /collapse the shared items list/i }))
-        expect(screen.queryByText('Tent')).toBeNull()
-        expect(screen.getByText('Sleeping bag')).toBeTruthy()
-    })
-
-    it('"+ Add Shared Items" reveals an empty shared section and is hidden once the section exists', async () => {
-        const db = renderCommunal({ ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) })
-        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
-        expect(screen.queryByText('Shared Items')).toBeNull()
-
-        fireEvent.click(screen.getByRole('button', { name: /add shared items/i }))
-
-        expect(screen.getByText('Shared Items')).toBeTruthy()
-        expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
-
-        // Adding an item through the revealed section creates a communal item
-        const inputs = screen.getAllByPlaceholderText('Add new item...')
-        fireEvent.change(inputs[0], { target: { value: 'Tent' } })
-        fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
-
-        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
-        const savedList = db.savePackingList.mock.calls[0][0]
-        const added = savedList.items.find((i: { itemText: string }) => i.itemText === 'Tent')
-        expect(added.communal).toBe(true)
-    })
-
-    it('does not show "+ Add Shared Items" when the list already has communal items', async () => {
-        renderCommunal()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
-    })
-
-    it('adding an item in the shared section creates a communal item', async () => {
-        const db = renderCommunal()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-
-        // Shared section is rendered first
-        const inputs = screen.getAllByPlaceholderText('Add new item...')
-        fireEvent.change(inputs[0], { target: { value: 'Camping stove' } })
-        fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[0])
-
-        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
-        const savedList = db.savePackingList.mock.calls[0][0]
-        const added = savedList.items.find((i: { itemText: string }) => i.itemText === 'Camping stove')
-        expect(added).toBeTruthy()
-        expect(added.communal).toBe(true)
-        expect(added.personId).toBe('')
-        expect(added.personName).toBe('')
-    })
-})
-
-describe('ViewPackingList shared (communal) items in category view', () => {
+describe('ViewPackingList shared (communal) items', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
             isLoggedIn: false,
@@ -2156,8 +1774,9 @@ describe('ViewPackingList shared (communal) items in category view', () => {
                 </Routes>
             </MemoryRouter>
         )
-        await waitFor(() => expect(screen.getByText('Sleeping bag')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
+        // By the row's button rather than by its text: a row's name is split so
+        // its last word can hold on to the chevron — see `splitLastWord`.
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Sleeping bag' })).toBeTruthy())
         return db
     }
 
@@ -2189,7 +1808,7 @@ describe('ViewPackingList shared (communal) items in category view', () => {
         // No column belongs to it, and it comes first — the shared card's place
         // in person view, kept
         expect(camping.getAllByTestId('grid-row')[0].textContent).toContain('Tent')
-        expect(camping.getByText('👥 Everyone')).toBeTruthy()
+        expect(camping.getByText('👥 Shared')).toBeTruthy()
     })
 
     it('counts shared items in the section total', async () => {
@@ -2244,21 +1863,13 @@ describe('ViewPackingList shared (communal) items in category view', () => {
         expect(added.communal).toBeUndefined()
     })
 
-    it('hides the "+ Add Shared Items" reveal, which belongs to person view', async () => {
+    it('offers no separate shared card to reveal — a shared item belongs to its section', async () => {
         const listWithoutCommunal = { ...communalPackingList, items: communalPackingList.items.filter(i => !i.communal) }
         await renderInQuestionView(listWithoutCommunal)
 
         expect(screen.queryByRole('button', { name: /add shared items/i })).toBeNull()
     })
 
-    it('keeps the Shared Items card in person view', async () => {
-        await renderInQuestionView()
-
-        fireEvent.click(screen.getByRole('button', { name: 'Person View' }))
-
-        expect(screen.getByText('Shared Items')).toBeTruthy()
-        expect(screen.getByText('Tent')).toBeTruthy()
-    })
 })
 
 describe('grouping honours generated item order', () => {
@@ -2518,6 +2129,7 @@ describe('ViewPackingList section completion celebration', () => {
             { id: 'a2', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: true },
             { id: 'b1', itemText: 'Wellies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: true },
             { id: 'b2', itemText: 'Toothbrush', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: false },
+            { id: 'a3', itemText: 'Comb', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: true },
         ],
     }
 
@@ -2560,48 +2172,50 @@ describe('ViewPackingList section completion celebration', () => {
         )
     }
 
-    it("keeps a fully packed person's section visible while packed items are hidden", async () => {
+    it('keeps a fully packed section visible while packed items are hidden', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        expect(screen.getByText("Alice's Items")).toBeTruthy()
+        expect(screen.getByRole('button', { name: /(expand|collapse) documents list/i })).toBeTruthy()
     })
 
-    it("celebrates a person whose items are all packed", async () => {
+    it('celebrates a section whose items are all packed', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        expect(screen.getByLabelText(/all packed for alice/i)).toBeTruthy()
+        expect(screen.getByLabelText(/all packed for documents/i)).toBeTruthy()
     })
 
-    it('does not celebrate a person with items still to pack', async () => {
+    it('does not celebrate a section with items still to pack', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        expect(screen.queryByLabelText(/all packed for bob/i)).toBeNull()
+        expect(screen.queryByLabelText(/all packed for toiletries/i)).toBeNull()
     })
 
-    it('celebrates a person as soon as their last item is checked', async () => {
+    it('celebrates a section as soon as its last item is checked', async () => {
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        expect(screen.queryByLabelText(/all packed for bob/i)).toBeNull()
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+        expect(screen.queryByLabelText(/all packed for toiletries/i)).toBeNull()
 
         // Toothbrush is the only unpacked item, so the only visible checkbox
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
-        await waitFor(() => expect(screen.getByLabelText(/all packed for bob/i)).toBeTruthy())
+        await waitFor(() => expect(screen.getByLabelText(/all packed for toiletries/i)).toBeTruthy())
     })
 
-    it('celebrates a fully packed category in category view', async () => {
+    it('celebrates a card finished for whoever is being packed for', async () => {
+        // Alice's comb is packed and Bob's toothbrush isn't, so Toiletries is
+        // unfinished for the trip. Packing Alice's bag it is done — what Bob
+        // still owes is not part of the question being asked.
         renderList()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: /category view/i }))
-
-        // Documents (Passport) is fully packed; Toiletries (Toothbrush) is not
-        expect(screen.getByText('Documents')).toBeTruthy()
-        expect(screen.getByLabelText(/all packed for documents/i)).toBeTruthy()
         expect(screen.queryByLabelText(/all packed for toiletries/i)).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', { name: /^Alice/ }))
+
+        expect(screen.getByLabelText(/all packed for toiletries for alice/i)).toBeTruthy()
     })
 })
 
@@ -2661,14 +2275,14 @@ describe('ViewPackingList completion', () => {
 
     it('does not fire confetti while items remain', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         expect(screen.queryByTestId('completion-confetti')).toBeNull()
     })
 
     it('fires confetti when the last item is checked', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
@@ -2682,30 +2296,30 @@ describe('ViewPackingList completion', () => {
         expect(screen.queryByTestId('completion-confetti')).toBeNull()
     })
 
-    it('folds the person cards away once everything is packed', async () => {
+    it('folds the cards away once everything is packed', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText("Bob's Items")).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
-        await waitFor(() => expect(screen.queryByText("Bob's Items")).toBeNull())
-        expect(screen.queryByText("Alice's Items")).toBeNull()
+        await waitFor(() => expect(screen.queryByTestId('list-section')).toBeNull())
     })
 
     it('leaves the celebration banner standing when the cards fold away', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
-        await waitFor(() => expect(screen.queryByText("Bob's Items")).toBeNull())
+        await waitFor(() => expect(screen.queryByTestId('list-section')).toBeNull())
         expect(screen.getByText("You're all packed!")).toBeTruthy()
     })
 
     it('opens an already-packed list with the cards already folded away', async () => {
         setup(fullyPackedList)
-        await waitFor(() => expect(screen.queryByText("Alice's Items")).toBeNull())
-        expect(screen.getByText("You're all packed!")).toBeTruthy()
+        await waitFor(() => expect(screen.getByText("You're all packed!")).toBeTruthy())
+        // The banner arrives first and the cards fold out from under it
+        await waitFor(() => expect(screen.queryByTestId('list-section')).toBeNull())
     })
 
     it('brings the cards back when packed items are shown', async () => {
@@ -2714,8 +2328,8 @@ describe('ViewPackingList completion', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
 
-        expect(screen.getByText("Alice's Items")).toBeTruthy()
-        expect(screen.getByText('Passport')).toBeTruthy()
+        expect(screen.getByTestId('list-section')).toBeTruthy()
+        expect(row('Passport')).toBeTruthy()
     })
 
     it('hides the "packed items hidden" nag once everything is packed', async () => {
@@ -2727,7 +2341,7 @@ describe('ViewPackingList completion', () => {
 
     it('holds the banner back while the cards are still folding away', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
@@ -2739,7 +2353,7 @@ describe('ViewPackingList completion', () => {
 
     it('rises the banner in once the cards have gone', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         fireEvent.click(screen.getAllByRole('checkbox')[0])
 
@@ -2758,11 +2372,11 @@ describe('ViewPackingList completion', () => {
 
     it('shows the banner straight away when packed items are being shown', async () => {
         setup(oneItemLeftList)
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
         // Nothing folds away in this mode, so there is no stage to clear
         fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-        fireEvent.click(screen.getByText('Toothbrush').closest('label')!.querySelector('input')!)
+        fireEvent.click(chipFor('Toothbrush', 'Bob'))
 
         await waitFor(() => expect(screen.getByTestId('completion-banner')).toBeTruthy())
         expect(screen.getByTestId('completion-banner').className).not.toContain('celebration-banner-rising')
@@ -2773,11 +2387,10 @@ describe('ViewPackingList completion', () => {
         await waitFor(() => expect(screen.getByText("You're all packed!")).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-        const passport = screen.getByText('Passport').closest('label')!.querySelector('input')!
-        fireEvent.click(passport)
+        fireEvent.click(chipFor('Passport', 'Alice'))
         fireEvent.click(screen.getByRole('button', { name: 'Hide Packed' }))
 
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) other list/i })).toBeTruthy())
     })
 })
 
@@ -2910,8 +2523,12 @@ describe('ViewPackingList check-off feedback', () => {
         )
     }
 
-    function checkboxFor(itemText: string) {
-        return screen.getByText(itemText).closest('label')!.querySelector('input')!
+    /**
+     * The grid's checkbox is the person's chip, labelled with both the item and
+     * whose it is — the same name can be on the row twice.
+     */
+    function checkboxFor(itemText: string, person = 'Alice') {
+        return screen.getByRole('checkbox', { name: `${itemText} for ${person}` }) as HTMLInputElement
     }
 
     function preferReducedMotion() {
@@ -2941,7 +2558,7 @@ describe('ViewPackingList check-off feedback', () => {
         await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-        fireEvent.click(checkboxFor('Wellies'))
+        fireEvent.click(checkboxFor('Wellies', 'Bob'))
 
         expect(mockTapFeedback).not.toHaveBeenCalled()
     })
@@ -2953,7 +2570,7 @@ describe('ViewPackingList check-off feedback', () => {
         fireEvent.click(checkboxFor('Passport'))
 
         expect(screen.getByTestId('item-tick-a1')).toBeTruthy()
-        expect(screen.getByTestId('item-row-a1').className).toContain('item-row-packed')
+        expect(screen.getByTestId('grid-cell-a1').className).toContain('grid-cell-packed')
     })
 
     it('flourishes only the row that was checked', async () => {
@@ -2963,7 +2580,7 @@ describe('ViewPackingList check-off feedback', () => {
         fireEvent.click(checkboxFor('Passport'))
 
         expect(screen.queryByTestId('item-tick-a2')).toBeNull()
-        expect(screen.getByTestId('item-row-a2').className).not.toContain('item-row-packed')
+        expect(screen.getByTestId('grid-cell-a2').className).not.toContain('grid-cell-packed')
     })
 
     it('holds the row on screen for the flourish before whisking it away', async () => {
@@ -2982,10 +2599,10 @@ describe('ViewPackingList check-off feedback', () => {
         await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
 
         fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-        fireEvent.click(checkboxFor('Wellies'))
+        fireEvent.click(checkboxFor('Wellies', 'Bob'))
 
         expect(screen.queryByTestId('item-tick-b1')).toBeNull()
-        expect(screen.getByTestId('item-row-b1').className).not.toContain('item-row-packed')
+        expect(screen.getByTestId('grid-cell-b1').className).not.toContain('grid-cell-packed')
     })
 
     it('holds still for anyone who asked for reduced motion', async () => {
@@ -3073,13 +2690,13 @@ describe('ViewPackingList adding items', () => {
         fireEvent.keyDown(input, { key: 'Enter' })
     }
 
-    it('files a new item under the section chosen on the person card', async () => {
+    it('files a new item into the card it was typed into', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
 
-        const { input, fields } = composerFor("Alice's items")
+        const { input, fields } = composerFor('Hiking')
         fireEvent.change(input, { target: { value: 'Trail map' } })
-        fireEvent.change(fields.getByLabelText('Section'), { target: { value: 'Hiking' } })
+        fireEvent.change(fields.getByLabelText('Who for'), { target: { value: 'Alice' } })
         fireEvent.keyDown(input, { key: 'Enter' })
 
         const added = await savedItem('Trail map')
@@ -3087,55 +2704,46 @@ describe('ViewPackingList adding items', () => {
         expect(added.personName).toBe('Alice')
     })
 
-    it('still files into the catch-all section when no section is chosen', async () => {
+    it('files into the catch-all section from the catch-all card', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
 
-        typeAndAdd(composerFor("Alice's items").input, 'Odds and ends')
+        const { input, fields } = composerFor('Other')
+        fireEvent.change(input, { target: { value: 'Odds and ends' } })
+        fireEvent.change(fields.getByLabelText('Who for'), { target: { value: 'Alice' } })
+        fireEvent.keyDown(input, { key: 'Enter' })
 
         expect((await savedItem('Odds and ends')).category).toBeUndefined()
     })
 
     it('saves a quantity typed alongside the item', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
 
-        const { input, fields } = composerFor("Alice's items")
+        const { input, fields } = composerFor('Hiking')
         fireEvent.change(input, { target: { value: 'Socks' } })
+        fireEvent.change(fields.getByLabelText('Who for'), { target: { value: 'Alice' } })
         fireEvent.change(fields.getByLabelText('Quantity'), { target: { value: '5' } })
         fireEvent.keyDown(input, { key: 'Enter' })
 
         expect((await savedItem('Socks')).quantity).toBe(5)
     })
 
-    it('adds straight into a section from that section’s own + Add button', async () => {
+    it('files an item for whoever the list is filtered to, without being asked again', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: 'Add item to Hiking for Alice' }))
-        typeAndAdd(composerFor('Hiking for Alice').input, 'Compass')
+        fireEvent.click(screen.getByRole('button', { name: /^Bob/ }))
+        typeAndAdd(composerFor('Essentials').input, 'Compass')
 
         const added = await savedItem('Compass')
-        expect(added.category).toBe('Hiking')
-        expect(added.personName).toBe('Alice')
-    })
-
-    it('opens only one in-place composer at a time', async () => {
-        renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-
-        fireEvent.click(screen.getByRole('button', { name: 'Add item to Hiking for Alice' }))
-        expect(screen.getByLabelText('Add an item to Hiking for Alice')).toBeTruthy()
-
-        fireEvent.click(screen.getByRole('button', { name: 'Add item to Other for Alice' }))
-        expect(screen.queryByLabelText('Add an item to Hiking for Alice')).toBeNull()
-        expect(screen.getByLabelText('Add an item to Other for Alice')).toBeTruthy()
+        expect(added.category).toBe('Essentials')
+        expect(added.personName).toBe('Bob')
     })
 
     it('adds for someone with nothing in a section yet, from category view', async () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
         const { input, fields } = composerFor('Hiking')
         fireEvent.change(input, { target: { value: 'Walking poles' } })
@@ -3150,10 +2758,12 @@ describe('ViewPackingList adding items', () => {
 
     it('suggests an item someone else has, and files it in the same section', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Tent' })).toBeTruthy())
 
-        const { input } = composerFor("Bob's items")
+        const { input, fields } = composerFor('Hiking')
+        // The who-for picker only appears once there is something typed
         fireEvent.change(input, { target: { value: 'ten' } })
+        fireEvent.change(fields.getByLabelText('Who for'), { target: { value: 'Bob' } })
         fireEvent.click(screen.getByRole('option', { name: /Tent/ }))
         fireEvent.keyDown(input, { key: 'Enter' })
 
@@ -3164,9 +2774,11 @@ describe('ViewPackingList adding items', () => {
 
     it('does not suggest what this person already has', async () => {
         renderComponentMultiCategory()
-        await waitFor(() => expect(screen.getByText('Tent')).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Tent' })).toBeTruthy())
 
-        fireEvent.change(composerFor("Alice's items").input, { target: { value: 'ten' } })
+        fireEvent.click(screen.getByRole('button', { name: /^Alice/ }))
+        fireEvent.change(composerFor('Hiking').input, { target: { value: 'ten' } })
+
         expect(screen.queryByRole('option', { name: /Tent/ })).toBeNull()
     })
 })
@@ -3226,9 +2838,7 @@ describe('ViewPackingList folding sections away', () => {
         )
     }
 
-    function checkboxFor(itemText: string) {
-        return screen.getByText(itemText).closest('label')!.querySelector('input')!
-    }
+    const checkboxFor = chipFor
 
     beforeEach(() => {
         mockList(familyList)
@@ -3239,73 +2849,75 @@ describe('ViewPackingList folding sections away', () => {
     })
 
     describe('when everything in a section is packed', () => {
+        // Sections are categories. Documents holds one item and it is packed,
+        // so it is the section that arrives finished.
         it('folds a section that was already finished when the list opened', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            expect(screen.getByRole('button', { name: /expand alice's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /expand documents list/i })).toBeTruthy()
         })
 
         it('leaves a section with items still to pack open', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            expect(screen.getByText('Toothbrush')).toBeTruthy()
-            expect(screen.getByText('Armbands')).toBeTruthy()
+            expect(row('Toothbrush')).toBeTruthy()
+            expect(row('Armbands')).toBeTruthy()
         })
 
         it('keeps the folded section on the page with its count and its celebration', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            const header = screen.getByRole('button', { name: /expand alice's list/i })
-            expect(header.textContent).toContain("Alice's Items")
-            expect(header.textContent).toContain('2 / 2')
-            expect(screen.getByLabelText(/all packed for alice/i)).toBeTruthy()
+            const header = screen.getByRole('button', { name: /expand documents list/i })
+            expect(header.textContent).toContain('Documents')
+            expect(header.textContent).toContain('1 / 1')
+            expect(screen.getByLabelText(/all packed for documents/i)).toBeTruthy()
         })
 
         it('folds a section that is finished in front of the user', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            fireEvent.click(checkboxFor('Toothbrush'))
+            fireEvent.click(checkboxFor('Toothbrush', 'Bob'))
 
             await waitFor(
-                () => expect(screen.getByRole('button', { name: /expand bob's list/i })).toBeTruthy(),
+                () => expect(screen.getByRole('button', { name: /expand toiletries list/i })).toBeTruthy(),
                 { timeout: 3000 },
             )
         })
 
         it('leaves a section the user reopened open when something else is packed', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /expand alice's list/i }))
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /expand documents list/i }))
 
-            fireEvent.click(checkboxFor('Toothbrush'))
+            fireEvent.click(checkboxFor('Toothbrush', 'Bob'))
             await waitFor(
-                () => expect(screen.getByRole('button', { name: /expand bob's list/i })).toBeTruthy(),
+                () => expect(screen.getByRole('button', { name: /expand toiletries list/i })).toBeTruthy(),
                 { timeout: 3000 },
             )
 
-            expect(screen.getByRole('button', { name: /collapse alice's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse documents list/i })).toBeTruthy()
         })
 
         it('folds a section again once it is packed back up', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
             fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
 
-            // Unpacking reopens Alice; packing it back folds her away again
-            fireEvent.click(checkboxFor('Sunhat'))
+            // Unpacking reopens Documents; packing it back folds it away again
+            fireEvent.click(checkboxFor('Passport', 'Alice'))
             fireEvent.click(screen.getByRole('button', { name: 'Hide Packed' }))
-            expect(screen.getByRole('button', { name: /collapse alice's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse documents list/i })).toBeTruthy()
 
             fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
-            fireEvent.click(checkboxFor('Sunhat'))
+            fireEvent.click(checkboxFor('Passport', 'Alice'))
             fireEvent.click(screen.getByRole('button', { name: 'Hide Packed' }))
 
             await waitFor(
-                () => expect(screen.getByRole('button', { name: /expand alice's list/i })).toBeTruthy(),
+                () => expect(screen.getByRole('button', { name: /expand documents list/i })).toBeTruthy(),
                 { timeout: 3000 },
             )
         })
@@ -3314,58 +2926,58 @@ describe('ViewPackingList folding sections away', () => {
     describe('showing packed items', () => {
         it('hands back the sections the page folded', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            expect(screen.getByRole('button', { name: /expand alice's list/i })).toBeTruthy()
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            expect(screen.getByRole('button', { name: /expand documents list/i })).toBeTruthy()
 
             fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
 
-            expect(screen.getByText('Passport')).toBeTruthy()
-            expect(screen.getByRole('button', { name: /collapse alice's list/i })).toBeTruthy()
+            expect(row('Passport')).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse documents list/i })).toBeTruthy()
         })
 
         it('leaves a section the user folded by hand alone', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /collapse cara's list/i }))
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /collapse toiletries list/i }))
 
             fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
 
-            expect(screen.getByRole('button', { name: /expand cara's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /expand toiletries list/i })).toBeTruthy()
         })
     })
 
     describe('collapse all / expand all', () => {
         it('folds every section', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
             fireEvent.click(screen.getByRole('button', { name: /collapse all/i }))
 
-            expect(screen.queryByText('Toothbrush')).toBeNull()
-            expect(screen.queryByText('Armbands')).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Edit Toothbrush' })).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Edit Armbands' })).toBeNull()
         })
 
         it('opens every section, including the ones folded automatically', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
             fireEvent.click(screen.getByRole('button', { name: /collapse all/i }))
 
             fireEvent.click(screen.getByRole('button', { name: /expand all/i }))
 
-            expect(screen.getByText('Toothbrush')).toBeTruthy()
-            expect(screen.getByRole('button', { name: /collapse alice's list/i })).toBeTruthy()
+            expect(row('Toothbrush')).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse documents list/i })).toBeTruthy()
         })
 
         it('does not re-fold a finished section after the user opens everything', async () => {
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
             fireEvent.click(screen.getByRole('button', { name: /collapse all/i }))
             fireEvent.click(screen.getByRole('button', { name: /expand all/i }))
 
-            fireEvent.click(checkboxFor('Armbands'))
+            fireEvent.click(checkboxFor('Armbands', 'Cara'))
             await new Promise(resolve => setTimeout(resolve, 1200))
 
-            expect(screen.getByRole('button', { name: /collapse alice's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse documents list/i })).toBeTruthy()
         })
 
         it('is not offered when the list has only one section', async () => {
@@ -3375,7 +2987,7 @@ describe('ViewPackingList folding sections away', () => {
                 items: [familyList.items[4]],
             })
             renderList('test-list-solo')
-            await waitFor(() => expect(screen.getByText('Armbands')).toBeTruthy())
+            await waitFor(() => expect(row('Armbands')).toBeTruthy())
 
             expect(screen.queryByRole('button', { name: /collapse all/i })).toBeNull()
         })
@@ -3384,86 +2996,91 @@ describe('ViewPackingList folding sections away', () => {
     describe('remembering how the list was left', () => {
         it('reopens with the sections the user folded still folded', async () => {
             const { unmount } = renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /collapse cara's list/i }))
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /collapse toiletries list/i }))
             unmount()
 
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Armbands')).toBeTruthy())
 
-            expect(screen.getByRole('button', { name: /expand cara's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /expand toiletries list/i })).toBeTruthy()
         })
 
-        it('reopens in the view mode the user chose', async () => {
+        it('opens showing everyone, whoever the user was last packing for', async () => {
+            // Fold state is how this list is kept; a filter is something the
+            // user was doing. Restoring one a week later shows them a third of
+            // their list and no reason why.
             const { unmount } = renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /category view/i }))
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /^Cara/ }))
+            expect(screen.queryByRole('button', { name: 'Edit Toothbrush' })).toBeNull()
             unmount()
 
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            expect(screen.getByRole('button', { name: /category view/i }).getAttribute('aria-pressed')).toBe('true')
+            expect(screen.getByRole('button', { name: /^Cara/ }).getAttribute('aria-pressed')).toBe('false')
         })
 
         it('reopens still showing packed items', async () => {
             const { unmount } = renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
             fireEvent.click(screen.getByRole('button', { name: 'Show Packed' }))
             unmount()
 
             renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
             expect(screen.getByText('Passport')).toBeTruthy()
         })
 
         it('reopens a folded group inside a section still folded', async () => {
             const { unmount } = renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
             fireEvent.click(screen.getByRole('button', { name: /collapse toiletries/i }))
             expect(screen.queryByText('Toothbrush')).toBeNull()
             unmount()
 
             renderList()
-            await waitFor(() => expect(screen.getByText('Armbands')).toBeTruthy())
+            await waitFor(() => expect(row('Armbands')).toBeTruthy())
 
             expect(screen.queryByText('Toothbrush')).toBeNull()
         })
 
         it('does not carry one list\'s folded sections onto another', async () => {
             const { unmount } = renderList()
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-            fireEvent.click(screen.getByRole('button', { name: /collapse cara's list/i }))
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+            fireEvent.click(screen.getByRole('button', { name: /collapse toiletries list/i }))
             unmount()
 
             mockList({ ...familyList, id: 'test-list-other' })
             renderList('test-list-other')
-            await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
+            await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-            expect(screen.getByRole('button', { name: /collapse cara's list/i })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /collapse toiletries list/i })).toBeTruthy()
         })
     })
 })
 
 describe('ViewPackingList opening a long list for the first time', () => {
-    // Six people so the list has plenty to fold, and 36 items so it clears the
-    // "long enough to arrive as a wall" threshold.
-    const people = ['Alice', 'Bob', 'Cara', 'Dev', 'Eve', 'Finn']
-    function bigList(id: string, itemsPerPerson: number) {
+    // Six categories so the list has plenty to fold, and 36 items so it clears
+    // the "long enough to arrive as a wall" threshold. Sections are categories,
+    // so it is the spread of categories that decides how much there is to fold.
+    const categories = ['Clothes', 'Toiletries', 'Documents', 'Electronics', 'Camping', 'Food']
+    function bigList(id: string, itemsPerCategory: number) {
         return {
             id,
             name: 'Big Trip',
             createdAt: '2026-01-01T00:00:00Z',
-            items: people.flatMap((person, p) =>
-                Array.from({ length: itemsPerPerson }, (_, i) => ({
-                    id: `${person}-${i}`,
-                    itemText: `${person} item ${i}`,
-                    personName: person,
-                    personId: `p${p}`,
+            items: categories.flatMap((category) =>
+                Array.from({ length: itemsPerCategory }, (_, i) => ({
+                    id: `${category}-${i}`,
+                    itemText: `${category} item ${i}`,
+                    personName: 'Alice',
+                    personId: 'p0',
                     questionId: 'q1',
                     optionId: 'o1',
-                    category: 'Clothes',
+                    category,
                     packed: false,
                 })),
             ),
@@ -3512,19 +3129,19 @@ describe('ViewPackingList opening a long list for the first time', () => {
     it('opens a long list folded', async () => {
         mockList(bigList('big-1', 6))
         renderList('big-1')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        expect(screen.queryByText('Alice item 0')).toBeNull()
-        expect(screen.getByRole('button', { name: /expand alice's list/i })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'Edit Clothes item 0' })).toBeNull()
+        expect(screen.getByRole('button', { name: /expand clothes list/i })).toBeTruthy()
     })
 
     it('keeps every section and its count on the page', async () => {
         mockList(bigList('big-2', 6))
         renderList('big-2')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        for (const person of people) {
-            expect(screen.getByRole('button', { name: new RegExp(`expand ${person}'s list`, 'i') }).textContent)
+        for (const category of categories) {
+            expect(screen.getByRole('button', { name: new RegExp(`expand ${category} list`, 'i') }).textContent)
                 .toContain('0 / 6')
         }
     })
@@ -3532,71 +3149,71 @@ describe('ViewPackingList opening a long list for the first time', () => {
     it('says why the list arrived folded, and offers the way out', async () => {
         mockList(bigList('big-3', 6))
         renderList('big-3')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
         const note = screen.getByTestId('folded-on-open-note')
         expect(note.textContent).toContain('all 6 sections start folded')
 
         fireEvent.click(within(note).getByRole('button', { name: /expand all/i }))
 
-        expect(screen.getByText('Alice item 0')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Edit Clothes item 0' })).toBeTruthy()
         expect(screen.queryByTestId('folded-on-open-note')).toBeNull()
     })
 
     it('drops the note as soon as the user opens a section themselves', async () => {
         mockList(bigList('big-4', 6))
         renderList('big-4')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: /expand alice's list/i }))
+        fireEvent.click(screen.getByRole('button', { name: /expand clothes list/i }))
 
         expect(screen.queryByTestId('folded-on-open-note')).toBeNull()
     })
 
     it('leaves a short list open', async () => {
-        // Six people, one item each — plenty of sections, but no wall
+        // Six categories, one item each — plenty of sections, but no wall
         mockList(bigList('small-1', 1))
         renderList('small-1')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        expect(screen.getByText('Alice item 0')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Edit Clothes item 0' })).toBeTruthy()
         expect(screen.queryByTestId('folded-on-open-note')).toBeNull()
     })
 
     it('leaves a long list with a single section open, having nothing to fold into', async () => {
         const list = bigList('solo-1', 6)
-        mockList({ ...list, items: list.items.map(item => ({ ...item, personName: 'Alice', personId: 'p0' })) })
+        mockList({ ...list, items: list.items.map(item => ({ ...item, category: 'Clothes' })) })
         renderList('solo-1')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        expect(screen.getByText('Alice item 0')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Edit Clothes item 0' })).toBeTruthy()
     })
 
     it('does not fold a list the user has opened before', async () => {
         mockList(bigList('big-5', 6))
         const { unmount } = renderList('big-5')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
         fireEvent.click(within(screen.getByTestId('folded-on-open-note')).getByRole('button', { name: /expand all/i }))
         unmount()
 
         renderList('big-5')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
         // Their arrangement wins, even though it matches the plain defaults
-        expect(screen.getByText('Alice item 0')).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Edit Clothes item 0' })).toBeTruthy()
         expect(screen.queryByTestId('folded-on-open-note')).toBeNull()
     })
 
     it('reopens folded if that is how the user left it', async () => {
         mockList(bigList('big-6', 6))
         const { unmount } = renderList('big-6')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
         unmount()
 
         renderList('big-6')
-        await waitFor(() => expect(screen.getByText("Alice's Items")).toBeTruthy())
+        await waitFor(() => expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy())
 
-        expect(screen.queryByText('Alice item 0')).toBeNull()
+        expect(screen.queryByRole('button', { name: 'Edit Clothes item 0' })).toBeNull()
         // Second time around it is their arrangement, not something to explain
         expect(screen.queryByTestId('folded-on-open-note')).toBeNull()
     })
@@ -3801,9 +3418,10 @@ describe('ViewPackingList last minute items', () => {
             lastMinuteBaseItems[1],
         ])
 
-        await waitFor(() => expect(screen.getByText('Toothbrush')).toBeTruthy())
-        expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy()
-        expect(within(sectionCard("Alice's Items")).queryByText('Passport')).toBeNull()
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+        expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Passport' })).toBeTruthy()
+        // Its own category card has gone with it — the card was only holding it
+        expect(screen.queryByRole('button', { name: /(expand|collapse) documents list/i })).toBeNull()
     })
 
     it('says what the section is for', async () => {
@@ -3816,11 +3434,13 @@ describe('ViewPackingList last minute items', () => {
     it('moves an item into the last minute section when it is marked', async () => {
         const db = renderLastMinuteList()
 
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /mark passport as .*last minute/i }))
+        await waitFor(() => expect(row('Passport')).toBeTruthy())
+        // Marking lives in the row's panel, reached through its name
+        fireEvent.click(row('Passport'))
+        fireEvent.click(screen.getByRole('button', { name: /mark alice's passport as a last minute item/i }))
 
-        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy())
-        expect(within(sectionCard("Alice's Items")).queryByText('Passport')).toBeNull()
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Passport' })).toBeTruthy())
+        expect(screen.queryByRole('button', { name: /(expand|collapse) documents list/i })).toBeNull()
         expect(savedItems(db).find(item => item.id === 'lm-1')?.lastMinute).toBe(true)
     })
 
@@ -3830,10 +3450,11 @@ describe('ViewPackingList last minute items', () => {
             lastMinuteBaseItems[1],
         ])
 
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /remove passport from .*last minute/i }))
+        await waitFor(() => expect(row('Passport')).toBeTruthy())
+        fireEvent.click(row('Passport'))
+        fireEvent.click(screen.getByRole('button', { name: /pack alice's passport with everything else/i }))
 
-        await waitFor(() => expect(within(sectionCard("Alice's Items")).getByText('Passport')).toBeTruthy())
+        await waitFor(() => expect(within(sectionCard('Documents')).getByRole('button', { name: 'Edit Passport' })).toBeTruthy())
         expect(screen.queryByText('Last Minute')).toBeNull()
         expect(savedItems(db).find(item => item.id === 'lm-1')?.lastMinute).toBeUndefined()
     })
@@ -3845,7 +3466,7 @@ describe('ViewPackingList last minute items', () => {
         ])
 
         await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        expect(within(sectionCard('Last Minute')).getByText('Phone charger')).toBeTruthy()
+        expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Phone charger' })).toBeTruthy()
         expect(screen.queryByText('Shared Items')).toBeNull()
     })
 
@@ -3856,23 +3477,25 @@ describe('ViewPackingList last minute items', () => {
         ])
 
         await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: 'Category View' }))
 
-        expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy()
+        expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Passport' })).toBeTruthy()
         expect(screen.queryByText('Documents')).toBeNull()
-        expect(within(sectionCard('Toiletries')).getByText('Toothbrush')).toBeTruthy()
+        expect(within(sectionCard('Toiletries')).getByRole('button', { name: 'Edit Toothbrush' })).toBeTruthy()
     })
 
-    it('groups the last minute section by person', async () => {
+    it('reads the last minute card the way every other card reads', async () => {
+        // It holds everybody's, so it is a grid like the rest: the item down
+        // the side, whose it is across it, and shared items on their own row.
         renderLastMinuteList([
             { ...lastMinuteBaseItems[0], lastMinute: true },
             { ...lastMinuteBaseItems[2], lastMinute: true },
         ])
 
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        const card = sectionCard('Last Minute')
-        expect(within(card).getByRole('button', { name: /Collapse Alice$/i })).toBeTruthy()
-        expect(within(card).getByRole('button', { name: /Collapse Shared$/i })).toBeTruthy()
+        await waitFor(() => expect(row('Passport')).toBeTruthy())
+
+        const card = within(sectionCard('Last Minute'))
+        expect(card.getByRole('checkbox', { name: 'Passport for Alice' })).toBeTruthy()
+        expect(card.getByRole('checkbox', { name: 'Phone charger for the whole group' })).toBeTruthy()
     })
 
     it('stays where the user is reading when an item is marked', async () => {
@@ -3880,15 +3503,15 @@ describe('ViewPackingList last minute items', () => {
         Element.prototype.scrollIntoView = scrollIntoView
         renderLastMinuteList()
 
-        await waitFor(() => expect(screen.getByText('Passport')).toBeTruthy())
-        fireEvent.click(screen.getByRole('button', { name: /mark passport as .*last minute/i }))
+        await waitFor(() => expect(row('Passport')).toBeTruthy())
+        fireEvent.click(row('Passport'))
+        fireEvent.click(screen.getByRole('button', { name: /mark alice's passport as a last minute item/i }))
 
         // The card is at the far end of a list being read down; the highlight
         // says where the item went without taking the page with it.
-        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Passport')).toBeTruthy())
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Passport' })).toBeTruthy())
         expect(scrollIntoView).not.toHaveBeenCalled()
-        const row = within(sectionCard('Last Minute')).getByText('Passport').closest('div.rounded-lg')
-        expect(row?.className).toContain('ring-green-400')
+        expect(screen.getByTestId('grid-cell-lm-1').className).toContain('ring-green-400')
     })
 
     it('marks items added inside the last minute section as last minute', async () => {
@@ -3899,7 +3522,356 @@ describe('ViewPackingList last minute items', () => {
         fireEvent.change(within(card).getAllByPlaceholderText(/add/i)[0], { target: { value: 'Contact lenses' } })
         fireEvent.click(within(card).getAllByRole('button', { name: /^add$/i })[0])
 
-        await waitFor(() => expect(within(sectionCard('Last Minute')).getByText('Contact lenses')).toBeTruthy())
+        await waitFor(() => expect(within(sectionCard('Last Minute')).getByRole('button', { name: 'Edit Contact lenses' })).toBeTruthy())
         expect(savedItems(db).find(item => item.itemText === 'Contact lenses')?.lastMinute).toBe(true)
+    })
+})
+
+// ─── Packing for one person ─────────────────────────────────────────────────
+
+describe('ViewPackingList people filter', () => {
+    // Alice is in all three sections; Bob only in Clothes; the tent is nobody's.
+    const familyList = {
+        id: 'test-list-filter',
+        name: 'Filter Trip',
+        createdAt: '2026-01-01T00:00:00Z',
+        guests: [{ id: 'g1', name: 'Zoe' }, { id: 'g2', name: 'Dan' }],
+        items: [
+            { id: 'f6', itemText: 'Armbands', personName: 'Zoe', personId: 'g1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
+            { id: 'f1', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
+            { id: 'f2', itemText: 'Wellies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false },
+            { id: 'f3', itemText: 'Toothbrush', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: false },
+            { id: 'f4', itemText: 'Passport', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Documents', packed: true },
+            { id: 'f5', itemText: 'Tent', personName: '', personId: '', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: false, communal: true },
+        ],
+    }
+
+    let db: ReturnType<typeof makeDb>
+
+    beforeEach(() => {
+        db = makeDb()
+        db.getPackingList.mockResolvedValue(familyList)
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...familyList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    async function renderList() {
+        render(
+            <MemoryRouter initialEntries={['/view-list/test-list-filter']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await waitFor(() => expect(row('Sunhat')).toBeTruthy())
+    }
+
+    const chip = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) })
+
+    describe('choosing who', () => {
+        it('starts on everybody, with nothing pressed', async () => {
+            await renderList()
+
+            expect(chip('Alice').getAttribute('aria-pressed')).toBe('false')
+            expect(chip('Bob').getAttribute('aria-pressed')).toBe('false')
+            expect(row('Wellies')).toBeTruthy()
+        })
+
+        it('narrows to one person on the first tap', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+
+            expect(row('Sunhat')).toBeTruthy()
+            expect(screen.queryByRole('button', { name: 'Edit Wellies' })).toBeNull()
+        })
+
+        it('adds a second person rather than replacing the first', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(chip('Bob'))
+
+            expect(row('Sunhat')).toBeTruthy()
+            expect(row('Wellies')).toBeTruthy()
+        })
+
+        it('takes a person back out of the selection', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(chip('Bob'))
+            fireEvent.click(chip('Alice'))
+
+            expect(screen.queryByRole('button', { name: 'Edit Sunhat' })).toBeNull()
+            expect(row('Wellies')).toBeTruthy()
+        })
+
+        it('goes back to everybody when the last person is tapped off', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Bob'))
+            fireEvent.click(chip('Bob'))
+
+            expect(row('Sunhat')).toBeTruthy()
+            expect(row('Wellies')).toBeTruthy()
+        })
+
+        it('offers Clear only while a filter is on', async () => {
+            await renderList()
+            expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+
+            expect(row('Wellies')).toBeTruthy()
+            expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull()
+        })
+    })
+
+    describe('what the cards show', () => {
+        it('drops a section with nothing for the selection, and says how many went', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Bob'))
+
+            expect(screen.queryByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeNull()
+            expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy()
+        })
+
+        it('brings them back when the filter is cleared', async () => {
+            await renderList()
+            fireEvent.click(chip('Bob'))
+
+            fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+
+            expect(screen.getByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeTruthy()
+        })
+
+        it('keeps a shared item, folded away rather than answering a question nobody asked', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Bob'))
+
+            const shared = screen.getByRole('button', { name: /Shared \(1\)/ })
+            expect(shared.getAttribute('aria-expanded')).toBe('false')
+
+            fireEvent.click(shared)
+            expect(row('Tent')).toBeTruthy()
+        })
+
+        it('leaves shared items among the rest when nobody is filtered to', async () => {
+            await renderList()
+
+            expect(screen.queryByRole('button', { name: /Shared \(1\)/ })).toBeNull()
+            expect(row('Tent')).toBeTruthy()
+        })
+
+        it('never lets a shared item into one person’s count', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+
+            // Clothes holds Alice's Sunhat, Bob's Wellies and the group's Tent.
+            // Only the Sunhat is hers.
+            expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
+                .toContain('0 / 1 for Alice')
+        })
+    })
+
+    describe('the group\'s own chip', () => {
+        // Scoped to the strip: the card's own "Shared (n)" disclosure shares
+        // the word, and the chip's emoji is decorative so it carries no name.
+        const shared = () => within(screen.getByTestId('people-key')).getByRole('button', { name: /^Shared/ })
+
+        it('keeps a filled chip meaning pressed, and nothing else', async () => {
+            // A chip filled green for "finished" read as selected beside the
+            // white ones that read as not — two states after one signal.
+            await renderList()
+
+            fireEvent.click(chip('Zoe'))
+            fireEvent.click(screen.getByRole('button', { name: "Pack all 1 of Zoe's" }))
+            await waitFor(() => expect(screen.getByText(/Zoe's bag is packed/)).toBeTruthy())
+
+            // Pressed: filled
+            expect(chip('Zoe').className).toContain('bg-blue-600')
+
+            // Finished but not pressed: the same white as everyone else, with
+            // the news carried on her face instead
+            fireEvent.click(chip('Zoe'))
+            expect(chip('Zoe').className).not.toContain('bg-emerald')
+            expect(chip('Zoe').className).toContain('bg-white')
+            expect(chip('Zoe').className).toBe(chip('Bob').className)
+        })
+
+        it('offers the group alongside the people', async () => {
+            await renderList()
+
+            expect(shared().getAttribute('aria-pressed')).toBe('false')
+        })
+
+        it('shows the group\'s items and nobody else\'s', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(row('Tent')).toBeTruthy()
+            expect(screen.queryByRole('button', { name: 'Edit Sunhat' })).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Edit Wellies' })).toBeNull()
+        })
+
+        it('brings the shared items back among the rest when asked for by name', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            // Filtered to a person they fold away; asked for, they come out
+            expect(screen.getByRole('button', { name: /Shared \(1\)/ })).toBeTruthy()
+
+            fireEvent.click(shared())
+
+            expect(screen.queryByRole('button', { name: /Shared \(1\)/ })).toBeNull()
+            expect(row('Tent')).toBeTruthy()
+            expect(row('Sunhat')).toBeTruthy()
+        })
+
+        it('counts the group\'s items against the group, and nobody else', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(shared().textContent).toContain('0/1')
+            // Clothes holds Alice's Sunhat, Bob's Wellies, Zoe's Armbands and
+            // the group's Tent — only the Tent is the group's.
+            expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
+                .toContain('0 / 1 for shared items')
+        })
+
+        it('is not somebody, so it is offered no bag to pack and no name to change', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(screen.queryByRole('button', { name: /^Pack all/ })).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull()
+        })
+    })
+
+    describe('one person at a time', () => {
+        it('packs everything of one person’s, and offers it back', async () => {
+            await renderList()
+            fireEvent.click(chip('Alice'))
+
+            // Passport is already packed, so it is two items, not three
+            fireEvent.click(screen.getByRole('button', { name: "Pack all 2 of Alice's" }))
+
+            expect(mockShowToast).toHaveBeenCalledWith(
+                "Packed 2 of Alice's items",
+                'success',
+                undefined,
+                expect.objectContaining({ label: 'Undo' }),
+            )
+        })
+
+        it('keeps the filter on a guest who has just been renamed', async () => {
+            // The filter holds names. Leave the old one in it and the page is
+            // filtered to somebody no chip names — every card empty, no chip
+            // pressed, and nothing on screen to undo it.
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+            const field = screen.getByRole('textbox', { name: 'Rename Zoe' })
+            fireEvent.change(field, { target: { value: 'Zoey' } })
+            fireEvent.blur(field)
+
+            await waitFor(() => expect(chip('Zoey').getAttribute('aria-pressed')).toBe('true'))
+            expect(row('Armbands')).toBeTruthy()
+        })
+
+        it('goes back to everybody when the filtered guest is removed', async () => {
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+            // The bar's button opens the confirmation; the dialog's does it
+            const dialog = within(await screen.findByRole('dialog'))
+            fireEvent.click(dialog.getByRole('button', { name: 'Remove' }))
+
+            // Not left filtered to a person who no longer exists
+            await waitFor(() => expect(row('Wellies')).toBeTruthy())
+        })
+
+        it('marks a bag that is finished rather than leaving a name on its own', async () => {
+            await renderList()
+            fireEvent.click(chip('Zoe'))
+
+            fireEvent.click(screen.getByRole('button', { name: "Pack all 1 of Zoe's" }))
+
+            await waitFor(() => expect(screen.getByText(/Zoe's bag is packed/)).toBeTruthy())
+            // The trip's own celebration is still the trip's
+            expect(screen.queryByTestId('completion-banner')).toBeNull()
+        })
+
+        it('says nothing about packing for two people at once', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(chip('Bob'))
+
+            expect(screen.queryByRole('button', { name: /^Pack all/ })).toBeNull()
+        })
+
+        it('counts by headcount past one person, rather than listing names', async () => {
+            // A comma-joined list beside a fraction reads as a truncated list,
+            // and on a phone it runs straight under the button beside it. The
+            // strip above is what says which people.
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            fireEvent.click(chip('Bob'))
+
+            expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
+                .toContain('for 2 people')
+        })
+
+        it('keeps Clear reachable, out of the strip that scrolls', async () => {
+            // Inside the strip it was pushed off the end of a phone by the
+            // fifth person, so the one control that undoes the filter never
+            // reached the screen.
+            await renderList()
+            fireEvent.click(chip('Alice'))
+
+            const clear = screen.getByRole('button', { name: 'Clear' })
+            expect(clear.closest('[aria-label="Filter by person"]')).toBeNull()
+        })
+
+        it('offers a way in when the filter leaves nothing on the page', async () => {
+            // Every composer lives inside a card, and a fresh guest's cards
+            // have all been dropped — so without this there is no way to give
+            // them their first item, and the page just looks broken.
+            await renderList()
+
+            fireEvent.click(chip('Dan'))
+
+            expect(screen.getByText(/Nothing on this list is for Dan yet/)).toBeTruthy()
+        })
     })
 })

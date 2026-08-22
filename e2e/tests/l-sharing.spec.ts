@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME, COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME } from '../../playwright.config'
+import { expandAllSections, firstItemChip } from '../helpers/packing-list'
 
 // L tests use two pod users. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -32,9 +33,10 @@ test.describe('L – Sharing a packing list', () => {
         await pageA.getByPlaceholder('Enter a name for your packing list').fill(listName)
         await pageA.getByRole('button', { name: 'Create Packing List' }).click()
         await pageA.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
+        await expandAllSections(pageA)
 
         // Sync to pod: check an item, wait for green indicator cycle
-        const firstCheckbox = pageA.locator('input[type="checkbox"]').first()
+        const firstCheckbox = firstItemChip(pageA)
         await firstCheckbox.waitFor({ timeout: 10_000 })
         await firstCheckbox.click()
         await expect(pageA.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
@@ -119,7 +121,7 @@ test.describe('L – Sharing a packing list', () => {
             await expect(pageB.getByText('Shared list')).toBeVisible({ timeout: 30_000 })
 
             // User B checks the first item
-            const firstCheckbox = pageB.locator('input[type="checkbox"]').first()
+            const firstCheckbox = firstItemChip(pageB)
             await firstCheckbox.waitFor({ timeout: 10_000 })
             await firstCheckbox.click()
 
@@ -165,7 +167,7 @@ test.describe('L – Sharing a packing list', () => {
             // Wait for list items to load via pod poll.
             // Item 1 is already packed (from L3) so it's hidden with showPacked=false;
             // the first visible checkbox is item 2.
-            const firstCheckbox = pageAnon.locator('input[type="checkbox"]').first()
+            const firstCheckbox = firstItemChip(pageAnon)
             await firstCheckbox.waitFor({ timeout: 20_000 })
 
             // Check the first visible item

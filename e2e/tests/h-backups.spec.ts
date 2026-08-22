@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, HUSER_EMAIL, HUSER_PASSWORD } from '../../playwright.config'
+import { expandAllSections, firstItemChip } from '../helpers/packing-list'
 
 // H tests share the same user's backups pod resource; running them in parallel causes
 // concurrent creates/deletes to make counts non-deterministic.
@@ -29,8 +30,9 @@ test.describe('H – Backups', () => {
     await page.getByPlaceholder('Enter a name for your packing list').fill('Backup Test List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
     await page.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
+    await expandAllSections(page)
     // Sync to pod via green-indicator cycle (same pattern as F/G/L/M).
-    await page.locator('input[type="checkbox"]').first().click()
+    await firstItemChip(page).click()
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })
   })
