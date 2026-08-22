@@ -20,6 +20,7 @@ import {
     pruneFilledSections,
     reconcileEmptySections,
     addEmptySection,
+    forgetEmptySection,
     type SectionSequenceEntry,
 } from './item-sections'
 import type { Item, Question, Option } from './types'
@@ -536,6 +537,24 @@ describe('empty sections', () => {
 
         it('refuses the default section, which always exists', () => {
             expect(addEmptySection(undefined, [], 'Yes', 'Yes')).toBeUndefined()
+        })
+    })
+
+    describe('forgetEmptySection', () => {
+        it('drops the removed name', () => {
+            expect(forgetEmptySection(['Spare', 'Toiletries'], 'Spare')).toEqual(['Toiletries'])
+        })
+
+        it('drops the field entirely once nothing is left', () => {
+            expect(forgetEmptySection(['Toiletries'], 'Toiletries')).toBeUndefined()
+        })
+
+        it('leaves a list that never mentioned the section alone', () => {
+            expect(forgetEmptySection(['Toiletries'], 'Spare')).toEqual(['Toiletries'])
+        })
+
+        it('copes with a list that was never recorded', () => {
+            expect(forgetEmptySection(undefined, 'Toiletries')).toBeUndefined()
         })
     })
 

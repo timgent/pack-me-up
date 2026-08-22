@@ -4,7 +4,7 @@ import { useDatabase } from '../components/DatabaseContext'
 import { SectionedItemReorder } from '../components/SectionedItemReorder'
 import { SectionOrderLegend, SectionOrderModal } from '../components/SectionOrderEditor'
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
-import { ALWAYS_NEEDED_CATEGORY, addEmptySection, buildSectionGroups, defaultCategoryFor, reconcileEmptySections, sectionNamesIn, type PositionedItem } from '../edit-questions/item-sections'
+import { ALWAYS_NEEDED_CATEGORY, addEmptySection, buildSectionGroups, defaultCategoryFor, forgetEmptySection, reconcileEmptySections, removeSection, sectionNamesIn, type PositionedItem } from '../edit-questions/item-sections'
 import { orderedSectionLabels, reconcileSectionOrder, sectionLabelsOf } from '../edit-questions/section-order'
 import { sectionAccent } from '../edit-questions/section-accent'
 import { DatabaseMigration } from '../services/migration'
@@ -369,7 +369,7 @@ export interface ItemAdding {
  * of every section on the page, which is the cost the read-only rows exist to
  * avoid.
  */
-const SectionedItemRows = memo(function SectionedItemRows({ items, people, defaultLabel, emptySections = NO_NAMES, allItemNames = NO_NAMES, sectionNames = NO_NAMES, adding, onItemChange, onItemDelete, onSectionAdd, onReorder }: {
+const SectionedItemRows = memo(function SectionedItemRows({ items, people, defaultLabel, emptySections = NO_NAMES, allItemNames = NO_NAMES, sectionNames = NO_NAMES, adding, onItemChange, onItemDelete, onSectionAdd, onSectionRemove, onReorder }: {
     items: Item[]
     people: Person[]
     defaultLabel: string
@@ -385,6 +385,8 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
     onItemDelete?: (index: number) => void
     /** Omit to leave the list unable to grow a section. */
     onSectionAdd?: (label: string) => void
+    /** Omit to leave sections undeletable — no bin appears on their headings. */
+    onSectionRemove?: (label: string) => void
     /** Omit to leave the list unorganisable — no reorder toggle appears. */
     onReorder?: (items: Item[], emptySections: string[] | undefined) => void
 }) {
@@ -397,6 +399,9 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
     const [openComposer, setOpenComposer] = useState<string | null>(null)
     const closeComposer = useCallback(() => setOpenComposer(null), [])
     const [addingSection, setAddingSection] = useState(false)
+    // The section whose bin was pressed while it still held items, waiting on
+    // the confirmation. Empty sections never get here — see `handleSectionBin`.
+    const [removingSection, setRemovingSection] = useState<string | null>(null)
     const [organising, setOrganising] = useState(false)
     const { draft: organiseDraft, onChange: onOrganiseChange, flush: flushOrganise } =
         useDeferredReorder(onReorder)
@@ -433,6 +438,15 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
             autoFocus
         />
     )
+    // A section with nothing in it goes on the press — there is nothing to lose,
+    // and a confirmation for it is the kind that teaches people to click through
+    // the ones that matter. One holding items asks first: its items are kept, but
+    // silently unfiling a dozen of them is a tedious thing to put back by hand.
+    const handleSectionBin = (label: string, itemCount: number) => {
+        if (itemCount === 0) onSectionRemove?.(label)
+        else setRemovingSection(label)
+    }
+
     // A sync or a delete can shrink the list under an open row; treat an index
     // that no longer exists as closed rather than rendering against undefined.
     const openAt = openIndex !== null && openIndex < items.length ? openIndex : null
@@ -548,6 +562,19 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
         </div>
     )
 
+    // Looked up rather than held in state, so a section that goes away underneath
+    // the confirmation — a sync, a drag elsewhere — takes its dialog with it.
+    const removingGroup = groups.find(group => group.label === removingSection)
+    const removeSectionModal = removingGroup && onSectionRemove && (
+        <DeleteConfirmModal
+            title={`Delete “${removingGroup.label}”?`}
+            body={`Its ${removingGroup.entries.length} item${removingGroup.entries.length === 1 ? '' : 's'} will move to “${defaultLabel}” — nothing is deleted.`}
+            confirmLabel="Delete section"
+            onConfirm={() => { onSectionRemove(removingGroup.label); setRemovingSection(null) }}
+            onCancel={() => setRemovingSection(null)}
+        />
+    )
+
     // A drag needs a scroll container of its own, and the only honest way to
     // give it one is to be the whole screen for a moment. Nested inside the
     // page it was a scroll area within a scroll area: neither one obviously in
@@ -605,6 +632,26 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
                                 >
                                     {group.entries.length} item{group.entries.length === 1 ? '' : 's'}
                                 </span>
+                                {onSectionRemove && group.label !== defaultLabel && (
+                                    // On the heading itself, because that is where
+                                    // the section is. Getting rid of one used to
+                                    // mean opening Organise items and finding its
+                                    // Remove — and a section holding a single item
+                                    // never even offered that, since the reorder
+                                    // view needs two items to be worth opening.
+                                    <button
+                                        type="button"
+                                        data-testid="delete-section"
+                                        onClick={() => handleSectionBin(group.label, group.entries.length)}
+                                        aria-label={`Delete section ${group.label}`}
+                                        title={`Delete section ${group.label} — its items move to ${defaultLabel}`}
+                                        className={`shrink-0 -my-1 rounded p-1.5 ${accent.muted} hover:bg-white/70 hover:text-red-600 transition-colors`}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                )}
                                 {adding && (
                                     <button
                                         type="button"
@@ -641,6 +688,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
             </div>
             {listFooter}
             {organiseModal}
+            {removeSectionModal}
         </div>
     )
 })
@@ -715,7 +763,7 @@ function OptionContextMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete:
     )
 }
 
-export function OptionSection({ option, people, sectionDefaultLabel, allItemNames, sectionNames, questionId, suggestions, onEdit, onDelete, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onReorder }: {
+export function OptionSection({ option, people, sectionDefaultLabel, allItemNames, sectionNames, questionId, suggestions, onEdit, onDelete, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onSectionRemove, onReorder }: {
     option: Option
     people: Person[]
     /** What the packing list will call items here that carry no category. */
@@ -734,6 +782,8 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
     onItemDelete?: (questionId: string, optionId: string, index: number) => void
     /** Omit to leave the option unable to grow a section. */
     onSectionAdd?: (questionId: string, optionId: string, label: string) => void
+    /** Omit to leave the option's sections undeletable. */
+    onSectionRemove?: (questionId: string, optionId: string, label: string) => void
     /** Omit to leave the items unorganisable. */
     onReorder?: (questionId: string, optionId: string, items: Item[], emptySections: string[] | undefined) => void
 }) {
@@ -756,6 +806,11 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
             ? (label: string) => onSectionAdd(questionId, optionId, label)
             : undefined,
         [onSectionAdd, questionId, optionId])
+    const handleSectionRemove = useMemo(
+        () => onSectionRemove && questionId
+            ? (label: string) => onSectionRemove(questionId, optionId, label)
+            : undefined,
+        [onSectionRemove, questionId, optionId])
     const handleReorder = useMemo(
         () => onReorder && questionId
             ? (reordered: Item[], sections: string[] | undefined) => onReorder(questionId, optionId, reordered, sections)
@@ -869,6 +924,7 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
                         onItemChange={handleItemChange}
                         onItemDelete={handleItemDelete}
                         onSectionAdd={handleSectionAdd}
+                        onSectionRemove={handleSectionRemove}
                         onReorder={handleReorder}
                     />
                 </div>
@@ -883,7 +939,13 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
     )
 }
 
-function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+function DeleteConfirmModal({ title = 'Delete question?', body = 'This will permanently remove the question and all its options.', confirmLabel = 'Delete', onConfirm, onCancel }: {
+    title?: string
+    body?: string
+    confirmLabel?: string
+    onConfirm: () => void
+    onCancel: () => void
+}) {
     return (
         <div
             className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
@@ -894,8 +956,8 @@ function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; on
                 className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"
                 onClick={e => e.stopPropagation()}
             >
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete question?</h2>
-                <p className="text-sm text-gray-500 mb-6">This will permanently remove the question and all its options.</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">{title}</h2>
+                <p className="text-sm text-gray-500 mb-6">{body}</p>
                 <div className="flex justify-end gap-3">
                     <button
                         type="button"
@@ -909,7 +971,7 @@ function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; on
                         onClick={onConfirm}
                         className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
                     >
-                        Delete
+                        {confirmLabel}
                     </button>
                 </div>
             </div>
@@ -988,7 +1050,7 @@ function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
 
 // Memoized with id-based handlers whose identity survives page re-renders, so
 // opening a modal (or a background sync tick) doesn't re-render every question.
-const QuestionSection = memo(function QuestionSection({ question, people, canMoveUp, canMoveDown, allItemNames, sectionNames, suggestions, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMove, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onReorder }: {
+const QuestionSection = memo(function QuestionSection({ question, people, canMoveUp, canMoveDown, allItemNames, sectionNames, suggestions, onEdit, onDelete, onAddOption, onEditOption, onDeleteOption, onMove, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onSectionRemove, onReorder }: {
     question: Question
     people: Person[]
     canMoveUp: boolean
@@ -1006,6 +1068,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
     onItemAdd: (questionId: string, optionId: string, text: string, category: string | undefined) => void
     onItemDelete: (questionId: string, optionId: string, index: number) => void
     onSectionAdd: (questionId: string, optionId: string, label: string) => void
+    onSectionRemove: (questionId: string, optionId: string, label: string) => void
     onReorder: (questionId: string, optionId: string, items: Item[], emptySections: string[] | undefined) => void
 }) {
     const [isExpanded, setIsExpanded] = useState(true)
@@ -1111,6 +1174,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                             onItemAdd={onItemAdd}
                             onItemDelete={onItemDelete}
                             onSectionAdd={onSectionAdd}
+                            onSectionRemove={onSectionRemove}
                             onReorder={onReorder}
                         />
                     ))}
@@ -1133,7 +1197,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
     )
 })
 
-const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections, allItemNames, sectionNames, suggestions, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onReorder }: {
+const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections, allItemNames, sectionNames, suggestions, onItemChange, onItemAdd, onItemDelete, onSectionAdd, onSectionRemove, onReorder }: {
     items: Item[]
     people: Person[]
     emptySections?: string[]
@@ -1144,6 +1208,7 @@ const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections
     onItemAdd: (text: string, category: string | undefined) => void
     onItemDelete: (index: number) => void
     onSectionAdd: (label: string) => void
+    onSectionRemove: (label: string) => void
     onReorder: (items: Item[], emptySections: string[] | undefined) => void
 }) {
     const [isExpanded, setIsExpanded] = useState(false)
@@ -1186,6 +1251,7 @@ const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections
                         onItemChange={onItemChange}
                         onItemDelete={onItemDelete}
                         onSectionAdd={onSectionAdd}
+                        onSectionRemove={onSectionRemove}
                         onReorder={onReorder}
                     />
                 </div>
@@ -1755,6 +1821,42 @@ export function QuestionsPage() {
         await saveData({ ...data, alwaysNeededEmptySections: emptySections })
     }, [saveData])
 
+    // Removing a section is the deliberate way to lose one, so the name is
+    // dropped rather than kept as an empty section — but its items are not:
+    // `removeSection` returns them to the list's default section, because losing
+    // a grouping should never destroy what was grouped.
+    const handleOptionSectionRemove = useCallback(async (questionId: string, optionId: string, label: string) => {
+        const data = dataRef.current
+        if (!data) return
+        const question = data.questions.find(q => q.id === questionId)
+        const option = question?.options.find(o => o.id === optionId)
+        if (!question || !option) return
+        const now = new Date().toISOString()
+        const items = removeSection(option.items, label, now)
+        await saveData(withReconciledSectionOrder(data, {
+            ...data,
+            questions: withQuestionOptions(data.questions, questionId, options =>
+                options.map(o => o.id === optionId
+                    ? withEmptySections({ ...o, items }, forgetEmptySection(o.emptySections, label))
+                    : o), now),
+        }))
+    }, [saveData])
+
+    const handleAlwaysSectionRemove = useCallback(async (label: string) => {
+        const data = dataRef.current
+        if (!data) return
+        const now = new Date().toISOString()
+        // Tombstones are restamped along with the rest, so an item restored on
+        // another device rejoins the default section instead of bringing the
+        // removed one back with it.
+        const items = removeSection(data.alwaysNeededItems ?? [], label, now)
+        await saveData(withReconciledSectionOrder(data, {
+            ...data,
+            alwaysNeededItems: items,
+            alwaysNeededEmptySections: forgetEmptySection(data.alwaysNeededEmptySections, label),
+        }))
+    }, [saveData])
+
     // A drag reports the whole list back, already stamped with each item's new
     // section by `applySectionLayout`, so this only has to renumber and save.
     const handleOptionReorder = useCallback(async (questionId: string, optionId: string, reordered: Item[], emptySections: string[] | undefined) => {
@@ -1960,6 +2062,7 @@ export function QuestionsPage() {
                     onItemAdd={handleAlwaysItemAdd}
                     onItemDelete={handleAlwaysItemDelete}
                     onSectionAdd={handleAlwaysSectionAdd}
+                    onSectionRemove={handleAlwaysSectionRemove}
                     onReorder={handleAlwaysReorder}
                 />
                 {activeQuestions.map((q, qi) => (
@@ -1982,6 +2085,7 @@ export function QuestionsPage() {
                         onItemAdd={handleOptionItemAdd}
                         onItemDelete={handleOptionItemDelete}
                         onSectionAdd={handleOptionSectionAdd}
+                        onSectionRemove={handleOptionSectionRemove}
                         onReorder={handleOptionReorder}
                     />
                 ))}

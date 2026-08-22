@@ -660,6 +660,77 @@ describe('OptionSection: creating a section', () => {
     })
 })
 
+describe('OptionSection: deleting a section', () => {
+    function renderRemovable(option: Option, onSectionRemove: ReturnType<typeof vi.fn> = vi.fn()) {
+        render(
+            <OptionSection
+                option={option}
+                people={people}
+                sectionDefaultLabel="Yes"
+                questionId="q1"
+                suggestions={buildIndexOf([])}
+                onEdit={vi.fn()}
+                onDelete={vi.fn()}
+                onItemChange={vi.fn()}
+                onItemAdd={vi.fn()}
+                onSectionRemove={onSectionRemove}
+            />
+        )
+        fireEvent.click(screen.getByRole('button', { name: /Yes/ }))
+        return { onSectionRemove }
+    }
+
+    const withSection = () => makeOption({
+        items: [makeItem('Socks'), makeItem('Soap', { category: 'Toiletries' })],
+    })
+
+    it('carries a bin on every section heading it can remove', () => {
+        renderRemovable(withSection())
+        expect(screen.getByRole('button', { name: 'Delete section Toiletries' })).toBeTruthy()
+    })
+
+    it('offers no bin on the default section, which cannot be removed', () => {
+        renderRemovable(withSection())
+        expect(screen.queryByRole('button', { name: 'Delete section Yes' })).toBeNull()
+    })
+
+    it('offers no bin at all when the page supplies no handler', () => {
+        renderEditable(makeOption({ items: [makeItem('Soap', { category: 'Toiletries' })] }))
+        expect(screen.queryByRole('button', { name: 'Delete section Toiletries' })).toBeNull()
+    })
+
+    it('removes an empty section on the spot — there is nothing to lose', () => {
+        const { onSectionRemove } = renderRemovable(
+            makeOption({ items: [makeItem('Socks')], emptySections: ['Toiletries'] }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete section Toiletries' }))
+        expect(onSectionRemove).toHaveBeenCalledWith('q1', 'o1', 'Toiletries')
+        expect(screen.queryByRole('heading', { name: 'Delete “Toiletries”?' })).toBeNull()
+    })
+
+    it('asks first when the section holds items, and says where they go', () => {
+        const { onSectionRemove } = renderRemovable(withSection())
+        fireEvent.click(screen.getByRole('button', { name: 'Delete section Toiletries' }))
+        expect(onSectionRemove).not.toHaveBeenCalled()
+        expect(screen.getByRole('heading', { name: 'Delete “Toiletries”?' })).toBeTruthy()
+        expect(screen.getByText(/Its 1 item will move to “Yes” — nothing is deleted/)).toBeTruthy()
+    })
+
+    it('removes the section once confirmed', () => {
+        const { onSectionRemove } = renderRemovable(withSection())
+        fireEvent.click(screen.getByRole('button', { name: 'Delete section Toiletries' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Delete section' }))
+        expect(onSectionRemove).toHaveBeenCalledWith('q1', 'o1', 'Toiletries')
+    })
+
+    it('keeps the section when the confirmation is cancelled', () => {
+        const { onSectionRemove } = renderRemovable(withSection())
+        fireEvent.click(screen.getByRole('button', { name: 'Delete section Toiletries' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+        expect(onSectionRemove).not.toHaveBeenCalled()
+        expect(screen.queryByRole('heading', { name: 'Delete “Toiletries”?' })).toBeNull()
+    })
+})
+
 describe('OptionSection: organising', () => {
     const withItems = () => makeOption({ items: [makeItem('Socks'), makeItem('Towel')] })
 

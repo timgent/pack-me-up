@@ -25,6 +25,7 @@ import type { Item } from '../edit-questions/types'
 import {
     applySectionLayout,
     buildSectionSequence,
+    forgetEmptySection,
     reconcileEmptySections,
     isAtSectionEdge,
     moveItemToSection,
@@ -327,10 +328,9 @@ export function SectionedItemReorder({ items, defaultLabel, emptySections, scrol
     // name itself rather than going through `reconcileEmptySections` — which
     // exists to *keep* a section whose items merely left.
     const removeSectionAt = (label: string) => {
-        const remaining = emptySections?.filter(l => l !== label)
         onChange(
             removeSection(items, label, new Date().toISOString()),
-            remaining?.length ? remaining : undefined,
+            forgetEmptySection(emptySections, label),
         )
     }
 
