@@ -261,8 +261,6 @@ export function ViewPackingList() {
      * list that looks like it has lost two thirds of itself.
      */
     const [selectedPeople, setSelectedPeople] = useState<ReadonlySet<string>>(() => new Set<string>())
-    /** Categories with nothing for the filter are dropped; this puts them back. */
-    const [showEmptyCategories, setShowEmptyCategories] = useState(false)
     const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [itemToDelete, setItemToDelete] = useState<string | null>(null)
     // Which row of the category grid has its "who needs this?" panel open, held
@@ -487,11 +485,9 @@ export function ViewPackingList() {
     const visibleColumnKeys = filtering ? selectedPeople : undefined
 
     const handleTogglePerson = useCallback((name: string) => {
-        setShowEmptyCategories(false)
         setSelectedPeople(prev => togglePerson(prev, name))
     }, [])
     const handleClearFilter = useCallback(() => {
-        setShowEmptyCategories(false)
         setSelectedPeople(new Set<string>())
     }, [])
 
@@ -1466,11 +1462,7 @@ export function ViewPackingList() {
     // same question answered with three real cards adrift in nine empty ones
     // would be a worse list, not a simpler app. What is missing is said in one
     // line under the cards instead, and that line puts them back.
-    const emptyForFilter = filtering ? allCategorySections.filter(section => !hasSomethingForFilter(section)) : []
-    const emptyCategoriesShown = filtering && showEmptyCategories && emptyForFilter.length > 0
-    const categorySections = filtering && !showEmptyCategories
-        ? allCategorySections.filter(hasSomethingForFilter)
-        : allCategorySections
+    const categorySections = filtering ? allCategorySections.filter(hasSomethingForFilter) : allCategorySections
     const listSections: ListSection[] = [...categorySections, ...lastMinuteSections]
 
     const soleGuest = solePerson === undefined
@@ -1850,21 +1842,6 @@ export function ViewPackingList() {
                                         {filterNames(selectedPeople)}
                                     </span>
                                 )}
-                                {/* Cards vanishing is an alarming thing for a
-                                    packing list to do, and the explanation used
-                                    to sit three thousand pixels below the cause.
-                                    It belongs where the filter is. */}
-                                {emptyForFilter.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowEmptyCategories(shown => !shown)}
-                                        className="ml-auto shrink-0 whitespace-nowrap rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
-                                    >
-                                        {emptyCategoriesShown
-                                            ? `Hide ${emptyForFilter.length} empty`
-                                            : `${emptyForFilter.length} empty — show`}
-                                    </button>
-                                )}
                             </div>
                         )}
                         {/* Announced rather than shown: the strip above says the
@@ -1988,13 +1965,14 @@ export function ViewPackingList() {
                             // total of "24 / 58" is a number with no referent.
                             const stats = filtering ? filteredStatsFor(section) : unfilteredStats
                             const isLastMinute = section.lastMinute === true
-                            // Emerald borders, the "all packed" pill and the
-                            // fold-away are how this app says the trip is done.
-                            // One person finishing their share of a category is
-                            // not that, so under a filter a card keeps its
-                            // ordinary clothes and the person's own chip goes
-                            // green instead.
-                            const isComplete = !filtering && isSectionComplete(unfilteredStats)
+                            // A card is finished when the part of it on screen
+                            // is finished — packing for Alice, Toiletries is
+                            // done when hers are, whatever Bob still owes. The
+                            // fold-away is the one part of the celebration a
+                            // filter doesn't get: folding writes to storage, and
+                            // a filter used once would leave the list folded up
+                            // for good (see `completeSectionKeys`).
+                            const isComplete = isSectionComplete(stats)
                             const completeLabel = title
                             const collapseLabelTarget = isLastMinute ? 'the last minute items' : title
                             // Every card is a grid now: the name down the side,
@@ -2033,7 +2011,7 @@ export function ViewPackingList() {
                                         </button>
                                         {isComplete && (
                                             <span
-                                                aria-label={`All packed for ${completeLabel}`}
+                                                aria-label={`All packed for ${completeLabel}${filterQualifier}`}
                                                 className="animate-pop-in text-xs font-semibold text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0"
                                             >
                                                 🎉 All packed!
@@ -2116,7 +2094,7 @@ export function ViewPackingList() {
                                 Nothing on this list is{filterQualifier} yet.
                             </p>
                             <p className="mt-1 text-sm text-gray-500">
-                                Show the empty sections above to add the first thing, or pick somebody else.
+                                Clear the filter to add the first thing{filterQualifier}, or pick somebody else.
                             </p>
                         </div>
                     )}

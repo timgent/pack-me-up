@@ -2129,6 +2129,7 @@ describe('ViewPackingList section completion celebration', () => {
             { id: 'a2', itemText: 'Sunhat', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: true },
             { id: 'b1', itemText: 'Wellies', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Clothes', packed: true },
             { id: 'b2', itemText: 'Toothbrush', personName: 'Bob', personId: 'p2', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: false },
+            { id: 'a3', itemText: 'Comb', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', category: 'Toiletries', packed: true },
         ],
     }
 
@@ -2203,16 +2204,18 @@ describe('ViewPackingList section completion celebration', () => {
         await waitFor(() => expect(screen.getByLabelText(/all packed for toiletries/i)).toBeTruthy())
     })
 
-    it('does not celebrate a card that is only finished for the person filtered to', async () => {
-        // Alice has packed her half of Clothes; Bob's Wellies are in it too.
-        // The emerald pill is how this app says a section of the trip is done,
-        // and one person's share of it being done is not that.
+    it('celebrates a card finished for whoever is being packed for', async () => {
+        // Alice's comb is packed and Bob's toothbrush isn't, so Toiletries is
+        // unfinished for the trip. Packing Alice's bag it is done — what Bob
+        // still owes is not part of the question being asked.
         renderList()
         await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
+        expect(screen.queryByLabelText(/all packed for toiletries/i)).toBeNull()
+
         fireEvent.click(screen.getByRole('button', { name: /^Alice/ }))
 
-        expect(screen.queryByLabelText(/all packed for clothes/i)).toBeNull()
+        expect(screen.getByLabelText(/all packed for toiletries for alice/i)).toBeTruthy()
     })
 })
 
@@ -2757,11 +2760,10 @@ describe('ViewPackingList adding items', () => {
         renderComponentMultiCategory()
         await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Tent' })).toBeTruthy())
 
-        fireEvent.click(screen.getByRole('button', { name: /^Bob/ }))
-        // Bob has nothing in Hiking, so the card is off the page until asked for
-        fireEvent.click(screen.getByRole('button', { name: /empty — show$/ }))
-        const { input } = composerFor('Hiking')
+        const { input, fields } = composerFor('Hiking')
+        // The who-for picker only appears once there is something typed
         fireEvent.change(input, { target: { value: 'ten' } })
+        fireEvent.change(fields.getByLabelText('Who for'), { target: { value: 'Bob' } })
         fireEvent.click(screen.getByRole('option', { name: /Tent/ }))
         fireEvent.keyDown(input, { key: 'Enter' })
 
@@ -3652,29 +3654,14 @@ describe('ViewPackingList people filter', () => {
             fireEvent.click(chip('Bob'))
 
             expect(screen.queryByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeNull()
-            // Said beside the filter that caused it, not at the foot of a page
-            // three thousand pixels down
-            expect(screen.getByRole('button', { name: '2 empty — show' })).toBeTruthy()
+            expect(screen.getByRole('button', { name: /(expand|collapse) clothes list/i })).toBeTruthy()
         })
 
-        it('puts the empty sections away again, having offered to show them', async () => {
+        it('brings them back when the filter is cleared', async () => {
             await renderList()
             fireEvent.click(chip('Bob'))
 
-            fireEvent.click(screen.getByRole('button', { name: '2 empty — show' }))
-            expect(screen.getByRole('button', { name: 'Hide 2 empty' })).toBeTruthy()
-
-            fireEvent.click(screen.getByRole('button', { name: 'Hide 2 empty' }))
-
-            expect(screen.queryByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeNull()
-            expect(screen.getByRole('button', { name: '2 empty — show' })).toBeTruthy()
-        })
-
-        it('puts the dropped sections back when asked', async () => {
-            await renderList()
-            fireEvent.click(chip('Bob'))
-
-            fireEvent.click(screen.getByRole('button', { name: /empty — show$/ }))
+            fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
 
             expect(screen.getByRole('button', { name: /(expand|collapse) toiletries list/i })).toBeTruthy()
         })

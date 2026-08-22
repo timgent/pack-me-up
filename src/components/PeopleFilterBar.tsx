@@ -24,13 +24,16 @@
  * selected is written out in the bar underneath instead, where there is a whole
  * line for it.
  *
+ * The names come back on demand: a pointer hovers, a finger holds. Whichever
+ * way, the chip says who it is without the strip having to carry it.
+ *
  * A filled chip means one thing and one thing only: pressed. Somebody who has
  * finished packing used to get a chip filled green, which read as selected
  * beside the white ones that read as not — two states competing for the same
  * signal. Finished is a tick on the face instead, which says it without
  * borrowing the fill.
  */
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PersonAvatar } from './PersonAvatar'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
 import type { GridColumn } from '../utils/categoryItemGrid'
@@ -61,6 +64,11 @@ function DoneTick() {
     )
 }
 
+/** How long a press has to be held before it is asking who, not choosing. */
+const LONG_PRESS_MS = 400
+/** And how long the answer stays up afterwards. */
+const REVEAL_MS = 1800
+
 export function PeopleFilterBar({
     columns,
     selected,
@@ -72,6 +80,64 @@ export function PeopleFilterBar({
 }: PeopleFilterBarProps) {
     const scroller = useRef<HTMLDivElement>(null)
     const settled = useRef(false)
+
+    /**
+     * Who a chip belongs to, on a screen with no room to write it beside them.
+     *
+     * A pointer gets `title`. A finger gets a long press, because the phone is
+     * where the names were dropped and "the face is the only label" is fine
+     * until the day somebody else packs the bag.
+     *
+     * Rendered outside the scroller: `overflow-x` makes the other axis scroll
+     * too, so anything drawn above a chip is clipped by the strip it sits in.
+     * The position is measured against the scroller instead and the label is
+     * placed over it.
+     */
+    const [revealed, setRevealed] = useState<{ name: string; left: number } | null>(null)
+    const pressTimer = useRef<number | null>(null)
+    const wasLongPress = useRef(false)
+
+    const cancelPress = useCallback(() => {
+        if (pressTimer.current !== null) {
+            clearTimeout(pressTimer.current)
+            pressTimer.current = null
+        }
+    }, [])
+
+    const beginPress = useCallback((name: string, chip: HTMLElement) => {
+        wasLongPress.current = false
+        cancelPress()
+        pressTimer.current = window.setTimeout(() => {
+            const box = scroller.current
+            if (!box) return
+            wasLongPress.current = true
+            const left = chip.offsetLeft - box.scrollLeft + chip.offsetWidth / 2
+            setRevealed({ name, left })
+        }, LONG_PRESS_MS)
+    }, [cancelPress])
+
+    useEffect(() => {
+        if (!revealed) return
+        const timer = setTimeout(() => setRevealed(null), REVEAL_MS)
+        return () => clearTimeout(timer)
+    }, [revealed])
+
+    useEffect(() => cancelPress, [cancelPress])
+
+    /** A press held long enough to ask who was not a press to choose them. */
+    const pressHandlers = (name: string) => ({
+        title: name,
+        onTouchStart: (e: React.TouchEvent<HTMLButtonElement>) => beginPress(name, e.currentTarget),
+        onTouchEnd: cancelPress,
+        onTouchMove: cancelPress,
+        onTouchCancel: cancelPress,
+    })
+
+    const swallowLongPress = () => {
+        if (!wasLongPress.current) return false
+        wasLongPress.current = false
+        return true
+    }
 
     // A chip pressed off screen leaves the list filtered by a control the user
     // can't see — which is what happens as soon as the group outgrows the strip.
@@ -129,7 +195,8 @@ export function PeopleFilterBar({
                             key={column.key}
                             type="button"
                             aria-pressed={isSelected}
-                            onClick={() => onToggle(column.key)}
+                            {...pressHandlers(column.name)}
+                            onClick={() => { if (!swallowLongPress()) onToggle(column.key) }}
                             className={`flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
@@ -166,7 +233,8 @@ export function PeopleFilterBar({
                         <button
                             type="button"
                             aria-pressed={isSelected}
-                            onClick={() => onToggle(SHARED_FILTER_KEY)}
+                            {...pressHandlers('Shared items')}
+                            onClick={() => { if (!swallowLongPress()) onToggle(SHARED_FILTER_KEY) }}
                             className={`flex min-h-[44px] min-w-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
@@ -191,6 +259,16 @@ export function PeopleFilterBar({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white to-transparent"
             />
+            {revealed && (
+                <span
+                    aria-hidden="true"
+                    data-testid="chip-name-reveal"
+                    style={{ left: `${revealed.left}px` }}
+                    className="pointer-events-none absolute -top-1 z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
+                >
+                    {revealed.name}
+                </span>
+            )}
             </div>
         </div>
     )
