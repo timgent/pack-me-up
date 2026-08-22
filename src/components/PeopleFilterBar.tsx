@@ -9,20 +9,21 @@
  * unlike the destructive thing a key could have done (pack somebody's whole
  * category on a stray tap), filtering undoes itself.
  *
- * One line, always, scrolled rather than wrapped. It is sticky, above a
- * progress line and a row of controls that already goes to two lines on a
- * phone; a wrapping strip of six tappable chips would take a third of the
- * screen in the one situation this is for — packing a bag in a hallway,
- * one-handed. Scrolling also keeps a chip where the user last saw it, which
- * wrapping does not: a chip that changes width on selection reflows the line.
- *
  * On a phone the chips are faces and nothing else. Four names and "Shared"
- * come to about 370px of chips in about 340px of room, so a family of four
- * scrolled — and a control you have to scroll to find is one you don't know is
- * there. The names are worth roughly a third of that width, and they are the
- * part the grid below already says twice over in colour and initial. Who is
- * selected is written out in the bar underneath instead, where there is a whole
- * line for it.
+ * come to about 370px of chips in about 340px of room, so carrying the names
+ * meant the strip could not hold a family of four. The names are worth roughly
+ * a third of that width, and they are the part the grid below already says
+ * twice over in colour and initial. Who is selected is written out in the bar
+ * underneath instead, where there is a whole line for it.
+ *
+ * The strip wraps rather than scrolls. It used to scroll, on the argument that
+ * a wrapping row of tappable chips would take a third of a phone screen and
+ * that a chip changing width on selection would reflow the line — both true of
+ * chips carrying names and counts, and neither true of these. A fixed 44px
+ * circle never changes width, and six fit a line, so a family of four wraps to
+ * nothing at all and only a party of seven costs a second row. What scrolling
+ * costs is worse and certain: a chip past the edge is a person the strip does
+ * not appear to have.
  *
  * The names come back on demand: a pointer hovers, a finger holds. Whichever
  * way, the chip says who it is without the strip having to carry it.
@@ -78,9 +79,6 @@ export function PeopleFilterBar({
     sharedStat,
     controlsId,
 }: PeopleFilterBarProps) {
-    const scroller = useRef<HTMLDivElement>(null)
-    const settled = useRef(false)
-
     /**
      * Who a chip belongs to, on a screen with no room to write it beside them.
      *
@@ -88,12 +86,11 @@ export function PeopleFilterBar({
      * where the names were dropped and "the face is the only label" is fine
      * until the day somebody else packs the bag.
      *
-     * Rendered outside the scroller: `overflow-x` makes the other axis scroll
-     * too, so anything drawn above a chip is clipped by the strip it sits in.
-     * The position is measured against the scroller instead and the label is
-     * placed over it.
+     * Placed under the chip's own row rather than over it: above would take it
+     * out of the strip and into the controls above, and with the chips wrapped
+     * every row has a below to sit against.
      */
-    const [revealed, setRevealed] = useState<{ name: string; left: number } | null>(null)
+    const [revealed, setRevealed] = useState<{ name: string; left: number; top: number } | null>(null)
     const pressTimer = useRef<number | null>(null)
     const wasLongPress = useRef(false)
 
@@ -108,11 +105,12 @@ export function PeopleFilterBar({
         wasLongPress.current = false
         cancelPress()
         pressTimer.current = window.setTimeout(() => {
-            const box = scroller.current
-            if (!box) return
             wasLongPress.current = true
-            const left = chip.offsetLeft - box.scrollLeft + chip.offsetWidth / 2
-            setRevealed({ name, left })
+            setRevealed({
+                name,
+                left: chip.offsetLeft + chip.offsetWidth / 2,
+                top: chip.offsetTop + chip.offsetHeight,
+            })
         }, LONG_PRESS_MS)
     }, [cancelPress])
 
@@ -139,23 +137,6 @@ export function PeopleFilterBar({
         return true
     }
 
-    // A chip pressed off screen leaves the list filtered by a control the user
-    // can't see — which is what happens as soon as the group outgrows the strip.
-    //
-    // Never on the first render: the list opens unfiltered, and scrolling
-    // anything into view before the user has asked for it moves a page they are
-    // already reading.
-    const lastSelected = [...selected].join('\u0000')
-    useEffect(() => {
-        const box = scroller.current
-        if (!box) return
-        if (!settled.current) { settled.current = true; return }
-        const target = selected.size > 0
-            ? box.querySelector<HTMLElement>('[aria-pressed="true"]')
-            : box.firstElementChild as HTMLElement | null
-        target?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
-    }, [lastSelected, selected.size])
-
     // One person is not a choice, and neither is nobody — unless the group's
     // own items are also on offer, which makes it a choice again.
     if (columns.length <= 1 && sharedStat === undefined) return null
@@ -172,15 +153,12 @@ export function PeopleFilterBar({
             <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 sm:inline">
                 Packing for
             </span>
-            {/* Faded at the trailing edge, so a group that runs off the end
-                looks like it continues rather than like it stops there. */}
             <div className="relative min-w-0 flex-1">
             <div
-                ref={scroller}
                 role="group"
                 aria-label="Filter by person"
                 aria-controls={controlsId}
-                className="flex items-center gap-1.5 overflow-x-auto scroll-pr-6 scroll-smooth pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex flex-wrap items-center gap-1.5"
             >
                 {columns.map(column => {
                     const isSelected = selected.has(column.key)
@@ -197,7 +175,7 @@ export function PeopleFilterBar({
                             aria-pressed={isSelected}
                             {...pressHandlers(column.name)}
                             onClick={() => { if (!swallowLongPress()) onToggle(column.key) }}
-                            className={`flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
+                            className={`flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
                                     : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
@@ -235,7 +213,7 @@ export function PeopleFilterBar({
                             aria-pressed={isSelected}
                             {...pressHandlers('Shared items')}
                             onClick={() => { if (!swallowLongPress()) onToggle(SHARED_FILTER_KEY) }}
-                            className={`flex min-h-[44px] min-w-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
+                            className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
                                     : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
@@ -255,16 +233,12 @@ export function PeopleFilterBar({
                     )
                 })()}
             </div>
-            <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white to-transparent"
-            />
             {revealed && (
                 <span
                     aria-hidden="true"
                     data-testid="chip-name-reveal"
-                    style={{ left: `${revealed.left}px` }}
-                    className="pointer-events-none absolute -top-1 z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
+                    style={{ left: `${revealed.left}px`, top: `${revealed.top + 4}px` }}
+                    className="pointer-events-none absolute z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
                 >
                     {revealed.name}
                 </span>

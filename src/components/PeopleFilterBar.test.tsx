@@ -80,6 +80,16 @@ describe('getting a name back off a face', () => {
     })
 })
 
+describe('fitting the group in', () => {
+    it('wraps rather than scrolling, so a chip past the edge is never a person the strip hides', () => {
+        renderBar()
+
+        const group = screen.getByRole('group', { name: 'Filter by person' })
+        expect(group.className).toContain('flex-wrap')
+        expect(group.className).not.toContain('overflow-x-auto')
+    })
+})
+
 describe('what a chip says without being asked', () => {
     it('tells two people who share a first letter apart', () => {
         renderBar()
