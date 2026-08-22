@@ -10,6 +10,7 @@ import React from 'react'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import { CategoryItemGrid } from './CategoryItemGrid'
 import { buildCategoryRows, buildGridColumns } from '../utils/categoryItemGrid'
+import { SHARED_FILTER_KEY } from '../utils/peopleFilter'
 import { PERSON_COLORS } from '../edit-questions/person-colors'
 import type { PackingListItem } from '../create-packing-list/types'
 
@@ -67,20 +68,16 @@ describe('where the chips sit', () => {
         expect(chips.className).not.toContain('order-first')
     })
 
-    it('leads with the chip for one person, where there is no grid left to line up', () => {
+    it('keeps them there for one person too — a row reads the same way round everywhere', () => {
         renderGrid(new Set(['Alice']))
 
         const { chips } = partsOf('Sunhat')
-        expect(chips.className).toContain('order-first')
-        // and gives the name the room the empty column used to take
-        expect(chips.style.width).toBe('')
+        expect(chips.className).not.toContain('order-first')
     })
 
-    it('moves the chip in the picture only, never in the reading order', () => {
+    it('puts the name before the chip in the reading order', () => {
         renderGrid(new Set(['Alice']))
 
-        // The name is still what a screen reader — and the tab key — reaches
-        // first, whichever side the chip is drawn on.
         const { row } = partsOf('Sunhat')
         const focusable = [...row.querySelectorAll('button, input')]
         expect(focusable[0]!.getAttribute('aria-label')).toBe('Edit Sunhat')
@@ -92,8 +89,8 @@ describe('where the chips sit', () => {
         renderGrid(new Set(['Alice']))
         fireEvent.click(screen.getByRole('button', { name: /Shared \(1\)/ }))
 
-        expect(partsOf('Tent').chips.className).toContain('order-first')
-        expect(partsOf('Sunhat').chips.className).toContain('order-first')
+        expect(partsOf('Tent').chips.className).not.toContain('order-first')
+        expect(partsOf('Sunhat').chips.className).not.toContain('order-first')
     })
 
     it('leaves a shared row alongside the rest when the columns are showing', () => {
@@ -112,7 +109,7 @@ describe('what the filter leaves on the page', () => {
         expect(screen.queryByRole('checkbox', { name: 'Sunhat for Alice' })).toBeNull()
     })
 
-    it('folds shared items away under a filter, and leaves them inline without one', () => {
+    it('folds shared items away when the filter is people, and leaves them inline without one', () => {
         const { unmount } = renderGrid()
         expect(screen.getByRole('checkbox', { name: 'Tent for the whole group' })).toBeTruthy()
         expect(screen.queryByRole('button', { name: /Shared \(1\)/ })).toBeNull()
@@ -120,5 +117,19 @@ describe('what the filter leaves on the page', () => {
 
         renderGrid(new Set(['Alice']))
         expect(screen.getByRole('button', { name: /Shared \(1\)/ })).toBeTruthy()
+    })
+
+    it('brings shared items back among the rest when the group is what was asked for', () => {
+        renderGrid(new Set(['Alice', SHARED_FILTER_KEY]))
+
+        expect(screen.getByRole('checkbox', { name: 'Tent for the whole group' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Shared \(1\)/ })).toBeNull()
+    })
+
+    it('shows the group alone when the group alone is selected', () => {
+        renderGrid(new Set([SHARED_FILTER_KEY]))
+
+        expect(screen.getByRole('checkbox', { name: 'Tent for the whole group' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'Edit Sunhat' })).toBeNull()
     })
 })

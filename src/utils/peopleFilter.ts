@@ -18,7 +18,18 @@
  */
 import type { PackingListItem } from '../create-packing-list/types'
 
-/** Names of the selected people; empty means everyone. */
+/**
+ * The group's own place in the filter.
+ *
+ * Shared items belong to nobody, so no person's chip reaches them — and with
+ * every filter folding them away, the tent was only findable by clearing the
+ * filter or opening a disclosure on every card. It gets a chip of its own.
+ *
+ * Not a name: a person actually called "Shared" keeps their own chip.
+ */
+export const SHARED_FILTER_KEY = '__shared__'
+
+/** Keys of the selected chips — people's names, and `SHARED_FILTER_KEY`. */
 export type PeopleFilter = ReadonlySet<string>
 
 export interface PersonStat { packed: number; total: number }
@@ -39,6 +50,38 @@ export function togglePerson(selected: PeopleFilter, name: string): Set<string> 
 
 export function isFiltered(selected: PeopleFilter): boolean {
     return selected.size > 0
+}
+
+/** Whether the group's own items are among what the filter is asking for. */
+export function sharedSelected(selected: PeopleFilter): boolean {
+    return selected.has(SHARED_FILTER_KEY)
+}
+
+/** How many of the group's own items are packed — the Shared chip's numbers. */
+export function sharedTotal(
+    items: readonly PackingListItem[],
+    packedById: Record<string, boolean>,
+): PersonStat {
+    const communal = items.filter(item => item.communal)
+    return {
+        packed: communal.filter(item => packedById[item.id]).length,
+        total: communal.length,
+    }
+}
+
+/**
+ * What a filtered count is *of*, as it reads beside the number.
+ *
+ * One name where there is one, "the group" for the shared chip, and a headcount
+ * past that: a comma-joined list beside a fraction reads as a truncated list,
+ * and on a phone it runs under the button beside it.
+ */
+export function filterLabel(selected: PeopleFilter): string {
+    if (!isFiltered(selected)) return ''
+    const people = [...selected].filter(key => key !== SHARED_FILTER_KEY)
+    if (people.length === 0) return 'shared items'
+    if (selected.size === 1) return people[0]!
+    return `${people.length}${sharedSelected(selected) ? '' : ''} people`
 }
 
 /**
@@ -75,7 +118,8 @@ export function personTotals(
  */
 export function filterSummary(selected: PeopleFilter, shownCategories: number, totalCategories: number): string {
     if (!isFiltered(selected)) return ''
-    const names = [...selected].sort((a, b) => a.localeCompare(b))
+    const names = [...selected].filter(key => key !== SHARED_FILTER_KEY).sort((a, b) => a.localeCompare(b))
+    if (sharedSelected(selected)) names.push('the group')
     const joined = names.length === 1
         ? names[0]!
         : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`

@@ -143,7 +143,7 @@ export function ItemRowPanel({
                     <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
                         <span aria-hidden="true">👥</span>
                         <span className="flex-1 text-sm font-medium text-blue-900">
-                            Everyone — packed once for the whole group
+                            Shared — packed once for the whole group
                         </span>
                         {renderItemControls(row.items[0], 'the group')}
                     </div>

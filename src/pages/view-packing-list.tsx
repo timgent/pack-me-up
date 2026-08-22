@@ -38,7 +38,7 @@ import { CategoryItemGrid } from '../components/CategoryItemGrid'
 import { ItemRowPanel } from '../components/ItemRowPanel'
 import { buildCategoryRows, buildGridColumns, UNASSIGNED_COLUMN_KEY, type GridRow } from '../utils/categoryItemGrid'
 import { PeopleFilterBar } from '../components/PeopleFilterBar'
-import { togglePerson, isFiltered, personTotals, filterSummary } from '../utils/peopleFilter'
+import { togglePerson, isFiltered, personTotals, filterSummary, sharedTotal, sharedSelected, filterLabel } from '../utils/peopleFilter'
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { loadListViewPreferences, saveListViewPreferences, hasStoredListViewPreferences, hasStalePersonViewSections } from '../utils/listViewPreferences'
@@ -502,7 +502,7 @@ export function ViewPackingList() {
      * filter by — it is every item nobody has claimed yet — but it is not
      * somebody to rename, remove, or pack a bag for.
      */
-    const solePerson = selectedPeople.size === 1
+    const solePerson = selectedPeople.size === 1 && !sharedSelected(selectedPeople)
         ? gridColumns.find(column => column.key === [...selectedPeople][0] && !column.unassigned)
         : undefined
 
@@ -537,6 +537,10 @@ export function ViewPackingList() {
     // thing from anywhere.
     const peopleTotals = useMemo(
         () => personTotals(packingList?.items ?? [], watchedItems),
+        [packingList?.items, watchedItems],
+    )
+    const sharedStat = useMemo(
+        () => sharedTotal(packingList?.items ?? [], watchedItems),
         [packingList?.items, watchedItems],
     )
 
@@ -1451,9 +1455,11 @@ export function ViewPackingList() {
      * a question the group's tent answers, and a card kept alive by one is a
      * card the user opens to find nothing of what they were looking for.
      */
-    const hasSomethingForFilter = (section: ListSection) => !filtering || (section.rows ?? []).some(
-        row => !row.communal && row.items.some(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY)),
-    )
+    const hasSomethingForFilter = (section: ListSection) => !filtering || (section.rows ?? []).some(row => (
+        row.communal
+            ? sharedSelected(selectedPeople)
+            : row.items.some(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
+    ))
 
     // Under a filter the empty ones go rather than staying as muted headers.
     // Person view used to answer "what is left for Alice?" with one card; the
@@ -1484,11 +1490,7 @@ export function ViewPackingList() {
      * list beside a fraction reads as a truncated list, and on a phone it runs
      * straight under the button beside it. The strip above says which people.
      */
-    const filterQualifier = !filtering
-        ? ''
-        : selectedPeople.size === 1
-            ? ` for ${[...selectedPeople][0]}`
-            : ` for ${selectedPeople.size} people`
+    const filterQualifier = filtering ? ` for ${filterLabel(selectedPeople)}` : ''
 
     /**
      * What "Check all" on a card ticks: what the card is showing. Under a
@@ -1497,7 +1499,7 @@ export function ViewPackingList() {
      */
     const checkableItemsOf = (section: ListSection) => (section.rows ?? []).flatMap(row => (
         row.communal
-            ? (filtering ? [] : row.items)
+            ? (!filtering || sharedSelected(selectedPeople) ? row.items : [])
             : row.items.filter(item => !filtering || selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
     ))
 
@@ -1506,9 +1508,17 @@ export function ViewPackingList() {
         let packed = 0
         let total = 0
         for (const row of section.rows ?? []) {
-            // Shared items belong to no one person, so counting them here would
-            // put the tent in Alice's total and in Bob's.
-            if (row.communal) continue
+            // Shared items belong to no one person, so counting them against a
+            // person would put the tent in Alice's total and in Bob's. Counted
+            // only when the group's own chip is what is asking.
+            if (row.communal) {
+                if (!sharedSelected(selectedPeople)) continue
+                for (const item of row.items) {
+                    total += 1
+                    if (watchedItems[item.id]) packed += 1
+                }
+                continue
+            }
             for (const item of row.items) {
                 if (!selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY)) continue
                 total += 1
@@ -1526,9 +1536,11 @@ export function ViewPackingList() {
             (rowCount, row) => {
                 // Counted the way the grid hides them: over the cells actually
                 // on screen, so a filter's numbers describe the filter.
-                const shown = filtering && !row.communal
-                    ? row.items.filter(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
-                    : row.items
+                const shown = !filtering
+                    ? row.items
+                    : row.communal
+                        ? (sharedSelected(selectedPeople) ? row.items : [])
+                        : row.items.filter(item => selectedPeople.has(item.personName || UNASSIGNED_COLUMN_KEY))
                 return rowCount + (shown.length > 0 && shown.every(item => watchedItems[item.id]) ? shown.length : 0)
             },
             0,
@@ -1737,6 +1749,7 @@ export function ViewPackingList() {
                                 columns={gridColumns}
                                 selected={selectedPeople}
                                 totals={peopleTotals}
+                                sharedStat={sharedStat.total > 0 ? sharedStat : undefined}
                                 personColor={personColor}
                                 onToggle={handleTogglePerson}
                                 controlsId={LIST_SECTIONS_ID}

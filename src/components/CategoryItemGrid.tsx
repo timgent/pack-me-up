@@ -40,6 +40,7 @@
  * and what Bob still owes is not part of the answer.
  */
 import { useState } from 'react'
+import { SHARED_FILTER_KEY } from '../utils/peopleFilter'
 import type { PackingListItem } from '../create-packing-list/types'
 import type { GridColumn, GridRow } from '../utils/categoryItemGrid'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
@@ -151,6 +152,11 @@ export function CategoryItemGrid({
 
     // Positions in the full column set, so `row.cells[index]` still lines up
     // after some of the people have been filtered out.
+    const filtering = visibleColumnKeys !== undefined
+    // With only the Shared chip pressed there are no people left to show, and
+    // the card is the group's items alone.
+    const anyPersonSelected = !filtering || [...visibleColumnKeys].some(key => key !== SHARED_FILTER_KEY)
+
     const shownIndices = columns
         .map((_column, index) => index)
         .filter(index => visibleColumnKeys === undefined || visibleColumnKeys.has(columns[index]!.key))
@@ -177,7 +183,11 @@ export function CategoryItemGrid({
     // A row nobody in the filter needs isn't hidden, it's absent: the question
     // being asked is what Alice has left, and an item that was never hers is no
     // part of the answer.
-    const rowsForFilter = rows.filter(row => row.communal || visibleItemsOf(row).length > 0)
+    // A row nobody in the filter needs is absent rather than hidden — and with
+    // the Shared chip alone, the people's rows are what nobody asked for.
+    const rowsForFilter = rows.filter(row => (
+        row.communal ? true : anyPersonSelected && visibleItemsOf(row).length > 0
+    ))
 
     // A finished row leaves when packed items are hidden — but not in the same
     // frame as the tick that finished it: it stays for the flourish, wearing the
@@ -187,12 +197,13 @@ export function CategoryItemGrid({
     )
 
     // Shared items belong to this category as much as anyone's do, so unfiltered
-    // they sit among the rest. Under a filter they would answer a question that
-    // wasn't asked — "what is left for the baby?" is not a request for the
-    // group's tent — so they fold into one line that can be opened.
-    const filtering = visibleColumnKeys !== undefined
-    const sharedRows = filtering ? visible.filter(row => row.communal) : []
-    const visibleRows = filtering ? visible.filter(row => !row.communal) : visible
+    // they sit among the rest. Filtered to people they would answer a question
+    // that wasn't asked — "what is left for the baby?" is not a request for the
+    // group's tent — so they fold into one line that can be opened. Asked for by
+    // name, on the Shared chip, they come back out among the rest.
+    const foldShared = filtering && !visibleColumnKeys.has(SHARED_FILTER_KEY)
+    const sharedRows = foldShared ? visible.filter(row => row.communal) : []
+    const visibleRows = foldShared ? visible.filter(row => !row.communal) : visible
 
     if (visibleRows.length === 0 && sharedRows.length === 0) {
         return <p className="text-sm font-medium text-emerald-700">Nothing left to pack 🎒</p>
@@ -201,17 +212,6 @@ export function CategoryItemGrid({
     // One width for every row in the card, so the chips land in the same places
     // on all of them — which is the whole of what makes this a grid.
     const chipBlockWidth = chipsPerLine(shownIndices.length, width) * CHIP_PITCH
-
-    /**
-     * Filtered to one person there is no grid left to line up — one chip a row,
-     * and the column it used to hold its place in is now a hand's width of empty
-     * paper between the name and the only control on the row.
-     *
-     * So it stops being a table: the chip leads, the name follows it, and the
-     * card reads as the checklist it now is. Two or more people and the columns
-     * come back, because then the alignment is the point again.
-     */
-    const asChecklist = shownIndices.length === 1
 
     const renderFlourish = (item: PackingListItem) => (
         item.id === flourish?.itemId
@@ -367,7 +367,7 @@ export function CategoryItemGrid({
                     aria-label={`${row.label} for the whole group`}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="whitespace-nowrap">👥 Everyone</span>
+                <span className="whitespace-nowrap">👥 Shared</span>
                 {renderFlourish(item)}
             </label>
         )
@@ -386,20 +386,19 @@ export function CategoryItemGrid({
                         >
                             {/* Capped, so a wide card doesn't strand the chips
                                 an inch and a half from the name they belong to. */}
-                            <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
+                            <span className="min-w-0 flex-1" style={{ maxWidth: `${NAME_MAX_WIDTH}px` }}>
                                 {renderName(row, complete)}
                             </span>
                             {/* A block of the same width on every row, so a
                                 person keeps their place down the whole card
-                                however many lines the chips take. Leading and
-                                unpadded when there is only one of them — see
-                                `asChecklist`. The flip is visual only: the name
-                                is still what a screen reader reaches first. */}
+                                however many lines the chips take — and the same
+                                side of the name on every row of every card,
+                                filtered or not. */}
                             <div
                                 role="group"
                                 aria-label={row.label}
-                                className={`flex shrink-0 flex-wrap gap-3 py-2 ${asChecklist ? 'order-first' : ''}`}
-                                style={asChecklist ? undefined : { width: `${chipBlockWidth}px` }}
+                                className="flex shrink-0 flex-wrap gap-3 py-2"
+                                style={{ width: `${chipBlockWidth}px` }}
                             >
                                 {row.communal
                                     ? renderSharedChip(row)
@@ -438,14 +437,10 @@ export function CategoryItemGrid({
                                     data-testid="grid-row"
                                     className="flex items-start gap-1 rounded-md transition-colors hover:bg-gray-50"
                                 >
-                                    <span className="min-w-0 flex-1" style={asChecklist ? undefined : { maxWidth: `${NAME_MAX_WIDTH}px` }}>
+                                    <span className="min-w-0 flex-1" style={{ maxWidth: `${NAME_MAX_WIDTH}px` }}>
                                         {renderName(row, rowComplete(row))}
                                     </span>
-                                    <div
-                                        role="group"
-                                        aria-label={row.label}
-                                        className={`flex shrink-0 flex-wrap gap-3 py-2 ${asChecklist ? 'order-first' : ''}`}
-                                    >
+                                    <div role="group" aria-label={row.label} className="flex shrink-0 flex-wrap gap-3 py-2">
                                         {renderSharedChip(row)}
                                     </div>
                                 </li>

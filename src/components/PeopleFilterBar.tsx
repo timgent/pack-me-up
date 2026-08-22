@@ -20,7 +20,7 @@ import { useEffect, useRef } from 'react'
 import { PersonAvatar } from './PersonAvatar'
 import type { PersonColorLookup } from '../hooks/usePersonColors'
 import type { GridColumn } from '../utils/categoryItemGrid'
-import type { PeopleFilter, PersonStat } from '../utils/peopleFilter'
+import { SHARED_FILTER_KEY, type PeopleFilter, type PersonStat } from '../utils/peopleFilter'
 
 export interface PeopleFilterBarProps {
     columns: readonly GridColumn[]
@@ -28,6 +28,8 @@ export interface PeopleFilterBarProps {
     totals: Map<string, PersonStat>
     personColor: PersonColorLookup
     onToggle: (name: string) => void
+    /** The group's own items, when the list has any. Omitted when it has none. */
+    sharedStat?: PersonStat
     /** Names the region the strip filters, for assistive tech. */
     controlsId: string
 }
@@ -38,24 +40,32 @@ export function PeopleFilterBar({
     totals,
     personColor,
     onToggle,
+    sharedStat,
     controlsId,
 }: PeopleFilterBarProps) {
     const scroller = useRef<HTMLDivElement>(null)
+    const settled = useRef(false)
 
     // A chip pressed off screen leaves the list filtered by a control the user
     // can't see — which is what happens as soon as the group outgrows the strip.
+    //
+    // Never on the first render: the list opens unfiltered, and scrolling
+    // anything into view before the user has asked for it moves a page they are
+    // already reading.
     const lastSelected = [...selected].join('\u0000')
     useEffect(() => {
         const box = scroller.current
         if (!box) return
+        if (!settled.current) { settled.current = true; return }
         const target = selected.size > 0
             ? box.querySelector<HTMLElement>('[aria-pressed="true"]')
             : box.firstElementChild as HTMLElement | null
         target?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
     }, [lastSelected, selected.size])
 
-    // One person is not a choice, and neither is nobody.
-    if (columns.length <= 1) return null
+    // One person is not a choice, and neither is nobody — unless the group's
+    // own items are also on offer, which makes it a choice again.
+    if (columns.length <= 1 && sharedStat === undefined) return null
 
     return (
         <div className="mt-1.5 flex items-center gap-2 border-t border-gray-100 pt-1.5">
@@ -119,6 +129,35 @@ export function PeopleFilterBar({
                         </button>
                     )
                 })}
+                {/* Last, after the people, because it is the one chip that is
+                    nobody's. Wearing the same mark a shared row wears. */}
+                {sharedStat !== undefined && (() => {
+                    const isSelected = selected.has(SHARED_FILTER_KEY)
+                    const done = sharedStat.total > 0 && sharedStat.packed === sharedStat.total
+                    return (
+                        <button
+                            type="button"
+                            aria-pressed={isSelected}
+                            onClick={() => onToggle(SHARED_FILTER_KEY)}
+                            className={`flex min-h-[44px] shrink-0 snap-start items-center gap-1.5 rounded-full border py-1.5 pl-2 pr-2.5 text-xs font-medium transition-colors ${
+                                isSelected
+                                    ? 'border-blue-500 bg-blue-600 text-white'
+                                    : done
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                        : 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'
+                            }`}
+                        >
+                            <span aria-hidden="true">👥</span>
+                            <span className="whitespace-nowrap">Shared</span>
+                            {isSelected && (
+                                <span className="whitespace-nowrap tabular-nums opacity-90">
+                                    {sharedStat.packed}/{sharedStat.total}
+                                </span>
+                            )}
+                            {!isSelected && done && <span aria-hidden="true">✓</span>}
+                        </button>
+                    )
+                })()}
             </div>
             <span
                 aria-hidden="true"

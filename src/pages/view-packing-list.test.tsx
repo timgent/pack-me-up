@@ -1808,7 +1808,7 @@ describe('ViewPackingList shared (communal) items', () => {
         // No column belongs to it, and it comes first — the shared card's place
         // in person view, kept
         expect(camping.getAllByTestId('grid-row')[0].textContent).toContain('Tent')
-        expect(camping.getByText('👥 Everyone')).toBeTruthy()
+        expect(camping.getByText('👥 Shared')).toBeTruthy()
     })
 
     it('counts shared items in the section total', async () => {
@@ -3706,6 +3706,63 @@ describe('ViewPackingList people filter', () => {
             // Only the Sunhat is hers.
             expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
                 .toContain('0 / 1 for Alice')
+        })
+    })
+
+    describe('the group\'s own chip', () => {
+        // Scoped to the strip: the card's own "Shared (n)" disclosure shares
+        // the word, and the chip's emoji is decorative so it carries no name.
+        const shared = () => within(screen.getByTestId('people-key')).getByRole('button', { name: /^Shared/ })
+
+        it('offers the group alongside the people', async () => {
+            await renderList()
+
+            expect(shared().getAttribute('aria-pressed')).toBe('false')
+        })
+
+        it('shows the group\'s items and nobody else\'s', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(row('Tent')).toBeTruthy()
+            expect(screen.queryByRole('button', { name: 'Edit Sunhat' })).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Edit Wellies' })).toBeNull()
+        })
+
+        it('brings the shared items back among the rest when asked for by name', async () => {
+            await renderList()
+
+            fireEvent.click(chip('Alice'))
+            // Filtered to a person they fold away; asked for, they come out
+            expect(screen.getByRole('button', { name: /Shared \(1\)/ })).toBeTruthy()
+
+            fireEvent.click(shared())
+
+            expect(screen.queryByRole('button', { name: /Shared \(1\)/ })).toBeNull()
+            expect(row('Tent')).toBeTruthy()
+            expect(row('Sunhat')).toBeTruthy()
+        })
+
+        it('counts the group\'s items against the group, and nobody else', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(shared().textContent).toContain('0/1')
+            // Clothes holds Alice's Sunhat, Bob's Wellies, Zoe's Armbands and
+            // the group's Tent — only the Tent is the group's.
+            expect(screen.getByRole('button', { name: /collapse clothes list/i }).textContent)
+                .toContain('0 / 1 for shared items')
+        })
+
+        it('is not somebody, so it is offered no bag to pack and no name to change', async () => {
+            await renderList()
+
+            fireEvent.click(shared())
+
+            expect(screen.queryByRole('button', { name: /^Pack all/ })).toBeNull()
+            expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull()
         })
     })
 
