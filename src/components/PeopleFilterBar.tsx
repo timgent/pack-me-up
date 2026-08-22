@@ -23,6 +23,12 @@
  * part the grid below already says twice over in colour and initial. Who is
  * selected is written out in the bar underneath instead, where there is a whole
  * line for it.
+ *
+ * A filled chip means one thing and one thing only: pressed. Somebody who has
+ * finished packing used to get a chip filled green, which read as selected
+ * beside the white ones that read as not — two states competing for the same
+ * signal. Finished is a tick on the face instead, which says it without
+ * borrowing the fill.
  */
 import { useEffect, useRef } from 'react'
 import { PersonAvatar } from './PersonAvatar'
@@ -40,6 +46,19 @@ export interface PeopleFilterBarProps {
     sharedStat?: PersonStat
     /** Names the region the strip filters, for assistive tech. */
     controlsId: string
+}
+
+/** Finished packing — said on the face, so the chip's fill can stay the answer
+ *  to one question only: is this one pressed? */
+function DoneTick() {
+    return (
+        <span
+            aria-hidden="true"
+            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white bg-emerald-500 text-[8px] font-bold leading-none text-white"
+        >
+            ✓
+        </span>
+    )
 }
 
 export function PeopleFilterBar({
@@ -114,14 +133,15 @@ export function PeopleFilterBar({
                             className={`flex min-h-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
-                                    : done
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                             }`}
                         >
-                            {column.unassigned
-                                ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">?</span>
-                                : <PersonAvatar name={column.name} color={color} initial={column.initial} />}
+                            <span className="relative shrink-0">
+                                {column.unassigned
+                                    ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">?</span>
+                                    : <PersonAvatar name={column.name} color={color} initial={column.initial} />}
+                                {done && <DoneTick />}
+                            </span>
                             <span className="hidden whitespace-nowrap sm:inline">{column.name}</span>
                             {/* Only the selected chip carries its numbers, and
                                 only where there is room for them. Every chip
@@ -134,7 +154,6 @@ export function PeopleFilterBar({
                                     {stat.packed}/{stat.total}
                                 </span>
                             )}
-                            {!isSelected && done && <span aria-hidden="true">✓</span>}
                         </button>
                     )
                 })}
@@ -151,19 +170,19 @@ export function PeopleFilterBar({
                             className={`flex min-h-[44px] min-w-[44px] shrink-0 snap-start items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
                                 isSelected
                                     ? 'border-blue-500 bg-blue-600 text-white'
-                                    : done
-                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                                        : 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                             }`}
                         >
-                            <span aria-hidden="true">👥</span>
+                            <span className="relative shrink-0">
+                                <span aria-hidden="true">👥</span>
+                                {done && <DoneTick />}
+                            </span>
                             <span className="hidden whitespace-nowrap sm:inline">Shared</span>
                             {isSelected && (
                                 <span className="hidden whitespace-nowrap tabular-nums opacity-90 sm:inline">
                                     {sharedStat.packed}/{sharedStat.total}
                                 </span>
                             )}
-                            {!isSelected && done && <span aria-hidden="true">✓</span>}
                         </button>
                     )
                 })()}

@@ -2315,7 +2315,8 @@ describe('ViewPackingList completion', () => {
     it('opens an already-packed list with the cards already folded away', async () => {
         setup(fullyPackedList)
         await waitFor(() => expect(screen.getByText("You're all packed!")).toBeTruthy())
-        expect(screen.queryByTestId('list-section')).toBeNull()
+        // The banner arrives first and the cards fold out from under it
+        await waitFor(() => expect(screen.queryByTestId('list-section')).toBeNull())
     })
 
     it('brings the cards back when packed items are shown', async () => {
@@ -3713,6 +3714,26 @@ describe('ViewPackingList people filter', () => {
         // Scoped to the strip: the card's own "Shared (n)" disclosure shares
         // the word, and the chip's emoji is decorative so it carries no name.
         const shared = () => within(screen.getByTestId('people-key')).getByRole('button', { name: /^Shared/ })
+
+        it('keeps a filled chip meaning pressed, and nothing else', async () => {
+            // A chip filled green for "finished" read as selected beside the
+            // white ones that read as not — two states after one signal.
+            await renderList()
+
+            fireEvent.click(chip('Zoe'))
+            fireEvent.click(screen.getByRole('button', { name: "Pack all 1 of Zoe's" }))
+            await waitFor(() => expect(screen.getByText(/Zoe's bag is packed/)).toBeTruthy())
+
+            // Pressed: filled
+            expect(chip('Zoe').className).toContain('bg-blue-600')
+
+            // Finished but not pressed: the same white as everyone else, with
+            // the news carried on her face instead
+            fireEvent.click(chip('Zoe'))
+            expect(chip('Zoe').className).not.toContain('bg-emerald')
+            expect(chip('Zoe').className).toContain('bg-white')
+            expect(chip('Zoe').className).toBe(chip('Bob').className)
+        })
 
         it('offers the group alongside the people', async () => {
             await renderList()
