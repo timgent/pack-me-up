@@ -8,6 +8,21 @@ export const LandingPage = () => {
     const { isLoggedIn, webId, login } = useSolidPod()
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const hasQuestions = useHasQuestions()
+    const primaryCta = hasQuestions ? (
+        <Link
+            to="/view-lists"
+            className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+        >
+            📋 View Packing Lists
+        </Link>
+    ) : (
+        <Link
+            to="/wizard"
+            className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+        >
+            ✨ Get Started with the Wizard
+        </Link>
+    )
     return (
         <>
             {isLoggedIn && (
@@ -18,10 +33,19 @@ export const LandingPage = () => {
                 </div>
             )}
             <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-12 animate-slide-up">
-                    <h1 className="text-5xl font-bold mb-4 text-primary-900">
-                        Smart Packing Lists, Made Simple
+                {/* Hero leads with the travel benefit and keeps the primary CTA above the
+                    fold — the data-ownership story lives in the trust section further down. */}
+                <div className="text-center mb-10 animate-slide-up">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-primary-900 text-balance">
+                        Packing lists that learn how you travel
                     </h1>
+                    <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
+                        Set up your questions once, then get a personalised list for every trip. Share one list with your partner or the whole family and pack as a team.
+                    </p>
+                </div>
+
+                <div className="text-center space-y-4 mb-14">
+                    {primaryCta}
                 </div>
 
                 <div className="mb-12">
@@ -29,9 +53,9 @@ export const LandingPage = () => {
                     <div className="grid md:grid-cols-3 gap-6">
                         <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-2xl shadow-soft hover:shadow-glow-primary transition-all duration-300 hover:scale-105 border-2 border-primary-200">
                             <div className="text-3xl mb-2">✨</div>
-                            <h3 className="text-xl font-bold mb-3 text-primary-900">1. Set up once</h3>
+                            <h3 className="text-xl font-bold mb-3 text-primary-900">1. Set up in a minute</h3>
                             <p className="text-gray-700">
-                                Run the quick wizard — tell us who you travel with and we'll generate a starter set of packing questions for you.
+                                One screen — tell us who you travel with, and we'll generate a starter set of packing questions for your group.
                             </p>
                         </div>
 
@@ -53,31 +77,9 @@ export const LandingPage = () => {
                     </div>
                 </div>
 
-                <div className="text-center space-y-4">
-                    {hasQuestions ? (
-                        <>
-                            <Link
-                                to="/view-lists"
-                                className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
-                            >
-                                📋 View Packing Lists
-                            </Link>
-                        </>
-                    ) : (
-                        <>
-                            <Link
-                                to="/wizard"
-                                className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
-                            >
-                                ✨ Get Started with the Wizard
-                            </Link>
-                        </>
-                    )}
-                </div>
-
                 <div className="mt-10 p-4 rounded-xl border border-gray-200 bg-gray-50 text-center text-sm text-gray-500">
                     <h2 className="font-semibold text-gray-600 inline">Own Your Data</h2>
-                    {' '}— Login with your Solid Pod to store your lists in your own free personal storage you control. Your data saves locally in your browser automatically, even without an account.
+                    {' '}— Your lists live in storage you control, never on our servers. They save to this device automatically, even without an account.
                     {!isLoggedIn && (
                         <span className="block mt-1">
                             <button
@@ -86,7 +88,7 @@ export const LandingPage = () => {
                             >
                                 Get a free Solid Pod
                             </button>
-                            {' '}to sync across devices.
+                            {' '}to sync across your devices and share lists with the people you travel with.
                         </span>
                     )}
                 </div>
