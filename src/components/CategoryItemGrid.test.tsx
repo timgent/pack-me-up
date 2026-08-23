@@ -33,7 +33,7 @@ function renderGrid(visibleColumnKeys?: ReadonlySet<string>) {
             columns={columns}
             visibleColumnKeys={visibleColumnKeys}
             rows={rows}
-            personColor={() => PERSON_COLORS[0]}
+            personIdentity={() => ({ color: PERSON_COLORS[0] })}
             packedById={{}}
             hidePacked={false}
             flourish={null}

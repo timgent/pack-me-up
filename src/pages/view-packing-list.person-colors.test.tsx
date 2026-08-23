@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ViewPackingList } from './view-packing-list'
 import type { PackingAppDatabase } from '../services/database'
 import { PERSON_COLORS, personColorAt } from '../edit-questions/person-colors'
+import { personEmojiAt } from '../edit-questions/person-emoji'
 
 vi.mock('../components/DatabaseContext', () => ({ useDatabase: vi.fn() }))
 vi.mock('../components/SolidPodContext', () => ({ useSolidPod: vi.fn() }))
@@ -87,6 +88,8 @@ function row(itemText: string) {
 
 const pink = PERSON_COLORS.find(c => c.id === 'pink')!
 
+let db: ReturnType<typeof makeDb>
+
 beforeEach(() => {
     localStorage.clear()
     vi.mocked(useSolidPod).mockReturnValue({
@@ -99,7 +102,8 @@ beforeEach(() => {
         handleSyncError: vi.fn(),
         saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...packingList, _rev: '2' }),
     })
-    vi.mocked(useDatabase).mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    db = makeDb()
+    vi.mocked(useDatabase).mockReturnValue({ db: db as unknown as PackingAppDatabase })
 })
 
 describe('ViewPackingList person colours', () => {
@@ -141,8 +145,31 @@ describe('ViewPackingList person colours', () => {
         renderList()
         await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
 
-        expect(within(chipFor('Alice')).getByTestId('person-avatar').textContent).toBe('A')
-        expect(within(chipFor('Bob')).getByTestId('person-avatar').textContent).toBe('B')
-        expect(within(chipFor('Zoe')).getByTestId('person-avatar').textContent).toBe('Z')
+        const marks = ['Alice', 'Bob', 'Zoe']
+            .map(name => within(chipFor(name)).getByTestId('person-avatar').textContent)
+
+        expect(marks.every(mark => mark !== null && mark !== '')).toBe(true)
+        expect(new Set(marks).size).toBe(3)
+    })
+
+    it('gives everyone the emoji their position in the question set hands them', async () => {
+        renderList()
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+
+        expect(within(chipFor('Alice')).getByTestId('person-avatar').textContent).toBe(personEmojiAt(0))
+        expect(within(chipFor('Bob')).getByTestId('person-avatar').textContent).toBe(personEmojiAt(1))
+    })
+
+    it('puts a person who has cleared their emoji back in their initial', async () => {
+        // '' is a decision, not an absence — the one way back to a plain letter.
+        db.getQuestionSet.mockResolvedValue({
+            ...questionSet,
+            people: [{ id: 'p1', name: 'Alice', emoji: '' }, questionSet.people[1]],
+        })
+        renderList()
+        await waitFor(() => expect(row('Toothbrush')).toBeTruthy())
+
+        await waitFor(() =>
+            expect(within(chipFor('Alice')).getByTestId('person-avatar').textContent).toBe('A'))
     })
 })

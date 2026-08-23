@@ -22,7 +22,11 @@ import { PodSyncIndicator } from '../components/PodSyncIndicator'
 import { tripDatesOutOfOrder } from '../create-packing-list/tripDetails'
 import { deduplicateItems } from '../create-packing-list/deduplicate'
 import { PersonAvatar } from '../components/PersonAvatar'
-import { personColorFor } from '../edit-questions/person-colors'
+import { personIdentityAt } from '../edit-questions/person-identity'
+import { usePersonPhotos } from '../hooks/usePersonIdentities'
+import type { Person } from '../edit-questions/types'
+
+const NO_PEOPLE: readonly Person[] = []
 
 export function getUnreviewedDeletedItems(
     packingLists: PackingList[],
@@ -317,6 +321,8 @@ export function CreatePackingList() {
     const [isDeletionSuggestionDismissed, setIsDeletionSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
     const { isLoggedIn, login, session } = useSolidPod()
+    // Their own faces, on the very first screen that names them.
+    const personPhoto = usePersonPhotos(questionSet?.people ?? NO_PEOPLE, session)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const { db } = useDatabase()
     const navigate = useNavigate()
@@ -880,7 +886,7 @@ export function CreatePackingList() {
                                     {/* The same mark they'll carry on the list this makes */}
                                     <PersonAvatar
                                         name={person.name}
-                                        color={personColorFor(person, personIndex)}
+                                        identity={personIdentityAt(person, personIndex, personPhoto)}
                                         size="sm"
                                     />
                                     <span className="text-gray-700">

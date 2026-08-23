@@ -31,14 +31,23 @@ import { buildIndexOf, type SuggestionIndex } from '../utils/itemSuggestions'
 import { ItemRow } from '../components/ItemRow'
 import { ItemSearchBar, ItemSearchResults } from '../components/ItemSearch'
 import { isSearchQuery } from '../edit-questions/item-search'
-import { personColorFor, type PersonColorId } from '../edit-questions/person-colors'
-import { PersonColorSwatches } from '../components/PersonColorPicker'
+import type { PersonColorId } from '../edit-questions/person-colors'
+import { personIdentityAt } from '../edit-questions/person-identity'
+import type { PhotoLookup } from '../edit-questions/person-identity'
+import { PersonIdentityPicker } from '../components/PersonIdentityPicker'
+import { PersonAvatar } from '../components/PersonAvatar'
+import { usePersonPhotos } from '../hooks/usePersonIdentities'
+import type { AppSession } from '../types/AppSession'
 
 // Stable empty default for the optional inline-editing props, so a section that
 // isn't editable doesn't hand its memoized children a new array every render.
 const NO_NAMES: string[] = []
 
-const PersonLegend = memo(function PersonLegend({ people, onEdit }: { people: Person[]; onEdit?: () => void }) {
+const PersonLegend = memo(function PersonLegend({ people, onEdit, personPhoto }: {
+    people: Person[]
+    onEdit?: () => void
+    personPhoto?: PhotoLookup
+}) {
     if (people.length < 2 && !onEdit) return null
     return (
         <div className="flex items-center gap-2 flex-wrap mb-4">
@@ -47,9 +56,11 @@ const PersonLegend = memo(function PersonLegend({ people, onEdit }: { people: Pe
             )}
             {people.map((person, i) => (
                 <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500">
-                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${personColorFor(person, i).avatar}`}>
-                        {person.name.charAt(0).toUpperCase()}
-                    </span>
+                    <PersonAvatar
+                        name={person.name}
+                        identity={personIdentityAt(person, i, personPhoto)}
+                        size="sm"
+                    />
                     {person.name}
                 </span>
             ))}
@@ -1246,17 +1257,21 @@ function OptionEditModal({ option, onSave, onClose }: {
     )
 }
 
-export function PeopleModal({ people, onSave, onClose }: {
+export function PeopleModal({ people, onSave, onClose, session }: {
     people: Person[]
     onSave: (newPeople: Person[]) => void
     onClose: () => void
+    session?: AppSession | null
 }) {
     const [localPeople, setLocalPeople] = useState<Person[]>(
         people.length > 0 ? people : [{ id: crypto.randomUUID(), name: '' }]
     )
-    // Which person's palette is open. One at a time: twelve swatches under
-    // every row would bury the names this modal exists to edit.
-    const [colorPickerFor, setColorPickerFor] = useState<string | null>(null)
+    // Which person's appearance is open. One at a time: a palette and two dozen
+    // creatures under every row would bury the names this modal exists to edit.
+    const [identityPickerFor, setIdentityPickerFor] = useState<string | null>(null)
+    // Photos for whatever WebIDs have been typed so far, so pasting one shows
+    // the face on the avatar above the field rather than only after saving.
+    const personPhoto = usePersonPhotos(localPeople, session)
 
     const addPerson = () => setLocalPeople(prev => [...prev, { id: crypto.randomUUID(), name: '' }])
     const removePerson = (idx: number) => {
@@ -1273,12 +1288,19 @@ export function PeopleModal({ people, onSave, onClose }: {
         setLocalPeople(prev => prev.map((p, i) => i === idx
             ? { ...p, ageRange: value === '' ? undefined : value as Person['ageRange'] }
             : p))
-    // Picking closes the palette: the choice shows immediately on the avatar
-    // above it, so leaving the grid open would only hide the confirmation.
-    const updateColor = (idx: number, color: PersonColorId) => {
+    // Colour and emoji leave the panel open, unlike the old colour-only picker:
+    // with three things to set, closing after the first would make setting the
+    // second a second trip. Both show on the avatar above it either way.
+    const updateColor = (idx: number, color: PersonColorId) =>
         setLocalPeople(prev => prev.map((p, i) => i === idx ? { ...p, color } : p))
-        setColorPickerFor(null)
-    }
+    // '' is stored, not dropped: it means "no emoji, show my initial", which is
+    // a different thing from never having chosen. See the note on `Person.emoji`.
+    const updateEmoji = (idx: number, emoji: string) =>
+        setLocalPeople(prev => prev.map((p, i) => i === idx ? { ...p, emoji } : p))
+    const updateWebId = (idx: number, webId: string) =>
+        setLocalPeople(prev => prev.map((p, i) => i === idx
+            ? { ...p, webId: webId.trim() || undefined }
+            : p))
 
     return (
         <div
@@ -1286,26 +1308,29 @@ export function PeopleModal({ people, onSave, onClose }: {
             onClick={onClose}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            {/* Bounded and scrollable: a household of five with an appearance
+                panel open is taller than a phone, and a modal that runs off the
+                bottom takes Save with it. */}
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="p-5">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit People</h2>
                     <div className="space-y-2 mb-3">
                         {localPeople.map((person, i) => {
-                            const color = personColorFor(person, i)
-                            const pickerOpen = colorPickerFor === person.id
+                            const identity = personIdentityAt(person, i, personPhoto)
+                            const pickerOpen = identityPickerFor === person.id
                             const personLabel = person.name || `Person ${i + 1}`
                             return (
                             <div key={person.id}>
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => setColorPickerFor(pickerOpen ? null : person.id)}
-                                        aria-label={`Change colour for ${personLabel}`}
+                                        onClick={() => setIdentityPickerFor(pickerOpen ? null : person.id)}
+                                        aria-label={`Change appearance for ${personLabel}`}
                                         aria-expanded={pickerOpen}
-                                        title="Change colour"
-                                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 transition-shadow hover:ring-2 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-offset-1 ${color.avatar} ${color.ring} ${pickerOpen ? 'ring-2 ring-offset-1' : ''}`}
+                                        title="Change colour, emoji or photo"
+                                        className={`rounded-full shrink-0 transition-shadow hover:ring-2 hover:ring-offset-1 focus:outline-none focus:ring-2 focus:ring-offset-1 ${identity.color.ring} ${pickerOpen ? 'ring-2 ring-offset-1' : ''}`}
                                     >
-                                        {person.name.charAt(0).toUpperCase() || '?'}
+                                        <PersonAvatar name={personLabel} identity={identity} />
                                     </button>
                                     <input
                                         autoFocus={i === 0}
@@ -1352,17 +1377,21 @@ export function PeopleModal({ people, onSave, onClose }: {
                                     </div>
                                 )}
                                 {pickerOpen && (
-                                    <PersonColorSwatches
+                                    <PersonIdentityPicker
                                         personName={personLabel}
-                                        selected={color}
-                                        onSelect={id => updateColor(i, id)}
+                                        selectedColor={identity.color}
+                                        selectedEmoji={identity.emoji}
+                                        webId={person.webId ?? ''}
+                                        onSelectColor={id => updateColor(i, id)}
+                                        onSelectEmoji={emoji => updateEmoji(i, emoji)}
+                                        onChangeWebId={webId => updateWebId(i, webId)}
                                     />
                                 )}
                             </div>
                             )
                         })}
                     </div>
-                    <p className="text-xs text-gray-400 mb-3">Tap someone's circle to change their colour — it follows them onto every packing list. Birthdays are optional: add one and we'll suggest packing-item updates as they grow, or bump the age group early if they're ready for it.</p>
+                    <p className="text-xs text-gray-400 mb-3">Tap someone's circle to change their colour, emoji or photo — it follows them onto every packing list. Birthdays are optional: add one and we'll suggest packing-item updates as they grow, or bump the age group early if they're ready for it.</p>
                     <button
                         type="button"
                         onClick={addPerson}
@@ -1464,7 +1493,7 @@ function QuestionModal({ question, onSave, onClose }: {
 
 export function QuestionsPage() {
     const { db } = useDatabase()
-    const { isLoggedIn } = useSolidPod()
+    const { isLoggedIn, session } = useSolidPod()
     const foreignPodCtx = useForeignPod()
     const foreignPodUrl = foreignPodCtx?.foreignPodUrl
     const isForeign = !!foreignPodUrl
@@ -1926,6 +1955,7 @@ export function QuestionsPage() {
     // Memoized so their identity is stable across re-renders that don't change
     // the data (modal opens, sync ticks) — they feed the memoized sections.
     const people = useMemo(() => (data?.people ?? []).filter(p => !p.deletedAt), [data])
+    const personPhoto = usePersonPhotos(people, session)
     const activeQuestions = useMemo(() => (data?.questions ?? []).filter(q => !q.deletedAt), [data])
     const activeAlwaysNeededItems = useMemo(() => (data?.alwaysNeededItems ?? []).filter(i => !i.deletedAt), [data])
 
@@ -1963,7 +1993,7 @@ export function QuestionsPage() {
                     />
                 )}
                 {!isForeign && <TemplateUpdatesCard questionSet={data} onApply={saveData} />}
-                <PersonLegend people={people} onEdit={openPeopleModal} />
+                <PersonLegend people={people} onEdit={openPeopleModal} personPhoto={personPhoto} />
                 {/* The legend stays above it: the person dots on a result row
                     mean nothing without the names they stand for. */}
                 <ItemSearchBar value={query} onChange={setQuery} />
@@ -2058,6 +2088,7 @@ export function QuestionsPage() {
                     people={people}
                     onSave={handlePeopleSave}
                     onClose={() => setPeopleModal(false)}
+                    session={session}
                 />
             )}
         </div>

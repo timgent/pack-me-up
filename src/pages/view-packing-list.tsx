@@ -32,7 +32,7 @@ import { groupItemsByCategory, sortByOrder, type CategoryAccessors } from '../ut
 import { CATEGORY_ORDER } from '../edit-questions/item-sections'
 import { useSectionOrder } from '../hooks/useSectionOrder'
 import { clearPendingSignInAction, getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
-import { usePersonColors } from '../hooks/usePersonColors'
+import { usePersonIdentities } from '../hooks/usePersonIdentities'
 import { AddItemComposer, UNCATEGORISED_LABEL, type AddItemTarget, type PersonOption } from '../components/AddItemComposer'
 import { CategoryItemGrid } from '../components/CategoryItemGrid'
 import { ItemRowPanel } from '../components/ItemRowPanel'
@@ -464,7 +464,7 @@ export function ViewPackingList() {
     // Everyone this list names, so the ones the question set doesn't know —
     // guests, or the whole cast of a shared list — still come out in colours
     // nobody else here is wearing.
-    const personColor = usePersonColors(db, peopleOptions)
+    const personIdentity = usePersonIdentities(db, peopleOptions, session)
 
     // The columns every category card uses — the whole list's people, not the
     // ones a particular category happens to mention, so a person is in the same
@@ -1742,7 +1742,7 @@ export function ViewPackingList() {
                                 selected={selectedPeople}
                                 totals={peopleTotals}
                                 sharedStat={sharedStat.total > 0 ? sharedStat : undefined}
-                                personColor={personColor}
+                                personIdentity={personIdentity}
                                 onToggle={handleTogglePerson}
                                 controlsId={LIST_SECTIONS_ID}
                             />
@@ -2071,7 +2071,7 @@ export function ViewPackingList() {
                                             columns={gridColumns}
                                             visibleColumnKeys={visibleColumnKeys}
                                             rows={section.rows ?? []}
-                                            personColor={personColor}
+                                            personIdentity={personIdentity}
                                             packedById={watchedItems}
                                             // The names go when there isn't room
                                             // for them; the legend above the
@@ -2133,7 +2133,7 @@ export function ViewPackingList() {
             row={openRow}
             columns={gridColumns}
             sectionTitle={openRowSection?.title ?? ''}
-            personColor={personColor}
+            personIdentity={personIdentity}
             packedById={watchedItems}
             onRename={handleRenameRow}
             onSetQuantity={handleSetItemQuantity}

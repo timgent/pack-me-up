@@ -19,7 +19,7 @@ function renderBar(selected: ReadonlySet<string> = new Set(), onToggle = vi.fn()
             columns={columns}
             selected={selected}
             totals={totals}
-            personColor={() => PERSON_COLORS[0]}
+            personIdentity={() => ({ color: PERSON_COLORS[0] })}
             onToggle={onToggle}
             controlsId="sections"
         />
@@ -114,7 +114,7 @@ describe('what a chip says without being asked', () => {
                 columns={columns}
                 selected={new Set([SHARED_FILTER_KEY])}
                 totals={totals}
-                personColor={() => PERSON_COLORS[0]}
+                personIdentity={() => ({ color: PERSON_COLORS[0] })}
                 onToggle={vi.fn()}
                 sharedStat={{ packed: 0, total: 3 }}
                 controlsId="sections"

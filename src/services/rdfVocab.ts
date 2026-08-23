@@ -73,6 +73,13 @@ export const PMU = {
     // 'rose' looks like, and an older client that doesn't know an id just falls
     // back to the person's position.
     personColor: `${PMU_NS}personColor`,
+    // The character itself, not an id: the whole point is that it means the
+    // same thing to a client that has never heard of this app. The empty string
+    // is a value here, meaning "no emoji" — see the note on `Person.emoji`.
+    personEmoji: `${PMU_NS}personEmoji`,
+    // Stored as a plain string rather than a URL so it survives the round trip
+    // byte for byte, matching how `sharedWebId` is stored.
+    personWebId: `${PMU_NS}personWebId`,
     personLastModified: `${PMU_NS}personLastModified`,
     personDeletedAt: `${PMU_NS}personDeletedAt`,
 
