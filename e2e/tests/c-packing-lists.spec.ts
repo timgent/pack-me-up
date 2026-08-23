@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { chipInput, chipsForPerson, expandAllSections, firstItemChip } from '../helpers/packing-list'
+import { personEmojiAt } from '../../src/edit-questions/person-emoji'
 
 async function runWizard(page: import('@playwright/test').Page) {
   await page.goto('/#/wizard')
@@ -185,10 +186,11 @@ test.describe('C – Packing Lists', () => {
     await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible({ timeout: 8_000 })
     await page.locator('button[title="Edit people"]').click()
     await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 3_000 })
-    await page.getByRole('button', { name: 'Change colour for Me' }).click()
+    await page.getByRole('button', { name: 'Change appearance for Me' }).click()
     await page.getByRole('group', { name: 'Colour for Me' }).getByRole('button', { name: 'Fuchsia' }).click()
     // The avatar shows the choice before the modal is even saved
-    await expect(page.getByRole('button', { name: 'Change colour for Me' })).toHaveClass(/bg-fuchsia-500/)
+    await expect(page.getByRole('button', { name: 'Change appearance for Me' })
+        .getByTestId('person-avatar')).toHaveClass(/bg-fuchsia-500/)
     await page.getByRole('button', { name: 'Save' }).click()
     // Give the async IndexedDB write time to commit
     await page.waitForTimeout(800)
@@ -205,6 +207,56 @@ test.describe('C – Packing Lists', () => {
     // Unpacked, so the disc is outlined in their colour rather than filled
     await expect(cell).toHaveClass(/border-fuchsia-300/)
   })
+  test('C18: a person’s emoji is theirs from the start, and follows them onto a list', async ({ freshPage: page }) => {
+    await runWizard(page)
+
+    await page.goto('/#/manage-questions')
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible({ timeout: 8_000 })
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 3_000 })
+
+    // Nobody has chosen anything, and they already have a mark of their own
+    const avatar = page.getByRole('button', { name: 'Change appearance for Me' }).getByTestId('person-avatar')
+    await expect(avatar).toHaveText(personEmojiAt(0))
+
+    // Pick a different one, and it shows before the modal is even saved
+    await page.getByRole('button', { name: 'Change appearance for Me' }).click()
+    await page.getByRole('group', { name: 'Emoji for Me' }).getByRole('button', { name: 'Rocket' }).click()
+    await expect(avatar).toHaveText('🚀')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await page.waitForTimeout(800)
+
+    // A list made afterwards wears it on their cells
+    await page.goto('/#/create-packing-list')
+    await createList(page, 'Rocket Trip')
+    const cell = chipsForPerson(page, 'Me').first()
+    await expect(cell).toBeVisible({ timeout: 8_000 })
+    await expect(cell).toHaveText('🚀')
+  })
+
+  test('C19: clearing an emoji puts the person back in their initial', async ({ freshPage: page }) => {
+    await runWizard(page)
+
+    await page.goto('/#/manage-questions')
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('heading', { name: 'Edit People' })).toBeVisible({ timeout: 3_000 })
+    await page.getByRole('button', { name: 'Change appearance for Me' }).click()
+    await page.getByRole('button', { name: 'No emoji, use their initial' }).click()
+
+    const avatar = page.getByRole('button', { name: 'Change appearance for Me' }).getByTestId('person-avatar')
+    await expect(avatar).toHaveText('M')
+
+    // And it survives the round trip through storage, rather than reverting to
+    // the default the moment the page is read back
+    await page.getByRole('button', { name: 'Save' }).click()
+    await page.waitForTimeout(800)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible({ timeout: 8_000 })
+    await page.locator('button[title="Edit people"]').click()
+    await expect(page.getByRole('button', { name: 'Change appearance for Me' })
+      .getByTestId('person-avatar')).toHaveText('M', { timeout: 5_000 })
+  })
+
   test('C15: category view writes each item once, with a checkbox per person', async ({ freshPage: page }) => {
     // Two people, because a grid with one column is just a list
     await page.goto('/#/wizard')

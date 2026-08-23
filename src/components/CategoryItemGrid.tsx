@@ -43,7 +43,7 @@ import { useState } from 'react'
 import { SHARED_FILTER_KEY } from '../utils/peopleFilter'
 import type { PackingListItem } from '../create-packing-list/types'
 import type { GridColumn, GridRow } from '../utils/categoryItemGrid'
-import type { PersonColorLookup } from '../hooks/usePersonColors'
+import type { PersonIdentityLookup } from '../hooks/usePersonIdentities'
 import { useMeasuredWidth } from '../hooks/useMeasuredWidth'
 
 export interface CategoryItemGridProps {
@@ -60,7 +60,7 @@ export interface CategoryItemGridProps {
      */
     visibleColumnKeys?: ReadonlySet<string>
     rows: readonly GridRow[]
-    personColor: PersonColorLookup
+    personIdentity: PersonIdentityLookup
     packedById: Record<string, boolean>
     /** Packed items are hidden, so a row with nothing left on it is on its way out. */
     hidePacked: boolean
@@ -138,7 +138,7 @@ export function CategoryItemGrid({
     columns,
     visibleColumnKeys,
     rows,
-    personColor,
+    personIdentity,
     packedById,
     hidePacked,
     flourish,
@@ -286,14 +286,19 @@ export function CategoryItemGrid({
      * until then — so the colour says whose it is in both states, which is what
      * lets the grid do without a header.
      *
-     * The initial comes from the column rather than from the first letter of
-     * the name: Alice and Amy are both "A", and with person view gone there is
-     * no other place in the app where their chips are told apart by anything
-     * but colour. `buildGridColumns` grows the label until it separates them.
+     * Their emoji when they have one, and otherwise the initial from the column
+     * rather than from the first letter of the name: Alice and Amy are both
+     * "A", and with person view gone there is no other place in the app where
+     * their chips are told apart by anything but colour. `buildGridColumns`
+     * grows the label until it separates them.
+     *
+     * Not the photo, though the avatar above the grid may be showing one: at
+     * 32px, half of which is a tick as soon as it is packed, a face is a smudge
+     * where a letter is still a letter.
      */
     const renderChip = (row: GridRow, column: GridColumn, item: PackingListItem) => {
         const packed = !!packedById[item.id]
-        const color = personColor({ id: column.personId, name: column.name })
+        const { color, emoji } = personIdentity({ id: column.personId, name: column.name })
         const quantity = item.quantity !== undefined && item.quantity > 1 ? item.quantity : undefined
         return (
             <label
@@ -313,7 +318,7 @@ export function CategoryItemGrid({
                     className="sr-only"
                 />
                 <span aria-hidden="true">
-                    {packed ? '✓' : column.initial}
+                    {packed ? '✓' : (emoji ?? column.initial)}
                 </span>
                 {row.mixedQuantities && quantity && (
                     <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-blue-100 px-1 text-[10px] font-semibold text-blue-700">

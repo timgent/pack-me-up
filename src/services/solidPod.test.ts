@@ -18,6 +18,8 @@ import {
     revokeCollaboratorAccess,
     getCollaborators,
     getPodOwnerName,
+    getSolidProfile,
+    clearSolidProfileCache,
     friendlyPodName,
     getPrimaryPodUrl,
     derivePodUrlFromWebId,
@@ -1479,6 +1481,11 @@ describe('getPodOwnerName', () => {
     const WEB_ID = 'https://pod.example.com/profile/card#me'
     const PROFILE_CARD_URL = 'https://pod.example.com/profile/card'
 
+    // Profile cards are cached for the life of the page (see `getSolidProfile`),
+    // so without this every case after the first would assert against the first
+    // one's answer.
+    beforeEach(() => clearSolidProfileCache())
+
     it('returns the foaf:name from the profile card', async () => {
         const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
         const thing = buildThing({ url: WEB_ID })
@@ -1510,6 +1517,56 @@ describe('getPodOwnerName', () => {
         const result = await getPodOwnerName(mockSession, POD)
 
         expect(result).toBeNull()
+    })
+
+    it('reads the photo the Solid profile editors write (vcard:hasPhoto)', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID })
+            .addUrl('http://www.w3.org/2006/vcard/ns#hasPhoto', 'https://pod.example.com/profile/me.jpg')
+            .build()
+        mockGetSolidDataset.mockResolvedValueOnce(setThing(createSolidDataset(), thing) as unknown as SolidDataset & WithServerResourceInfo)
+
+        expect((await getSolidProfile(mockSession, WEB_ID)).photo).toBe('https://pod.example.com/profile/me.jpg')
+    })
+
+    it('falls back to foaf:img, then foaf:depiction, for the cards that use those', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const withImg = buildThing({ url: WEB_ID })
+            .addUrl('http://xmlns.com/foaf/0.1/img', 'https://pod.example.com/img.png')
+            .build()
+        mockGetSolidDataset.mockResolvedValueOnce(setThing(createSolidDataset(), withImg) as unknown as SolidDataset & WithServerResourceInfo)
+        expect((await getSolidProfile(mockSession, WEB_ID)).photo).toBe('https://pod.example.com/img.png')
+
+        clearSolidProfileCache()
+        const withDepiction = buildThing({ url: WEB_ID })
+            .addUrl('http://xmlns.com/foaf/0.1/depiction', 'https://pod.example.com/dep.png')
+            .build()
+        mockGetSolidDataset.mockResolvedValueOnce(setThing(createSolidDataset(), withDepiction) as unknown as SolidDataset & WithServerResourceInfo)
+        expect((await getSolidProfile(mockSession, WEB_ID)).photo).toBe('https://pod.example.com/dep.png')
+    })
+
+    it('fetches a profile card once however many people are asked about at once', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const thing = buildThing({ url: WEB_ID })
+            .addStringNoLocale('http://xmlns.com/foaf/0.1/name', 'Alice Smith')
+            .build()
+        mockGetSolidDataset.mockResolvedValue(setThing(createSolidDataset(), thing) as unknown as SolidDataset & WithServerResourceInfo)
+
+        // Concurrently, as a page full of avatars asks — and then again, as a
+        // remount asks.
+        await Promise.all([getSolidProfile(mockSession, WEB_ID), getSolidProfile(mockSession, WEB_ID)])
+        await getSolidProfile(mockSession, WEB_ID)
+
+        expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not re-request a card that failed, however often it is asked for', async () => {
+        mockGetSolidDataset.mockRejectedValue(new Error('Not found'))
+
+        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null })
+        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null })
+
+        expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
     })
 
     it('uses an explicit WebID instead of deriving from the pod URL', async () => {

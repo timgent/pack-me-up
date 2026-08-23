@@ -20,7 +20,7 @@ import { Modal } from './Modal'
 import { PersonAvatar } from './PersonAvatar'
 import type { PackingListItem } from '../create-packing-list/types'
 import type { GridColumn, GridRow } from '../utils/categoryItemGrid'
-import type { PersonColorLookup } from '../hooks/usePersonColors'
+import type { PersonIdentityLookup } from '../hooks/usePersonIdentities'
 
 export interface ItemRowPanelProps {
     isOpen: boolean
@@ -31,7 +31,7 @@ export interface ItemRowPanelProps {
     columns: readonly GridColumn[]
     /** Where the item lives, shown under its name. */
     sectionTitle: string
-    personColor: PersonColorLookup
+    personIdentity: PersonIdentityLookup
     packedById: Record<string, boolean>
     /** Applies to every copy on the row. */
     onRename: (row: GridRow, text: string) => void
@@ -48,7 +48,7 @@ export function ItemRowPanel({
     row,
     columns,
     sectionTitle,
-    personColor,
+    personIdentity,
     packedById,
     onRename,
     onSetQuantity,
@@ -173,7 +173,7 @@ export function ItemRowPanel({
                                             <PersonAvatar
                                                 name={column.name}
                                                 initial={column.initial}
-                                                color={personColor({ id: column.personId, name: column.name })}
+                                                identity={personIdentity({ id: column.personId, name: column.name })}
                                                 size="sm"
                                             />
                                         )}

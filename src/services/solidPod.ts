@@ -1,5 +1,5 @@
 import { AppSession as Session } from '../types/AppSession'
-import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt, acp_ess_2, getThing, getStringNoLocale } from '@inrupt/solid-client'
+import { getPodUrlAll, overwriteFile, getSolidDataset, getContainedResourceUrlAll, getFile, deleteFile, solidDatasetAsTurtle, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, createContainerAt, acp_ess_2, getThing, getStringNoLocale, getUrl } from '@inrupt/solid-client'
 import type { SolidDataset, Access } from '@inrupt/solid-client'
 const { getAgentAccessAll, setPublicAccess, getPublicAccess } = universalAccess
 import { PackingAppDatabase } from './database'
@@ -177,17 +177,90 @@ export function deriveWebIdFromPodUrl(podUrl: string): string {
     return `${base}/profile/card#me`
 }
 
+/** What a Solid profile card is asked for, and all it is asked for. */
+export interface SolidProfile {
+    name: string | null
+    /** Absolute URL of the profile photo, if the card names one. */
+    photo: string | null
+}
+
+const EMPTY_PROFILE: SolidProfile = { name: null, photo: null }
+
+/**
+ * Profile cards already fetched, or in flight, keyed by WebID and by whether
+ * the request carried a session — an anonymous miss on a card that turns out to
+ * be private must not stand in for the answer a logged-in read would give.
+ *
+ * A profile card is about as static as anything on the web, and the app asks
+ * for the same handful of them from every component that draws a person: the
+ * avatar in the People editor, the same person's avatar on three packing lists,
+ * the owner's name on every shared-list card. Without this, every mount of
+ * every one of those is its own request, and two people on the same pod fetch
+ * the same document twice.
+ *
+ * Promises are cached rather than results, so concurrent callers share one
+ * request instead of racing to start their own. Failures are cached too — as
+ * an empty profile — because a WebID that does not resolve will not start
+ * resolving because a component re-mounted, and retrying on every render of a
+ * list of people is how you get a request storm out of a typo.
+ *
+ * Nothing evicts it. It is bounded by the number of distinct WebIDs a session
+ * mentions, which is the size of a household plus the people who have shared a
+ * list with you.
+ */
+const profileCache = new Map<string, Promise<SolidProfile>>()
+
+/** For tests, and for a "reload profile" that does not yet exist. */
+export function clearSolidProfileCache(): void {
+    profileCache.clear()
+}
+
+const FOAF = 'http://xmlns.com/foaf/0.1/'
+const VCARD = 'http://www.w3.org/2006/vcard/ns#'
+
+/**
+ * Reads a WebID's profile card: their name, and their photo.
+ *
+ * Three predicates are tried for the photo because three are in use in the
+ * wild — `vcard:hasPhoto` is what the Solid profile editors write, `foaf:img`
+ * is what older pods have, and `foaf:depiction` is what some hand-written
+ * cards use. First one present wins.
+ */
+export async function getSolidProfile(session: Session | null | undefined, webId: string): Promise<SolidProfile> {
+    const key = `${webId}|${session ? 'auth' : 'anon'}`
+    const cached = profileCache.get(key)
+    if (cached) return cached
+
+    const profileCardUrl = webId.replace(/#.*$/, '')
+    const pending = (async (): Promise<SolidProfile> => {
+        try {
+            // Unauthenticated when there is no session: a WebID profile card is
+            // public by convention, and the person typing a family member's
+            // WebID into the People editor has no reason to have signed into a
+            // pod of their own first.
+            const dataset = await getSolidDataset(profileCardUrl, session ? { fetch: session.fetch } : undefined)
+            const card = getThing(dataset, webId)
+            if (!card) return EMPTY_PROFILE
+            const photo =
+                getUrl(card, `${VCARD}hasPhoto`) ??
+                getUrl(card, `${FOAF}img`) ??
+                getUrl(card, `${FOAF}depiction`)
+            return {
+                name: getStringNoLocale(card, `${FOAF}name`) ?? null,
+                photo: photo ?? null,
+            }
+        } catch {
+            return EMPTY_PROFILE
+        }
+    })()
+
+    profileCache.set(key, pending)
+    return pending
+}
+
 export async function getPodOwnerName(session: Session, podUrl: string, explicitWebId?: string): Promise<string | null> {
     const webId = explicitWebId ?? deriveWebIdFromPodUrl(podUrl)
-    const profileCardUrl = webId.replace(/#.*$/, '')
-    try {
-        const dataset = await getSolidDataset(profileCardUrl, { fetch: session.fetch })
-        const profile = getThing(dataset, webId)
-        if (!profile) return null
-        return getStringNoLocale(profile, 'http://xmlns.com/foaf/0.1/name') ?? null
-    } catch {
-        return null
-    }
+    return (await getSolidProfile(session, webId)).name
 }
 
 /**

@@ -36,7 +36,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PersonAvatar } from './PersonAvatar'
-import type { PersonColorLookup } from '../hooks/usePersonColors'
+import type { PersonIdentityLookup } from '../hooks/usePersonIdentities'
 import type { GridColumn } from '../utils/categoryItemGrid'
 import { SHARED_FILTER_KEY, type PeopleFilter, type PersonStat } from '../utils/peopleFilter'
 
@@ -44,7 +44,7 @@ export interface PeopleFilterBarProps {
     columns: readonly GridColumn[]
     selected: PeopleFilter
     totals: Map<string, PersonStat>
-    personColor: PersonColorLookup
+    personIdentity: PersonIdentityLookup
     onToggle: (name: string) => void
     /** The group's own items, when the list has any. Omitted when it has none. */
     sharedStat?: PersonStat
@@ -74,7 +74,7 @@ export function PeopleFilterBar({
     columns,
     selected,
     totals,
-    personColor,
+    personIdentity,
     onToggle,
     sharedStat,
     controlsId,
@@ -167,7 +167,7 @@ export function PeopleFilterBar({
                     // chip carries numbers reads as a chip that failed to load.
                     const stat = totals.get(column.key) ?? { packed: 0, total: 0 }
                     const done = stat.total > 0 && stat.packed === stat.total
-                    const color = personColor({ id: column.personId, name: column.name })
+                    const identity = personIdentity({ id: column.personId, name: column.name })
                     return (
                         <button
                             key={column.key}
@@ -184,7 +184,7 @@ export function PeopleFilterBar({
                             <span className="relative shrink-0">
                                 {column.unassigned
                                     ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">?</span>
-                                    : <PersonAvatar name={column.name} color={color} initial={column.initial} />}
+                                    : <PersonAvatar name={column.name} identity={identity} initial={column.initial} />}
                                 {done && <DoneTick />}
                             </span>
                             <span className="hidden whitespace-nowrap sm:inline">{column.name}</span>

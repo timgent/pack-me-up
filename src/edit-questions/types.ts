@@ -45,6 +45,14 @@ export const PET_SPECIES_OPTIONS = [
 // `color` is optional and additive: absent means "whatever this person's
 // position gives them", which is the colour they had before the picker
 // existed. See `person-colors.ts`.
+// `emoji` is optional and additive, and has three states rather than two:
+// absent means "whatever my position gives me" (see `person-emoji.ts`), a
+// character means that character, and the empty string means "none, show my
+// initial". Absent and empty have to be told apart, because only the second is
+// a decision the user made.
+// `webId` is optional and additive: the person's Solid WebID, followed to their
+// profile card to show their own photo on their avatar. Nothing else depends on
+// it, so a wrong or unreachable one costs the initial and nothing more.
 export const PersonSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -53,6 +61,8 @@ export const PersonSchema = z.object({
   gender: GenderSchema.optional(),
   species: PetSpeciesSchema.optional(),
   color: PersonColorSchema.optional(),
+  emoji: z.string().optional(),
+  webId: z.string().optional(),
   lastModified: z.string().optional(),
   deletedAt: z.string().optional(),
 })
