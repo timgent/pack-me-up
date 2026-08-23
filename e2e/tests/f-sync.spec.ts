@@ -47,8 +47,8 @@ test.describe('F – Solid Pod Sync', () => {
   // Using a targeted element wait avoids the slow networkidle pattern on a busy CSS server.
   async function createList(name: string) {
     await page.goto('/#/create-packing-list')
-    await page.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 15_000 })
-    await page.getByPlaceholder('Enter a name for your packing list').fill(name)
+    await page.getByLabel('Packing List Name').waitFor({ timeout: 15_000 })
+    await page.getByLabel('Packing List Name').fill(name)
     await page.getByRole('button', { name: 'Create Packing List' }).click()
     await page.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
   }

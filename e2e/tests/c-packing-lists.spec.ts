@@ -15,7 +15,7 @@ async function runWizard(page: import('@playwright/test').Page) {
 async function createList(page: import('@playwright/test').Page, name: string) {
   // Wait for the question set to load (questions appear on the page)
   await page.waitForLoadState('networkidle')
-  await page.getByPlaceholder('Enter a name for your packing list').fill(name)
+  await page.getByLabel('Packing List Name').fill(name)
   await page.getByRole('button', { name: 'Create Packing List' }).click()
   // Navigates to /view-lists/:id
   await page.waitForURL(/#\/view-lists\//, { timeout: 8_000 })

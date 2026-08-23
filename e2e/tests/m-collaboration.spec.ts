@@ -36,7 +36,7 @@ test.describe('M – Full pod collaboration', () => {
 
         // Try create-packing-list directly — if a question set already exists skip the wizard.
         await pageA.goto('/#/create-packing-list')
-        const nameInput = pageA.getByPlaceholder('Enter a name for your packing list')
+        const nameInput = pageA.getByLabel('Packing List Name')
         const isReady = await nameInput.isVisible({ timeout: 8_000 }).catch(() => false)
         if (!isReady) {
             await pageA.goto('/#/wizard')
@@ -48,8 +48,8 @@ test.describe('M – Full pod collaboration', () => {
             await pageA.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
         }
 
-        await pageA.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 15_000 })
-        await pageA.getByPlaceholder('Enter a name for your packing list').fill(listName)
+        await pageA.getByLabel('Packing List Name').waitFor({ timeout: 15_000 })
+        await pageA.getByLabel('Packing List Name').fill(listName)
         await pageA.getByRole('button', { name: 'Create Packing List' }).click()
         await pageA.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
         await expandAllSections(pageA)

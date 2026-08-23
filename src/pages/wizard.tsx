@@ -211,10 +211,11 @@ export const Wizard = () => {
                                         </div>
                                         {field.kind === 'pet' ? (
                                             <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                <label htmlFor={`person-species-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
                                                     Species
                                                 </label>
                                                 <select
+                                                    id={`person-species-${index}`}
                                                     {...register(`people.${index}.species`)}
                                                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                 >
@@ -232,10 +233,11 @@ export const Wizard = () => {
                                         ) : (
                                             <>
                                                 <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <label htmlFor={`person-birthday-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
                                                         Birthday <span className="text-gray-400 font-normal">(optional)</span>
                                                     </label>
                                                     <input
+                                                        id={`person-birthday-${index}`}
                                                         type="date"
                                                         {...register(`people.${index}.dateOfBirth`, {
                                                             onChange: (e) => {
@@ -250,10 +252,11 @@ export const Wizard = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <label htmlFor={`person-age-range-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
                                                         Age Range
                                                     </label>
                                                     <select
+                                                        id={`person-age-range-${index}`}
                                                         {...register(`people.${index}.ageRange`)}
                                                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                     >
@@ -269,10 +272,11 @@ export const Wizard = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <label htmlFor={`person-gender-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
                                                         Gender
                                                     </label>
                                                     <select
+                                                        id={`person-gender-${index}`}
                                                         {...register(`people.${index}.gender`)}
                                                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
                                                     >
