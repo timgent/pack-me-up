@@ -16,6 +16,12 @@ vi.mock('../services/rdfSerialization', () => ({
     datasetToPackingList: vi.fn(),
 }))
 
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('react-router-dom')>()
+    return { ...actual, useNavigate: () => mockNavigate }
+})
+
 import { ForeignPackingListsPage } from './foreign-packing-lists'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -216,5 +222,46 @@ describe('ForeignPackingListsPage past trips', () => {
 
         const [current, past] = screen.getAllByTestId('shared-list-card')
         expect(current.className).not.toBe(past.className)
+    })
+})
+
+// The nav no longer carries "Create List" (#302), so this page is the only
+// create-list entry point in foreign-pod context — it did not have one before.
+describe('ForeignPackingListsPage create entry point', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: {} as Session,
+            webId: 'https://me.example/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseForeignPod.mockReturnValue({ foreignPodUrl: 'https://friend.example/' } as ReturnType<typeof useForeignPod>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    it('offers a New List button while the shared lists are still loading', async () => {
+        mockLoadMultipleRdfFromPod.mockReturnValue(new Promise(() => {}))
+
+        renderPage()
+
+        await waitFor(() => expect(screen.getByRole('button', { name: /New List/i })).toBeTruthy())
+    })
+
+    it('creates the list into the pod being viewed, not your own', async () => {
+        mockLoadMultipleRdfFromPod.mockResolvedValue({ data: [], errors: [] })
+
+        renderPage()
+
+        fireEvent.click(await screen.findByRole('button', { name: /New List/i }))
+
+        expect(mockNavigate).toHaveBeenCalledWith(
+            `/pod/${encodeURIComponent('https://friend.example/')}/create-packing-list`
+        )
     })
 })

@@ -3,12 +3,15 @@ import { useState, useEffect } from 'react'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
+import { AccountMenu, ProfileBadge } from './AccountMenu'
+import { useSolidProfile } from '../hooks/useSolidProfile'
+import { podUsernameFromWebId } from '../services/solidPod'
 import type { SharedContext } from '../services/rdfSerialization'
 
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const { login, logout, isLoggedIn, webId } = useSolidPod()
+    const { login, logout, isLoggedIn, webId, session } = useSolidPod()
     const { db, loginSyncVersion } = useDatabase()
     const location = useLocation()
     const navigate = useNavigate()
@@ -20,6 +23,11 @@ export const Navigation = () => {
             .catch(() => {})
     }, [db, loginSyncVersion])
 
+    const profile = useSolidProfile(webId, session)
+    // Their name if their card has one, otherwise the username their WebID
+    // carries. Both beat printing the WebID, which is what used to sit here.
+    const displayName = profile.name ?? (webId ? podUsernameFromWebId(webId) : null) ?? 'Your account'
+
     const podMatch = /^\/pod\/([^/]+)/.exec(location.pathname)
     const currentForeignEncoded = podMatch?.[1] ?? null
     const inForeignContext = currentForeignEncoded !== null
@@ -27,7 +35,6 @@ export const Navigation = () => {
     // When viewing a foreign pod, contextual links stay inside that pod's routes
     const viewListsPath = inForeignContext ? `/pod/${currentForeignEncoded}/view-lists` : '/view-lists'
     const manageQuestionsPath = inForeignContext ? `/pod/${currentForeignEncoded}/manage-questions` : '/manage-questions'
-    const createListPath = inForeignContext ? `/pod/${currentForeignEncoded}/create-packing-list` : '/create-packing-list'
 
     const handleSolidLogin = () => {
         setIsProviderSelectorOpen(true)
@@ -45,7 +52,7 @@ export const Navigation = () => {
         <>
             <nav className="bg-primary-950 text-white shadow-soft safe-area-top">
                 <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex items-center justify-between h-14 md:h-16">
+                    <div data-testid="nav-bar" className="flex items-center justify-between h-14 md:h-16">
                         <div className="flex items-center">
                             <div className="flex-shrink-0">
                                 <Link to="/home" className="flex items-center gap-2 text-xl md:text-2xl font-bold hover:scale-105 transition-transform duration-200 drop-shadow-md">
@@ -61,26 +68,20 @@ export const Navigation = () => {
                                     >
                                         {inForeignContext ? 'Questions & Items' : 'My Questions & Items'}
                                     </Link>
-                                    <Link
-                                        to={createListPath}
-                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                                    >
-                                        Create List
-                                    </Link>
+                                    {/*
+                                      * No "Create List" here: creating starts from
+                                      * Lists, where the "New List" button sits, in
+                                      * your own pod and in someone else's alike.
+                                      * Backups lives in the account menu — it is a
+                                      * once-in-a-while destination, not an everyday
+                                      * one. See #302.
+                                      */}
                                     <Link
                                         to={viewListsPath}
                                         className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
                                     >
-                                        View Lists
+                                        Lists
                                     </Link>
-                                    {isLoggedIn && (
-                                        <Link
-                                            to="/backups"
-                                            className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                                        >
-                                            Backups
-                                        </Link>
-                                    )}
                                     {/*
                                       * Sharing stays visible logged out: the page's own
                                       * benefit-framed sign-in handles that case, and hiding
@@ -98,7 +99,13 @@ export const Navigation = () => {
                         {/* Solid Login/Logout section */}
                         <div className="hidden md:flex items-center gap-4">
                             {isLoggedIn ? (
-                                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    {/*
+                                      * The context switcher stays out here rather than
+                                      * inside the account menu: whose data you are
+                                      * looking at has to be answerable at a glance,
+                                      * without opening anything.
+                                      */}
                                     {sharedContexts.length > 0 && (
                                         <select
                                             value={currentForeignEncoded ?? '__own__'}
@@ -122,15 +129,12 @@ export const Navigation = () => {
                                             ))}
                                         </select>
                                     )}
-                                    <span className="text-sm font-medium truncate max-w-xs" title={webId}>
-                                        {webId}
-                                    </span>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-white/20 hover:bg-white/30 transition-all duration-200 hover:scale-105"
-                                    >
-                                        Logout
-                                    </button>
+                                    <AccountMenu
+                                        webId={webId ?? ''}
+                                        displayName={displayName}
+                                        photoUrl={profile.photo}
+                                        onLogout={handleLogout}
+                                    />
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-end">
@@ -179,7 +183,7 @@ export const Navigation = () => {
                 </div>
 
                 {/* Mobile menu */}
-                <div className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-950`}>
+                <div data-testid="mobile-menu" className={`${isOpen ? 'block' : 'hidden'} md:hidden bg-primary-950`}>
                     <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                         <Link
                             to={manageQuestionsPath}
@@ -189,28 +193,12 @@ export const Navigation = () => {
                             {inForeignContext ? 'Questions & Items' : 'My Questions & Items'}
                         </Link>
                         <Link
-                            to={createListPath}
-                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Create List
-                        </Link>
-                        <Link
                             to={viewListsPath}
                             className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
                             onClick={() => setIsOpen(false)}
                         >
-                            View Lists
+                            Lists
                         </Link>
-                        {isLoggedIn && (
-                            <Link
-                                to="/backups"
-                                className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Backups
-                            </Link>
-                        )}
                         <Link
                             to="/sharing"
                             className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
@@ -222,9 +210,25 @@ export const Navigation = () => {
                         <div className="border-t border-white/20 pt-2 mt-2">
                             {isLoggedIn ? (
                                 <>
-                                    <div className="px-3 py-2 text-sm font-medium truncate" title={webId}>
-                                        {webId}
+                                    {/*
+                                      * The same things the desktop account menu holds,
+                                      * flat: the mobile menu is already a disclosure,
+                                      * and a dropdown inside a dropdown buys nothing.
+                                      */}
+                                    <div className="flex items-center gap-2 px-3 py-2">
+                                        <ProfileBadge name={displayName} photoUrl={profile.photo} />
                                     </div>
+                                    <div className="px-3 pb-2">
+                                        <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Signed in as</p>
+                                        <p className="mt-0.5 text-xs text-white/80 break-all" title={webId}>{webId}</p>
+                                    </div>
+                                    <Link
+                                        to="/backups"
+                                        className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        Backups
+                                    </Link>
                                     <button
                                         onClick={() => {
                                             handleLogout()

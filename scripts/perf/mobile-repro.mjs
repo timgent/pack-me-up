@@ -90,8 +90,9 @@ async function main() {
     // then log out so PouchDB keeps the data but pod polling is disabled.
     await loginToCss(page, { appOrigin: APP_ORIGIN, cssOrigin: CSS_ORIGIN, email: EMAIL, password: PASSWORD })
     await restoreSeededBackup(page)
+    await page.getByRole('button', { name: /account menu/i }).first().click()
     await page.getByRole('button', { name: 'Logout' }).first().click()
-    await page.getByRole('button', { name: 'Login with Solid Pod' }).first().waitFor({ timeout: 10_000 })
+    await page.getByRole('button', { name: 'Sync & Share' }).first().waitFor({ timeout: 10_000 })
   }
 
   await page.setViewportSize(MOBILE_VIEWPORT)

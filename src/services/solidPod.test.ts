@@ -23,6 +23,7 @@ import {
     friendlyPodName,
     getPrimaryPodUrl,
     derivePodUrlFromWebId,
+    podUsernameFromWebId,
     resetPodSessionCaches,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
@@ -1748,5 +1749,33 @@ describe('derivePodUrlFromWebId', () => {
 
     it('returns null for an invalid URL', () => {
         expect(derivePodUrlFromWebId('not-a-url')).toBeNull()
+    })
+})
+
+// ─── podUsernameFromWebId ────────────────────────────────────────────────────
+
+describe('podUsernameFromWebId', () => {
+    it('reads the username out of a WebID stored inside its Pod', () => {
+        expect(podUsernameFromWebId('http://localhost:4000/testuser/profile/card#me')).toBe('testuser')
+    })
+
+    it('reads the username off the subdomain when the profile sits at the host root', () => {
+        expect(podUsernameFromWebId('https://alice.solidcommunity.net/profile/card#me')).toBe('alice')
+    })
+
+    it('reads the username off an identity-provider WebID', () => {
+        expect(podUsernameFromWebId('https://id.inrupt.com/hannahwprior')).toBe('hannahwprior')
+    })
+
+    it('falls back to the host when nothing in the WebID names a user', () => {
+        expect(podUsernameFromWebId('https://example.org/profile/card#me')).toBe('example.org')
+    })
+
+    it('ignores a service subdomain rather than calling the user "storage"', () => {
+        expect(podUsernameFromWebId('https://storage.inrupt.com/profile/card#me')).toBe('inrupt.com')
+    })
+
+    it('returns null for an invalid URL', () => {
+        expect(podUsernameFromWebId('not-a-url')).toBeNull()
     })
 })

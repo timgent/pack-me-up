@@ -286,6 +286,45 @@ export function derivePodUrlFromWebId(webId: string): string | null {
     return null
 }
 
+/**
+ * The username a WebID carries, for the places that need to name the signed-in
+ * user when their profile card does not — the nav bar's account menu, which
+ * would otherwise have a raw WebID to show and nothing else.
+ *
+ * Not `friendlyPodName`: fed a WebID rather than a Pod root, that reads the
+ * first path segment and calls the user "profile on solidcommunity.net".
+ *
+ * The username lives in a different place on each kind of WebID, so each is
+ * tried in turn: the segment before `/profile/card` for a WebID stored inside
+ * its own Pod, the last path segment for one minted by an identity provider,
+ * then the subdomain for a per-user host. A host with no user in it anywhere is
+ * the host itself — "example.org" says less than a name, but it is true, and it
+ * is shorter than the WebID it stands in for.
+ */
+export function podUsernameFromWebId(webId: string): string | null {
+    try {
+        const url = new URL(webId)
+        const segments = url.pathname.split('/').filter(s => s.length > 0)
+
+        const last = segments[segments.length - 1]
+        // .../<username>/profile/card#me — the CSS and NSS convention
+        if (segments.length >= 3 && segments[segments.length - 2] === 'profile' && last === 'card') {
+            return segments[segments.length - 3]
+        }
+        // https://id.inrupt.com/<username> — no Pod in the WebID at all
+        if (segments.length >= 1 && last !== 'card') {
+            return last
+        }
+
+        const parts = url.hostname.split('.')
+        if (parts.length >= 3 && !SERVICE_SUBDOMAINS.has(parts[0])) return parts[0]
+        if (parts.length >= 3 && SERVICE_SUBDOMAINS.has(parts[0])) return parts.slice(1).join('.')
+        return url.hostname
+    } catch {
+        return null
+    }
+}
+
 export async function grantCollaboratorAccess(
     session: Session,
     resourceUrl: string,
