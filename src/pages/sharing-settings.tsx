@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
@@ -22,8 +22,42 @@ import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
+import { SolidPodPrompt } from '../components/SolidPodPrompt'
+import { Button } from '../components/Button'
+import {
+    clearPendingSignInAction,
+    getPendingSignInAction,
+    setPendingSignInAction,
+} from '../utils/pendingSignInAction'
 
 type ListSharingStatus = { collaborators: string[]; isPublic: boolean } | 'loading' | 'error'
+
+/**
+ * The whole-set share has always worked; it was just buried under a label
+ * ("People who can access my data") that described plumbing rather than the
+ * thing anyone wants. The copy below is deliberately relationship-agnostic —
+ * the examples carry the breadth so nobody has to be someone's "partner" to
+ * see themselves in it.
+ */
+const FULL_SETUP_TAGLINE = 'Let someone else use your questions and lists.'
+
+function FullSetupIntro() {
+    return (
+        <div className="space-y-2">
+            <p className="text-sm text-gray-700">{FULL_SETUP_TAGLINE}</p>
+            <p className="text-sm text-gray-600">
+                They get your question set and every packing list you have — including the ones you
+                make later — and can view and edit them. Handy for anyone who packs with the same
+                people over and over: couples, families, sports clubs, scout troops, climbing
+                buddies.
+            </p>
+            <p className="text-sm text-gray-500">
+                Sharing just one list? Open that list and choose <strong>Share</strong> — that sends
+                a single list, not your whole setup.
+            </p>
+        </div>
+    )
+}
 
 export function SharingSettingsPage() {
     const { session, isLoggedIn } = useSolidPod()
@@ -37,6 +71,9 @@ export function SharingSettingsPage() {
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
     const [isGranting, setIsGranting] = useState(false)
     const [inviteLink, setInviteLink] = useState<string | null>(null)
+    const [sharedWith, setSharedWith] = useState<string | null>(null)
+    const [signInPromptOpen, setSignInPromptOpen] = useState(false)
+    const webIdInputRef = useRef<HTMLInputElement>(null)
     const [collaborators, setCollaborators] = useState<string[]>([])
     const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false)
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
@@ -61,6 +98,18 @@ export function SharingSettingsPage() {
         if (!isLoggedIn || !session) return
         getPrimaryPodUrl(session).then(url => setOwnPodUrl(url ?? null))
     }, [isLoggedIn, session])
+
+    // Someone who signed in from the "share your full setup" prompt lands back
+    // here — put the cursor where they were going rather than making them find
+    // the field again.
+    useEffect(() => {
+        if (!isLoggedIn) return
+        const pending = getPendingSignInAction()
+        if (pending?.type !== 'share-full-setup') return
+        clearPendingSignInAction()
+        webIdInputRef.current?.focus()
+        webIdInputRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    }, [isLoggedIn])
 
     const loadCollaborators = useCallback(async () => {
         if (!session || !ownPodUrl) return
@@ -134,12 +183,14 @@ export function SharingSettingsPage() {
         if (!session || !ownPodUrl || !collaboratorWebId.trim()) return
         setIsGranting(true)
         setInviteLink(null)
+        setSharedWith(null)
         try {
             await grantFullCollaboratorAccess(session, ownPodUrl, collaboratorWebId.trim())
             const ownerWebId = session?.info.webId
             const ownerParam = ownerWebId ? `?owner=${encodeURIComponent(ownerWebId)}` : ''
             const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists${ownerParam}`
             setInviteLink(link)
+            setSharedWith(collaboratorWebId.trim())
             setCollaboratorWebId('')
             await loadCollaborators()
             showToast('Access granted successfully', 'success')
@@ -149,6 +200,20 @@ export function SharingSettingsPage() {
             showToast(`Failed to grant access: ${msg}`, 'error', details)
         } finally {
             setIsGranting(false)
+        }
+    }
+
+    const handleCopyInviteLink = async () => {
+        if (!inviteLink) return
+        try {
+            await navigator.clipboard.writeText(inviteLink)
+            showToast('Invite link copied', 'success')
+        } catch (err) {
+            // Clipboard access can be refused (permissions, insecure origin) —
+            // the link is on screen and selectable, so say so rather than fail
+            // silently.
+            const details = reportError(err, 'SharingSettingsPage: failed to copy invite link')
+            showToast('Could not copy — select the link and copy it manually.', 'error', details)
         }
     }
 
@@ -204,10 +269,41 @@ export function SharingSettingsPage() {
         }
     }
 
+    const fullSetupSignInPrompt = (
+        <SolidPodPrompt
+            isOpen={signInPromptOpen}
+            onClose={() => setSignInPromptOpen(false)}
+            title="Sign in to share your full setup"
+            message="Handing someone your questions and lists needs somewhere online for them to live. Sign in with a Solid Pod and we'll bring you straight back here to finish."
+            benefitsTitle="What signing in unlocks:"
+            benefits={[
+                { label: 'Share your full setup', text: 'Your question set and every list, in one go' },
+                { label: 'Pack together', text: 'You both work from the same questions and lists' },
+                { label: 'Free', text: 'All major Pod providers are free to sign up' },
+                { label: 'You own your data', text: 'Everything stays in your personal storage' },
+            ]}
+            confirmLabel="🔗 Sign in and share"
+            dismissLabel="Not now"
+            onBeforeLogin={() => setPendingSignInAction({ type: 'share-full-setup' })}
+        />
+    )
+
     if (!isLoggedIn) {
         return (
-            <div className="max-w-2xl mx-auto py-8 px-4">
-                <p className="text-gray-700">Please log in to manage sharing settings.</p>
+            <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
+                <h1 className="text-3xl font-bold text-primary-900">Sharing</h1>
+                <section className="space-y-4">
+                    <h2 className="text-xl font-semibold text-gray-900">Share your full setup</h2>
+                    <FullSetupIntro />
+                    <Button type="button" variant="primary" onClick={() => setSignInPromptOpen(true)}>
+                        Sign in to share your setup
+                    </Button>
+                    <p className="text-sm text-gray-500">
+                        Everything you have made so far stays on this device until you sign in — nothing
+                        is shared before you say who with.
+                    </p>
+                </section>
+                {fullSetupSignInPrompt}
             </div>
         )
     }
@@ -221,51 +317,62 @@ export function SharingSettingsPage() {
     return (
         <div className="max-w-2xl mx-auto py-8 px-4 space-y-10">
             <div>
-                <h1 className="text-3xl font-bold text-primary-900">Sharing Settings</h1>
+                <h1 className="text-3xl font-bold text-primary-900">Sharing</h1>
             </div>
 
-            {/* Section 1: Grant access to others */}
+            {/* Section 1: Share the whole setup — questions + every list */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">People who can access my data</h2>
-                <p className="text-sm text-gray-600">
-                    Grant someone access to all your packing lists and questions. They'll be able to view
-                    and edit your data.
-                </p>
-                <div className="flex gap-2">
+                <h2 className="text-xl font-semibold text-gray-900">Share your full setup</h2>
+                <FullSetupIntro />
+                <div className="flex flex-col sm:flex-row gap-2">
                     <input
+                        ref={webIdInputRef}
                         type="text"
                         value={collaboratorWebId}
                         onChange={e => setCollaboratorWebId(e.target.value)}
-                        placeholder="Collaborator WebID (e.g. https://alice.solidcommunity.net/profile/card#me)"
-                        aria-label="Collaborator WebID"
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
+                        aria-label="Their WebID"
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <button
                         onClick={handleGrantAccess}
                         disabled={isGranting || !collaboratorWebId.trim()}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
                     >
-                        {isGranting ? 'Granting…' : 'Grant access'}
+                        {isGranting ? 'Sharing…' : 'Share my setup'}
                     </button>
                 </div>
+                <p className="text-xs text-gray-500">
+                    A WebID is the address of someone's Solid Pod — ask them to copy theirs from their
+                    own sharing page.
+                </p>
 
                 {inviteLink && (
-                    <div className="mt-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Invite link</label>
+                    <div className="mt-2 rounded-xl border-2 border-primary-200 bg-primary-50 p-4 space-y-2">
+                        <p className="text-sm font-semibold text-primary-900">
+                            ✅ Your full setup is shared{sharedWith ? ' with ' + sharedWith : ''}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                            They now have your question set and all your packing lists. Send them this
+                            link so they can open it:
+                        </p>
                         <input
                             type="text"
                             readOnly
                             value={inviteLink}
                             aria-label="Invite link"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:outline-none"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none"
                             onClick={e => (e.target as HTMLInputElement).select()}
                         />
-                        <p className="text-xs text-gray-500 mt-1">Share this link with your collaborator.</p>
+                        <Button type="button" variant="secondary" onClick={handleCopyInviteLink}>
+                            Copy link
+                        </Button>
                     </div>
                 )}
 
+                <h3 className="text-sm font-semibold text-gray-700 pt-2">People with your full setup</h3>
                 {isLoadingCollaborators ? (
-                    <p className="text-sm text-gray-500">Loading collaborators…</p>
+                    <p className="text-sm text-gray-500">Loading…</p>
                 ) : collaborators.length > 0 ? (
                     <ul className="space-y-2 mt-2">
                         {collaborators.map(webId => (
@@ -283,7 +390,7 @@ export function SharingSettingsPage() {
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-gray-500">No collaborators yet.</p>
+                    <p className="text-sm text-gray-500">You haven't shared your full setup with anyone yet.</p>
                 )}
             </section>
 

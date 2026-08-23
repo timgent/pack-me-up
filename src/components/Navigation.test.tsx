@@ -48,6 +48,17 @@ describe('Navigation', () => {
         expect(screen.queryByText('Backups')).toBeNull()
     })
 
+    it('keeps the Sharing link reachable when logged out so sharing is discoverable', () => {
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        // Desktop and mobile menus each render one
+        expect(screen.getAllByText('Sharing').length).toBeGreaterThan(0)
+    })
+
     it('shows "My Questions & Items" nav link instead of "Edit Questions"', () => {
         render(
             <MemoryRouter>

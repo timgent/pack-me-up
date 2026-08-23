@@ -7,11 +7,16 @@
  */
 export const PENDING_SIGN_IN_ACTION_KEY = 'pending-sign-in-action'
 
-export type PendingSignInAction = { type: 'share'; listId: string }
+export type PendingSignInAction =
+    /** Share one packing list — resumed on that list's page. */
+    | { type: 'share'; listId: string }
+    /** Share the whole setup (question set + every list) — resumed on the sharing page. */
+    | { type: 'share-full-setup' }
 
 function isPendingSignInAction(value: unknown): value is PendingSignInAction {
     if (typeof value !== 'object' || value === null) return false
     const candidate = value as Record<string, unknown>
+    if (candidate.type === 'share-full-setup') return true
     return candidate.type === 'share' && typeof candidate.listId === 'string'
 }
 

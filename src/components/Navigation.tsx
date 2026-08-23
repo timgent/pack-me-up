@@ -81,14 +81,17 @@ export const Navigation = () => {
                                             Backups
                                         </Link>
                                     )}
-                                    {isLoggedIn && (
-                                        <Link
-                                            to="/sharing"
-                                            className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
-                                        >
-                                            Sharing
-                                        </Link>
-                                    )}
+                                    {/*
+                                      * Sharing stays visible logged out: the page's own
+                                      * benefit-framed sign-in handles that case, and hiding
+                                      * the link is what made whole-setup sharing invisible.
+                                      */}
+                                    <Link
+                                        to="/sharing"
+                                        className="px-4 py-2 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 hover:scale-105"
+                                    >
+                                        Sharing
+                                    </Link>
                                 </div>
                             </div>
                         </div>
@@ -208,15 +211,13 @@ export const Navigation = () => {
                                 Backups
                             </Link>
                         )}
-                        {isLoggedIn && (
-                            <Link
-                                to="/sharing"
-                                className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Sharing
-                            </Link>
-                        )}
+                        <Link
+                            to="/sharing"
+                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Sharing
+                        </Link>
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">
                             {isLoggedIn ? (
