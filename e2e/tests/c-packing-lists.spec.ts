@@ -382,6 +382,35 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await expect(prompt).toHaveCount(0)
   })
 
+  test('C17: the sharing page pitches the full setup to a logged-out user, on desktop and on a phone', async ({ freshPage: page }) => {
+    // The nav link is the entry point — hiding it logged out is what made
+    // whole-setup sharing invisible in the first place
+    await page.goto('/#/home')
+    await page.getByRole('link', { name: 'Sharing' }).first().click()
+    await page.waitForURL(/#\/sharing/, { timeout: 8_000 })
+
+    await expect(page.getByRole('heading', { name: 'Share your full setup' })).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText(/let someone else use your questions and lists/i)).toBeVisible()
+    await expect(page.getByText(/sharing just one list\?/i)).toBeVisible()
+    await expect(page.getByText(/please log in/i)).toHaveCount(0)
+
+    // Sign-in is offered framed around the payoff, and backing out remembers nothing
+    await page.getByRole('button', { name: 'Sign in to share your setup' }).click()
+    await expect(page.getByRole('heading', { name: /sign in to share your full setup/i })).toBeVisible({ timeout: 5_000 })
+    await page.getByRole('button', { name: 'Not now' }).click()
+    await expect(page.getByRole('heading', { name: /sign in to share your full setup/i })).toHaveCount(0)
+    expect(await page.evaluate(() => sessionStorage.getItem('pending-sign-in-action'))).toBeNull()
+
+    // Reachable through the hamburger on a phone, and the page fits
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/#/home')
+    await page.getByRole('button', { name: 'Open main menu' }).click()
+    await page.getByRole('link', { name: 'Sharing' }).click()
+    await expect(page.getByRole('heading', { name: 'Share your full setup' })).toBeVisible({ timeout: 8_000 })
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+
   test('C14: a last minute item moves to its own section and survives a reload', async ({ freshPage: page }) => {
     await runWizard(page)
     // A name with no "last minute" in it, so the assertions below can't be

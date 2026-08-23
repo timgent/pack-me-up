@@ -80,13 +80,13 @@ test.describe('M – Full pod collaboration', () => {
 
     test('M1: Owner navigates to sharing settings', async () => {
         await pageA.goto('/#/sharing')
-        await expect(pageA.getByRole('heading', { name: /sharing settings/i })).toBeVisible({ timeout: 10_000 })
+        await expect(pageA.getByRole('heading', { name: /share your full setup/i })).toBeVisible({ timeout: 10_000 })
     })
 
     test('M2: Owner grants full access to collaborator and gets invite link', async () => {
         await pageA.goto('/#/sharing')
-        await pageA.getByLabel(/collaborator webid/i).fill(collabWebId)
-        await pageA.getByRole('button', { name: /grant access/i }).click()
+        await pageA.getByLabel(/their webid/i).fill(collabWebId)
+        await pageA.getByRole('button', { name: /share my setup/i }).click()
 
         await expect(pageA.getByLabel(/invite link/i)).toBeVisible({ timeout: 15_000 })
         inviteLink = await pageA.getByLabel(/invite link/i).inputValue()
@@ -95,8 +95,14 @@ test.describe('M – Full pod collaboration', () => {
         expect(inviteLink).toContain(encodeURIComponent(ownerPodUrl))
         expect(inviteLink).toContain('/view-lists')
 
-        // Collaborator should now appear in the list
-        await expect(pageA.getByText(collabWebId)).toBeVisible({ timeout: 10_000 })
+        // The share is confirmed in the page's own words, and the collaborator
+        // appears in the list of people who have the full setup
+        // "with <webid>" pins this to the confirmation panel — the success toast
+        // says the same thing without it
+        await expect(pageA.getByText(/your full setup is shared with/i)).toBeVisible({ timeout: 10_000 })
+        await expect(
+            pageA.getByRole('button', { name: `Revoke access for ${collabWebId}` })
+        ).toBeVisible({ timeout: 10_000 })
     })
 
     test('M3: Collab visits invite link and sees foreign context banner', async () => {
@@ -173,9 +179,10 @@ test.describe('M – Full pod collaboration', () => {
     test('M9: Owner revokes access; collab sees access denied', async ({ browser }) => {
         // Owner revokes
         await pageA.goto('/#/sharing')
-        await expect(pageA.getByText(collabWebId)).toBeVisible({ timeout: 10_000 })
-        await pageA.getByRole('button', { name: /revoke/i }).first().click()
-        await expect(pageA.getByText(collabWebId)).not.toBeVisible({ timeout: 10_000 })
+        const revokeCollab = pageA.getByRole('button', { name: `Revoke access for ${collabWebId}` })
+        await expect(revokeCollab).toBeVisible({ timeout: 10_000 })
+        await revokeCollab.click()
+        await expect(revokeCollab).not.toBeVisible({ timeout: 10_000 })
 
         // Fresh context required: pageB has stale PouchDB cache from M3-M6, so the app serves
         // cached data rather than detecting the 403. A fresh login has no local cache.
