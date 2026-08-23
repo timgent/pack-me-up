@@ -32,7 +32,8 @@ vi.mock('../services/solidPod', () => ({
 
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { saveRdfToPod } from '../services/solidPod'
+import { saveRdfToPod, getFullCollaborators, getCollaborators } from '../services/solidPod'
+import { useToast } from '../components/ToastContext'
 import { getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
 
 const mockUseDatabase = vi.mocked(useDatabase)
@@ -198,5 +199,52 @@ describe('SharingSettingsPage — share your full setup', () => {
         await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/webid/i)))
         // Consumed, so a later visit does not steal focus again
         expect(getPendingSignInAction()).toBeNull()
+    })
+})
+
+describe('SharingSettingsPage — full setup vs individual lists', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        sessionStorage.clear()
+    })
+
+    it('confirms the share in the language of the feature, not the plumbing', async () => {
+        const showToast = vi.fn()
+        vi.mocked(useToast).mockReturnValue({ showToast } as unknown as ReturnType<typeof useToast>)
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'https://alice.example.com/profile/card#me' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/full setup is shared/i), 'success'))
+    })
+
+    it('does not count a full-setup collaborator as an individual list share', async () => {
+        vi.mocked(getFullCollaborators).mockResolvedValue(['https://alice.example.com/profile/card#me'])
+        // The whole-setup grant sits on the container, so the ACL check on each
+        // child list reports the same person
+        vi.mocked(getCollaborators).mockResolvedValue(['https://alice.example.com/profile/card#me'])
+        renderPage({
+            getAllPackingLists: vi.fn(() => Promise.resolve([
+                { id: 'list-1', name: 'Alps hut trip' },
+            ] as unknown as PackingList[])),
+        })
+
+        expect(await screen.findByText(/haven't shared any individual lists yet/i)).toBeTruthy()
+        expect(screen.queryByText(/Alps hut trip/)).toBeNull()
+    })
+
+    it('still lists a genuinely individually shared list', async () => {
+        vi.mocked(getFullCollaborators).mockResolvedValue([])
+        vi.mocked(getCollaborators).mockResolvedValue(['https://bob.example.com/profile/card#me'])
+        renderPage({
+            getAllPackingLists: vi.fn(() => Promise.resolve([
+                { id: 'list-1', name: 'Alps hut trip' },
+            ] as unknown as PackingList[])),
+        })
+
+        expect(await screen.findByText(/Alps hut trip/)).toBeTruthy()
     })
 })

@@ -193,11 +193,11 @@ export function SharingSettingsPage() {
             setSharedWith(collaboratorWebId.trim())
             setCollaboratorWebId('')
             await loadCollaborators()
-            showToast('Access granted successfully', 'success')
+            showToast('Your full setup is shared', 'success')
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
             const details = reportError(err, 'SharingSettingsPage: failed to grant access')
-            showToast(`Failed to grant access: ${msg}`, 'error', details)
+            showToast(`Failed to share your setup: ${msg}`, 'error', details)
         } finally {
             setIsGranting(false)
         }
@@ -308,11 +308,21 @@ export function SharingSettingsPage() {
         )
     }
 
-    const sharedOwnLists = ownLists.filter(list => {
-        const status = sharingStatusByListId[list.id]
+    // The whole-setup grant lives on the pack-me-up container, so an ACL check on
+    // any single list reports those people too. Section 4 is about lists shared
+    // one at a time, so the full-setup collaborators come off first — otherwise
+    // sharing your setup silently makes every list look individually shared.
+    const individualCollaborators = (status: ListSharingStatus) =>
+        typeof status === 'object' && status !== null
+            ? status.collaborators.filter(webId => !collaborators.includes(webId))
+            : []
+
+    const isIndividuallyShared = (status: ListSharingStatus | undefined) => {
         if (typeof status !== 'object' || status === null) return false
-        return status.isPublic || status.collaborators.length > 0
-    })
+        return status.isPublic || individualCollaborators(status).length > 0
+    }
+
+    const sharedOwnLists = ownLists.filter(list => isIndividuallyShared(sharingStatusByListId[list.id]))
 
     return (
         <div className="max-w-2xl mx-auto py-8 px-4 space-y-10">
@@ -471,7 +481,8 @@ export function SharingSettingsPage() {
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900">Individual lists I've shared</h2>
                 <p className="text-sm text-gray-600">
-                    Lists you've shared with specific people or publicly. Use "Manage sharing" to update access.
+                    Lists you've shared on their own — with specific people or publicly. People who have
+                    your full setup are not listed here; they already have every list.
                 </p>
                 {ownLists.length === 0 ? (
                     <p className="text-sm text-gray-500">No packing lists yet.</p>
@@ -483,8 +494,7 @@ export function SharingSettingsPage() {
                             .filter(list => {
                                 const status = sharingStatusByListId[list.id]
                                 if (status === 'loading') return true
-                                if (typeof status !== 'object' || status === null) return false
-                                return status.isPublic || status.collaborators.length > 0
+                                return isIndividuallyShared(status)
                             })
                             .map(list => {
                                 const status = sharingStatusByListId[list.id]
@@ -497,7 +507,7 @@ export function SharingSettingsPage() {
                                                     status === 'error' ? 'Could not load sharing info' :
                                                     [
                                                         status.isPublic ? '🌐 Public' : null,
-                                                        status.collaborators.length > 0 ? `👤 ${status.collaborators.length} person${status.collaborators.length > 1 ? 's' : ''}` : null,
+                                                        individualCollaborators(status).length > 0 ? `👤 ${individualCollaborators(status).length} person${individualCollaborators(status).length > 1 ? 's' : ''}` : null,
                                                     ].filter(Boolean).join(' · ')}
                                             </span>
                                         </div>
