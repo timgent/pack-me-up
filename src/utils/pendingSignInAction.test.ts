@@ -21,6 +21,12 @@ describe('pendingSignInAction', () => {
         expect(getPendingSignInAction()).toEqual({ type: 'share', listId: 'list-1' })
     })
 
+    it('round-trips a full-setup share action', () => {
+        setPendingSignInAction({ type: 'share-full-setup' })
+
+        expect(getPendingSignInAction()).toEqual({ type: 'share-full-setup' })
+    })
+
     it('clears the pending action', () => {
         setPendingSignInAction({ type: 'share', listId: 'list-1' })
 
