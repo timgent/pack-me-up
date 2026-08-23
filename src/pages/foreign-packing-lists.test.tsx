@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import type { AppSession as Session } from '../types/AppSession'
@@ -31,6 +31,24 @@ function renderPage() {
             <ForeignPackingListsPage />
         </MemoryRouter>
     )
+}
+
+/**
+ * A YYYY-MM-DD date the given number of days either side of today. Trip dates
+ * in fixtures have to move with the clock: a hard-coded date would quietly slip
+ * into the past and land the list in the "Past trips" section instead.
+ */
+const daysFromToday = (days: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** The same YYYY-MM-DD date as the page renders it, in the viewer's locale. */
+const localDateOf = (isoDate: string) => {
+    const [year, month, day] = isoDate.split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString()
 }
 
 describe('ForeignPackingListsPage loading state', () => {
@@ -73,7 +91,8 @@ describe('ForeignPackingListsPage loading state', () => {
 })
 
 describe('ForeignPackingListsPage trip destination and dates', () => {
-    const localDate = (y: number, m: number, d: number) => new Date(y, m, d).toLocaleDateString()
+    const tripStart = daysFromToday(30)
+    const tripEnd = daysFromToday(37)
 
     beforeEach(() => {
         vi.clearAllMocks()
@@ -99,8 +118,8 @@ describe('ForeignPackingListsPage trip destination and dates', () => {
                 name: 'Summer Holiday',
                 createdAt: '2026-01-01T00:00:00Z',
                 destination: 'Lisbon, Portugal',
-                startDate: '2026-07-12',
-                endDate: '2026-07-19',
+                startDate: tripStart,
+                endDate: tripEnd,
                 items: [],
             }],
             errors: [],
@@ -110,7 +129,7 @@ describe('ForeignPackingListsPage trip destination and dates', () => {
 
         await screen.findByText(/Summer Holiday/)
         expect(screen.getByText(/Lisbon, Portugal/)).toBeTruthy()
-        expect(screen.getByText(new RegExp(localDate(2026, 6, 12).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy()
+        expect(screen.getByText(new RegExp(localDateOf(tripStart).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy()
         expect(screen.queryByText(/📅 Created/)).toBeNull()
     })
 
@@ -124,5 +143,78 @@ describe('ForeignPackingListsPage trip destination and dates', () => {
 
         await screen.findByText(/Summer Holiday/)
         expect(screen.getByText(/📅 Created/)).toBeTruthy()
+    })
+})
+
+describe('ForeignPackingListsPage past trips', () => {
+    const sharedList = (id: string, name: string, startDate?: string, endDate?: string) =>
+        ({ id, name, createdAt: '2026-01-01T00:00:00Z', items: [], startDate, endDate })
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: {} as Session,
+            webId: 'https://me.example/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseForeignPod.mockReturnValue({ foreignPodUrl: 'https://friend.example/' } as ReturnType<typeof useForeignPod>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    const pastTripsToggle = () => screen.getByRole('button', { name: /Past trips/ })
+
+    it('folds a friend\'s finished trips away behind a collapsed section', async () => {
+        mockLoadMultipleRdfFromPod.mockResolvedValue({
+            data: [
+                sharedList('l1', 'Next Summer', daysFromToday(30), daysFromToday(37)),
+                sharedList('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+            ],
+            errors: [],
+        })
+
+        renderPage()
+
+        await screen.findByText(/Next Summer/)
+        expect(pastTripsToggle().textContent).toContain('Past trips (1)')
+        expect(screen.queryByText(/Last Winter/)).toBeNull()
+
+        fireEvent.click(pastTripsToggle())
+        expect(screen.getByText(/Last Winter/)).toBeTruthy()
+    })
+
+    it('leaves an undated shared list in the current section', async () => {
+        mockLoadMultipleRdfFromPod.mockResolvedValue({
+            data: [sharedList('l1', 'Someday Trip')],
+            errors: [],
+        })
+
+        renderPage()
+
+        expect(await screen.findByText(/Someday Trip/)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Past trips/ })).toBeNull()
+    })
+
+    it('carries the gradient rotation on across the current/past boundary', async () => {
+        mockLoadMultipleRdfFromPod.mockResolvedValue({
+            data: [
+                sharedList('l1', 'Next Summer', daysFromToday(30), daysFromToday(37)),
+                sharedList('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+            ],
+            errors: [],
+        })
+
+        renderPage()
+
+        await screen.findByText(/Next Summer/)
+        fireEvent.click(pastTripsToggle())
+
+        const [current, past] = screen.getAllByTestId('shared-list-card')
+        expect(current.className).not.toBe(past.className)
     })
 })

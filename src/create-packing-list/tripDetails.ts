@@ -38,6 +38,25 @@ export function formatTripDates(startDate: string | undefined, endDate: string |
     return null
 }
 
+/**
+ * True when the trip's last known date is before today — the trip is over and
+ * there is nothing left to pack for.
+ *
+ * The last date is the end date, falling back to the start date for an
+ * open-ended trip. A list with no usable dates is never past: an undated list
+ * is one somebody may still be planning, so it stays in view.
+ */
+export function tripIsPast(startDate: string | undefined, endDate: string | undefined): boolean {
+    const lastDate = parseTripDate(endDate) ?? parseTripDate(startDate)
+    if (!lastDate) return false
+
+    // Compared as calendar days, so a trip ending today stays current until
+    // tomorrow whatever the time of day.
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return lastDate.getTime() < today.getTime()
+}
+
 /** True only when both dates are known and the trip would end before it began. */
 export function tripDatesOutOfOrder(startDate: string | undefined, endDate: string | undefined): boolean {
     const start = parseTripDate(startDate)
