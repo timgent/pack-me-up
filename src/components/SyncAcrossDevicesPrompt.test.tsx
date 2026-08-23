@@ -55,7 +55,7 @@ describe('SyncAcrossDevicesPrompt', () => {
         render(<SyncAcrossDevicesPrompt />)
         fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }))
 
-        expect(screen.getByText(/login with your solid pod/i)).toBeTruthy()
+        expect(screen.getByText(/sync & share your lists/i)).toBeTruthy()
     })
 
     it('logs in with the chosen provider', () => {

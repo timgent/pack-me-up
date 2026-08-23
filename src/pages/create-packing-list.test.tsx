@@ -601,13 +601,13 @@ describe('CreatePackingList - login button', () => {
         mockUseToast.mockReturnValue({ showToast: vi.fn() as (message: string, type: ToastType) => void })
     })
 
-    it('shows a "Login with Solid Pod" button in the page when not logged in and no questions found', () => {
+    it('shows a "Sync & Share" button in the page when not logged in and no questions found', () => {
         render(
             <MemoryRouter>
                 <CreatePackingList />
             </MemoryRouter>
         )
-        expect(screen.getByRole('button', { name: /login with solid pod/i })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /sync & share/i })).toBeTruthy()
     })
 
     it('opens the provider selector modal when the login button is clicked', () => {
@@ -616,7 +616,7 @@ describe('CreatePackingList - login button', () => {
                 <CreatePackingList />
             </MemoryRouter>
         )
-        const loginButton = screen.getByRole('button', { name: /login with solid pod/i })
+        const loginButton = screen.getByRole('button', { name: /sync & share/i })
         fireEvent.click(loginButton)
         expect(screen.getByRole('dialog')).toBeTruthy()
     })

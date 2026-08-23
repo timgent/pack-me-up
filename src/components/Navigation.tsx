@@ -134,11 +134,11 @@ export const Navigation = () => {
                                     <button
                                         onClick={handleSolidLogin}
                                         className="px-4 py-2 rounded-xl text-sm font-semibold bg-white/90 text-primary-700 hover:bg-white hover:scale-105 transition-all duration-200 shadow-soft"
-                                        title="Store your packing lists in your own personal Pod - you own your data"
+                                        title="Sign in to sync your lists across devices and share them - your data stays in your own Solid Pod"
                                     >
-                                        Login with Solid Pod
+                                        Sync &amp; Share
                                     </button>
-                                    <span className="text-xs text-white mt-1 font-medium">Own your data</span>
+                                    <span className="text-xs text-white mt-1 font-medium">Sync across devices</span>
                                 </div>
                             )}
                         </div>
@@ -242,11 +242,11 @@ export const Navigation = () => {
                                             setIsOpen(false)
                                         }}
                                         className="w-full text-left px-3 py-3 rounded-xl text-base font-semibold bg-white/90 text-primary-700 hover:bg-white transition-all duration-200"
-                                        title="Store your packing lists in your own personal Pod - you own your data"
+                                        title="Sign in to sync your lists across devices and share them - your data stays in your own Solid Pod"
                                     >
-                                        Login with Solid Pod
+                                        Sync &amp; Share
                                     </button>
-                                    <p className="px-3 py-1 text-xs text-white font-medium">Own your data</p>
+                                    <p className="px-3 py-1 text-xs text-white font-medium">Sync across devices and share lists</p>
                                 </div>
                             )}
                         </div>

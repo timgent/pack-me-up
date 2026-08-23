@@ -43,9 +43,9 @@ export function SolidPodPrompt({
   onClose,
   title,
   message,
-  benefitsTitle = 'Benefits of using a Solid Pod:',
+  benefitsTitle = 'What signing in unlocks:',
   benefits = DEFAULT_BENEFITS,
-  confirmLabel = '🔒 Set Up Solid Pod',
+  confirmLabel = '🔒 Sync & Share',
   dismissLabel = 'Maybe Later',
   onBeforeLogin,
 }: SolidPodPromptProps) {

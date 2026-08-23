@@ -103,3 +103,25 @@ describe('SolidProviderSelector', () => {
     })
   })
 })
+
+describe('SolidProviderSelector – sign-in framing', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  it('titles the sign-in screen with the benefit rather than the mechanism', () => {
+    render(<SolidProviderSelector {...defaultProps} />)
+    expect(screen.getByText('Sync & Share your lists')).toBeTruthy()
+  })
+
+  it('spells out the payoff of signing in', () => {
+    render(<SolidProviderSelector {...defaultProps} />)
+    expect(screen.getByText(/sync across (?:your )?devices/i)).toBeTruthy()
+  })
+
+  it('still explains that this uses a Solid Pod', () => {
+    render(<SolidProviderSelector {...defaultProps} />)
+    expect(screen.getByText('What is a Solid Pod?')).toBeTruthy()
+  })
+})
