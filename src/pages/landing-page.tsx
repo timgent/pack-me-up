@@ -37,10 +37,10 @@ export const LandingPage = () => {
                     fold — the data-ownership story lives in the trust section further down. */}
                 <div className="text-center mb-10 animate-slide-up">
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-primary-900 text-balance">
-                        Personalised packing lists for couples and families
+                        Packing lists that learn how you travel
                     </h1>
                     <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
-                        Share one list, pack as a team — and never argue about who packed the passports again.
+                        Set up your questions once, then get a personalised list for every trip. Share one list with your partner or the whole family and pack as a team.
                     </p>
                 </div>
 
@@ -53,9 +53,9 @@ export const LandingPage = () => {
                     <div className="grid md:grid-cols-3 gap-6">
                         <div className="bg-gradient-to-br from-primary-50 to-primary-100 p-6 rounded-2xl shadow-soft hover:shadow-glow-primary transition-all duration-300 hover:scale-105 border-2 border-primary-200">
                             <div className="text-3xl mb-2">✨</div>
-                            <h3 className="text-xl font-bold mb-3 text-primary-900">1. Set up once</h3>
+                            <h3 className="text-xl font-bold mb-3 text-primary-900">1. Set up in a minute</h3>
                             <p className="text-gray-700">
-                                Run the quick wizard — tell us who you travel with and we'll generate a starter set of packing questions for you.
+                                One screen — tell us who you travel with, and we'll generate a starter set of packing questions for your group.
                             </p>
                         </div>
 

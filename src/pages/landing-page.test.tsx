@@ -73,7 +73,7 @@ describe('LandingPage', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
         const heading = screen.getByRole('heading', { level: 1 })
-        expect(heading.textContent).toMatch(/packing lists for couples and families/i)
+        expect(heading.textContent).toMatch(/packing lists that learn how you travel/i)
     })
 
     it('does not mention Solid Pod or data ownership above the fold', () => {
@@ -88,7 +88,7 @@ describe('LandingPage', () => {
     it('supports the h1 with a sharing-focused subheadline', () => {
         mockUseHasQuestions.mockReturnValue(false)
         render(<MemoryRouter><LandingPage /></MemoryRouter>)
-        expect(screen.getByText(/share one list, pack as a team/i)).toBeTruthy()
+        expect(screen.getByText(/share one list with your partner or the whole family/i)).toBeTruthy()
     })
 
     it('renders the primary CTA before the "How it works" section so it is above the fold', () => {
