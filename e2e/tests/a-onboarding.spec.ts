@@ -109,4 +109,50 @@ test.describe('A – Onboarding & Wizard', () => {
     await expect(page.locator('[name="people.1.species"]')).toHaveValue('dog')
     await expect(page.getByText('2 in your group')).toBeVisible()
   })
+
+  test('A6: the wizard ends in one success screen, and dismissing it is not a dead end', async ({ freshPage: page }) => {
+    await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
+    await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    await waitForWizardSuccess(page)
+
+    // Exactly one modal — no Solid Pod upsell queued up behind it
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Maybe Later' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Set Up Solid Pod/i })).toHaveCount(0)
+
+    // Dismissing lands on the questions just generated, not back on the wizard form
+    await page.getByRole('button', { name: /^Close$/i }).click()
+    await expect(page).toHaveURL(/#\/manage-questions/, { timeout: 5_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('A7: the success screen fits a phone screen with both actions tappable', async ({ freshPage: page }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await page.goto('/#/wizard')
+    await fillPersonRequiredFields(page)
+    await page.getByRole('button', { name: /Generate My Packing Questions/i }).click()
+    await waitForWizardSuccess(page)
+
+    const createList = page.getByRole('button', { name: /Create My First Packing List/i })
+    const refine = page.getByRole('button', { name: /Refine My Packing List Questions/i })
+    await expect(createList).toBeVisible({ timeout: 10_000 })
+    await expect(refine).toBeVisible()
+
+    // Both buttons stack inside the viewport, with no clipping and a tappable height
+    for (const button of [createList, refine]) {
+      const box = await button.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(375)
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+    }
+
+    // The primary CTA sits above the secondary action, and still works from here
+    const createBox = await createList.boundingBox()
+    const refineBox = await refine.boundingBox()
+    expect(createBox!.y).toBeLessThan(refineBox!.y)
+    await createList.click()
+    await expect(page).toHaveURL(/#\/create-packing-list/, { timeout: 5_000 })
+  })
 })
