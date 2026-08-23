@@ -93,7 +93,7 @@ test.describe('K – JSON Schema Compatibility', () => {
     await page.waitForLoadState('networkidle')
 
     // Fill in a name and create the list
-    await page.getByPlaceholder('Enter a name for your packing list').fill('K3 New List')
+    await page.getByLabel('Packing List Name').fill('K3 New List')
     await page.getByRole('button', { name: 'Create Packing List' }).click()
 
     // Pod write + navigation

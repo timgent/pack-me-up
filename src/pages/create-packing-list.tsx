@@ -810,7 +810,6 @@ export function CreatePackingList() {
                 <div>
                     <Input
                         label="How many nights away? (optional)"
-                        aria-label="How many nights away? (optional)"
                         type="number"
                         min={1}
                         placeholder="e.g. 3"
@@ -824,7 +823,6 @@ export function CreatePackingList() {
                 <div>
                     <Input
                         label="Destination (optional)"
-                        aria-label="Destination (optional)"
                         placeholder="e.g. Lisbon, Portugal"
                         {...register('destination')}
                     />
@@ -832,13 +830,11 @@ export function CreatePackingList() {
                     <div className="mt-4 flex flex-col gap-4 sm:flex-row">
                         <Input
                             label="Start date (optional)"
-                            aria-label="Start date (optional)"
                             type="date"
                             {...register('startDate')}
                         />
                         <Input
                             label="End date (optional)"
-                            aria-label="End date (optional)"
                             type="date"
                             min={watch('startDate') || undefined}
                             {...register('endDate')}

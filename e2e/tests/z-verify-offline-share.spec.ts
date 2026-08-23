@@ -23,7 +23,7 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         await page.getByRole('button', { name: /Create My First Packing List/i }).click()
         await page.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
 
-        await page.getByPlaceholder('Enter a name for your packing list').fill('Offline Verification List')
+        await page.getByLabel('Packing List Name').fill('Offline Verification List')
         await page.getByRole('button', { name: 'Create Packing List' }).click()
         await page.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
         const listId = page.url().split('/view-lists/')[1]?.split('?')[0]

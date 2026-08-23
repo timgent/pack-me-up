@@ -652,7 +652,7 @@ describe('CreatePackingList – pod sync on creation', () => {
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My New List' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'My New List' } })
         fireEvent.click(screen.getByRole('radio', { name: /beach/i }))
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
@@ -681,7 +681,7 @@ describe('CreatePackingList – pod sync on creation', () => {
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My New List' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'My New List' } })
         fireEvent.click(screen.getByRole('radio', { name: /beach/i }))
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
@@ -1297,7 +1297,7 @@ describe('CreatePackingList – travellers select-all/none and validation', () =
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
         fireEvent.click(screen.getByRole('button', { name: /select none/i }))
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'My Trip' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'My Trip' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => expect(showToast).toHaveBeenCalledWith(
@@ -1351,7 +1351,7 @@ describe('CreatePackingList – nights away and suggested quantities', () => {
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Cornwall' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Cornwall' } })
         fireEvent.change(screen.getByLabelText(/how many nights away/i), { target: { value: '3' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
@@ -1369,7 +1369,7 @@ describe('CreatePackingList – nights away and suggested quantities', () => {
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Cornwall' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Cornwall' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
@@ -1431,7 +1431,7 @@ describe('CreatePackingList – trip destination and dates', () => {
     it('stores the destination and trip dates on the created list', async () => {
         const db = await renderForm()
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Summer Holiday' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Summer Holiday' } })
         fireEvent.change(screen.getByLabelText(/destination/i), { target: { value: 'Lisbon, Portugal' } })
         fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-07-12' } })
         fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-07-19' } })
@@ -1447,7 +1447,7 @@ describe('CreatePackingList – trip destination and dates', () => {
     it('creates the list without trip details when the fields are left blank', async () => {
         const db = await renderForm()
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Quick trip' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Quick trip' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
@@ -1460,7 +1460,7 @@ describe('CreatePackingList – trip destination and dates', () => {
     it('trims whitespace around the destination and drops a blank one', async () => {
         const db = await renderForm()
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Trip' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Trip' } })
         fireEvent.change(screen.getByLabelText(/destination/i), { target: { value: '   ' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
@@ -1471,7 +1471,7 @@ describe('CreatePackingList – trip destination and dates', () => {
     it('keeps a start date with no end date', async () => {
         const db = await renderForm()
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Trip' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Trip' } })
         fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-07-12' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
 
@@ -1484,7 +1484,7 @@ describe('CreatePackingList – trip destination and dates', () => {
     it('refuses to create a list whose end date is before its start date', async () => {
         const db = await renderForm()
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Trip' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Trip' } })
         fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-07-19' } })
         fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-07-12' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
@@ -1591,7 +1591,7 @@ describe('CreatePackingList – landing on the new list', () => {
         renderCreatePackingList()
         await waitFor(() => screen.getByText(/Answer the questions below/i))
 
-        fireEvent.change(screen.getByPlaceholderText(/enter a name/i), { target: { value: 'Beach Holiday' } })
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Beach Holiday' } })
         fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
         await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
         return db

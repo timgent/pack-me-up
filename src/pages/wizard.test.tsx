@@ -396,6 +396,23 @@ describe('Wizard', () => {
     })
 
 
+    it("associates each person's birthday, age range and gender fields with their labels", async () => {
+        const db = makeDb()
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        const birthday = await screen.findByLabelText(/birthday/i)
+        expect(birthday.getAttribute('type')).toBe('date')
+        expect((await screen.findByLabelText('Age Range')).tagName).toBe('SELECT')
+        expect((await screen.findByLabelText('Gender')).tagName).toBe('SELECT')
+    })
+
+
     describe("Who's Packing? - pets", () => {
         function renderWizard() {
             const db = makeDb()
@@ -417,6 +434,14 @@ describe('Wizard', () => {
             const addPetBtn = await screen.findByRole('button', { name: /add a pet/i })
             addPetBtn.click()
             await waitFor(() => expect(screen.getByText('Select species...')).toBeTruthy())
+        })
+
+        it('associates the species select with its label', async () => {
+            renderWizard()
+            const addPetBtn = await screen.findByRole('button', { name: /add a pet/i })
+            addPetBtn.click()
+            const species = await screen.findByLabelText('Species')
+            expect(species.tagName).toBe('SELECT')
         })
 
         it('a pet row does not render an age range select', async () => {

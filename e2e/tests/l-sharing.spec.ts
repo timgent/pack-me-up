@@ -29,8 +29,8 @@ test.describe('L – Sharing a packing list', () => {
         await pageA.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
 
         // Create list
-        await pageA.getByPlaceholder('Enter a name for your packing list').waitFor({ timeout: 15_000 })
-        await pageA.getByPlaceholder('Enter a name for your packing list').fill(listName)
+        await pageA.getByLabel('Packing List Name').waitFor({ timeout: 15_000 })
+        await pageA.getByLabel('Packing List Name').fill(listName)
         await pageA.getByRole('button', { name: 'Create Packing List' }).click()
         await pageA.waitForURL(/#\/view-lists\//, { timeout: 10_000 })
         await expandAllSections(pageA)

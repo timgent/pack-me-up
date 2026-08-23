@@ -5,15 +5,18 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ label, ...props }: InputProps) {
+    const generatedId = React.useId()
+    const inputId = props.id ?? generatedId
     return (
         <div className="flex-1">
             {label && (
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                <label htmlFor={inputId} className="block text-sm font-semibold text-gray-800 mb-2">
                     {label}
                 </label>
             )}
             <input
                 {...props}
+                id={inputId}
                 className={`
                     w-full
                     px-4
@@ -36,4 +39,4 @@ export function Input({ label, ...props }: InputProps) {
             />
         </div>
     )
-} 
+}
