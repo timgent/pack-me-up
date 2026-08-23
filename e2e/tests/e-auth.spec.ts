@@ -8,7 +8,7 @@ const TEST_PASSWORD = 'test1234'
 test.describe('E – Solid Pod Authentication', () => {
   test('E1: full login flow completes and shows logged-in state', async ({ freshPage: page }) => {
     await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Login with Solid Pod' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sync & Share' })).toBeVisible()
     await loginToCss(page, CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD)
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
     // webId should be displayed (use .first() to avoid strict mode violations when multiple elements match)
@@ -20,7 +20,7 @@ test.describe('E – Solid Pod Authentication', () => {
   test('E2: logout returns to unauthenticated state', async ({ authedPage: page }) => {
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
     await page.getByRole('button', { name: 'Logout' }).click()
-    await expect(page.getByRole('button', { name: 'Login with Solid Pod' })).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByRole('button', { name: 'Sync & Share' })).toBeVisible({ timeout: 8_000 })
     await expect(page.getByRole('button', { name: 'Logout' })).not.toBeVisible()
   })
 

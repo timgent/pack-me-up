@@ -19,7 +19,7 @@ export async function loginToCss(
   options?: { waitForLoggedIn?: boolean },
 ): Promise<void> {
   // Open provider selector
-  await page.getByRole('button', { name: 'Login with Solid Pod' }).click()
+  await page.getByRole('button', { name: 'Sync & Share' }).click()
   await page.getByRole('dialog').waitFor()
 
   // Show other providers

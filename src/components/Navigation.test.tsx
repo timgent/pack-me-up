@@ -123,3 +123,48 @@ describe('Navigation', () => {
         expect(screen.getAllByText('Backups').length).toBeGreaterThan(0)
     })
 })
+
+describe('Navigation – signed-out auth control', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            sessionExpired: false,
+            clearSessionExpired: vi.fn(),
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('labels the auth control with the benefit in both desktop nav and mobile menu', () => {
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        expect(screen.getAllByRole('button', { name: 'Sync & Share' })).toHaveLength(2)
+    })
+
+    it('does not lead with "Solid Pod" on the auth control', () => {
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        expect(screen.queryByRole('button', { name: /solid pod/i })).toBeNull()
+    })
+
+    it('notes the payoff alongside the auth control', () => {
+        render(
+            <MemoryRouter>
+                <Navigation />
+            </MemoryRouter>
+        )
+
+        expect(screen.getAllByText(/sync across devices/i).length).toBeGreaterThanOrEqual(2)
+    })
+})

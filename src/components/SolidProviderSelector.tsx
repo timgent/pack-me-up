@@ -76,13 +76,16 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
   const isLastUsed = localStorage.getItem(LAST_PROVIDER_KEY) === primaryProvider.issuer;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Login with Your Solid Pod">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Sync &amp; Share your lists">
       <div className="space-y-4">
-        {/* Explanation section */}
+        {/* Payoff first, mechanism second — signing in is what unlocks these */}
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-2">
+          <p className="text-sm text-gray-700">
+            Signing in lets you <strong>sync across your devices</strong> and <strong>share lists</strong> — a single list with a friend, or your whole question set with the person you travel with.
+          </p>
           <h3 className="font-semibold text-gray-900 text-sm">What is a Solid Pod?</h3>
           <p className="text-sm text-gray-700">
-            A Solid Pod is your personal data storage that <strong>you control</strong>. Instead of storing your packing lists on our servers, they're stored in your own secure space.
+            Signing in uses a Solid Pod: personal data storage that <strong>you control</strong>. Instead of storing your packing lists on our servers, they're stored in your own secure space.
           </p>
           <ul className="text-sm text-gray-700 space-y-1 ml-4 list-disc">
             <li><strong>You own your data</strong> - it stays in your Pod</li>
