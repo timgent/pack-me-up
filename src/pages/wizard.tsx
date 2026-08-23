@@ -108,6 +108,11 @@ export const Wizard = () => {
         navigate(route)
     }
 
+    // Dismissing the one success screen must not drop the user back on the
+    // wizard form they have just finished — the questions are saved, so show
+    // them, rather than an unchanged form that would regenerate over the top.
+    const handleDismissSuccess = () => handleSuccessAction('/manage-questions')
+
     const onSubmit = async (data: WizardFormData) => {
         if (hasExistingData) {
             setShowConfirmDialog(true)
@@ -354,7 +359,7 @@ Are you sure you want to continue?"
             {/* Success Modal */}
             <Modal
                 isOpen={showSuccessModal}
-                onClose={() => setShowSuccessModal(false)}
+                onClose={handleDismissSuccess}
                 title="🎉 Questions Generated Successfully!"
             >
                 <div className="space-y-6">
@@ -395,17 +400,17 @@ Are you sure you want to continue?"
                                 Your starter questions are ready! Head to 'My Questions &amp; Items' to add, remove, or tweak them to match how you travel — then create your first list.
                             </p>
 
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <button
                                     onClick={() => handleSuccessAction('/create-packing-list')}
-                                    className="w-full bg-gradient-primary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                                    className="w-full bg-gradient-primary text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
                                 >
                                     🚀 Create My First Packing List
                                 </button>
 
                                 <button
                                     onClick={() => handleSuccessAction('/manage-questions')}
-                                    className="w-full bg-gradient-secondary text-white px-6 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-secondary"
+                                    className="w-full text-primary-700 border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
                                 >
                                     ✏️ Refine My Packing List Questions
                                 </button>

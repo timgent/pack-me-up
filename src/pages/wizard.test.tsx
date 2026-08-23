@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { Wizard } from './wizard'
 import type { PackingAppDatabase } from '../services/database'
 
@@ -183,32 +183,77 @@ describe('Wizard', () => {
         expect(screen.queryByText(/set up solid pod/i)).toBeNull()
     })
 
-    it('closes the success modal when the X button is clicked', async () => {
-        const db = makeDb()
-        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
-        mockUseWizardGeneration.mockReturnValue({
-            isLoading: false,
-            isSuccess: true,
-            generatedSet: null,
-            generateAndSave: vi.fn(),
+    describe('the single success screen', () => {
+        function renderAfterGeneration() {
+            const db = makeDb()
+            mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+            mockUseWizardGeneration.mockReturnValue({
+                isLoading: false,
+                isSuccess: true,
+                generatedSet: null,
+                generateAndSave: vi.fn(),
+            })
+
+            return render(
+                <MemoryRouter initialEntries={['/wizard']}>
+                    <Routes>
+                        <Route path="/wizard" element={<Wizard />} />
+                        <Route path="/create-packing-list" element={<div>Create list page</div>} />
+                        <Route path="/manage-questions" element={<div>Questions page</div>} />
+                    </Routes>
+                </MemoryRouter>
+            )
+        }
+
+        it('is the only thing between the wizard and the app — one modal, no second ask', async () => {
+            renderAfterGeneration()
+
+            await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1))
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+            expect(screen.queryByText(/set up solid pod/i)).toBeNull()
         })
 
-        render(
-            <MemoryRouter>
-                <Wizard />
-            </MemoryRouter>
-        )
+        it('sends the primary CTA to the list builder', async () => {
+            renderAfterGeneration()
 
-        await waitFor(() =>
-            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
-        )
+            const create = await screen.findByRole('button', { name: /create my first packing list/i })
+            create.click()
 
-        const closeButton = screen.getByRole('button', { name: /close/i })
-        closeButton.click()
+            expect(await screen.findByText('Create list page')).toBeTruthy()
+        })
 
-        await waitFor(() =>
+        it('sends the secondary action to the questions page', async () => {
+            renderAfterGeneration()
+
+            const refine = await screen.findByRole('button', { name: /refine my packing list questions/i })
+            refine.click()
+
+            expect(await screen.findByText('Questions page')).toBeTruthy()
+        })
+
+        it('gives the primary CTA more weight than the secondary action', async () => {
+            renderAfterGeneration()
+
+            const create = await screen.findByRole('button', { name: /create my first packing list/i })
+            const refine = await screen.findByRole('button', { name: /refine my packing list questions/i })
+
+            expect(create.className).toContain('bg-gradient-primary')
+            expect(refine.className).not.toContain('bg-gradient')
+        })
+
+        it('dismissing it lands on the questions just generated, not back on the wizard form', async () => {
+            renderAfterGeneration()
+
+            await waitFor(() =>
+                expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+            )
+
+            screen.getByRole('button', { name: /close/i }).click()
+
+            // No dead-end: the wizard form is behind us, and the modal is gone
+            expect(await screen.findByText('Questions page')).toBeTruthy()
             expect(screen.queryByText(/questions generated successfully/i)).toBeNull()
-        )
+        })
     })
 
     it('acts on a success modal CTA without asking a logged-out user to sign in', async () => {
