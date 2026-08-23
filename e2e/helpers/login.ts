@@ -22,15 +22,10 @@ export async function loginToCss(
   await page.getByRole('button', { name: 'Sync & Share' }).click()
   await page.getByRole('dialog').waitFor()
 
-  // Show other providers
-  await page.getByText('Other providers').click()
-
-  // Show custom provider input
-  await page.getByRole('button', { name: 'Use Custom Provider' }).click()
-
-  // Fill in CSS URL
-  await page.getByLabel('Custom Provider URL').fill(cssIssuer)
-  await page.getByRole('button', { name: 'Connect' }).click()
+  // Search box doubles as Pod URL entry: type the CSS issuer, then pick the
+  // "use this URL" option it offers.
+  await page.getByLabel('Search providers or paste your Pod URL').fill(cssIssuer)
+  await page.getByRole('button', { name: `Connect to ${cssIssuer.replace(/\/$/, '')}` }).click()
 
   // Wait for navigation to CSS password login page specifically.
   // (CSS redirects: /.oidc/auth → /.account/ → /.account/login/password/)
