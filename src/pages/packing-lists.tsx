@@ -16,6 +16,7 @@ import { packingListToDataset, deletedPackingListsToDataset } from '../services/
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { generateUUID } from '../utils/uuid'
+import { duplicateListName } from '../utils/duplicateListName'
 import { formatTripCountdown, formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
 import { TripCountdownBadge } from '../components/TripCountdownBadge'
 import { PastTripsSection } from '../components/PastTripsSection'
@@ -133,7 +134,7 @@ export function PackingLists() {
         try {
             const newList: PackingList = {
                 id: generateUUID(),
-                name: `Copy of ${list.name}`,
+                name: duplicateListName(list.name, packingLists.map(l => l.name)),
                 createdAt: new Date().toISOString(),
                 lastModified: new Date().toISOString(),
                 items: list.items.map(item => ({ ...item, id: generateUUID(), packed: false })),

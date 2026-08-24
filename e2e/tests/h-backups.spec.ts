@@ -3,6 +3,7 @@ import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, HUSER_EMAIL, HUSER_PASSWORD } from '../../playwright.config'
 import { expandAllSections, firstItemChip } from '../helpers/packing-list'
+import { successToastMatching } from '../helpers/toasts'
 
 // H tests share the same user's backups pod resource; running them in parallel causes
 // concurrent creates/deletes to make counts non-deterministic.
@@ -46,7 +47,7 @@ test.describe('H – Backups', () => {
     await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Create Backup' }).click()
     // Toast success
-    await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(successToastMatching('backupCreated'))).toBeVisible({ timeout: 10_000 })
     // Backup entry appears
     await expect(page.getByRole('button', { name: 'Restore' }).first()).toBeVisible()
     await expect(page.locator('text=/packing list/').first()).toBeVisible()
@@ -56,11 +57,11 @@ test.describe('H – Backups', () => {
     await page.goto('/#/backups')
     await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Create Backup' }).click()
-    await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(successToastMatching('backupCreated'))).toBeVisible({ timeout: 10_000 })
     // Handle window.confirm for restore
     page.on('dialog', dialog => dialog.accept())
     await page.getByRole('button', { name: 'Restore' }).first().click()
-    await expect(page.getByText(/backup restored/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(successToastMatching('backupRestored'))).toBeVisible({ timeout: 10_000 })
   })
 
   test('H3: delete a backup removes it from the list', async () => {
@@ -69,7 +70,7 @@ test.describe('H – Backups', () => {
     await expect(page.getByRole('button', { name: 'Create Backup' })).toBeVisible({ timeout: 15_000 })
     // Create a fresh backup to guarantee at least one exists
     await page.getByRole('button', { name: 'Create Backup' }).click()
-    await expect(page.getByText(/backup created/i)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(successToastMatching('backupCreated'))).toBeVisible({ timeout: 10_000 })
     // Wait for the newly created backup to appear in the list
     await expect(page.getByRole('button', { name: 'Restore' }).first()).toBeVisible({ timeout: 5_000 })
     const initialCount = await page.getByRole('button', { name: 'Restore' }).count()

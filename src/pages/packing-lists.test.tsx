@@ -477,7 +477,9 @@ describe('PackingLists duplicate', () => {
         expect(within(openCardMenu()).getByRole('menuitem', { name: /duplicate/i })).toBeTruthy()
     })
 
-    it('calls savePackingList with a new list named "Copy of {name}" when Duplicate is clicked', async () => {
+    // People duplicate a list because they are going somewhere again, not
+    // because they want a photocopy of it.
+    it('names the duplicate after the trip it repeats when Duplicate is clicked', async () => {
         const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '1' }) }
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -489,7 +491,31 @@ describe('PackingLists duplicate', () => {
 
         await waitFor(() => {
             expect(db.savePackingList).toHaveBeenCalledWith(
-                expect.objectContaining({ name: 'Copy of Summer Holiday', id: 'new-uuid' })
+                expect.objectContaining({ name: 'Summer Holiday (again!)', id: 'new-uuid' })
+            )
+        })
+    })
+
+    it('counts up rather than reusing the name of a duplicate already on the page', async () => {
+        const db = {
+            ...makeDb(),
+            getAllPackingLists: vi.fn().mockResolvedValue([
+                testList,
+                { id: 'list-2', name: 'Summer Holiday (again!)', createdAt: '2026-01-02T00:00:00Z', items: [] },
+            ]),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday \(again!\)/)
+
+        chooseCardAction(/duplicate/i)
+
+        await waitFor(() => {
+            expect(db.savePackingList).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'Summer Holiday (again! \u00d72)' })
             )
         })
     })
@@ -590,7 +616,7 @@ describe('PackingLists pod sync on mutation', () => {
             expect(mockSaveRdfToPod).toHaveBeenCalledWith(
                 expect.objectContaining({
                     fileUrl: expect.stringContaining('.ttl'),
-                    data: expect.objectContaining({ name: 'Copy of Summer Holiday' }),
+                    data: expect.objectContaining({ name: 'Summer Holiday (again!)' }),
                 })
             )
         })

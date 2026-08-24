@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
+import { successToast } from '../utils/successToastCopy'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { Button } from '../components/Button'
 import { LoadingState } from '../components/LoadingState'
@@ -57,7 +58,7 @@ export function BackupsPage() {
         setIsCreating(true)
         try {
             await createBackup(session, podUrl, db)
-            showToast('Backup created successfully!', 'success')
+            showToast(successToast('backupCreated'), 'success')
             await fetchBackups()
         } catch (error) {
             handlePodError(error, 'Failed to create backup.')
@@ -81,7 +82,7 @@ export function BackupsPage() {
 
         try {
             await restoreBackup(session, podUrl, db, backup.url)
-            showToast('Backup restored successfully!', 'success')
+            showToast(successToast('backupRestored'), 'success')
         } catch (error) {
             handlePodError(error, 'Failed to restore backup.')
         }

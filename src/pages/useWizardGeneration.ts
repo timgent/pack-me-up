@@ -6,6 +6,7 @@ import { createExampleData, WIZARD_TEMPLATE_VERSION } from '../edit-questions/ex
 import { QUESTION_SET_ID } from '../constants'
 import { WizardFormData } from './wizard-types'
 import { generateUUID } from '../utils/uuid'
+import { successToast } from '../utils/successToastCopy'
 import { Person, PackingListQuestionSet } from '../edit-questions/types'
 import { deriveAgeRange } from '../edit-questions/age-derivation'
 import { usePodSync } from '../hooks/usePodSync'
@@ -65,7 +66,7 @@ export function useWizardGeneration() {
                 saveToPod
             )
 
-            showToast('Packing list questions generated successfully!', 'success')
+            showToast(successToast('questionsGenerated'), 'success')
             setGeneratedSet(questionSet)
             setIsSuccess(true)
         } catch (err) {

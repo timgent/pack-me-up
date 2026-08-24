@@ -1982,8 +1982,32 @@ export function QuestionsPage() {
                 <div className="mb-2">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{isForeign ? 'Questions & Items' : 'My Questions & Items'}</h1>
                     <p className="mt-1 text-gray-600 dark:text-gray-400 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
-                    {!isForeign && <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Want to start from scratch? <Link to="/wizard" className="text-primary-600 dark:text-primary-400 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
+                    {/* "Redo the setup wizard" is the wrong advice for someone
+                        who has never done it — the empty state below makes the
+                        first-time offer instead. */}
+                    {!isForeign && !nothingStoredYet && <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Want to start from scratch? <Link to="/wizard" className="text-primary-600 dark:text-primary-400 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
                 </div>
+                {/* Empty scaffolding with no suggestion of what to do with it is
+                    where a new user gives up. Someone else's pod gets no offer:
+                    their setup is not ours to run a wizard over. */}
+                {!isForeign && nothingStoredYet && (
+                    <div
+                        data-testid="questions-empty-state"
+                        className="text-center py-10 px-6 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft"
+                    >
+                        <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">Nothing here yet — let's fix that 🧳</p>
+                        <p className="mx-auto mt-2 max-w-md text-sm text-gray-600 dark:text-gray-400">
+                            Answer a few questions about who's travelling and we'll build your questions and packing items for you. Everything stays editable afterwards.
+                        </p>
+                        <Link
+                            to="/wizard"
+                            className="mt-5 inline-block rounded-xl bg-primary-600 px-5 py-2.5 font-semibold text-white transition-colors hover:bg-primary-700"
+                        >
+                            Start the setup wizard
+                        </Link>
+                        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">Rather build it yourself? Add your first question below.</p>
+                    </div>
+                )}
                 {!isForeign && (
                     <AgePromotionCard
                         questionSet={data}
