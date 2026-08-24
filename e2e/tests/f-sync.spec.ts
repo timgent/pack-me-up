@@ -114,7 +114,8 @@ test.describe('F – Solid Pod Sync', () => {
     await syncListToPod()
 
     await page.goto('/#/view-lists')
-    await page.locator('.rounded-2xl').filter({ hasText: f3ListName }).getByRole('button', { name: /Delete/i }).click()
+    await page.getByRole('button', { name: `More actions for ${f3ListName}` }).click()
+    await page.getByRole('menuitem', { name: /^Delete$/ }).click()
     await page.getByRole('button', { name: /^Delete$/ }).click()
     // The list card heading disappearing confirms both local removal and pod delete completed.
     // Using getByRole('heading') avoids matching the dialog text which also contains the list name.
@@ -254,7 +255,8 @@ test.describe('F – Solid Pod Sync', () => {
 
     // Device A: delete the list.
     await page.goto('/#/view-lists')
-    await page.locator('.rounded-2xl').filter({ hasText: f7ListName }).getByRole('button', { name: /Delete/i }).click()
+    await page.getByRole('button', { name: `More actions for ${f7ListName}` }).click()
+    await page.getByRole('menuitem', { name: /^Delete$/ }).click()
     await page.getByRole('button', { name: /^Delete$/ }).click()
     await expect(page.getByRole('heading').filter({ hasText: f7ListName })).not.toBeVisible({ timeout: 5_000 })
 

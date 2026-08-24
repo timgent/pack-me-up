@@ -86,7 +86,8 @@ test.describe('G – Cross-context Pod Sync', () => {
       r => r.url().includes('/pack-me-up/packing-lists/') && r.request().method() === 'PUT',
       { timeout: 15_000 }
     )
-    await page.locator('.rounded-2xl').filter({ hasText: originalName }).getByRole('button', { name: /Rename/i }).click()
+    await page.getByRole('button', { name: `More actions for ${originalName}` }).click()
+    await page.getByRole('menuitem', { name: /Rename/i }).click()
     const renameInput = page.locator('[role="dialog"] input[type="text"]')
     await renameInput.clear()
     await renameInput.fill(renamedName)

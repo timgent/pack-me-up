@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { PackingLists } from './packing-lists'
@@ -108,6 +108,20 @@ function renderComponent() {
             <PackingLists />
         </MemoryRouter>
     )
+}
+
+/**
+ * Open a card's kebab menu. Radix opens its menu on pointerdown, which
+ * fireEvent.click does not send.
+ */
+function openCardMenu(listName = 'Summer Holiday') {
+    fireEvent.pointerDown(screen.getByRole('button', { name: `More actions for ${listName}` }), { button: 0 })
+    return screen.getByRole('menu')
+}
+
+/** Pick an action out of a card's kebab menu. */
+function chooseCardAction(action: RegExp, listName = 'Summer Holiday') {
+    fireEvent.click(within(openCardMenu(listName)).getByRole('menuitem', { name: action }))
 }
 
 describe('PackingLists', () => {
@@ -255,7 +269,7 @@ describe('PackingLists delete confirmation', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
 
         expect(db.deletePackingList).not.toHaveBeenCalled()
     })
@@ -268,7 +282,7 @@ describe('PackingLists delete confirmation', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
 
         await waitFor(() => {
             expect(screen.getByText(/cannot be undone/i)).toBeTruthy()
@@ -284,7 +298,7 @@ describe('PackingLists delete confirmation', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
 
         await waitFor(() => expect(screen.getByText(/cannot be undone/i)).toBeTruthy())
 
@@ -304,7 +318,7 @@ describe('PackingLists delete confirmation', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
 
         await screen.findByText(/cannot be undone/i)
 
@@ -328,7 +342,7 @@ describe('PackingLists delete confirmation', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
         await screen.findByText(/cannot be undone/i)
         fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
@@ -350,7 +364,7 @@ describe('PackingLists rename', () => {
         })
     })
 
-    it('shows a Rename button on each list card', async () => {
+    it("offers Rename in each card's kebab menu", async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -358,7 +372,7 @@ describe('PackingLists rename', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        expect(screen.getByRole('button', { name: /rename/i })).toBeTruthy()
+        expect(within(openCardMenu()).getByRole('menuitem', { name: /rename/i })).toBeTruthy()
     })
 
     it('opens a rename modal pre-filled with the current list name when Rename is clicked', async () => {
@@ -369,7 +383,7 @@ describe('PackingLists rename', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+        chooseCardAction(/rename/i)
 
         await waitFor(() => {
             const input = screen.getByRole('textbox')
@@ -385,7 +399,7 @@ describe('PackingLists rename', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+        chooseCardAction(/rename/i)
 
         await waitFor(() => screen.getByRole('textbox'))
 
@@ -407,7 +421,7 @@ describe('PackingLists rename', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+        chooseCardAction(/rename/i)
 
         await waitFor(() => screen.getByRole('textbox'))
 
@@ -452,7 +466,7 @@ describe('PackingLists duplicate', () => {
         })
     })
 
-    it('shows a Duplicate button on each list card', async () => {
+    it("offers Duplicate in each card's kebab menu", async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -460,7 +474,7 @@ describe('PackingLists duplicate', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        expect(screen.getByRole('button', { name: /duplicate/i })).toBeTruthy()
+        expect(within(openCardMenu()).getByRole('menuitem', { name: /duplicate/i })).toBeTruthy()
     })
 
     it('calls savePackingList with a new list named "Copy of {name}" when Duplicate is clicked', async () => {
@@ -471,7 +485,7 @@ describe('PackingLists duplicate', () => {
 
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
+        chooseCardAction(/duplicate/i)
 
         await waitFor(() => {
             expect(db.savePackingList).toHaveBeenCalledWith(
@@ -549,7 +563,7 @@ describe('PackingLists pod sync on mutation', () => {
         renderComponent()
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+        chooseCardAction(/rename/i)
         await waitFor(() => screen.getByRole('textbox'))
         fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Winter Holiday' } })
         fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
@@ -570,7 +584,7 @@ describe('PackingLists pod sync on mutation', () => {
         renderComponent()
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
+        chooseCardAction(/duplicate/i)
 
         await waitFor(() => {
             expect(mockSaveRdfToPod).toHaveBeenCalledWith(
@@ -588,7 +602,7 @@ describe('PackingLists pod sync on mutation', () => {
         renderComponent()
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByText('🗑️ Delete'))
+        chooseCardAction(/delete/i)
         await screen.findByText(/cannot be undone/i)
         fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
 
@@ -614,7 +628,7 @@ describe('PackingLists pod sync on mutation', () => {
         renderComponent()
         await screen.findByText(/Summer Holiday/)
 
-        fireEvent.click(screen.getByRole('button', { name: /duplicate/i }))
+        chooseCardAction(/duplicate/i)
 
         await waitFor(() => {
             expect(makeDb().savePackingList).toBeDefined()
@@ -1002,5 +1016,106 @@ describe('PackingLists past trips', () => {
 
         expect(await screen.findByText(/No upcoming trips/i)).toBeTruthy()
         expect(screen.queryByText(/No packing lists found/i)).toBeNull()
+    })
+})
+
+describe('PackingLists card actions menu', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+        mockNavigate.mockClear()
+    })
+
+    it('opens the list when the card body is clicked', async () => {
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByTestId('packing-list-card'))
+
+        expect(mockNavigate).toHaveBeenCalledWith('/view-lists/list-1')
+    })
+
+    it('opens the shared list when a cached copy of someone else’s card is clicked', async () => {
+        const db = makeDb()
+        db.getAllPackingLists = vi.fn().mockResolvedValue([
+            { ...testList, sharedFromPodUrl: 'https://someone-else.example/' },
+        ])
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        fireEvent.click(screen.getByTestId('packing-list-card'))
+
+        expect(mockNavigate).toHaveBeenCalledWith('/view-lists/list-1?pod=https://someone-else.example/')
+    })
+
+    it('does not open the list when the kebab is clicked', async () => {
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        const kebab = screen.getByRole('button', { name: 'More actions for Summer Holiday' })
+        fireEvent.pointerDown(kebab, { button: 0 })
+        fireEvent.click(kebab)
+
+        expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('gathers Rename, Duplicate and Delete behind the kebab', async () => {
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        const menu = openCardMenu()
+        expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+            'Rename', 'Duplicate', 'Delete',
+        ])
+    })
+
+    it('leaves no action buttons loose on the card', async () => {
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        const card = screen.getByTestId('packing-list-card')
+        expect(within(card).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual([
+            'More actions for Summer Holiday',
+        ])
+    })
+
+    it('closes the menu on Escape without opening the list', async () => {
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        openCardMenu()
+        fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+        await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+        expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('does not open the list when an action is chosen from the menu', async () => {
+        const db = { ...makeDb(), savePackingList: vi.fn().mockResolvedValue({ rev: '1' }) }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+
+        await screen.findByText(/Summer Holiday/)
+
+        chooseCardAction(/duplicate/i)
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        expect(mockNavigate).not.toHaveBeenCalled()
     })
 })
