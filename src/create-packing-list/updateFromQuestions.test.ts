@@ -408,3 +408,60 @@ describe('an item reaching one person from two answers', () => {
         expect(towels.quantity).toBe(3)
     })
 })
+
+describe('entities the user has deleted from the question set', () => {
+    const DELETED = '2026-01-01T00:00:00.000Z'
+
+    it('adds nothing for a question that has been deleted', () => {
+        const questionSet = makeQuestionSet({
+            questions: [makeQuestion({
+                deletedAt: DELETED,
+                options: [{
+                    id: 'opt-swimming', text: 'Swimming', order: 0,
+                    items: [makeItem('Goggles', ['p1'])],
+                }],
+            })],
+        })
+        const list = makeList({
+            questionAnswers: [{ questionId: 'q-activities', selectedOptionIds: ['opt-swimming'] }],
+        })
+        expect(computeQuestionSetAdditions(list, questionSet)).toHaveLength(0)
+    })
+
+    it('skips a deleted item inside a live option', () => {
+        const questionSet = makeQuestionSet({
+            questions: [makeQuestion({
+                options: [{
+                    id: 'opt-swimming', text: 'Swimming', order: 0,
+                    items: [
+                        makeItem('Goggles', ['p1']),
+                        makeItem('Wetsuit', ['p1'], { deletedAt: DELETED }),
+                    ],
+                }],
+            })],
+        })
+        const list = makeList({
+            questionAnswers: [{ questionId: 'q-activities', selectedOptionIds: ['opt-swimming'] }],
+        })
+        expect(computeQuestionSetAdditions(list, questionSet).map(i => i.itemText)).toEqual(['Goggles'])
+    })
+
+    it('skips a deleted always-needed item', () => {
+        const questionSet = makeQuestionSet({
+            alwaysNeededItems: [
+                makeItem('Passport', ['p1']),
+                makeItem('Sun cream', ['p1'], { deletedAt: DELETED }),
+            ],
+        })
+        expect(computeQuestionSetAdditions(makeList(), questionSet).map(i => i.itemText)).toEqual(['Passport'])
+    })
+
+    it('packs nothing for a traveller who has been deleted', () => {
+        const questionSet = makeQuestionSet({
+            people: [alice, { ...bob, deletedAt: DELETED }],
+            alwaysNeededItems: [makeItem('Passport', ['p1', 'p2'])],
+        })
+        const additions = computeQuestionSetAdditions(makeList(), questionSet)
+        expect(additions.map(i => i.personId)).toEqual(['p1'])
+    })
+})

@@ -1,4 +1,5 @@
 import { PackingListQuestionSet } from '../edit-questions/types'
+import { activeQuestionSet } from '../edit-questions/tombstones'
 import { PackingList, PackingListItem } from './types'
 import { generateQuestionBasedItems, generateAlwaysNeededItems } from './generatePackingListItems'
 // Identity and collapsing are shared with the creation flow, so an item arriving
@@ -61,8 +62,12 @@ function resolveGenerationInputs(list: PackingList): GenerationInputs {
 // a fresh id and lastModified so the item-level merge can track them.
 export function computeQuestionSetAdditions(
     list: PackingList,
-    questionSet: PackingListQuestionSet,
+    storedQuestionSet: PackingListQuestionSet,
 ): PackingListItem[] {
+    // Deletions in the question set are tombstones, so read past them: a
+    // question, item or person the user has deleted must never come back as an
+    // addition. See `activeQuestionSet`.
+    const questionSet = activeQuestionSet(storedQuestionSet)
     const { questionAnswers, selectedPeopleIds } = resolveGenerationInputs(list)
 
     // A person removed from the question set must not be regenerated; this also

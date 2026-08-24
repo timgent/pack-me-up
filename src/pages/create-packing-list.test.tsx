@@ -1612,3 +1612,125 @@ describe('CreatePackingList – landing on the new list', () => {
         expect(showToast).not.toHaveBeenCalledWith(expect.stringMatching(/created successfully/i), 'success')
     })
 })
+
+// ─── CreatePackingList – deleted questions, people and items ──────────────────
+
+describe('CreatePackingList – tombstoned questions, people and items', () => {
+    const DELETED = '2026-01-01T00:00:00.000Z'
+
+    // A set as it looks after the user has deleted a question, a traveller and
+    // a couple of items: the tombstones are still in the document, because
+    // that's how the deletions reach the pod.
+    const tombstonedQuestionSet: PackingListQuestionSet = {
+        people: [
+            { id: 'p1', name: 'Alice' },
+            { id: 'p2', name: 'Ghost', deletedAt: DELETED },
+        ],
+        alwaysNeededItems: [
+            { text: 'Passport', personSelections: [{ personId: 'p1', selected: true }] },
+            { text: 'Sun cream', personSelections: [{ personId: 'p1', selected: true }], deletedAt: DELETED },
+        ],
+        questions: [
+            {
+                id: 'q1', type: 'saved', text: 'Where are you going?', order: 0,
+                options: [{
+                    id: 'o1', text: 'Beach', order: 0,
+                    items: [
+                        { text: 'Towel', personSelections: [{ personId: 'p1', selected: true }] },
+                        { text: 'Wetsuit', personSelections: [{ personId: 'p1', selected: true }], deletedAt: DELETED },
+                    ],
+                }],
+            },
+            // Deleted, and emptied of its options before it was deleted — the
+            // shape that showed up on this page as a question with nothing
+            // under it.
+            { id: 'q2', type: 'saved', text: 'Which activities?', order: 1, options: [], deletedAt: DELETED },
+        ],
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockUseSolidPod.mockReturnValue({ isLoggedIn: false } as ReturnType<typeof useSolidPod>)
+        mockUseToast.mockReturnValue({ showToast: vi.fn() } as ReturnType<typeof useToast>)
+    })
+
+    afterEach(() => {
+        cleanup()
+    })
+
+    function makeTombstonedDb() {
+        return makeDb({
+            getQuestionSet: vi.fn().mockResolvedValue(tombstonedQuestionSet),
+            getAllPackingLists: vi.fn().mockResolvedValue([]),
+        })
+    }
+
+    async function renderWithTombstones() {
+        const db = makeTombstonedDb()
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/Answer the questions below/i))
+        return db
+    }
+
+    it('does not show a question the user has deleted', async () => {
+        await renderWithTombstones()
+        expect(screen.queryByText('Which activities?')).toBeNull()
+    })
+
+    it('still shows the questions that are left, with their options', async () => {
+        await renderWithTombstones()
+        expect(screen.getByText('Where are you going?')).toBeTruthy()
+        expect(screen.getByText('Beach')).toBeTruthy()
+    })
+
+    it('does not offer a deleted traveller', async () => {
+        await renderWithTombstones()
+        expect(screen.getByText('Alice')).toBeTruthy()
+        expect(screen.queryByText('Ghost')).toBeNull()
+    })
+
+    it('leaves deleted items off the list it creates', async () => {
+        const db = await renderWithTombstones()
+
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Cornwall' } })
+        fireEvent.click(screen.getByRole('radio', { name: /beach/i }))
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0] as PackingList
+        const texts = savedList.items.map(i => i.itemText)
+        expect(texts).toContain('Passport')
+        expect(texts).toContain('Towel')
+        expect(texts).not.toContain('Sun cream')
+        expect(texts).not.toContain('Wetsuit')
+    })
+
+    it('does not select a deleted traveller, so nothing is packed for them', async () => {
+        const db = await renderWithTombstones()
+
+        fireEvent.change(screen.getByLabelText('Packing List Name'), { target: { value: 'Cornwall' } })
+        fireEvent.click(screen.getByRole('button', { name: /create packing list/i }))
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const savedList = db.savePackingList.mock.calls[0][0] as PackingList
+        expect(savedList.selectedPeopleIds).toEqual(['p1'])
+        expect(savedList.items.every(i => i.personId !== 'p2')).toBe(true)
+    })
+
+    it('does not offer a deleted question as a home for a suggested item', async () => {
+        const db = makeDb({
+            getQuestionSet: vi.fn().mockResolvedValue(tombstonedQuestionSet),
+            getAllPackingLists: vi.fn().mockResolvedValue([pastList]),
+        })
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        renderCreatePackingList()
+        await waitFor(() => screen.getByText(/past trips you added items/i))
+        fireEvent.click(screen.getByRole('button', { name: /review/i }))
+
+        const select = screen.getByRole('combobox', { name: /destination for sunscreen spf50/i }) as HTMLSelectElement
+        const optionLabels = Array.from(select.options).map(o => o.text)
+        expect(optionLabels).toContain('Where are you going?: Beach')
+        expect(optionLabels.some(label => label?.includes('Which activities?'))).toBe(false)
+    })
+})

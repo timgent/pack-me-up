@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { PackingListQuestionSet } from '../edit-questions/types'
+import { activeQuestionSet } from '../edit-questions/tombstones'
 import { PackingList, PackingListFormData, PackingListItem } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
 import { Input } from '../components/Input'
@@ -346,7 +347,7 @@ export function CreatePackingList() {
         if (foreignPodUrl) {
             // Foreign pod: just set state, don't write to local DB
             setQuestionSet(podData)
-            setSelectedPeopleIds(podData.people.map(p => p.id))
+            setSelectedPeopleIds(podData.people.filter(p => !p.deletedAt).map(p => p.id))
             setIsLoading(false)
             return
         }
@@ -404,7 +405,7 @@ export function CreatePackingList() {
                 setQuestionSet(doc)
                 setAllPackingLists(lists)
                 setNoQuestionsFound(false)
-                setSelectedPeopleIds(doc.people.map(p => p.id))
+                setSelectedPeopleIds(doc.people.filter(p => !p.deletedAt).map(p => p.id))
             } catch (err: unknown) {
                 const hasName = typeof err === 'object' && err !== null && 'name' in err
                 if (hasName && (err as { name: string }).name === 'not_found') {
@@ -421,14 +422,23 @@ export function CreatePackingList() {
         return fetchQuestionSet()
     }, [db, foreignPodUrl, session])
 
+    // What the page shows and generates from. `questionSet` is the stored
+    // document, tombstones and all — those have to survive every write, or the
+    // deletions would be undone on the next sync — so everything read here goes
+    // through the active view instead. See `activeQuestionSet`.
+    const activeSet = useMemo(
+        () => questionSet ? activeQuestionSet(questionSet) : null,
+        [questionSet]
+    )
+
     const suggestions = useMemo(
-        () => questionSet ? getUnreviewedCustomItems(allPackingLists, questionSet) : [],
-        [allPackingLists, questionSet]
+        () => activeSet ? getUnreviewedCustomItems(allPackingLists, activeSet) : [],
+        [allPackingLists, activeSet]
     )
 
     const deletionSuggestions = useMemo(
-        () => questionSet ? getUnreviewedDeletedItems(allPackingLists, questionSet) : [],
-        [allPackingLists, questionSet]
+        () => activeSet ? getUnreviewedDeletedItems(allPackingLists, activeSet) : [],
+        [allPackingLists, activeSet]
     )
 
     const handleSaveToQuestionSet = async (listId: string, item: PackingListItem, destination: SaveDestination, communal: boolean) => {
@@ -583,7 +593,7 @@ export function CreatePackingList() {
     }
 
     const onSubmit: SubmitHandler<PackingListFormData> = async (data) => {
-        if (!questionSet) return
+        if (!questionSet || !activeSet) return
 
         if (selectedPeopleIds.length === 0) {
             showToast('Please select at least one traveller.', 'error')
@@ -602,17 +612,17 @@ export function CreatePackingList() {
 
         // Get items from question answers
         const questionBasedItems = generateQuestionBasedItems(
-            questionSet.questions,
+            activeSet.questions,
             data.questionAnswers,
-            questionSet.people,
+            activeSet.people,
             selectedPeopleIds,
             nights
         )
 
         // Get always needed items
         const alwaysNeededItems = generateAlwaysNeededItems(
-            questionSet.alwaysNeededItems,
-            questionSet.people,
+            activeSet.alwaysNeededItems,
+            activeSet.people,
             selectedPeopleIds,
             nights
         )
@@ -756,7 +766,7 @@ export function CreatePackingList() {
         )
     }
 
-    if (!questionSet) {
+    if (!questionSet || !activeSet) {
         return null
     }
 
@@ -781,7 +791,7 @@ export function CreatePackingList() {
                 <div className="mb-6">
                     <SuggestionCard
                         suggestions={suggestions}
-                        questionSet={questionSet}
+                        questionSet={activeSet}
                         onSaveToQuestionSet={handleSaveToQuestionSet}
                         onSkip={handleSkip}
                         onDismiss={() => setIsSuggestionDismissed(true)}
@@ -846,7 +856,7 @@ export function CreatePackingList() {
                 </div>
 
                 {/* Person Selection */}
-                {questionSet.people.length > 0 && (
+                {activeSet.people.length > 0 && (
                     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -855,17 +865,17 @@ export function CreatePackingList() {
                             <button
                                 type="button"
                                 onClick={() =>
-                                    selectedPeopleIds.length === questionSet.people.length
+                                    selectedPeopleIds.length === activeSet.people.length
                                         ? setSelectedPeopleIds([])
-                                        : setSelectedPeopleIds(questionSet.people.map(p => p.id))
+                                        : setSelectedPeopleIds(activeSet.people.map(p => p.id))
                                 }
                                 className="text-sm text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-200"
                             >
-                                {selectedPeopleIds.length === questionSet.people.length ? 'Select none' : 'Select all'}
+                                {selectedPeopleIds.length === activeSet.people.length ? 'Select none' : 'Select all'}
                             </button>
                         </div>
                         <div className="space-y-2">
-                            {questionSet.people.map((person, personIndex) => (
+                            {activeSet.people.map((person, personIndex) => (
                                 <label key={person.id} className="flex items-center space-x-3">
                                     <input
                                         type="checkbox"
@@ -897,7 +907,7 @@ export function CreatePackingList() {
                     </div>
                 )}
 
-                {questionSet.questions.map((question, index) => {
+                {activeSet.questions.map((question, index) => {
                     // Default to single-choice for backward compatibility
                     const questionType = question.questionType || "single-choice"
 
