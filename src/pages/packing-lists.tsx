@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useNavigate } from 'react-router-dom'
 import { PackingList } from '../create-packing-list/types'
 import { useDatabase } from '../components/DatabaseContext'
@@ -20,6 +21,70 @@ import { PastTripsSection } from '../components/PastTripsSection'
 
 type SharingStatus = 'public' | 'shared' | 'private'
 
+/**
+ * The card's actions, behind a kebab. Gathering them into one menu replaces the
+ * three sibling buttons that each had to stop its own click from reaching the
+ * card underneath and opening the list. The menu keeps clicks off the card in
+ * two places instead of once per action: the trigger, and the content — the
+ * latter because a React portal still propagates events up the React tree, so
+ * the card's onClick sees an item click even though the menu is rendered
+ * outside the card in the DOM.
+ */
+function ListCardMenu({ listName, onRename, onDuplicate, onDelete }: {
+    listName: string
+    onRename: () => void
+    onDuplicate: () => void
+    onDelete: () => void
+}) {
+    return (
+        <DropdownMenu.Root>
+            <span onClick={e => e.stopPropagation()} className="inline-flex">
+                <DropdownMenu.Trigger asChild>
+                    <button
+                        type="button"
+                        aria-label={`More actions for ${listName}`}
+                        title="More actions"
+                        className="text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20 px-2 py-1 rounded-lg transition-colors duration-200"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <circle cx="12" cy="5" r="1.5" />
+                            <circle cx="12" cy="12" r="1.5" />
+                            <circle cx="12" cy="19" r="1.5" />
+                        </svg>
+                    </button>
+                </DropdownMenu.Trigger>
+            </span>
+            <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                    align="end"
+                    sideOffset={4}
+                    onClick={e => e.stopPropagation()}
+                    className="w-40 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50"
+                >
+                    <DropdownMenu.Item
+                        onSelect={onRename}
+                        className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none"
+                    >
+                        Rename
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                        onSelect={onDuplicate}
+                        className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none"
+                    >
+                        Duplicate
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                        onSelect={onDelete}
+                        className="px-4 py-2.5 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950/40 cursor-default outline-none"
+                    >
+                        Delete
+                    </DropdownMenu.Item>
+                </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+    )
+}
+
 export function PackingLists() {
     const [packingLists, setPackingLists] = useState<PackingList[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -38,13 +103,11 @@ export function PackingLists() {
     const { db } = useDatabase()
     const handlePodError = usePodErrorHandler()
 
-    const requestDeletePackingList = (id: string, name: string, event: React.MouseEvent) => {
-        event.stopPropagation()
+    const requestDeletePackingList = (id: string, name: string) => {
         setListToDelete({ id, name })
     }
 
-    const requestRenamePackingList = (id: string, name: string, event: React.MouseEvent) => {
-        event.stopPropagation()
+    const requestRenamePackingList = (id: string, name: string) => {
         setListToRename({ id, name })
         setRenameValue(name)
     }
@@ -65,8 +128,7 @@ export function PackingLists() {
         }
     }
 
-    const handleDuplicatePackingList = async (list: PackingList, event: React.MouseEvent) => {
-        event.stopPropagation()
+    const handleDuplicatePackingList = async (list: PackingList) => {
         try {
             const newList: PackingList = {
                 id: generateUUID(),
@@ -247,24 +309,12 @@ export function PackingLists() {
                                 ? `📅 ${tripDates}`
                                 : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
                         </span>
-                        <button
-                            onClick={(e) => requestRenamePackingList(list.id, list.name, e)}
-                            className="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
-                        >
-                            ✏️ Rename
-                        </button>
-                        <button
-                            onClick={(e) => handleDuplicatePackingList(list, e)}
-                            className="text-secondary-600 dark:text-secondary-400 hover:text-secondary-800 dark:hover:text-secondary-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
-                        >
-                            📋 Duplicate
-                        </button>
-                        <button
-                            onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
-                            className="text-danger-600 dark:text-danger-400 hover:text-danger-800 dark:hover:text-danger-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
-                        >
-                            🗑️ Delete
-                        </button>
+                        <ListCardMenu
+                            listName={list.name}
+                            onRename={() => requestRenamePackingList(list.id, list.name)}
+                            onDuplicate={() => handleDuplicatePackingList(list)}
+                            onDelete={() => requestDeletePackingList(list.id, list.name)}
+                        />
                     </div>
                 </div>
                 <div className="flex items-center gap-4">

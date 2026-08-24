@@ -12,6 +12,12 @@ async function runWizard(page: import('@playwright/test').Page) {
   await page.waitForURL(/#\/create-packing-list/, { timeout: 5_000 })
 }
 
+/** Open a list card's kebab menu and pick one of its actions. */
+async function chooseCardAction(page: import('@playwright/test').Page, listName: string, action: RegExp | string) {
+  await page.getByRole('button', { name: `More actions for ${listName}` }).click()
+  await page.getByRole('menuitem', { name: action }).click()
+}
+
 async function createList(page: import('@playwright/test').Page, name: string) {
   // Wait for the question set to load (questions appear on the page)
   await page.waitForLoadState('networkidle')
@@ -96,7 +102,7 @@ test.describe('C – Packing Lists', () => {
     await runWizard(page)
     await createList(page, 'Old Name')
     await page.goto('/#/view-lists')
-    await page.getByRole('button', { name: /Rename/i }).first().click()
+    await chooseCardAction(page, 'Old Name', /Rename/i)
     // Rename modal input
     const renameInput = page.locator('[role="dialog"] input[type="text"]')
     await renameInput.clear()
@@ -110,7 +116,7 @@ test.describe('C – Packing Lists', () => {
     await runWizard(page)
     await createList(page, 'Original List')
     await page.goto('/#/view-lists')
-    await page.getByRole('button', { name: /Duplicate/i }).first().click()
+    await chooseCardAction(page, 'Original List', /Duplicate/i)
     await expect(page.getByText(/Copy of Original List/i)).toBeVisible({ timeout: 5_000 })
   })
 
@@ -119,7 +125,7 @@ test.describe('C – Packing Lists', () => {
     await createList(page, 'To Delete')
     await page.goto('/#/view-lists')
     await expect(page.getByText('To Delete')).toBeVisible()
-    await page.getByRole('button', { name: /Delete/i }).first().click()
+    await chooseCardAction(page, 'To Delete', /^Delete$/)
     // Confirmation dialog
     await expect(page.getByText(/Are you sure.*delete/i)).toBeVisible()
     await page.getByRole('button', { name: /^Delete$/ }).click()
