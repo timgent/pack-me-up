@@ -71,6 +71,10 @@ Two guards catch a repeat, and `npm test` runs both (CI included):
    (`database.test.ts` → "Field fidelity") and through the pod's RDF serialisation
    (`rdfSerialization.test.ts` → "Field fidelity").
 
+The same fixture guards **duplication** (`src/utils/duplicatePackingList.ts`, #325): a
+duplicate is built with an omit-list too, and `duplicatePackingList.test.ts` fails until a
+new field is listed as carried, regenerated or deliberately dropped.
+
 So when the type check sends you to the fixtures, add the field with a distinctive value
 and run the tests — don't reach for `as` or a partial fixture. A field that genuinely must
 not leave the device belongs in `packingListLocalOnlyFields` with a comment saying why.

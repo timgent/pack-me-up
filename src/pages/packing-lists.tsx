@@ -15,8 +15,7 @@ import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, deletedPackingListsToDataset } from '../services/rdfSerialization'
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
-import { generateUUID } from '../utils/uuid'
-import { duplicateListName } from '../utils/duplicateListName'
+import { duplicatePackingList } from '../utils/duplicatePackingList'
 import { formatTripCountdown, formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
 import { TripCountdownBadge } from '../components/TripCountdownBadge'
 import { PastTripsSection } from '../components/PastTripsSection'
@@ -132,13 +131,10 @@ export function PackingLists() {
 
     const handleDuplicatePackingList = async (list: PackingList) => {
         try {
-            const newList: PackingList = {
-                id: generateUUID(),
-                name: duplicateListName(list.name, packingLists.map(l => l.name)),
-                createdAt: new Date().toISOString(),
-                lastModified: new Date().toISOString(),
-                items: list.items.map(item => ({ ...item, id: generateUUID(), packed: false })),
-            }
+            // Which fields a copy inherits — and the few it must not — live
+            // with the helper, so a field added to `PackingList` is carried
+            // without anyone having to remember this page.
+            const newList: PackingList = duplicatePackingList(list, packingLists.map(l => l.name))
             await db.savePackingList(newList)
             setPackingLists([newList, ...packingLists])
             syncListToPod(newList)
