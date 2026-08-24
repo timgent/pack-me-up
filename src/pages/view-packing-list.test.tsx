@@ -3875,3 +3875,91 @@ describe('ViewPackingList people filter', () => {
         })
     })
 })
+
+describe('a section named after a question', () => {
+    // The section a question's items fall into is named with the question's own
+    // text (see `defaultCategoryFor`), so a heading arrives as "Will you be
+    // staying overnight?" — a question where the card wants a noun phrase.
+    const QUESTION_CATEGORY = 'Will you be staying overnight?'
+    const questionCategoryList = {
+        id: 'test-list-question-heading',
+        name: 'Question Heading Trip',
+        createdAt: '2026-01-01T00:00:00Z',
+        items: [
+            { id: 'qh-1', itemText: 'Pyjamas', personName: 'Alice', personId: 'p1', questionId: 'q1', optionId: 'o1', packed: false, category: QUESTION_CATEGORY, order: 0 },
+        ],
+    }
+
+    let savePackingList: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...questionCategoryList, _rev: '2' }),
+        })
+        savePackingList = vi.fn().mockResolvedValue({ rev: '2' })
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getPackingList: vi.fn().mockResolvedValue(questionCategoryList),
+                savePackingList,
+                getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }),
+            } as unknown as PackingAppDatabase,
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    async function renderList() {
+        render(
+            <MemoryRouter initialEntries={['/view-list/test-list-question-heading']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        await waitFor(() => expect(row('Pyjamas')).toBeTruthy())
+    }
+
+    it('drops the question mark from the heading', async () => {
+        await renderList()
+
+        expect(screen.getByText('Will you be staying overnight')).toBeTruthy()
+        expect(screen.queryByText(QUESTION_CATEGORY)).toBeNull()
+    })
+
+    it('drops it from the controls that name the section too', async () => {
+        await renderList()
+
+        expect(screen.getByRole('button', { name: 'Collapse Will you be staying overnight list' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Check all in Will you be staying overnight' })).toBeTruthy()
+    })
+
+    it('files an item typed into the card under the section it was typed into', async () => {
+        // The heading is display only: strip the question mark from the stored
+        // category and a typed item starts a second card beside the first.
+        await renderList()
+
+        const card = screen.getByTestId('list-section')
+        fireEvent.change(within(card).getByPlaceholderText('Add new item...'), { target: { value: 'Eye mask' } })
+        fireEvent.click(within(card).getByRole('button', { name: 'Add' }))
+
+        await waitFor(() => expect(savePackingList).toHaveBeenCalled())
+        const saved = savePackingList.mock.calls[0][0] as { items: PackingListItem[] }
+        expect(saved.items.find(item => item.itemText === 'Eye mask')?.category).toBe(QUESTION_CATEGORY)
+
+        await waitFor(() => expect(screen.getAllByTestId('list-section').length).toBe(1))
+    })
+})

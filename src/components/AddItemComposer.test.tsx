@@ -207,6 +207,32 @@ describe('AddItemComposer: suggestions', () => {
         expect(onAdd).not.toHaveBeenCalled()
     })
 
+    it('writes a question-named section the way the card heading does', () => {
+        // The badge names the section the suggestion would land in, and the
+        // card it lands on is headed without the question mark — see
+        // `sectionHeading`. The stored category is untouched, so the item
+        // still joins the section it names.
+        const questionSuggestions = buildSuggestionIndex([
+            mk({ itemText: 'Pyjamas', personName: 'Bob', category: 'Will you be staying overnight?' }),
+        ])
+        const { onAdd, input } = renderComposer({
+            suggestions: questionSuggestions,
+            categoryOptions: ['Will you be staying overnight?', 'Other'],
+        })
+        fireEvent.change(input, { target: { value: 'pyj' } })
+
+        expect(screen.getByRole('option', { name: /Pyjamas/ }).textContent)
+            .toBe('PyjamasWill you be staying overnight')
+
+        fireEvent.click(screen.getByRole('option', { name: /Pyjamas/ }))
+        fireEvent.keyDown(input, { key: 'Enter' })
+        expect(onAdd).toHaveBeenCalledWith(
+            expect.objectContaining({ category: 'Will you be staying overnight?' }),
+            'Pyjamas',
+            undefined,
+        )
+    })
+
     it('closes the suggestions on Escape without closing the composer', () => {
         const onClose = vi.fn()
         const { input } = renderComposer({ suggestions, onClose })

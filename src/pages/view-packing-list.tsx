@@ -29,6 +29,7 @@ import { formatTripDates } from '../create-packing-list/tripDetails'
 import { tapFeedback } from '../utils/haptics'
 import { prefersReducedMotion } from '../utils/prefersReducedMotion'
 import { groupItemsByCategory, sortByOrder, type CategoryAccessors } from '../utils/groupByCategory'
+import { sectionHeading } from '../utils/sectionHeading'
 import { CATEGORY_ORDER } from '../edit-questions/item-sections'
 import { useSectionOrder } from '../hooks/useSectionOrder'
 import { clearPendingSignInAction, getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
@@ -110,7 +111,9 @@ const CONFETTI_PIECES = [
 ]
 
 interface ListSection {
+    /** The section's stored name — what a category is written as on its items. */
     key: string
+    /** What the card is headed with: the name as `sectionHeading` writes it. */
     title: string
     items: PackingListItem[]
     // Name used in aria-labels and guest actions; '' for the shared section
@@ -1437,7 +1440,7 @@ export function ViewPackingList() {
     const allCategorySections: ListSection[] = groupByCategory(packingList.items.filter(i => !i.lastMinute), sectionOrder)
         .map(({ label, items }) => ({
             key: label,
-            title: label,
+            title: sectionHeading(label),
             name: '',
             items,
             isCategory: true,
@@ -2053,7 +2056,7 @@ export function ViewPackingList() {
                                         <AddItemComposer
                                             personName={solePerson?.name ?? ''}
                                             personId={solePerson?.personId ?? ''}
-                                            category={isLastMinute ? undefined : categoryFromLabel(title)}
+                                            category={isLastMinute ? undefined : categoryFromLabel(sectionKey)}
                                             lastMinute={isLastMinute}
                                             peopleOptions={sectionPeopleChoices}
                                             suggestions={suggestionIndex}
@@ -2145,7 +2148,7 @@ export function ViewPackingList() {
                 // card's isn't: its items keep the section they came from, so a
                 // copy made there takes it from the item beside it.
                 category: openRowSection?.isCategory
-                    ? categoryFromLabel(openRowSection.title)
+                    ? categoryFromLabel(openRowSection.key)
                     : row.items[0]?.category,
                 lastMinute: openRowSection?.lastMinute,
             }, row.label, row.quantity)}
