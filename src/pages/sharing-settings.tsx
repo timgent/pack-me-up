@@ -44,14 +44,14 @@ const FULL_SETUP_TAGLINE = 'Let someone else use your questions and lists.'
 function FullSetupIntro() {
     return (
         <div className="space-y-2">
-            <p className="text-sm text-gray-700">{FULL_SETUP_TAGLINE}</p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-700 dark:text-gray-300">{FULL_SETUP_TAGLINE}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
                 They get your question set and every packing list you have — including the ones you
                 make later — and can view and edit them. Handy for anyone who packs with the same
                 people over and over: couples, families, sports clubs, scout troops, climbing
                 buddies.
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
                 Sharing just one list? Open that list and choose <strong>Share</strong> — that sends
                 a single list, not your whole setup.
             </p>
@@ -291,14 +291,14 @@ export function SharingSettingsPage() {
     if (!isLoggedIn) {
         return (
             <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
-                <h1 className="text-3xl font-bold text-primary-900">Sharing</h1>
+                <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200">Sharing</h1>
                 <section className="space-y-4">
-                    <h2 className="text-xl font-semibold text-gray-900">Share your full setup</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                     <FullSetupIntro />
                     <Button type="button" variant="primary" onClick={() => setSignInPromptOpen(true)}>
                         Sign in to share your setup
                     </Button>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         Everything you have made so far stays on this device until you sign in — nothing
                         is shared before you say who with.
                     </p>
@@ -327,12 +327,12 @@ export function SharingSettingsPage() {
     return (
         <div className="max-w-2xl mx-auto py-8 px-4 space-y-10">
             <div>
-                <h1 className="text-3xl font-bold text-primary-900">Sharing</h1>
+                <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200">Sharing</h1>
             </div>
 
             {/* Section 1: Share the whole setup — questions + every list */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Share your full setup</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                 <FullSetupIntro />
                 <div className="flex flex-col sm:flex-row gap-2">
                     <input
@@ -342,7 +342,7 @@ export function SharingSettingsPage() {
                         onChange={e => setCollaboratorWebId(e.target.value)}
                         placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
                         aria-label="Their WebID"
-                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <button
                         onClick={handleGrantAccess}
@@ -352,17 +352,17 @@ export function SharingSettingsPage() {
                         {isGranting ? 'Sharing…' : 'Share my setup'}
                     </button>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                     A WebID is the address of someone's Solid Pod — ask them to copy theirs from their
                     own sharing page.
                 </p>
 
                 {inviteLink && (
-                    <div className="mt-2 rounded-xl border-2 border-primary-200 bg-primary-50 p-4 space-y-2">
-                        <p className="text-sm font-semibold text-primary-900">
+                    <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
+                        <p className="text-sm font-semibold text-primary-900 dark:text-primary-200">
                             ✅ Your full setup is shared{sharedWith ? ' with ' + sharedWith : ''}
                         </p>
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                             They now have your question set and all your packing lists. Send them this
                             link so they can open it:
                         </p>
@@ -371,7 +371,7 @@ export function SharingSettingsPage() {
                             readOnly
                             value={inviteLink}
                             aria-label="Invite link"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none"
                             onClick={e => (e.target as HTMLInputElement).select()}
                         />
                         <Button type="button" variant="secondary" onClick={handleCopyInviteLink}>
@@ -380,19 +380,19 @@ export function SharingSettingsPage() {
                     </div>
                 )}
 
-                <h3 className="text-sm font-semibold text-gray-700 pt-2">People with your full setup</h3>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 pt-2">People with your full setup</h3>
                 {isLoadingCollaborators ? (
-                    <p className="text-sm text-gray-500">Loading…</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
                 ) : collaborators.length > 0 ? (
                     <ul className="space-y-2 mt-2">
                         {collaborators.map(webId => (
-                            <li key={webId} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                                <span className="text-sm text-gray-800 truncate flex-1" title={webId}>{webId}</span>
+                            <li key={webId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={webId}>{webId}</span>
                                 <button
                                     onClick={() => handleRevoke(webId)}
                                     disabled={revokingWebId === webId}
                                     aria-label={`Revoke access for ${webId}`}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
                                 >
                                     {revokingWebId === webId ? 'Revoking…' : 'Revoke'}
                                 </button>
@@ -400,27 +400,27 @@ export function SharingSettingsPage() {
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-gray-500">You haven't shared your full setup with anyone yet.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">You haven't shared your full setup with anyone yet.</p>
                 )}
             </section>
 
             {/* Section 2: Pods shared with me */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Data shared with me</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Data shared with me</h2>
                 {sharedContexts.length === 0 ? (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         No shared pods yet. Visit an invite link to add one.
                     </p>
                 ) : (
                     <ul className="space-y-2">
                         {sharedContexts.map(ctx => (
-                            <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                                <span className="text-sm text-gray-800 truncate flex-1" title={ctx.podUrl}>
+                            <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={ctx.podUrl}>
                                     {ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)}
                                 </span>
                                 <button
                                     onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                 >
                                     Open
                                 </button>
@@ -428,7 +428,7 @@ export function SharingSettingsPage() {
                                     onClick={() => handleRemoveSharedContext(ctx.podUrl)}
                                     disabled={removingPodUrl === ctx.podUrl}
                                     aria-label={`Remove shared pod`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
                                 >
                                     {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
                                 </button>
@@ -440,26 +440,26 @@ export function SharingSettingsPage() {
 
             {/* Section 3: Individual lists shared with me */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Individual lists shared with me</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Individual lists shared with me</h2>
                 {sharedLists.length === 0 ? (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         No individual lists yet. When someone shares a list link with you and you save it, it will appear here.
                     </p>
                 ) : (
                     <ul className="space-y-2">
                         {sharedLists.map(ctx => (
-                            <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                            <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
                                 <div className="flex flex-col flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-gray-800 truncate">
+                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                                         {ctx.label ?? ctx.listId}
                                     </span>
-                                    <span className="text-xs text-gray-500 truncate" title={ctx.podUrl}>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
                                         {resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)}
                                     </span>
                                 </div>
                                 <button
                                     onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                 >
                                     Open
                                 </button>
@@ -467,7 +467,7 @@ export function SharingSettingsPage() {
                                     onClick={() => handleRemoveSharedList(ctx.listId)}
                                     disabled={removingListId === ctx.listId}
                                     aria-label={`Remove shared list ${ctx.label ?? ctx.listId}`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
                                 >
                                     {removingListId === ctx.listId ? 'Removing…' : 'Remove'}
                                 </button>
@@ -479,15 +479,15 @@ export function SharingSettingsPage() {
 
             {/* Section 4: Individual lists I've shared */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Individual lists I've shared</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Individual lists I've shared</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                     Lists you've shared on their own — with specific people or publicly. People who have
                     your full setup are not listed here; they already have every list.
                 </p>
                 {ownLists.length === 0 ? (
-                    <p className="text-sm text-gray-500">No packing lists yet.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No packing lists yet.</p>
                 ) : sharedOwnLists.length === 0 && Object.values(sharingStatusByListId).every(s => s !== 'loading') ? (
-                    <p className="text-sm text-gray-500">You haven't shared any individual lists yet.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">You haven't shared any individual lists yet.</p>
                 ) : (
                     <ul className="space-y-2">
                         {ownLists
@@ -499,10 +499,10 @@ export function SharingSettingsPage() {
                             .map(list => {
                                 const status = sharingStatusByListId[list.id]
                                 return (
-                                    <li key={list.id} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                    <li key={list.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
                                         <div className="flex flex-col flex-1 min-w-0">
-                                            <span className="text-sm font-medium text-gray-800 truncate">✈️ {list.name}</span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">✈️ {list.name}</span>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
                                                 {status === 'loading' ? 'Loading sharing info…' :
                                                     status === 'error' ? 'Could not load sharing info' :
                                                     [
@@ -517,7 +517,7 @@ export function SharingSettingsPage() {
                                                     fileUrl: `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
                                                     listId: list.id,
                                                 })}
-                                                className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors"
+                                                className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                             >
                                                 Manage sharing
                                             </button>

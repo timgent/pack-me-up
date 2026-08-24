@@ -22,7 +22,7 @@ export function PodSyncIndicator({ subject }: PodSyncIndicatorProps) {
             data-testid="pod-sync-indicator"
             role="status"
             aria-live="polite"
-            className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-600"
+            className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400"
         >
             <span aria-hidden="true" className="loading-suitcase text-base leading-none">🧳</span>
             Checking your Pod for changes{subject ? ` to ${subject}` : ''}...

@@ -17,7 +17,7 @@ import { useMemo, useState } from 'react'
 import { suggestFor, type ItemSuggestion, type SuggestionIndex } from '../utils/itemSuggestions'
 
 /** A composer field, bar the focus ring — each page brings its own accent. */
-export const FIELD_BASE = 'px-3 py-2 border border-gray-300 rounded-md bg-white text-sm text-gray-700 focus:outline-none focus:ring-2'
+export const FIELD_BASE = 'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2'
 export const FIELD = `${FIELD_BASE} focus:ring-blue-500`
 
 interface ItemNameFieldProps {
@@ -144,7 +144,7 @@ export function ItemNameField({
                 <ul
                     id={listboxId}
                     role="listbox"
-                    className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+                    className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1 shadow-lg"
                 >
                     {matches.map((suggestion, i) => (
                         <li key={suggestion.text}>
@@ -155,11 +155,11 @@ export function ItemNameField({
                                 // Blur would close the list before the click landed.
                                 onMouseDown={e => e.preventDefault()}
                                 onClick={() => applySuggestion(suggestion)}
-                                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${i === highlighted ? 'bg-blue-50 text-blue-900' : 'text-gray-700 hover:bg-gray-50'}`}
+                                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${i === highlighted ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                             >
                                 <span className="truncate">{suggestion.text}</span>
                                 {suggestion.category && (
-                                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+                                    <span className="shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-[11px] text-gray-500 dark:text-gray-400">
                                         {suggestion.category}
                                     </span>
                                 )}

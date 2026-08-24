@@ -74,11 +74,11 @@ export function SolidPodPrompt({
     <>
       <Modal isOpen={isOpen} onClose={handleMaybeLater} title={title}>
         <div className="space-y-4">
-          <p className="text-gray-700 leading-relaxed">{message}</p>
+          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{message}</p>
 
-          <div className="bg-gradient-to-br from-primary-50 to-accent-50 border-2 border-primary-200 rounded-xl p-4 space-y-2">
-            <h4 className="font-bold text-primary-900 text-sm">{benefitsTitle}</h4>
-            <ul className="text-sm text-gray-700 space-y-1.5 ml-4 list-disc">
+          <div className="bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 border-2 border-primary-200 dark:border-primary-800 rounded-xl p-4 space-y-2">
+            <h4 className="font-bold text-primary-900 dark:text-primary-200 text-sm">{benefitsTitle}</h4>
+            <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1.5 ml-4 list-disc">
               {benefits.map(benefit => (
                 <li key={benefit.label}>
                   <strong>{benefit.label}</strong> - {benefit.text}
@@ -106,7 +106,7 @@ export function SolidPodPrompt({
             </Button>
           </div>
 
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
             You can always set this up later from the navigation menu
           </p>
         </div>

@@ -206,7 +206,7 @@ export function CategoryItemGrid({
     const visibleRows = foldShared ? visible.filter(row => !row.communal) : visible
 
     if (visibleRows.length === 0 && sharedRows.length === 0) {
-        return <p className="text-sm font-medium text-emerald-700">Nothing left to pack 🎒</p>
+        return <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Nothing left to pack 🎒</p>
     }
 
     // One width for every row in the card, so the chips land in the same places
@@ -220,7 +220,7 @@ export function CategoryItemGrid({
                     key={flourish.nonce}
                     data-testid={`item-tick-${item.id}`}
                     aria-hidden="true"
-                    className="item-packed-tick pointer-events-none absolute left-1/2 top-1/2 z-10 text-xl font-bold text-success-600"
+                    className="item-packed-tick pointer-events-none absolute left-1/2 top-1/2 z-10 text-xl font-bold text-success-600 dark:text-success-400"
                 >
                     ✓
                 </span>
@@ -244,9 +244,9 @@ export function CategoryItemGrid({
                 onClick={() => onOpenRow(row)}
                 aria-label={`Edit ${row.label}`}
                 title="Rename, quantities, and who needs it"
-                className="group block w-full cursor-pointer rounded-md px-1 py-2 text-left transition-colors active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                className="group block w-full cursor-pointer rounded-md px-1 py-2 text-left transition-colors active:bg-blue-100 dark:active:bg-blue-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             >
-                <span className={`break-words ${complete ? 'text-gray-400 line-through' : 'text-gray-800 group-hover:text-blue-800'}`}>
+                <span className={`break-words ${complete ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-800 dark:text-gray-100 group-hover:text-blue-800 dark:group-hover:text-blue-200'}`}>
                     {head && `${head} `}
                     {/* The last word, the quantity and the chevron travel
                         together, so the chevron is never left pointing at
@@ -254,7 +254,7 @@ export function CategoryItemGrid({
                     <span className="whitespace-nowrap">
                         {lastWord}
                         {row.quantity !== undefined && (
-                            <span className="ml-1.5 inline-block rounded-full bg-blue-100 px-1.5 py-0.5 align-middle text-xs font-semibold text-blue-700">
+                            <span className="ml-1.5 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 align-middle text-xs font-semibold text-blue-700 dark:text-blue-300">
                                 ×{row.quantity}
                             </span>
                         )}
@@ -270,7 +270,7 @@ export function CategoryItemGrid({
                             strokeWidth={2.5}
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="ml-1.5 inline-block h-3.5 w-3.5 align-[-0.15em] text-gray-500 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600"
+                            className="ml-1.5 inline-block h-3.5 w-3.5 align-[-0.15em] text-gray-500 dark:text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                         >
                             <path d="M7.5 4.5 13 10l-5.5 5.5" />
                         </svg>
@@ -307,7 +307,7 @@ export function CategoryItemGrid({
                 ref={(element) => registerCellRef(item.id, element)}
                 title={`${row.label} for ${column.name}`}
                 className={`relative flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold transition-colors before:absolute before:-inset-1.5 before:content-[''] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
-                    packed ? color.avatar : `border-2 bg-white ${color.border} ${color.text}`
+                    packed ? color.avatar : `border-2 bg-white dark:bg-gray-900 ${color.border} ${color.text}`
                 } ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
             >
                 <input
@@ -321,7 +321,7 @@ export function CategoryItemGrid({
                     {packed ? '✓' : (emoji ?? column.initial)}
                 </span>
                 {row.mixedQuantities && quantity && (
-                    <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-blue-100 px-1 text-[10px] font-semibold text-blue-700">
+                    <span className="pointer-events-none absolute -bottom-1 -right-1 rounded-full bg-blue-100 dark:bg-blue-900/40 px-1 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
                         ×{quantity}
                     </span>
                 )}
@@ -349,9 +349,9 @@ export function CategoryItemGrid({
             aria-hidden="true"
             onClick={() => onOpenRow(row)}
             title={`${column.name} doesn't need this — open to change`}
-            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-blue-50"
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
         >
-            <span className="block h-1 w-1 rounded-full bg-gray-200" />
+            <span className="block h-1 w-1 rounded-full bg-gray-200 dark:bg-gray-700" />
         </button>
     )
 
@@ -363,14 +363,14 @@ export function CategoryItemGrid({
             <label
                 data-testid={`grid-cell-${item.id}`}
                 ref={(element) => registerCellRef(item.id, element)}
-                className={`relative flex h-8 cursor-pointer items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${packed ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-50 text-blue-800 hover:bg-blue-100'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
+                className={`relative flex h-8 cursor-pointer items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-[''] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${packed ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/40'} ${item.id === highlightedItemId ? 'ring-2 ring-green-400' : ''} ${item.id === flourish?.itemId ? 'grid-cell-packed' : ''}`}
             >
                 <input
                     type="checkbox"
                     checked={packed}
                     onChange={(e) => onToggleItem(item, e.target.checked)}
                     aria-label={`${row.label} for the whole group`}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                 />
                 <span className="whitespace-nowrap">👥 Shared</span>
                 {renderFlourish(item)}
@@ -380,14 +380,14 @@ export function CategoryItemGrid({
 
     return (
         <div ref={containerRef}>
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                 {visibleRows.map(row => {
                     const complete = rowComplete(row)
                     return (
                         <li
                             key={row.key}
                             data-testid="grid-row"
-                            className={`flex items-start gap-1 rounded-md transition-colors ${complete ? 'bg-emerald-50' : 'hover:bg-gray-50'} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
+                            className={`flex items-start gap-1 rounded-md transition-colors ${complete ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800'} ${hidePacked && complete ? 'grid-row-leaving' : ''}`}
                         >
                             {/* Capped, so a wide card doesn't strand the chips
                                 an inch and a half from the name they belong to. */}
@@ -423,24 +423,24 @@ export function CategoryItemGrid({
                 category's business, and a line saying how many there are is
                 enough to remember that while packing one person's bag. */}
             {sharedRows.length > 0 && (
-                <div className="mt-1 border-t border-gray-100 pt-1">
+                <div className="mt-1 border-t border-gray-100 dark:border-gray-800 pt-1">
                     <button
                         type="button"
                         aria-expanded={sharedOpen}
                         onClick={() => setSharedOpen(open => !open)}
-                        className="flex w-full items-center gap-1.5 rounded-md px-1 py-2 text-left text-xs font-semibold text-blue-800 transition-colors hover:bg-blue-50"
+                        className="flex w-full items-center gap-1.5 rounded-md px-1 py-2 text-left text-xs font-semibold text-blue-800 dark:text-blue-200 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
                     >
-                        <span aria-hidden="true" className="text-gray-400">{sharedOpen ? '▼' : '▶'}</span>
+                        <span aria-hidden="true" className="text-gray-400 dark:text-gray-500">{sharedOpen ? '▼' : '▶'}</span>
                         <span aria-hidden="true">👥</span>
                         Shared ({sharedRows.length})
                     </button>
                     {sharedOpen && (
-                        <ul className="divide-y divide-gray-100">
+                        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                             {sharedRows.map(row => (
                                 <li
                                     key={row.key}
                                     data-testid="grid-row"
-                                    className="flex items-start gap-1 rounded-md transition-colors hover:bg-gray-50"
+                                    className="flex items-start gap-1 rounded-md transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <span className="min-w-0 flex-1" style={{ maxWidth: `${NAME_MAX_WIDTH}px` }}>
                                         {renderName(row, rowComplete(row))}

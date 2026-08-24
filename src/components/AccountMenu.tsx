@@ -113,23 +113,23 @@ export function AccountMenu({ webId, displayName, photoUrl, onLogout }: {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-72 z-50 rounded-xl bg-white text-gray-900 shadow-soft ring-1 ring-black/10 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Signed in as</p>
+                <div className="absolute right-0 mt-2 w-72 z-50 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-soft ring-1 ring-black/10 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Signed in as</p>
                         {/* Reachable, but no longer the thing the nav bar shouts */}
-                        <p className="mt-1 text-xs text-gray-700 break-all" title={webId}>{webId}</p>
+                        <p className="mt-1 text-xs text-gray-700 dark:text-gray-300 break-all" title={webId}>{webId}</p>
                     </div>
                     <Link
                         to="/backups"
                         onClick={() => setIsOpen(false)}
-                        className="block px-4 py-3 text-sm font-semibold hover:bg-primary-50 transition-colors duration-200"
+                        className="block px-4 py-3 text-sm font-semibold hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors duration-200"
                     >
                         Backups
                     </Link>
                     <button
                         type="button"
                         onClick={() => { setIsOpen(false); onLogout() }}
-                        className="w-full text-left px-4 py-3 text-sm font-semibold border-t border-gray-100 hover:bg-primary-50 transition-colors duration-200"
+                        className="w-full text-left px-4 py-3 text-sm font-semibold border-t border-gray-100 dark:border-gray-800 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors duration-200"
                     >
                         Logout
                     </button>

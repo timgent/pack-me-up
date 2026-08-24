@@ -102,8 +102,8 @@ export function BackupsPage() {
     if (!isLoggedIn) {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
-                <h1 className="text-4xl font-bold text-primary-900 mb-4">Backups</h1>
-                <p className="text-lg text-gray-700 font-medium">
+                <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200 mb-4">Backups</h1>
+                <p className="text-lg text-gray-700 dark:text-gray-300 font-medium">
                     Backups require a Solid Pod login. Please log in to manage your backups.
                 </p>
             </div>
@@ -114,8 +114,8 @@ export function BackupsPage() {
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8 flex justify-between items-start">
                 <div>
-                    <h1 className="text-4xl font-bold text-primary-900">Backups</h1>
-                    <p className="mt-2 text-lg text-gray-700 font-medium">
+                    <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">Backups</h1>
+                    <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">
                         Create and restore backups of your packing data.
                     </p>
                 </div>
@@ -132,22 +132,22 @@ export function BackupsPage() {
             {isLoadingBackups ? (
                 <LoadingState message="Loading backups..." rows={2} />
             ) : backups.length === 0 ? (
-                <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
-                    <p className="text-lg text-gray-800 font-semibold">No backups yet</p>
+                <div className="text-center py-12 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft">
+                    <p className="text-lg text-gray-800 dark:text-gray-100 font-semibold">No backups yet</p>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {backups.map(backup => (
                         <div
                             key={backup.url}
-                            className="bg-white rounded-2xl border-2 border-primary-200 shadow-soft p-5"
+                            className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft p-5"
                         >
                             <div className="flex justify-between items-center">
                                 <div>
-                                    <p className="font-semibold text-gray-900">
+                                    <p className="font-semibold text-gray-900 dark:text-gray-100">
                                         {new Date(backup.createdAt).toLocaleString()}
                                     </p>
-                                    <p className="text-sm text-gray-600 mt-1">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                         {backup.packingListCount} packing list{backup.packingListCount !== 1 ? 's' : ''}
                                         {backup.hasQuestionSet ? ' · question set included' : ''}
                                     </p>
@@ -163,7 +163,7 @@ export function BackupsPage() {
                                     <button
                                         type="button"
                                         onClick={() => handleDelete(backup)}
-                                        className="px-4 py-2 rounded-xl font-semibold text-sm text-danger-600 hover:bg-danger-50 border-2 border-danger-200 hover:border-danger-400 transition-all duration-200"
+                                        className="px-4 py-2 rounded-xl font-semibold text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950/40 border-2 border-danger-200 dark:border-danger-800 hover:border-danger-400 dark:hover:border-danger-600 transition-all duration-200"
                                     >
                                         Delete
                                     </button>

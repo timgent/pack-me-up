@@ -18,7 +18,7 @@ import { CustomCreatableSelect } from './CreatableSelect'
 import { PersonToggles, QuantityPanel } from './ItemEditorControls'
 import type { Item, Person } from '../edit-questions/types'
 
-const FIELD_LABEL = 'block text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1'
+const FIELD_LABEL = 'block text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1'
 
 export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, allItemNames, sectionNames, sectionDefaultLabel, onChange, onDelete, onClose }: {
     item: Item
@@ -78,7 +78,7 @@ export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, a
         <div
             data-testid="item-inline-editor"
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-            className="mt-1 mb-2 rounded-lg border border-primary-200 bg-white p-3 space-y-3 shadow-sm"
+            className="mt-1 mb-2 rounded-lg border border-primary-200 dark:border-primary-800 bg-white dark:bg-gray-900 p-3 space-y-3 shadow-sm"
         >
             <div data-testid="item-name-field">
                 <span className={FIELD_LABEL}>Item</span>
@@ -101,7 +101,7 @@ export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, a
                     onToggleCommunal={toggleCommunal}
                 />
                 {item.communal && people.length > 1 && (
-                    <p className="mt-1 text-[11px] text-blue-600">
+                    <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400">
                         Packed once for the group — included when a highlighted person is going
                     </p>
                 )}
@@ -129,7 +129,7 @@ export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, a
                     aria-label="Section"
                     value={item.category ?? sectionDefaultLabel}
                     onChange={e => setSection(e.target.value)}
-                    className="w-full border border-gray-200 rounded px-3 py-2.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full border border-gray-200 dark:border-gray-700 rounded px-3 py-2.5 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                     {sectionOptions.map(label => (
                         <option key={label} value={label}>{label}</option>
@@ -146,7 +146,7 @@ export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, a
                         type="button"
                         onClick={onDelete}
                         aria-label={item.text ? `Delete ${item.text}` : 'Delete item'}
-                        className="px-2 py-1.5 text-sm font-medium text-gray-400 rounded-lg hover:text-red-600 hover:bg-red-50"
+                        className="px-2 py-1.5 text-sm font-medium text-gray-400 dark:text-gray-500 rounded-lg hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                     >
                         Delete
                     </button>
@@ -154,7 +154,7 @@ export const ItemInlineEditor = memo(function ItemInlineEditor({ item, people, a
                 <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100"
+                    className="px-4 py-1.5 text-sm font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40"
                 >
                     Done
                 </button>

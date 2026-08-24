@@ -42,10 +42,10 @@ export function SyncAcrossDevicesPrompt() {
         <>
             <div
                 data-testid="sync-across-devices-prompt"
-                className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3"
+                className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 px-4 py-3"
             >
-                <p className="flex-1 min-w-50 text-sm text-gray-700">
-                    <span className="font-bold text-primary-900">📱 Sync across devices</span>
+                <p className="flex-1 min-w-50 text-sm text-gray-700 dark:text-gray-300">
+                    <span className="font-bold text-primary-900 dark:text-primary-200">📱 Sync across devices</span>
                     {' — '}
                     sign in to pick these lists up on your phone or laptop, and keep them safe if you clear your browser.
                 </p>
@@ -53,7 +53,7 @@ export function SyncAcrossDevicesPrompt() {
                     <button
                         type="button"
                         onClick={() => setIsProviderSelectorOpen(true)}
-                        className="text-sm font-bold text-primary-700 underline hover:no-underline px-2 py-1"
+                        className="text-sm font-bold text-primary-700 dark:text-primary-300 underline hover:no-underline px-2 py-1"
                     >
                         Sign in
                     </button>
@@ -61,9 +61,9 @@ export function SyncAcrossDevicesPrompt() {
                         type="button"
                         onClick={handleDismiss}
                         aria-label="Dismiss sync prompt"
-                        className="p-2 rounded-lg hover:bg-primary-100 transition-colors"
+                        className="p-2 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors"
                     >
-                        <XMarkIcon className="h-4 w-4 text-primary-700" />
+                        <XMarkIcon className="h-4 w-4 text-primary-700 dark:text-primary-300" />
                     </button>
                 </div>
             </div>

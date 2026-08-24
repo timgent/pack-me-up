@@ -192,10 +192,10 @@ export function PackingLists() {
 
         // Rotate through gradient colors
         const gradients = [
-            'from-primary-50 to-primary-100 border-primary-300',
-            'from-secondary-50 to-secondary-100 border-secondary-300',
-            'from-accent-50 to-accent-100 border-accent-300',
-            'from-success-50 to-success-100 border-success-300'
+            'from-primary-50 dark:from-primary-950/40 to-primary-100 dark:to-primary-900/40 border-primary-300 dark:border-primary-700',
+            'from-secondary-50 dark:from-secondary-950/40 to-secondary-100 dark:to-secondary-900/40 border-secondary-300 dark:border-secondary-700',
+            'from-accent-50 dark:from-accent-950/40 to-accent-100 dark:to-accent-900/40 border-accent-300 dark:border-accent-700',
+            'from-success-50 dark:from-success-950/40 to-success-100 dark:to-success-900/40 border-success-300 dark:border-success-700'
         ]
         const gradient = gradients[index % gradients.length]
 
@@ -218,19 +218,19 @@ export function PackingLists() {
             >
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                     <div className="min-w-0">
-                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
                         ✈️ {list.name}
                         {list.sharedFromPodUrl ? (
-                            <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full">
                                 👤 From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
                             </span>
                         ) : (
                             <>
                                 {sharingStatus[list.id] === 'public' && (
-                                    <span className="text-xs font-medium bg-white/60 text-blue-700 px-2 py-0.5 rounded-full">🌐 Public</span>
+                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">🌐 Public</span>
                                 )}
                                 {sharingStatus[list.id] === 'shared' && (
-                                    <span className="text-xs font-medium bg-white/60 text-indigo-700 px-2 py-0.5 rounded-full">👤 Shared</span>
+                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">👤 Shared</span>
                                 )}
                             </>
                         )}
@@ -238,44 +238,44 @@ export function PackingLists() {
                     {/* On its own line so a long destination never
                         pushes the actions onto a second row */}
                     {list.destination && (
-                        <p className="mt-1 text-sm text-gray-600 truncate">📍 {list.destination}</p>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 truncate">📍 {list.destination}</p>
                     )}
                     </div>
                     <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-gray-600 bg-white/60 px-3 py-1 rounded-lg">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg">
                             {tripDates
                                 ? `📅 ${tripDates}`
                                 : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
                         </span>
                         <button
                             onClick={(e) => requestRenamePackingList(list.id, list.name, e)}
-                            className="text-primary-600 hover:text-primary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                            className="text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
                         >
                             ✏️ Rename
                         </button>
                         <button
                             onClick={(e) => handleDuplicatePackingList(list, e)}
-                            className="text-secondary-600 hover:text-secondary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                            className="text-secondary-600 dark:text-secondary-400 hover:text-secondary-800 dark:hover:text-secondary-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
                         >
                             📋 Duplicate
                         </button>
                         <button
                             onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
-                            className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                            className="text-danger-600 dark:text-danger-400 hover:text-danger-800 dark:hover:text-danger-200 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg"
                         >
                             🗑️ Delete
                         </button>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex-1 bg-white/40 rounded-full h-3 overflow-hidden">
+                    <div className="flex-1 bg-white/40 dark:bg-white/10 rounded-full h-3 overflow-hidden">
                         <div
                             data-testid="progress-fill"
                             className="progress-bar-fill bg-gradient-primary h-full rounded-full"
                             style={{ width: `${displayWidth}%` }}
                         ></div>
                     </div>
-                    <span className="text-sm font-bold text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg">
                         {packedCount} / {totalCount} ({percentComplete}%)
                     </span>
                 </div>
@@ -294,8 +294,8 @@ export function PackingLists() {
             <div className="max-w-4xl mx-auto py-8 px-4">
                 <div className="mb-8 flex justify-between items-start">
                     <div className="mb-2">
-                        <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                        <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
+                        <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">📦 Packing Lists</h1>
+                        <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">View all your created packing lists.</p>
                     </div>
                     <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
                 </div>
@@ -308,8 +308,8 @@ export function PackingLists() {
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8 flex justify-between items-start">
                 <div className="mb-2">
-                    <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                    <p className="mt-2 text-lg text-gray-700 font-medium">View all your created packing lists.</p>
+                    <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">📦 Packing Lists</h1>
+                    <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">View all your created packing lists.</p>
                 </div>
                 <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
             </div>
@@ -322,8 +322,8 @@ export function PackingLists() {
             {packingLists.length > 0 && <SyncAcrossDevicesPrompt />}
 
             {packingLists.length === 0 ? (
-                <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
-                    <p className="text-lg text-gray-800 font-semibold">
+                <div className="text-center py-12 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft">
+                    <p className="text-lg text-gray-800 dark:text-gray-100 font-semibold">
                         No packing lists found. Create your first packing list to get started! 🎒
                     </p>
                 </div>
@@ -336,8 +336,8 @@ export function PackingLists() {
                     {/* Everything is behind us, so "no packing lists found" would
                         be wrong — say what is actually the case. */}
                     {currentLists.length === 0 && (
-                        <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
-                            <p className="text-lg text-gray-800 font-semibold">
+                        <div className="text-center py-12 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft">
+                            <p className="text-lg text-gray-800 dark:text-gray-100 font-semibold">
                                 No upcoming trips. Your past trips are below — or start a new list! 🎒
                             </p>
                         </div>
@@ -368,7 +368,7 @@ export function PackingLists() {
                         type="text"
                         value={renameValue}
                         onChange={e => setRenameValue(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-400"
                     />
                     <div className="flex gap-3 justify-end mt-4">
                         <Button variant="ghost" onClick={() => setListToRename(null)}>Cancel</Button>

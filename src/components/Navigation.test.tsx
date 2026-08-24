@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { Navigation } from './Navigation'
+import { ThemeProvider } from './ThemeContext'
 
 vi.mock('./SolidPodContext', () => ({
     useSolidPod: vi.fn(),
@@ -51,7 +52,9 @@ function signedIn() {
 function renderNav() {
     return render(
         <MemoryRouter>
-            <Navigation />
+            <ThemeProvider>
+                <Navigation />
+            </ThemeProvider>
         </MemoryRouter>
     )
 }
@@ -76,32 +79,20 @@ describe('Navigation', () => {
     })
 
     it('hides Backups link when not logged in', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.queryByText('Backups')).toBeNull()
     })
 
     it('keeps the Sharing link reachable when logged out so sharing is discoverable', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         // Desktop and mobile menus each render one
         expect(screen.getAllByText('Sharing').length).toBeGreaterThan(0)
     })
 
     it('shows "My Questions & Items" nav link instead of "Edit Questions"', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.getAllByText('My Questions & Items').length).toBeGreaterThan(0)
         expect(screen.queryByText('Edit Questions')).toBeNull()
@@ -111,11 +102,7 @@ describe('Navigation', () => {
     // they're once-in-a-while links, and the nav is for everyday ones. See
     // Footer.test.tsx for their coverage.
     it('keeps once-in-a-while links out of the nav', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.queryByRole('link', { name: /feedback/i })).toBeNull()
         expect(screen.queryByRole('link', { name: /privacy/i })).toBeNull()
@@ -127,11 +114,7 @@ describe('Navigation', () => {
     // a tall empty band above the logo. The inset is applied through a class so
     // CSS can limit it to the cases that actually draw under the status bar.
     it('leaves the status-bar inset to CSS rather than an inline style', () => {
-        const { container } = render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        const { container } = renderNav()
 
         const nav = container.querySelector('nav')!
         expect(nav.style.paddingTop).toBe('')
@@ -139,11 +122,7 @@ describe('Navigation', () => {
     })
 
     it('uses a shorter header row on mobile than on desktop', () => {
-        const { container } = render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        const { container } = renderNav()
 
         const row = container.querySelector('nav .flex.items-center.justify-between')!
         expect(row.className).toContain('h-14')
@@ -258,31 +237,19 @@ describe('Navigation – signed-out auth control', () => {
     })
 
     it('labels the auth control with the benefit in both desktop nav and mobile menu', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.getAllByRole('button', { name: 'Sync & Share' })).toHaveLength(2)
     })
 
     it('does not lead with "Solid Pod" on the auth control', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.queryByRole('button', { name: /solid pod/i })).toBeNull()
     })
 
     it('notes the payoff alongside the auth control', () => {
-        render(
-            <MemoryRouter>
-                <Navigation />
-            </MemoryRouter>
-        )
+        renderNav()
 
         expect(screen.getAllByText(/sync across devices/i).length).toBeGreaterThanOrEqual(2)
     })

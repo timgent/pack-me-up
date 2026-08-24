@@ -15,7 +15,7 @@ export function LoadingState({ message, rows = 3 }: LoadingStateProps) {
         <div role="status" aria-live="polite">
             <div className="flex flex-col items-center gap-3 py-6">
                 <span aria-hidden="true" className="loading-suitcase text-5xl leading-none">🧳</span>
-                <p className="text-lg font-semibold text-gray-700">{message}</p>
+                <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">{message}</p>
             </div>
 
             <div data-testid="loading-skeleton" aria-hidden="true" className="space-y-4">
@@ -23,7 +23,7 @@ export function LoadingState({ message, rows = 3 }: LoadingStateProps) {
                     <div
                         key={index}
                         data-testid="loading-skeleton-card"
-                        className="rounded-2xl border-2 border-primary-100 bg-white p-5 shadow-soft"
+                        className="rounded-2xl border-2 border-primary-100 dark:border-primary-900 bg-white dark:bg-gray-900 p-5 shadow-soft"
                     >
                         <div className="loading-skeleton-bar h-5 w-1/2 rounded-full" />
                         <div className="loading-skeleton-bar mt-3 h-4 w-1/3 rounded-full" />

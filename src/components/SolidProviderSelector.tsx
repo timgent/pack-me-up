@@ -143,21 +143,21 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
     <Modal isOpen={isOpen} onClose={handleClose} title="Sync &amp; Share your lists">
       <div className="space-y-4">
         {/* Payoff first, mechanism second — signing in is what unlocks these */}
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 space-y-2">
-          <p className="text-sm text-gray-700">
+        <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-md p-4 space-y-2">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
             Signing in lets you <strong>sync across your devices</strong> and <strong>share lists</strong> — a single list with a friend, or your whole question set with the person you travel with.
           </p>
           <details className="group">
-            <summary className="text-sm font-semibold text-gray-900 cursor-pointer list-none marker:content-none">
+            <summary className="text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-pointer list-none marker:content-none">
               <span className="group-open:hidden">▸ </span>
               <span className="hidden group-open:inline">▾ </span>
               What is a Solid Pod?
             </summary>
             <div className="mt-2 space-y-2">
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
                 Signing in uses a Solid Pod: personal data storage that <strong>you control</strong>. Instead of storing your packing lists on our servers, they're stored in your own secure space.
               </p>
-              <ul className="text-sm text-gray-700 space-y-1 ml-4 list-disc">
+              <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 ml-4 list-disc">
                 <li><strong>You own your data</strong> - it stays in your Pod</li>
                 <li><strong>Privacy-focused</strong> - you choose who can access it</li>
                 <li><strong>Portable</strong> - use your Pod with any Solid app</li>
@@ -167,18 +167,18 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
         </div>
 
         {connectingTo ? (
-          <div className="border-t border-gray-200 pt-6 pb-4 flex flex-col items-center gap-3" aria-live="polite">
-            <svg className="h-8 w-8 animate-spin text-blue-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 pb-4 flex flex-col items-center gap-3" aria-live="polite">
+            <svg className="h-8 w-8 animate-spin text-blue-500 dark:text-blue-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
             </svg>
-            <p className="text-sm text-gray-700">Connecting to {connectingTo.name}…</p>
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-sm text-gray-700 dark:text-gray-300">Connecting to {connectingTo.name}…</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
               You'll be taken to your provider to sign in.
             </p>
           </div>
         ) : (
-          <div className="border-t border-gray-200 pt-4 space-y-3">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
             <Input
               label="Search providers or paste your Pod URL"
               type="text"
@@ -193,7 +193,7 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
             />
 
             {error && (
-              <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <p role="alert" className="text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-md px-3 py-2">
                 {error}
               </p>
             )}
@@ -205,10 +205,10 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
                   data-provider-option
                   aria-label={`Connect to ${typedUrl}`}
                   onClick={() => void connect(providerForIssuer(typedUrl))}
-                  className="w-full text-left px-4 py-3 border-2 border-blue-400 bg-blue-50 hover:bg-blue-100 hover:border-blue-500 rounded-md transition-colors"
+                  className="w-full text-left px-4 py-3 border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:border-blue-500 dark:hover:border-blue-600 rounded-md transition-colors"
                 >
-                  <div className="font-medium text-gray-900 break-all">{typedUrl}</div>
-                  <div className="text-xs text-blue-700 font-medium">Use this Pod URL</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100 break-all">{typedUrl}</div>
+                  <div className="text-xs text-blue-700 dark:text-blue-300 font-medium">Use this Pod URL</div>
                 </button>
               )}
 
@@ -221,18 +221,18 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
                     data-provider-option
                     aria-label={provider.name}
                     onClick={() => void connect(provider)}
-                    className="w-full text-left px-4 py-3 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-md transition-colors"
+                    className="w-full text-left px-4 py-3 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500 rounded-md transition-colors"
                   >
-                    <div className="font-medium text-gray-900 break-all">{provider.name}</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100 break-all">{provider.name}</div>
                     {provider.description && (
-                      <div className="text-xs text-green-700 font-medium">{provider.description}</div>
+                      <div className="text-xs text-green-700 dark:text-green-300 font-medium">{provider.description}</div>
                     )}
                     <div className="flex items-baseline justify-between gap-2">
                       {provider.name === provider.issuer
                         ? <span />
-                        : <span className="text-xs text-gray-400 break-all">{provider.issuer}</span>}
+                        : <span className="text-xs text-gray-400 dark:text-gray-500 break-all">{provider.issuer}</span>}
                       {isLastUsed && (
-                        <span className="text-xs font-medium text-blue-700 whitespace-nowrap">Last used</span>
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">Last used</span>
                       )}
                     </div>
                   </button>
@@ -240,7 +240,7 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
               })}
 
               {providers.length === 0 && !typedUrl && (
-                <p className="text-sm text-gray-500 text-center py-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
                   No matching providers. Paste your Pod's URL to connect to it directly.
                 </p>
               )}
@@ -248,7 +248,7 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
           </div>
         )}
 
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
           No Pod? No problem — your data saves locally in your browser automatically.
         </p>
       </div>

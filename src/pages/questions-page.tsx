@@ -52,10 +52,10 @@ const PersonLegend = memo(function PersonLegend({ people, onEdit, personPhoto }:
     return (
         <div className="flex items-center gap-2 flex-wrap mb-4">
             {people.length === 0 && onEdit && (
-                <span className="text-xs text-gray-400">No people added</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">No people added</span>
             )}
             {people.map((person, i) => (
-                <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500">
+                <span key={person.id} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                     <PersonAvatar
                         name={person.name}
                         identity={personIdentityAt(person, i, personPhoto)}
@@ -68,7 +68,7 @@ const PersonLegend = memo(function PersonLegend({ people, onEdit, personPhoto }:
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="p-1 text-gray-300 hover:text-gray-600 rounded"
+                    className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 rounded"
                     title="Edit people"
                 >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,12 +119,12 @@ function ReorganiseModal({ items, defaultLabel, emptySections, onChange, onClose
             <div
                 role="dialog"
                 aria-label={`Organise ${defaultLabel} items`}
-                className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]"
+                className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="p-5 border-b border-gray-100 flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-gray-900">Organise items</h2>
-                    <p className="mt-0.5 text-sm text-gray-500 truncate">{defaultLabel}</p>
+                <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Organise items</h2>
+                    <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400 truncate">{defaultLabel}</p>
                 </div>
                 <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 px-5 py-4">
                     <SectionedItemReorder
@@ -135,7 +135,7 @@ function ReorganiseModal({ items, defaultLabel, emptySections, onChange, onClose
                         onChange={onChange}
                     />
                 </div>
-                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 flex justify-end">
+                <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 flex justify-end">
                     <button
                         type="button"
                         onClick={onClose}
@@ -207,7 +207,7 @@ function useDeferredReorder(onReorder?: (items: Item[], emptySections: string[] 
     return { draft, onChange, flush: stop }
 }
 
-const FOOT_BUTTON = 'py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors'
+const FOOT_BUTTON = 'py-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-400 dark:text-gray-500 hover:border-primary-300 dark:hover:border-primary-700 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors'
 
 /**
  * Name a new section. Offers the names already used elsewhere in the set, so
@@ -243,7 +243,7 @@ function AddSection({ suggestions, onAdd, onClose }: {
                 }}
                 aria-label="New section name"
                 placeholder="Section name (e.g. Toiletries)"
-                className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <datalist id={listId}>
                 {suggestions.map(label => <option key={label} value={label} />)}
@@ -473,7 +473,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
             <button
                 type="button"
                 onClick={() => setOrganising(true)}
-                className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 text-primary-600 hover:bg-primary-50 transition-colors"
+                className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
             >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -538,7 +538,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
                             // clipped away to nothing. The heading rounds its own
                             // top corners instead of relying on the card to crop
                             // them.
-                            className={`rounded-lg border ${accent.border} bg-white`}
+                            className={`rounded-lg border ${accent.border} bg-white dark:bg-gray-900`}
                         >
                             <div className={`flex items-center gap-2 rounded-t-lg px-2.5 py-1.5 ${accent.header}`}>
                                 <span
@@ -566,7 +566,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
                                         onClick={() => handleSectionBin(group.label, group.entries.length)}
                                         aria-label={`Delete section ${group.label}`}
                                         title={`Delete section ${group.label} — its items move to ${defaultLabel}`}
-                                        className={`shrink-0 -my-1 rounded p-1.5 ${accent.muted} hover:bg-white/70 hover:text-red-600 transition-colors`}
+                                        className={`shrink-0 -my-1 rounded p-1.5 ${accent.muted} hover:bg-white/70 dark:hover:bg-white/10 hover:text-red-600 dark:hover:text-red-400 transition-colors`}
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -581,7 +581,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
                                         aria-expanded={openComposer === group.label}
                                         aria-label={`Add an item to ${group.label}`}
                                         title={`Add an item to ${group.label}`}
-                                        className={`shrink-0 -my-1 rounded p-1.5 ${accent.text} hover:bg-white/70 transition-colors`}
+                                        className={`shrink-0 -my-1 rounded p-1.5 ${accent.text} hover:bg-white/70 dark:hover:bg-white/10 transition-colors`}
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
@@ -594,7 +594,7 @@ const SectionedItemRows = memo(function SectionedItemRows({ items, people, defau
                                     // A section you have just made, before anything is
                                     // in it. Says so rather than drawing a card with a
                                     // blank body, which reads as a rendering fault.
-                                    <p className="px-1.5 py-1 text-xs text-gray-400 italic">
+                                    <p className="px-1.5 py-1 text-xs text-gray-400 dark:text-gray-500 italic">
                                         Nothing here yet — use ＋ to add the first item
                                     </p>
                                 )}
@@ -650,7 +650,7 @@ function OptionContextMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete:
             <DropdownMenu.Trigger asChild>
                 <button
                     type="button"
-                    className="p-2 text-gray-400 hover:text-gray-700 rounded"
+                    className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded"
                     title="More actions"
                 >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -664,17 +664,17 @@ function OptionContextMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete:
                 <DropdownMenu.Content
                     align="end"
                     sideOffset={4}
-                    className="w-32 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50"
+                    className="w-32 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50"
                 >
                     <DropdownMenu.Item
                         onSelect={onEdit}
-                        className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none"
+                        className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none"
                     >
                         Edit
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                         onSelect={onDelete}
-                        className="px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 cursor-default outline-none"
+                        className="px-4 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-default outline-none"
                     >
                         Delete
                     </DropdownMenu.Item>
@@ -767,24 +767,24 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
             ) : (
                 <svg
                     data-testid="option-expand-chevron"
-                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
             )}
-            <span className="text-sm font-medium text-gray-800 flex-1 min-w-0">
-                {option.text || <em className="text-gray-400 font-normal">Untitled option</em>}
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-100 flex-1 min-w-0">
+                {option.text || <em className="text-gray-400 dark:text-gray-500 font-normal">Untitled option</em>}
             </span>
             {isEmpty ? (
-                <span className="text-xs text-gray-400 italic flex-shrink-0 mr-1">No items</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 italic flex-shrink-0 mr-1">No items</span>
             ) : (
-                <span className="hidden sm:inline text-xs text-gray-400 flex-shrink-0 mr-1">{option.items.length} items</span>
+                <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 mr-1">{option.items.length} items</span>
             )}
         </>
     )
     return (
-        <div data-testid="option-section" className="bg-gray-50 rounded-lg p-3">
+        <div data-testid="option-section" className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
             <div className={`flex items-center${isExpanded ? ' mb-2' : ''}`}>
                 {!canExpand ? (
                     <div className="flex items-center gap-2 flex-1 text-left min-w-0">
@@ -812,7 +812,7 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
                         <button
                             type="button"
                             onClick={onEdit}
-                            className="p-1 text-gray-300 hover:text-gray-600 rounded"
+                            className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 rounded"
                             title="Edit option"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -822,7 +822,7 @@ export function OptionSection({ option, people, sectionDefaultLabel, allItemName
                         <button
                             type="button"
                             onClick={() => setShowDeleteModal(true)}
-                            className="p-1 text-gray-300 hover:text-red-400 rounded"
+                            className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 rounded"
                             title="Delete option"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -874,16 +874,16 @@ function DeleteConfirmModal({ title = 'Delete question?', body = 'This will perm
             onKeyDown={e => { if (e.key === 'Escape') onCancel() }}
         >
             <div
-                className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"
+                className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm p-6"
                 onClick={e => e.stopPropagation()}
             >
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">{title}</h2>
-                <p className="text-sm text-gray-500 mb-6">{body}</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{title}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{body}</p>
                 <div className="flex justify-end gap-3">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100"
+                        className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                         Cancel
                     </button>
@@ -914,7 +914,7 @@ function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
                 <DropdownMenu.Trigger asChild>
                     <button
                         type="button"
-                        className="p-2 text-gray-400 hover:text-gray-700 rounded"
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded"
                         title="More actions"
                     >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -928,31 +928,31 @@ function QuestionContextMenu({ onMoveUp, onMoveDown, onEdit, onDelete }: {
                     <DropdownMenu.Content
                         align="end"
                         sideOffset={4}
-                        className="w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50"
+                        className="w-40 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50"
                     >
                         <DropdownMenu.Item
                             onSelect={onEdit}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none"
                         >
                             Edit
                         </DropdownMenu.Item>
                         <DropdownMenu.Item
                             onSelect={onMoveUp}
                             disabled={!onMoveUp}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
                         >
                             Move Up
                         </DropdownMenu.Item>
                         <DropdownMenu.Item
                             onSelect={onMoveDown}
                             disabled={!onMoveDown}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-default outline-none data-[disabled]:text-gray-300 data-[disabled]:pointer-events-none"
                         >
                             Move Down
                         </DropdownMenu.Item>
                         <DropdownMenu.Item
                             onSelect={e => { e.preventDefault(); setShowDeleteModal(true) }}
-                            className="px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 cursor-default outline-none"
+                            className="px-4 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-default outline-none"
                         >
                             Delete
                         </DropdownMenu.Item>
@@ -1002,23 +1002,23 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
     const moveUp = canMoveUp ? () => onMove(question.id, 'up') : undefined
     const moveDown = canMoveDown ? () => onMove(question.id, 'down') : undefined
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="flex items-stretch">
                 <button
                     type="button"
                     onClick={() => setIsExpanded(e => !e)}
-                    className="flex items-center gap-3 flex-1 text-left px-4 py-4 sm:px-6 min-w-0 hover:bg-gray-50 transition-colors duration-150"
+                    className="flex items-center gap-3 flex-1 text-left px-4 py-4 sm:px-6 min-w-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150"
                 >
                     <svg
-                        className={`w-5 h-5 text-gray-400 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    <span className="font-medium text-gray-900 flex-1 min-w-0">
-                        {question.text || <em className="text-gray-400 font-normal">Untitled question</em>}
+                    <span className="font-medium text-gray-900 dark:text-gray-100 flex-1 min-w-0">
+                        {question.text || <em className="text-gray-400 dark:text-gray-500 font-normal">Untitled question</em>}
                     </span>
-                    <span className="hidden sm:inline text-xs text-gray-400 flex-shrink-0 mr-2">{question.options.length} options</span>
+                    <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 mr-2">{question.options.length} options</span>
                 </button>
                 <div className="flex items-center pr-3 flex-shrink-0">
                     {/* Mobile: context menu */}
@@ -1036,7 +1036,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                             type="button"
                             onClick={moveUp}
                             disabled={!canMoveUp}
-                            className={`p-1.5 rounded ${canMoveUp ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${canMoveUp ? 'text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400' : 'text-gray-100 cursor-not-allowed'}`}
                             title="Move up"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1047,7 +1047,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                             type="button"
                             onClick={moveDown}
                             disabled={!canMoveDown}
-                            className={`p-1.5 rounded ${canMoveDown ? 'text-gray-300 hover:text-gray-600' : 'text-gray-100 cursor-not-allowed'}`}
+                            className={`p-1.5 rounded ${canMoveDown ? 'text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400' : 'text-gray-100 cursor-not-allowed'}`}
                             title="Move down"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1057,7 +1057,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                         <button
                             type="button"
                             onClick={handleEdit}
-                            className="p-1.5 text-gray-300 hover:text-gray-600 rounded"
+                            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 rounded"
                             title="Edit question"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1067,7 +1067,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                         <button
                             type="button"
                             onClick={() => setShowDeleteModal(true)}
-                            className="p-1.5 text-gray-300 hover:text-red-400 rounded"
+                            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 rounded"
                             title="Delete question"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1102,7 +1102,7 @@ const QuestionSection = memo(function QuestionSection({ question, people, canMov
                     <button
                         type="button"
                         onClick={() => onAddOption(question.id)}
-                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                        className="w-full py-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-400 dark:text-gray-500 hover:border-primary-300 dark:hover:border-primary-700 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
                     >
                         + Add Option
                     </button>
@@ -1140,7 +1140,7 @@ const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections
     const hasExpandedRef = useRef(isExpanded)
     if (isExpanded) hasExpandedRef.current = true
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <div className="flex items-center">
                 <button
                     type="button"
@@ -1148,14 +1148,14 @@ const AlwaysSection = memo(function AlwaysSection({ items, people, emptySections
                     className="flex items-center gap-2 flex-1 text-left min-w-0"
                 >
                     <svg
-                        className={`w-5 h-5 text-gray-400 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                     <span className="flex flex-col min-w-0">
-                        <span className="font-medium text-gray-900">Always Needed Items</span>
-                        <span className="hidden sm:inline text-sm font-normal text-gray-500">{items.length} items</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Always Needed Items</span>
+                        <span className="hidden sm:inline text-sm font-normal text-gray-500 dark:text-gray-400">{items.length} items</span>
                     </span>
                 </button>
             </div>
@@ -1222,12 +1222,12 @@ function OptionEditModal({ option, onSave, onClose }: {
             onClick={onClose}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                         {option ? 'Edit Option' : 'Add Option'}
                     </h2>
-                    <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">Answer text</label>
+                    <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Answer text</label>
                     <input
                         id={fieldId}
                         autoFocus
@@ -1235,11 +1235,11 @@ function OptionEditModal({ option, onSave, onClose }: {
                         value={text}
                         onChange={e => setText(e.target.value)}
                         placeholder="e.g. Yes"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-5"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-5"
                         onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
                     />
                     <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                             Cancel
                         </button>
                         <button
@@ -1311,9 +1311,9 @@ export function PeopleModal({ people, onSave, onClose, session }: {
             {/* Bounded and scrollable: a household of five with an appearance
                 panel open is taller than a phone, and a modal that runs off the
                 bottom takes Save with it. */}
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Edit People</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Edit People</h2>
                     <div className="space-y-2 mb-3">
                         {localPeople.map((person, i) => {
                             const identity = personIdentityAt(person, i, personPhoto)
@@ -1338,14 +1338,14 @@ export function PeopleModal({ people, onSave, onClose, session }: {
                                         value={person.name}
                                         onChange={e => updateName(i, e.target.value)}
                                         placeholder={`Person ${i + 1}`}
-                                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         onKeyDown={e => { if (e.key === 'Enter') addPerson() }}
                                     />
                                     {localPeople.length > 1 && (
                                         <button
                                             type="button"
                                             onClick={() => removePerson(i)}
-                                            className="text-gray-300 hover:text-red-400 text-xl leading-none shrink-0"
+                                            className="text-gray-300 dark:text-gray-600 hover:text-red-400 text-xl leading-none shrink-0"
                                             title="Remove person"
                                         >
                                             ×
@@ -1360,14 +1360,14 @@ export function PeopleModal({ people, onSave, onClose, session }: {
                                             title="Birthday (optional) — used to keep age-based items up to date"
                                             value={person.dateOfBirth ?? ''}
                                             onChange={e => updateDob(i, e.target.value)}
-                                            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         />
                                         <select
                                             aria-label={`Age group for ${person.name || `Person ${i + 1}`}`}
                                             title="Age group — change it manually if they're ready for the next one early"
                                             value={person.ageRange ?? ''}
                                             onChange={e => updateAgeRange(i, e.target.value)}
-                                            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                            className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         >
                                             <option value="">Age group…</option>
                                             {AGE_RANGE_OPTIONS.map(option => (
@@ -1391,16 +1391,16 @@ export function PeopleModal({ people, onSave, onClose, session }: {
                             )
                         })}
                     </div>
-                    <p className="text-xs text-gray-400 mb-3">Tap someone's circle to change their colour, emoji or photo — it follows them onto every packing list. Birthdays are optional: add one and we'll suggest packing-item updates as they grow, or bump the age group early if they're ready for it.</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Tap someone's circle to change their colour, emoji or photo — it follows them onto every packing list. Birthdays are optional: add one and we'll suggest packing-item updates as they grow, or bump the age group early if they're ready for it.</p>
                     <button
                         type="button"
                         onClick={addPerson}
-                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors mb-4"
+                        className="w-full py-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-xs text-gray-400 dark:text-gray-500 hover:border-primary-300 dark:hover:border-primary-700 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors mb-4"
                     >
                         + Add Person
                     </button>
                     <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                             Cancel
                         </button>
                         <button type="button" onClick={() => onSave(localPeople)} className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">
@@ -1440,29 +1440,29 @@ function QuestionModal({ question, onSave, onClose }: {
             onClick={onClose}
             onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="p-5">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                         {question ? 'Edit Question' : 'Add Question'}
                     </h2>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Question text</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Question text</label>
                     <input
                         autoFocus
                         type="text"
                         value={text}
                         onChange={e => setText(e.target.value)}
                         placeholder="e.g. Are you going to a hot climate?"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
                         onKeyDown={e => { if (e.key === 'Enter' && text.trim()) onSave(text.trim(), type) }}
                     />
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Answer type</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Answer type</label>
                     <div className="flex gap-2 mb-5">
                         {(['single-choice', 'multiple-choice'] as QuestionType[]).map(t => (
                             <button
                                 key={t}
                                 type="button"
                                 onClick={() => setType(t)}
-                                className={`flex-1 py-2 rounded-lg text-sm border-2 transition-colors ${type === t ? 'border-primary-400 bg-primary-50 text-primary-900 font-medium' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                className={`flex-1 py-2 rounded-lg text-sm border-2 transition-colors ${type === t ? 'border-primary-400 dark:border-primary-600 bg-primary-50 dark:bg-primary-950/40 text-primary-900 dark:text-primary-200 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'}`}
                             >
                                 {t === 'single-choice' ? 'Single choice' : 'Multiple choice'}
                             </button>
@@ -1472,7 +1472,7 @@ function QuestionModal({ question, onSave, onClose }: {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
+                            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
                             Cancel
                         </button>
@@ -1959,7 +1959,7 @@ export function QuestionsPage() {
     const activeQuestions = useMemo(() => (data?.questions ?? []).filter(q => !q.deletedAt), [data])
     const activeAlwaysNeededItems = useMemo(() => (data?.alwaysNeededItems ?? []).filter(i => !i.deletedAt), [data])
 
-    if (error) return <div className="p-8 text-red-600">Error: {error}</div>
+    if (error) return <div className="p-8 text-red-600 dark:text-red-400">Error: {error}</div>
     // An empty set on a device that has never synced isn't an answer yet: the
     // login sync may be about to bring the user's real questions. Showing them
     // "you have no questions" first, and a full set a moment later, would read
@@ -1980,9 +1980,9 @@ export function QuestionsPage() {
                     still being read, so anything that changes makes sense. */}
                 {isCheckingPod && <PodSyncIndicator />}
                 <div className="mb-2">
-                    <h1 className="text-2xl font-bold text-gray-900">{isForeign ? 'Questions & Items' : 'My Questions & Items'}</h1>
-                    <p className="mt-1 text-gray-600 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
-                    {!isForeign && <p className="mt-1 text-xs text-gray-400">Want to start from scratch? <Link to="/wizard" className="text-primary-600 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{isForeign ? 'Questions & Items' : 'My Questions & Items'}</h1>
+                    <p className="mt-1 text-gray-600 dark:text-gray-400 text-sm">Customise the questions and packing items that generate your lists. Changes here affect all future packing lists you create.</p>
+                    {!isForeign && <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Want to start from scratch? <Link to="/wizard" className="text-primary-600 dark:text-primary-400 hover:underline">Redo the setup wizard</Link> to regenerate your questions.</p>}
                 </div>
                 {!isForeign && (
                     <AgePromotionCard
@@ -2056,7 +2056,7 @@ export function QuestionsPage() {
                     <button
                         type="button"
                         onClick={() => setQuestionModal({ question: null })}
-                        className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                        className="w-full py-3 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:border-primary-300 dark:hover:border-primary-700 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
                     >
                         + Add Question
                     </button>

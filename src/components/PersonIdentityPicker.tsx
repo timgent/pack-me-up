@@ -27,9 +27,9 @@ export function PersonIdentityPicker({ personName, selectedColor, selectedEmoji,
 }) {
     const emojiChoices = [...PERSON_EMOJI, ...EXTRA_PERSON_EMOJI]
     return (
-        <div className="mt-2 ml-9 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div className="mt-2 ml-9 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
             <div>
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Colour</p>
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Colour</p>
                 <div role="group" aria-label={`Colour for ${personName}`} className="grid grid-cols-6 gap-1.5">
                     {PERSON_COLORS.map(color => {
                         const isSelected = color.id === selectedColor.id
@@ -51,7 +51,7 @@ export function PersonIdentityPicker({ personName, selectedColor, selectedEmoji,
             </div>
 
             <div>
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Emoji</p>
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Emoji</p>
                 <div role="group" aria-label={`Emoji for ${personName}`} className="grid grid-cols-6 gap-1.5">
                     {/* First, so the way back to a plain initial is where the eye
                         lands rather than at the end of two dozen creatures. */}
@@ -75,7 +75,7 @@ export function PersonIdentityPicker({ personName, selectedColor, selectedEmoji,
                                 aria-label={choice.label}
                                 aria-pressed={isSelected}
                                 title={choice.label}
-                                className={`h-7 w-7 rounded-full flex items-center justify-center text-sm bg-white border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 ${isSelected ? `border-transparent ring-2 ring-offset-1 ${selectedColor.ring}` : 'border-gray-200'}`}
+                                className={`h-7 w-7 rounded-full flex items-center justify-center text-sm bg-white dark:bg-gray-900 border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 ${isSelected ? `border-transparent ring-2 ring-offset-1 ${selectedColor.ring}` : 'border-gray-200 dark:border-gray-700'}`}
                             >
                                 {choice.emoji}
                             </button>
@@ -85,7 +85,7 @@ export function PersonIdentityPicker({ personName, selectedColor, selectedEmoji,
             </div>
 
             <div>
-                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
                     Solid WebID
                     <input
                         type="url"
@@ -94,10 +94,10 @@ export function PersonIdentityPicker({ personName, selectedColor, selectedEmoji,
                         onChange={event => onChangeWebId(event.target.value)}
                         placeholder="https://example.org/profile/card#me"
                         aria-label={`Solid WebID for ${personName}`}
-                        className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-normal normal-case tracking-normal text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 px-2 py-1.5 text-sm font-normal normal-case tracking-normal text-gray-600 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                 </label>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">
                     Has their own pod? Paste their WebID and their profile photo becomes their avatar.
                 </p>
             </div>

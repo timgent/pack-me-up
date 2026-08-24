@@ -59,27 +59,27 @@ export function UpdateFromQuestionsModal({
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Update from questions">
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Your questions have new items that match this trip. Choose which to add.
             </p>
             <div className="max-h-96 overflow-y-auto space-y-4">
                 {groups.map(group => (
                     <div key={group.label}>
-                        <p className="text-sm font-semibold text-gray-700 mb-2">{group.label}</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{group.label}</p>
                         <div className="space-y-1">
                             {group.items.map(item => (
-                                <label key={item.id} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                                <label key={item.id} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         aria-label={`Add ${item.itemText}${item.personName ? ` for ${item.personName}` : ''}`}
                                         checked={!excludedIds.has(item.id)}
                                         onChange={() => toggle(item.id)}
-                                        className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                        className="h-4 w-4 text-blue-600 dark:text-blue-400 rounded focus:ring-2 focus:ring-blue-500"
                                     />
-                                    <span className="text-gray-900">
+                                    <span className="text-gray-900 dark:text-gray-100">
                                         {item.itemText}
                                         {item.quantity !== undefined && (
-                                            <span className="ml-1.5 text-sm text-gray-500">×{item.quantity}</span>
+                                            <span className="ml-1.5 text-sm text-gray-500 dark:text-gray-400">×{item.quantity}</span>
                                         )}
                                     </span>
                                 </label>

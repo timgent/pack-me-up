@@ -148,23 +148,23 @@ export const Wizard = () => {
     return (
         <div className="max-w-3xl mx-auto">
             <div className="mb-8 text-center animate-slide-up">
-                <h1 className="text-4xl font-bold mb-4 text-primary-900">
+                <h1 className="text-4xl font-bold mb-4 text-primary-900 dark:text-primary-200">
                     Create Your Packing Questions
                 </h1>
-                <p className="text-lg text-gray-700">
+                <p className="text-lg text-gray-700 dark:text-gray-300">
                     Tell us who you travel with — we'll generate a starter set of packing questions tailored to your group.
                 </p>
-                <p className="text-sm text-gray-500 mt-2 italic">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 italic">
                     Do this once to get started. Afterwards, fine-tune your questions and packing items from 'My Questions &amp; Items' to match exactly what you need.
                 </p>
             </div>
 
             {hasExistingData && (
-                <div className="mb-6 p-4 bg-warning-50 border-2 border-warning-300 rounded-2xl">
-                    <p className="text-warning-900 font-semibold">
+                <div className="mb-6 p-4 bg-warning-50 dark:bg-warning-950/40 border-2 border-warning-300 dark:border-warning-700 rounded-2xl">
+                    <p className="text-warning-900 dark:text-warning-200 font-semibold">
                         ⚠️ You already have packing list questions set up. Completing this wizard will replace them.
                     </p>
-                    <p className="text-sm text-warning-800 mt-1">
+                    <p className="text-sm text-warning-800 dark:text-warning-200 mt-1">
                         To keep your existing questions, go to{' '}
                         <Link to="/manage-questions" className="underline font-semibold">Edit Questions</Link> instead.
                     </p>
@@ -173,16 +173,16 @@ export const Wizard = () => {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 {/* People Section */}
-                <div className="bg-white p-6 rounded-2xl shadow-soft border-2 border-primary-200">
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-soft border-2 border-primary-200 dark:border-primary-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold text-primary-900">👥 Who's Packing?</h2>
-                        <span className="text-sm text-gray-600 font-medium">
+                        <h2 className="text-2xl font-bold text-primary-900 dark:text-primary-200">👥 Who's Packing?</h2>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                             {fields.length} in your group
                         </span>
                     </div>
 
                     {isPrefilled && (
-                        <p className="mb-4 text-sm text-gray-600">
+                        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
                             We've filled in the people from your current setup — add, remove or change anyone before generating.
                         </p>
                     )}
@@ -192,32 +192,32 @@ export const Wizard = () => {
                             const dob = field.kind === 'person' ? watch(`people.${index}.dateOfBirth`) : undefined
                             const derivedAgeRange = dob ? deriveAgeRange(dob) : undefined
                             return (
-                            <div key={field.id} className="bg-primary-50 p-4 rounded-xl border border-primary-200">
+                            <div key={field.id} className="bg-primary-50 dark:bg-primary-950/40 p-4 rounded-xl border border-primary-200 dark:border-primary-800">
                                 <div className="flex items-start gap-4">
                                     <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label htmlFor={`person-name-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
+                                            <label htmlFor={`person-name-${index}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                 Name
                                             </label>
                                             <input
                                                 id={`person-name-${index}`}
                                                 type="text"
                                                 {...register(`people.${index}.name`)}
-                                                className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-primary-500 dark:focus:border-primary-600 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-all"
                                             />
                                             {errors.people?.[index]?.name && (
-                                                <p className="text-danger-500 text-sm mt-1">{errors.people[index]?.name?.message}</p>
+                                                <p className="text-danger-500 dark:text-danger-400 text-sm mt-1">{errors.people[index]?.name?.message}</p>
                                             )}
                                         </div>
                                         {field.kind === 'pet' ? (
                                             <div>
-                                                <label htmlFor={`person-species-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
+                                                <label htmlFor={`person-species-${index}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                     Species
                                                 </label>
                                                 <select
                                                     id={`person-species-${index}`}
                                                     {...register(`people.${index}.species`)}
-                                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                    className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-primary-500 dark:focus:border-primary-600 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-all"
                                                 >
                                                     <option value="">Select species...</option>
                                                     {PET_SPECIES_OPTIONS.map(option => (
@@ -227,14 +227,14 @@ export const Wizard = () => {
                                                     ))}
                                                 </select>
                                                 {errors.people?.[index] && 'species' in errors.people[index]! && (
-                                                    <p className="text-danger-500 text-sm mt-1">Species is required</p>
+                                                    <p className="text-danger-500 dark:text-danger-400 text-sm mt-1">Species is required</p>
                                                 )}
                                             </div>
                                         ) : (
                                             <>
                                                 <div>
-                                                    <label htmlFor={`person-birthday-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
-                                                        Birthday <span className="text-gray-400 font-normal">(optional)</span>
+                                                    <label htmlFor={`person-birthday-${index}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                                        Birthday <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
                                                     </label>
                                                     <input
                                                         id={`person-birthday-${index}`}
@@ -245,20 +245,20 @@ export const Wizard = () => {
                                                                 if (derived) setValue(`people.${index}.ageRange`, derived)
                                                             },
                                                         })}
-                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-primary-500 dark:focus:border-primary-600 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-all"
                                                     />
                                                     {derivedAgeRange && (
-                                                        <p className="text-xs text-gray-500 mt-1">Age group filled in from birthday — adjust it if they're ahead or behind</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Age group filled in from birthday — adjust it if they're ahead or behind</p>
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label htmlFor={`person-age-range-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <label htmlFor={`person-age-range-${index}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                         Age Range
                                                     </label>
                                                     <select
                                                         id={`person-age-range-${index}`}
                                                         {...register(`people.${index}.ageRange`)}
-                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-primary-500 dark:focus:border-primary-600 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-all"
                                                     >
                                                         <option value="">Select age range...</option>
                                                         {AGE_RANGE_OPTIONS.map(option => (
@@ -268,17 +268,17 @@ export const Wizard = () => {
                                                         ))}
                                                     </select>
                                                     {errors.people?.[index] && 'ageRange' in errors.people[index]! && (
-                                                        <p className="text-danger-500 text-sm mt-1">{(errors.people[index] as { ageRange?: { message?: string } }).ageRange?.message}</p>
+                                                        <p className="text-danger-500 dark:text-danger-400 text-sm mt-1">{(errors.people[index] as { ageRange?: { message?: string } }).ageRange?.message}</p>
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label htmlFor={`person-gender-${index}`} className="block text-sm font-semibold text-gray-700 mb-2">
+                                                    <label htmlFor={`person-gender-${index}`} className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                                         Gender
                                                     </label>
                                                     <select
                                                         id={`person-gender-${index}`}
                                                         {...register(`people.${index}.gender`)}
-                                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
+                                                        className="w-full px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:border-primary-500 dark:focus:border-primary-600 focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 transition-all"
                                                     >
                                                         <option value="">Select gender...</option>
                                                         {GENDER_OPTIONS.map(option => (
@@ -294,7 +294,7 @@ export const Wizard = () => {
                                     <button
                                         type="button"
                                         onClick={() => handleRemovePerson(index)}
-                                        className="mt-8 p-2 text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
+                                        className="mt-8 p-2 text-danger-500 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-950/40 rounded-lg transition-colors"
                                         title={field.kind === 'pet' ? 'Remove pet' : 'Remove person'}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -311,7 +311,7 @@ export const Wizard = () => {
                         <button
                             type="button"
                             onClick={handleAddPerson}
-                            className="w-full py-3 px-4 border-2 border-dashed border-primary-300 rounded-xl text-primary-700 font-semibold hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            className="w-full py-3 px-4 border-2 border-dashed border-primary-300 dark:border-primary-700 rounded-xl text-primary-700 dark:text-primary-300 font-semibold hover:border-primary-500 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all duration-200 flex items-center justify-center gap-2"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -321,7 +321,7 @@ export const Wizard = () => {
                         <button
                             type="button"
                             onClick={handleAddPet}
-                            className="w-full py-3 px-4 border-2 border-dashed border-primary-300 rounded-xl text-primary-700 font-semibold hover:border-primary-500 hover:bg-primary-50 transition-all duration-200 flex items-center justify-center gap-2"
+                            className="w-full py-3 px-4 border-2 border-dashed border-primary-300 dark:border-primary-700 rounded-xl text-primary-700 dark:text-primary-300 font-semibold hover:border-primary-500 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-all duration-200 flex items-center justify-center gap-2"
                         >
                             <span className="text-lg leading-none">🐾</span>
                             Add a Pet
@@ -329,7 +329,7 @@ export const Wizard = () => {
                     </div>
 
                     {errors.people && typeof errors.people.message === 'string' && (
-                        <p className="text-danger-500 text-sm mt-2">{errors.people.message}</p>
+                        <p className="text-danger-500 dark:text-danger-400 text-sm mt-2">{errors.people.message}</p>
                     )}
                 </div>
 
@@ -372,7 +372,7 @@ Are you sure you want to continue?"
                             {revealSteps.slice(0, revealedCount).map(step => (
                                 <li
                                     key={step.personId}
-                                    className="reveal-line flex gap-2 text-gray-700 break-words"
+                                    className="reveal-line flex gap-2 text-gray-700 dark:text-gray-300 break-words"
                                 >
                                     <span aria-hidden="true">✨</span>
                                     <span className="flex-1 min-w-0">{step.text}</span>
@@ -385,7 +385,7 @@ Are you sure you want to continue?"
                         <div className="flex justify-center">
                             <button
                                 onClick={handleSkipReveal}
-                                className="text-sm font-semibold text-primary-700 underline hover:text-primary-900"
+                                className="text-sm font-semibold text-primary-700 dark:text-primary-300 underline hover:text-primary-900 dark:hover:text-primary-200"
                             >
                                 Skip ›
                             </button>
@@ -395,12 +395,12 @@ Are you sure you want to continue?"
                     {isRevealComplete && (
                         <>
                             {summary && (
-                                <p className="text-center font-bold text-primary-900 break-words">
+                                <p className="text-center font-bold text-primary-900 dark:text-primary-200 break-words">
                                     {summary.text}
                                 </p>
                             )}
 
-                            <p className="text-gray-700 text-center">
+                            <p className="text-gray-700 dark:text-gray-300 text-center">
                                 Your starter questions are ready! Head to 'My Questions &amp; Items' to add, remove, or tweak them to match how you travel — then create your first list.
                             </p>
 
@@ -414,13 +414,13 @@ Are you sure you want to continue?"
 
                                 <button
                                     onClick={() => handleSuccessAction('/manage-questions')}
-                                    className="w-full text-primary-700 border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
+                                    className="w-full text-primary-700 dark:text-primary-300 border-2 border-primary-200 dark:border-primary-800 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
                                 >
                                     ✏️ Refine My Packing List Questions
                                 </button>
                             </div>
 
-                            <p className="text-sm text-gray-500 text-center mt-4">
+                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
                                 You can always access these options from the navigation menu above
                             </p>
                         </>

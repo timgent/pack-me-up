@@ -116,30 +116,30 @@ export function AgePromotionCard({ questionSet, onApply, manualTransitions, onMa
         .join(', ')
 
     const renderSuggestion = (s: PromotionSuggestion) => (
-        <label key={s.key} className="flex items-start gap-2 text-sm text-gray-700 bg-white rounded border border-violet-200 px-3 py-2">
+        <label key={s.key} className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 rounded border border-violet-200 dark:border-violet-800 px-3 py-2">
             <input
                 type="checkbox"
                 checked={!unchecked.has(s.key)}
                 onChange={() => toggleChecked(s.key)}
-                className="mt-0.5 h-4 w-4 text-violet-600 rounded focus:ring-2 focus:ring-violet-500"
+                className="mt-0.5 h-4 w-4 text-violet-600 dark:text-violet-400 rounded focus:ring-2 focus:ring-violet-500"
             />
             <span>
-                <span className="font-medium text-gray-900">{s.itemText}</span>
-                <span className="ml-2 text-xs text-gray-500">{s.contextLabel}</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{s.itemText}</span>
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{s.contextLabel}</span>
             </span>
         </label>
     )
 
     return (
-        <div className="bg-violet-50 rounded-lg border border-violet-200 p-4">
+        <div className="bg-violet-50 dark:bg-violet-950/40 rounded-lg border border-violet-200 dark:border-violet-800 p-4">
             <div className="flex items-start justify-between gap-4">
-                <p className="text-violet-900 font-medium">🎂 Time flies — {summary}! Want to update their packing items?</p>
+                <p className="text-violet-900 dark:text-violet-200 font-medium">🎂 Time flies — {summary}! Want to update their packing items?</p>
                 <button
                     type="button"
                     aria-label="Dismiss age update"
                     title="Don't ask again for this age change"
                     onClick={handleDismiss}
-                    className="text-violet-600 hover:text-violet-900 text-xl leading-none flex-shrink-0"
+                    className="text-violet-600 dark:text-violet-400 hover:text-violet-900 dark:hover:text-violet-200 text-xl leading-none flex-shrink-0"
                 >
                     ×
                 </button>
@@ -148,7 +148,7 @@ export function AgePromotionCard({ questionSet, onApply, manualTransitions, onMa
                 <button
                     type="button"
                     onClick={() => setIsExpanded(true)}
-                    className="mt-2 text-sm text-violet-700 underline"
+                    className="mt-2 text-sm text-violet-700 dark:text-violet-300 underline"
                 >
                     Review changes
                 </button>
@@ -156,21 +156,21 @@ export function AgePromotionCard({ questionSet, onApply, manualTransitions, onMa
                 <div className="mt-4 space-y-5">
                     {byPerson.map(({ transition, ageOut, ageIn }) => (
                         <div key={transition.person.id}>
-                            <p className="text-sm text-violet-800 font-semibold">
+                            <p className="text-sm text-violet-800 dark:text-violet-200 font-semibold">
                                 {transition.person.name}: {bracketLabel(transition.from)} → {bracketLabel(transition.to)}
                             </p>
                             {ageOut.length === 0 && ageIn.length === 0 && (
-                                <p className="mt-1 text-sm text-violet-700">No item changes suggested — we'll just remember the new age bracket.</p>
+                                <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">No item changes suggested — we'll just remember the new age bracket.</p>
                             )}
                             {ageOut.length > 0 && (
                                 <div className="mt-2">
-                                    <p className="text-xs uppercase tracking-wide text-violet-600 font-semibold mb-1">Outgrown — untick to keep</p>
+                                    <p className="text-xs uppercase tracking-wide text-violet-600 dark:text-violet-400 font-semibold mb-1">Outgrown — untick to keep</p>
                                     <div className="space-y-1.5">{ageOut.map(renderSuggestion)}</div>
                                 </div>
                             )}
                             {ageIn.length > 0 && (
                                 <div className="mt-2">
-                                    <p className="text-xs uppercase tracking-wide text-violet-600 font-semibold mb-1">Suggested for their new age</p>
+                                    <p className="text-xs uppercase tracking-wide text-violet-600 dark:text-violet-400 font-semibold mb-1">Suggested for their new age</p>
                                     <div className="space-y-1.5">{ageIn.map(renderSuggestion)}</div>
                                 </div>
                             )}
@@ -180,7 +180,7 @@ export function AgePromotionCard({ questionSet, onApply, manualTransitions, onMa
                         <button
                             type="button"
                             onClick={() => setIsExpanded(false)}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-violet-100"
+                            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg hover:bg-violet-100 dark:hover:bg-violet-900/40"
                         >
                             Not now
                         </button>
