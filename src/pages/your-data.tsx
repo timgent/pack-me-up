@@ -6,6 +6,7 @@ import { Button } from '../components/Button'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 import { getPrimaryPodUrl } from '../services/solidPod'
 import { deleteAllLocalData, deleteAllPodData } from '../services/dataDeletion'
+import { SignInHistory } from '../components/SignInHistory'
 
 const SUPPORT_EMAIL = 'tim.packmeup@gmail.com'
 
@@ -183,6 +184,8 @@ export function YourDataPage() {
                     .
                 </p>
             </section>
+
+            <SignInHistory />
 
             {pendingScope && (
                 <ConfirmationDialog

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SolidPodProvider, useSolidPod } from './SolidPodContext'
+import { ResilientSession } from '../services/ResilientSession'
 import { ToastProvider } from './ToastContext'
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -22,25 +23,46 @@ let mockAuthFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }
 let mockIsActive = false
 let mockWebId: string | undefined
 
-vi.mock('@uvdsl/solid-oidc-client-browser/core', () => ({
-    // Must use a regular function (not arrow) so vitest can call it as a constructor
-    SessionCore: vi.fn().mockImplementation(function(_clientDetails: unknown, options: typeof capturedCallbacks) {
-        capturedCallbacks = options ?? {}
-        return {
-            get isActive() { return mockIsActive },
-            get webId() { return mockWebId },
-            handleRedirectFromLogin: vi.fn().mockResolvedValue(undefined),
-            restore: vi.fn().mockResolvedValue(undefined),
-            login: vi.fn().mockResolvedValue(undefined),
-            logout: vi.fn().mockResolvedValue(undefined),
-            authFetch: mockAuthFetch,
-        }
-    }),
-}))
+vi.mock('../services/ResilientSession', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../services/ResilientSession')>()
+    return {
+        ...actual,
+        // Must use a regular function (not arrow) so vitest can call it as a constructor
+        ResilientSession: vi.fn().mockImplementation(function(
+            _clientDetails: unknown,
+            _database: unknown,
+            options: typeof capturedCallbacks,
+        ) {
+            capturedCallbacks = options ?? {}
+            return {
+                get isActive() { return mockIsActive },
+                get webId() { return mockWebId },
+                handleRedirectFromLogin: vi.fn().mockResolvedValue(undefined),
+                restore: vi.fn().mockResolvedValue(undefined),
+                login: vi.fn().mockResolvedValue(undefined),
+                logout: vi.fn().mockResolvedValue(undefined),
+                authFetch: mockAuthFetch,
+                hasStoredSession: vi.fn().mockResolvedValue(false),
+                needsRenewal: vi.fn().mockReturnValue(false),
+                scheduleRenewal: vi.fn(),
+                cancelRenewal: vi.fn(),
+            }
+        }),
+    }
+})
 
 vi.mock('@uvdsl/solid-oidc-client-browser', () => ({
     SessionIDB: vi.fn().mockImplementation(function() { return {} }),
 }))
+
+/** The ResilientSession instance the provider constructed. */
+function constructedSession() {
+    const ctor = vi.mocked(ResilientSession)
+    return ctor.mock.results[ctor.mock.results.length - 1].value as {
+        scheduleRenewal: ReturnType<typeof vi.fn>
+        cancelRenewal: ReturnType<typeof vi.fn>
+    }
+}
 
 function fireStateChange(isActive: boolean, webId?: string) {
     capturedCallbacks.onSessionStateChange?.(
@@ -272,10 +294,11 @@ describe('SolidPodContext', () => {
         })
     })
 
-    it('periodically calls authFetch to keep the session alive', async () => {
-        const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
-
-        render(<Wrapper><Consumer /></Wrapper>)
+    it('arms a renewal timer for the life of the session, and disarms it on logout', async () => {
+        // Keeping the session alive is the session object's job now: it renews on a
+        // timer pegged to the token's own expiry, rather than a fixed poll that
+        // could only ever notice a token already dead.
+        render(<Wrapper><ConsumerWithActions /></Wrapper>)
 
         await act(async () => {
             mockIsActive = true
@@ -287,18 +310,17 @@ describe('SolidPodContext', () => {
             expect(screen.getByTestId('isLoggedIn').textContent).toBe('true')
         })
 
-        const keepaliveCall = setIntervalSpy.mock.calls.find(([, delay]) => delay === 10 * 60 * 1000)
-        expect(keepaliveCall).toBeDefined()
+        const session = constructedSession()
+        expect(session.scheduleRenewal).toHaveBeenCalled()
 
-        mockAuthFetch.mockClear()
         await act(async () => {
-            await (keepaliveCall![0] as () => Promise<void>)()
+            screen.getByRole('button', { name: 'logout' }).click()
         })
 
-        expect(mockAuthFetch).toHaveBeenCalledWith(
-            'https://user.example.org/profile/card#me',
-            { method: 'HEAD' }
-        )
+        await waitFor(() => {
+            expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
+            expect(session.cancelRenewal).toHaveBeenCalled()
+        })
     })
 
     it('clearSessionExpired sets sessionExpired to false', async () => {
