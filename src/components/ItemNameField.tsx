@@ -15,6 +15,7 @@
  */
 import { useMemo, useState } from 'react'
 import { suggestFor, type ItemSuggestion, type SuggestionIndex } from '../utils/itemSuggestions'
+import { sectionHeading } from '../utils/sectionHeading'
 
 /** A composer field, bar the focus ring — each page brings its own accent. */
 export const FIELD_BASE = 'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2'
@@ -160,7 +161,7 @@ export function ItemNameField({
                                 <span className="truncate">{suggestion.text}</span>
                                 {suggestion.category && (
                                     <span className="shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                                        {suggestion.category}
+                                        {sectionHeading(suggestion.category)}
                                     </span>
                                 )}
                             </button>
