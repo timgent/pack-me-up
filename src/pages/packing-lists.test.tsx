@@ -940,6 +940,63 @@ describe('PackingLists past trips', () => {
         expect(current.className).not.toBe(past.className)
     })
 
+    it('keeps only the three most recently worked on undated lists in view', async () => {
+        const undated = (id: string, name: string, touchedDaysAgo: number) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00Z',
+            lastModified: new Date(Date.now() - touchedDaysAgo * 86_400_000).toISOString(),
+            items: [],
+        })
+
+        renderWithLists([
+            undated('l1', 'Touched today', 0),
+            undated('l2', 'Touched yesterday', 1),
+            undated('l3', 'Touched last week', 7),
+            undated('l4', 'Touched last month', 30),
+            undated('l5', 'Touched ages ago', 200),
+        ])
+
+        await screen.findByText(/Touched today/)
+        expect(screen.getByText(/Touched yesterday/)).toBeTruthy()
+        expect(screen.getByText(/Touched last week/)).toBeTruthy()
+        expect(screen.queryByText(/Touched last month/)).toBeNull()
+        expect(screen.queryByText(/Touched ages ago/)).toBeNull()
+    })
+
+    // "Past trips" would be a lie about a list folded for going quiet.
+    it('calls the folded section "Older trips" when it holds an undated list', async () => {
+        const undated = (id: string, name: string, touchedDaysAgo: number) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00Z',
+            lastModified: new Date(Date.now() - touchedDaysAgo * 86_400_000).toISOString(),
+            items: [],
+        })
+
+        renderWithLists([
+            undated('l1', 'A', 1),
+            undated('l2', 'B', 2),
+            undated('l3', 'C', 3),
+            undated('l4', 'D', 4),
+        ])
+
+        await screen.findByText(/A/)
+        expect(screen.getByRole('button', { name: /Older trips \(1\)/ })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Past trips/ })).toBeNull()
+    })
+
+    it('never folds a trip that is still ahead, however many there are', async () => {
+        renderWithLists(
+            Array.from({ length: 6 }, (_, i) =>
+                listWithDates(`l${i}`, `Trip ${i}`, daysFromToday(10 + i * 7), daysFromToday(14 + i * 7)))
+        )
+
+        await screen.findByText(/Trip 0/)
+        expect(screen.getByText(/Trip 5/)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /trips/i })).toBeNull()
+    })
+
     it('says why the main section is empty when only past trips are left', async () => {
         renderWithLists([listWithDates('l1', 'Last Winter', daysFromToday(-60), daysFromToday(-53))])
 

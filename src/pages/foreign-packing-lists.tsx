@@ -6,7 +6,7 @@ import { loadMultipleRdfFromPod, POD_CONTAINERS } from '../services/solidPod'
 import { datasetToPackingList } from '../services/rdfSerialization'
 import { LoadingState } from '../components/LoadingState'
 import type { PackingList } from '../create-packing-list/types'
-import { formatTripDates, tripIsPast } from '../create-packing-list/tripDetails'
+import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
 import { PastTripsSection } from '../components/PastTripsSection'
 
 export function ForeignPackingListsPage() {
@@ -58,10 +58,9 @@ export function ForeignPackingListsPage() {
         'from-success-50 to-success-100 border-success-300',
     ]
 
-    // Trips that have already finished are folded away below rather than
-    // dropped. An undated list is never past — see tripIsPast.
-    const currentLists = lists.filter(list => !tripIsPast(list.startDate, list.endDate))
-    const pastLists = lists.filter(list => tripIsPast(list.startDate, list.endDate))
+    // Finished trips, and undated lists that have gone quiet, are folded away
+    // below rather than dropped — see splitCurrentAndPastTrips.
+    const { current: currentLists, past: pastLists, allPastFinished } = splitCurrentAndPastTrips(lists)
 
     /**
      * One shared list card. `index` is the card's position across both
@@ -137,7 +136,7 @@ export function ForeignPackingListsPage() {
                     )}
 
                     {pastLists.length > 0 && (
-                        <PastTripsSection count={pastLists.length}>
+                        <PastTripsSection count={pastLists.length} allPastFinished={allPastFinished}>
                             {pastLists.map((list, index) => renderListCard(list, currentLists.length + index))}
                         </PastTripsSection>
                     )}

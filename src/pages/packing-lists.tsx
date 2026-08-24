@@ -15,7 +15,7 @@ import { packingListToDataset, deletedPackingListsToDataset } from '../services/
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { generateUUID } from '../utils/uuid'
-import { formatTripDates, tripIsPast } from '../create-packing-list/tripDetails'
+import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
 import { PastTripsSection } from '../components/PastTripsSection'
 
 type SharingStatus = 'public' | 'shared' | 'private'
@@ -174,10 +174,9 @@ export function PackingLists() {
         }).catch(() => {})
     }, [packingLists, isLoggedIn, session])
 
-    // Trips that have already finished still sit in the same list; they are
-    // just folded away below. An undated list is never past — see tripIsPast.
-    const currentLists = packingLists.filter(list => !tripIsPast(list.startDate, list.endDate))
-    const pastLists = packingLists.filter(list => tripIsPast(list.startDate, list.endDate))
+    // Finished trips, and undated lists that have gone quiet, are folded away
+    // below rather than dropped — see splitCurrentAndPastTrips.
+    const { current: currentLists, past: pastLists, allPastFinished } = splitCurrentAndPastTrips(packingLists)
 
     /**
      * One list card. `index` is the card's position across both sections, not
@@ -345,7 +344,7 @@ export function PackingLists() {
                     )}
 
                     {pastLists.length > 0 && (
-                        <PastTripsSection count={pastLists.length}>
+                        <PastTripsSection count={pastLists.length} allPastFinished={allPastFinished}>
                             {pastLists.map((list, index) => renderListCard(list, currentLists.length + index))}
                         </PastTripsSection>
                     )}
