@@ -36,14 +36,14 @@ export interface SectionAccent {
  * the same colour would suggest a link that isn't there.
  */
 export const SECTION_ACCENTS: readonly SectionAccent[] = [
-    { border: 'border-violet-200', header: 'bg-violet-50', text: 'text-violet-900', muted: 'text-violet-500', rail: 'bg-violet-400' },
-    { border: 'border-amber-200', header: 'bg-amber-50', text: 'text-amber-900', muted: 'text-amber-600', rail: 'bg-amber-400' },
-    { border: 'border-rose-200', header: 'bg-rose-50', text: 'text-rose-900', muted: 'text-rose-500', rail: 'bg-rose-400' },
-    { border: 'border-cyan-200', header: 'bg-cyan-50', text: 'text-cyan-900', muted: 'text-cyan-600', rail: 'bg-cyan-400' },
-    { border: 'border-lime-200', header: 'bg-lime-50', text: 'text-lime-900', muted: 'text-lime-600', rail: 'bg-lime-500' },
-    { border: 'border-fuchsia-200', header: 'bg-fuchsia-50', text: 'text-fuchsia-900', muted: 'text-fuchsia-500', rail: 'bg-fuchsia-400' },
-    { border: 'border-indigo-200', header: 'bg-indigo-50', text: 'text-indigo-900', muted: 'text-indigo-500', rail: 'bg-indigo-400' },
-    { border: 'border-orange-200', header: 'bg-orange-50', text: 'text-orange-900', muted: 'text-orange-600', rail: 'bg-orange-400' },
+    { border: 'border-violet-200 dark:border-violet-800', header: 'bg-violet-50 dark:bg-violet-950/40', text: 'text-violet-900 dark:text-violet-200', muted: 'text-violet-500 dark:text-violet-400', rail: 'bg-violet-400' },
+    { border: 'border-amber-200 dark:border-amber-800', header: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-900 dark:text-amber-200', muted: 'text-amber-600 dark:text-amber-400', rail: 'bg-amber-400' },
+    { border: 'border-rose-200 dark:border-rose-800', header: 'bg-rose-50 dark:bg-rose-950/40', text: 'text-rose-900 dark:text-rose-200', muted: 'text-rose-500 dark:text-rose-400', rail: 'bg-rose-400' },
+    { border: 'border-cyan-200 dark:border-cyan-800', header: 'bg-cyan-50 dark:bg-cyan-950/40', text: 'text-cyan-900 dark:text-cyan-200', muted: 'text-cyan-600 dark:text-cyan-400', rail: 'bg-cyan-400' },
+    { border: 'border-lime-200 dark:border-lime-800', header: 'bg-lime-50 dark:bg-lime-950/40', text: 'text-lime-900 dark:text-lime-200', muted: 'text-lime-600 dark:text-lime-400', rail: 'bg-lime-500' },
+    { border: 'border-fuchsia-200 dark:border-fuchsia-800', header: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', text: 'text-fuchsia-900 dark:text-fuchsia-200', muted: 'text-fuchsia-500 dark:text-fuchsia-400', rail: 'bg-fuchsia-400' },
+    { border: 'border-indigo-200 dark:border-indigo-800', header: 'bg-indigo-50 dark:bg-indigo-950/40', text: 'text-indigo-900 dark:text-indigo-200', muted: 'text-indigo-500 dark:text-indigo-400', rail: 'bg-indigo-400' },
+    { border: 'border-orange-200 dark:border-orange-800', header: 'bg-orange-50 dark:bg-orange-950/40', text: 'text-orange-900 dark:text-orange-200', muted: 'text-orange-600 dark:text-orange-400', rail: 'bg-orange-400' },
 ]
 
 /**
@@ -52,10 +52,10 @@ export const SECTION_ACCENTS: readonly SectionAccent[] = [
  * That way colour on this page always means "someone named this group".
  */
 export const DEFAULT_SECTION_ACCENT: SectionAccent = {
-    border: 'border-gray-200',
-    header: 'bg-gray-100',
-    text: 'text-gray-700',
-    muted: 'text-gray-400',
+    border: 'border-gray-200 dark:border-gray-700',
+    header: 'bg-gray-100 dark:bg-gray-800',
+    text: 'text-gray-700 dark:text-gray-300',
+    muted: 'text-gray-400 dark:text-gray-500',
     rail: 'bg-gray-300',
 }
 

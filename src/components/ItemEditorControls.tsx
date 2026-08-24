@@ -80,7 +80,7 @@ export const PersonToggles = memo(function PersonToggles({ item, people, layout,
                             onClick={() => onTogglePerson(personIdx)}
                             title={personTitle(person.name)}
                             aria-pressed={selected}
-                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? personColorFor(person, personIdx).avatar : PERSON_COLOR_OFF} ${isCommunal && selected ? 'ring-2 ring-blue-300 ring-offset-1' : ''}`}
+                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${selected ? personColorFor(person, personIdx).avatar : PERSON_COLOR_OFF} ${isCommunal && selected ? 'ring-2 ring-blue-300 dark:ring-blue-700 ring-offset-1' : ''}`}
                         >
                             {person.name.charAt(0).toUpperCase()}
                         </button>
@@ -98,7 +98,7 @@ export const PersonToggles = memo(function PersonToggles({ item, people, layout,
                 title={communalTitle}
                 aria-label={`Toggle shared for ${item.text || 'item'}`}
                 aria-pressed={isCommunal}
-                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${isCommunal ? 'bg-blue-600 text-white border-transparent' : 'bg-white border-gray-200 text-gray-400'}`}
+                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${isCommunal ? 'bg-blue-600 text-white border-transparent' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}
             >
                 <span className="text-lg font-bold leading-none">👥</span>
                 <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
@@ -114,7 +114,7 @@ export const PersonToggles = memo(function PersonToggles({ item, people, layout,
                         onClick={() => onTogglePerson(personIdx)}
                         title={personTitle(person.name)}
                         aria-pressed={selected}
-                        className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${selected ? `${personColorFor(person, personIdx).avatar} border-transparent` : 'bg-white border-gray-200 text-gray-400'}`}
+                        className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${selected ? `${personColorFor(person, personIdx).avatar} border-transparent` : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}
                     >
                         <span className="text-lg font-bold leading-none">
                             {person.name.charAt(0).toUpperCase()}
@@ -142,7 +142,7 @@ export const QuantityPanel = memo(function QuantityPanel({ item, onPerNight, onP
 }) {
     const hasRate = item.perNight !== undefined
     return (
-        <div className="w-full flex items-center gap-3 flex-wrap text-xs text-gray-600 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+        <div className="w-full flex items-center gap-3 flex-wrap text-xs text-gray-600 dark:text-gray-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 rounded-lg px-2.5 py-1.5">
             <span className="flex items-center gap-1.5">
                 Pack
                 <input
@@ -151,7 +151,7 @@ export const QuantityPanel = memo(function QuantityPanel({ item, onPerNight, onP
                     value={item.perNight ?? ''}
                     onChange={e => onPerNight(parseQty(e.target.value))}
                     aria-label={`Quantity to pack for ${item.text || 'item'}`}
-                    className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-12 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
                 per
                 <input
@@ -162,7 +162,7 @@ export const QuantityPanel = memo(function QuantityPanel({ item, onPerNight, onP
                     onChange={e => onPerNights(parseQty(e.target.value))}
                     disabled={!hasRate}
                     aria-label={`Number of nights per ${item.text || 'item'}`}
-                    className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-40"
+                    className="w-12 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-40"
                 />
                 night{(item.perNights ?? 1) > 1 ? 's' : ''}
             </span>
@@ -175,10 +175,10 @@ export const QuantityPanel = memo(function QuantityPanel({ item, onPerNight, onP
                     onChange={e => onMaxQuantity(parseQty(e.target.value))}
                     disabled={!hasRate}
                     aria-label={`Maximum quantity for ${item.text || 'item'}`}
-                    className="w-12 border border-gray-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-12 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
             </label>
-            <span className="text-gray-400">
+            <span className="text-gray-400 dark:text-gray-500">
                 e.g. socks: 1 per night; a jumper: 1 per 4 nights. Suggests a
                 quantity when a list has nights away — leave blank to skip
             </span>

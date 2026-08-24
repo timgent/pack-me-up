@@ -4,6 +4,7 @@ import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
 import { AccountMenu, ProfileBadge } from './AccountMenu'
+import { ThemeToggle } from './ThemeToggle'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
 
@@ -95,6 +96,7 @@ export const Navigation = () => {
                         </div>
                         {/* Solid Login/Logout section */}
                         <div className="hidden md:flex items-center gap-4">
+                            <ThemeToggle />
                             {isLoggedIn ? (
                                 <div className="flex items-center gap-3">
                                     {/*
@@ -114,12 +116,12 @@ export const Navigation = () => {
                                             className="text-sm font-medium bg-white/20 text-white rounded-lg px-2 py-1 border-0 focus:ring-0 cursor-pointer"
                                             aria-label="Switch context"
                                         >
-                                            <option value="__own__" className="text-gray-900">Your data</option>
+                                            <option value="__own__" className="text-gray-900 dark:text-gray-100">Your data</option>
                                             {sharedContexts.map(ctx => (
                                                 <option
                                                     key={ctx.podUrl}
                                                     value={encodeURIComponent(ctx.podUrl)}
-                                                    className="text-gray-900"
+                                                    className="text-gray-900 dark:text-gray-100"
                                                 >
                                                     {ctx.label ?? ctx.podUrl}
                                                 </option>
@@ -147,7 +149,8 @@ export const Navigation = () => {
                             )}
                         </div>
                         {/* Mobile menu button */}
-                        <div className="md:hidden">
+                        <div className="md:hidden flex items-center gap-1">
+                            <ThemeToggle />
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
                                 className="inline-flex items-center justify-center p-2.5 rounded-lg text-white hover:bg-white/20 focus:outline-none transition-all duration-200"
@@ -203,6 +206,7 @@ export const Navigation = () => {
                         >
                             Sharing
                         </Link>
+                        <ThemeToggle showLabel />
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">
                             {isLoggedIn ? (

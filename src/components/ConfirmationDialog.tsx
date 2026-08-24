@@ -25,7 +25,7 @@ export function ConfirmationDialog({
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="space-y-4">
-                <p className="text-gray-700 whitespace-pre-line">{message}</p>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{message}</p>
                 <div className="flex gap-3 justify-end mt-6">
                     <Button variant="ghost" onClick={onClose}>
                         {cancelText}

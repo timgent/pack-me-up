@@ -11,7 +11,7 @@ export function Button({ variant = 'primary', ...props }: ButtonProps) {
         primary: 'bg-gradient-primary text-white shadow-soft hover:shadow-glow-primary focus:ring-primary-500',
         secondary: 'bg-gradient-secondary text-white shadow-soft hover:shadow-glow-secondary focus:ring-secondary-500',
         danger: 'bg-gradient-to-r from-danger-500 to-danger-600 text-white shadow-soft hover:shadow-lg focus:ring-danger-500',
-        ghost: 'text-primary-700 hover:bg-primary-50 border-2 border-primary-200 hover:border-primary-400 focus:ring-primary-500'
+        ghost: 'text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/40 border-2 border-primary-200 dark:border-primary-800 hover:border-primary-400 dark:hover:border-primary-600 focus:ring-primary-500'
     }[variant]
 
     return (

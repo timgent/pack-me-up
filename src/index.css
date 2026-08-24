@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/*
+ * Dark mode follows a class on <html> rather than the media query, so a theme
+ * the user picked outlives the OS setting. ThemeContext puts the class there;
+ * the inline script in index.html gets it there before the first paint.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Primary - Very Dark Teal for navigation */
   --color-primary-950: #042f2e;
@@ -269,6 +276,11 @@ body {
   animation: loading-skeleton-sweep 1.6s ease-in-out infinite;
 }
 
+.dark .loading-skeleton-bar {
+  background-color: #1f2937;
+  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%);
+}
+
 /* Ticking an item is the move the user repeats hundreds of times a trip, so it
    gets a beat of acknowledgement — a green swell and a tick lifting out of the
    checkbox — before the row is whisked out of the unpacked list. Kept in step
@@ -289,8 +301,30 @@ body {
   100% { transform: translate(-50%, -135%) scale(1); opacity: 0; }
 }
 
+@keyframes item-packed-swell-dark {
+  0% { transform: scale(1); background-color: rgb(17 24 39); }
+  30% { transform: scale(1.02); background-color: rgb(6 78 59); }
+  70% { transform: scale(1); background-color: rgb(6 78 59); }
+  100% { transform: scale(1); background-color: rgb(17 24 39); }
+}
+
+@keyframes grid-cell-packed-dark {
+  0% { transform: scale(1); background-color: transparent; }
+  30% { transform: scale(1.06); background-color: rgb(6 78 59); }
+  70% { transform: scale(1); background-color: rgb(6 78 59); }
+  100% { transform: scale(1); background-color: transparent; }
+}
+
 .item-row-packed {
   animation: item-packed-swell 0.45s ease-out;
+}
+
+.dark .item-row-packed {
+  animation-name: item-packed-swell-dark;
+}
+
+.dark .grid-cell-packed {
+  animation-name: grid-cell-packed-dark;
 }
 
 .item-packed-tick {

@@ -142,15 +142,15 @@ export function PeopleFilterBar({
     if (columns.length <= 1 && sharedStat === undefined) return null
 
     return (
-        <div className="mt-1.5 flex items-center gap-2 border-t border-gray-100 pt-1.5">
+        <div className="mt-1.5 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 pt-1.5">
             {/* The words are worth 87px of a 390px screen, which is most of a
                 chip — so the phone gets the funnel and the room instead. */}
-            <span aria-hidden="true" className="shrink-0 text-gray-400 sm:hidden">
+            <span aria-hidden="true" className="shrink-0 text-gray-400 dark:text-gray-500 sm:hidden">
                 <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                     <path fillRule="evenodd" d="M2.6 4.2A1 1 0 0 1 3.5 3.6h13a1 1 0 0 1 .77 1.64l-4.77 5.6v4.2a1 1 0 0 1-.55.9l-2.4 1.2a1 1 0 0 1-1.45-.9v-5.4L2.33 5.24a1 1 0 0 1 .27-1.04Z" clipRule="evenodd" />
                 </svg>
             </span>
-            <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 sm:inline">
+            <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 sm:inline">
                 Packing for
             </span>
             <div className="relative min-w-0 flex-1">
@@ -177,13 +177,13 @@ export function PeopleFilterBar({
                             onClick={() => { if (!swallowLongPress()) onToggle(column.key) }}
                             className={`flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full border p-2 text-xs font-medium transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 ${
                                 isSelected
-                                    ? 'border-blue-500 bg-blue-600 text-white'
-                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                                    ? 'border-blue-500 dark:border-blue-600 bg-blue-600 text-white'
+                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                         >
                             <span className="relative shrink-0">
                                 {column.unassigned
-                                    ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">?</span>
+                                    ? <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-600 dark:text-gray-400">?</span>
                                     : <PersonAvatar name={column.name} identity={identity} initial={column.initial} />}
                                 {done && <DoneTick />}
                             </span>
@@ -215,8 +215,8 @@ export function PeopleFilterBar({
                             onClick={() => { if (!swallowLongPress()) onToggle(SHARED_FILTER_KEY) }}
                             className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full border p-2 text-base transition-colors sm:py-1.5 sm:pl-2 sm:pr-2.5 sm:text-xs sm:font-medium ${
                                 isSelected
-                                    ? 'border-blue-500 bg-blue-600 text-white'
-                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                                    ? 'border-blue-500 dark:border-blue-600 bg-blue-600 text-white'
+                                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                         >
                             <span className="relative shrink-0">

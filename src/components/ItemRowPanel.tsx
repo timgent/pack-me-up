@@ -95,7 +95,7 @@ export function ItemRowPanel({
                 title={item.lastMinute
                     ? 'Packed with everything else after all'
                     : "Can't be packed until just before you go"}
-                className={`rounded-md p-1.5 transition-colors hover:bg-amber-50 hover:text-amber-600 ${item.lastMinute ? 'text-amber-600' : 'text-gray-400'}`}
+                className={`rounded-md p-1.5 transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 ${item.lastMinute ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.5 2.5a1 1 0 101.414-1.414L11 9.586V6z" clipRule="evenodd" />
@@ -113,11 +113,11 @@ export function ItemRowPanel({
             {/* The modal centres its content on a phone, which is right for a
                 message and wrong for a form. */}
             <div className="space-y-4 text-left">
-                <p className="-mt-2 text-sm text-gray-500">
+                <p className="-mt-2 text-sm text-gray-500 dark:text-gray-400">
                     In {sectionTitle} · rename it, choose who needs one and how many, or remove it.
                 </p>
                 <div>
-                    <label htmlFor="item-row-name" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="item-row-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Name
                     </label>
                     <input
@@ -130,25 +130,25 @@ export function ItemRowPanel({
                             if (e.key === 'Enter') { e.preventDefault(); commitName() }
                             if (e.key === 'Escape') { e.preventDefault(); setDraftName(row.label) }
                         }}
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="mt-1 w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {row.items.length > 1 && (
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             Renaming changes it for everyone below
                         </p>
                     )}
                 </div>
 
                 {row.communal ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
                         <span aria-hidden="true">👥</span>
-                        <span className="flex-1 text-sm font-medium text-blue-900">
+                        <span className="flex-1 text-sm font-medium text-blue-900 dark:text-blue-200">
                             Shared — packed once for the whole group
                         </span>
                         {renderItemControls(row.items[0], 'the group')}
                     </div>
                 ) : (
-                    <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                         {columns.map((column, index) => {
                             const item = row.cells[index]
                             const packed = item !== undefined && packedById[item.id]
@@ -167,7 +167,7 @@ export function ItemRowPanel({
                                             // This one decides whether she has
                                             // one at all.
                                             aria-label={`${column.name} needs ${row.label}`}
-                                            className="h-5 w-5 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            className="h-5 w-5 shrink-0 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                                         />
                                         {!column.unassigned && (
                                             <PersonAvatar
@@ -177,11 +177,11 @@ export function ItemRowPanel({
                                                 size="sm"
                                             />
                                         )}
-                                        <span className={`truncate text-sm font-medium ${item ? 'text-gray-800' : 'text-gray-400'}`}>
+                                        <span className={`truncate text-sm font-medium ${item ? 'text-gray-800 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
                                             {column.name}
                                         </span>
                                         {packed && (
-                                            <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                                            <span className="shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                                                 packed
                                             </span>
                                         )}
@@ -197,14 +197,14 @@ export function ItemRowPanel({
                     <button
                         type="button"
                         onClick={() => onDeleteRow(row)}
-                        className="rounded-md px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                        className="rounded-md px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
                     >
                         {row.items.length > 1 ? `Remove for all ${row.items.length}` : 'Remove item'}
                     </button>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                         Done
                     </button>
@@ -248,7 +248,7 @@ function QuantityField({ item, label, onCommit }: {
             placeholder="Qty"
             aria-label={label}
             title="How many to pack (leave blank for one)"
-            className="w-14 shrink-0 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-14 shrink-0 rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
     )
 }

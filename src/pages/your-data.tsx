@@ -83,10 +83,10 @@ export function YourDataPage() {
     }
 
     return (
-        <div className="max-w-3xl mx-auto bg-white/60 rounded-2xl shadow-soft p-6 md:p-10 space-y-6">
+        <div className="max-w-3xl mx-auto bg-white/60 dark:bg-gray-900/60 rounded-2xl shadow-soft p-6 md:p-10 space-y-6">
             <div>
-                <h1 className="text-3xl font-bold text-primary-900 mb-1">Your data</h1>
-                <p className="text-gray-700">
+                <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200 mb-1">Your data</h1>
+                <p className="text-gray-700 dark:text-gray-300">
                     Pack Me Up keeps your packing lists on your own device, and — if you choose to sign
                     in — in a Solid Pod that belongs to you. There are no Pack Me Up servers holding your
                     lists. This page is where you delete any of it.
@@ -94,14 +94,14 @@ export function YourDataPage() {
             </div>
 
             <section className="space-y-3">
-                <h2 className="text-xl font-bold text-primary-900">On this device</h2>
-                <p className="text-gray-700">
+                <h2 className="text-xl font-bold text-primary-900 dark:text-primary-200">On this device</h2>
+                <p className="text-gray-700 dark:text-gray-300">
                     Your packing lists, your questions and items, and your app settings are stored on
                     this device so the app works offline. Deleting them removes them from this device
                     only — other devices you've used keep their own copies.
                 </p>
                 {isLoggedIn && (
-                    <p className="text-gray-700 font-medium">
+                    <p className="text-gray-700 dark:text-gray-300 font-medium">
                         You're signed in, so anything also saved in your pod will sync back to this device
                         next time you sign in. To remove it for good, use "Delete everything" below.
                     </p>
@@ -114,17 +114,17 @@ export function YourDataPage() {
                 >
                     Delete all data on this device
                 </Button>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                     You can also do this without opening the app: on Android, Settings → Apps → Pack Me Up
                     → Storage → Clear storage. Uninstalling the app removes it as well.
                 </p>
             </section>
 
             <section className="space-y-3">
-                <h2 className="text-xl font-bold text-primary-900">In your Solid Pod</h2>
+                <h2 className="text-xl font-bold text-primary-900 dark:text-primary-200">In your Solid Pod</h2>
                 {isLoggedIn ? (
                     <>
-                        <p className="text-gray-700">
+                        <p className="text-gray-700 dark:text-gray-300">
                             Everything the app has saved lives in a single <code>pack-me-up</code> folder
                             in your pod{podUrl ? <> (<span className="break-all">{podUrl}</span>)</> : null},
                             including your backups. Deleting it leaves the rest of your pod untouched.
@@ -137,21 +137,21 @@ export function YourDataPage() {
                         >
                             Delete everything
                         </Button>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                             This removes your pod copy and this device's copy together. There's no
                             pod-only option because it wouldn't hold: signing in again re-uploads whatever
                             is still on this device, rebuilding the folder you just deleted.
                         </p>
                     </>
                 ) : (
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                         If you've signed in with a Solid Pod, everything the app saved is in a single{' '}
                         <code>pack-me-up</code> folder in that pod. Sign in here to delete it with one tap,
                         or delete the folder yourself using your pod provider's file manager — you don't
                         need this app installed to do that.
                     </p>
                 )}
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                     If you've shared a list with someone, deleting your copy doesn't delete theirs. Revoke
                     their access from the list's share dialog before deleting if you want it gone from
                     their view too.
@@ -159,8 +159,8 @@ export function YourDataPage() {
             </section>
 
             <section className="space-y-3">
-                <h2 className="text-xl font-bold text-primary-900">Error reports and analytics</h2>
-                <p className="text-gray-700">
+                <h2 className="text-xl font-bold text-primary-900 dark:text-primary-200">Error reports and analytics</h2>
+                <p className="text-gray-700 dark:text-gray-300">
                     The only things that leave your device to us are crash reports and page-view counts,
                     and neither is linked to you. A crash report carries the error message, a stack trace
                     and your browser or device type — no name, no email, no account, and no IP address.
@@ -169,14 +169,14 @@ export function YourDataPage() {
                     for one person — and equally nothing in them that points back to you. Crash reports
                     are deleted automatically after {ERROR_REPORT_RETENTION} either way.
                 </p>
-                <p className="text-gray-700">
+                <p className="text-gray-700 dark:text-gray-300">
                     The exception is anything you send us on purpose. If you report a bug with the app's
                     feedback button, or email us directly, we have whatever you chose to put in it —
                     including your name and email address if you filled those in. Ask us to delete it and
                     we will:{' '}
                     <a
                         href={`mailto:${SUPPORT_EMAIL}`}
-                        className="font-semibold text-primary-700 underline hover:text-primary-900"
+                        className="font-semibold text-primary-700 dark:text-primary-300 underline hover:text-primary-900 dark:hover:text-primary-200"
                     >
                         {SUPPORT_EMAIL}
                     </a>

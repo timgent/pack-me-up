@@ -87,7 +87,7 @@ function SectionHeaderRow({ id, label, isDefault, onRename, onRemove }: {
                         if (e.key === 'Escape') { setDraft(label); setEditing(false) }
                     }}
                     aria-label={`Rename section ${label}`}
-                    className="w-full border border-primary-300 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full border border-primary-300 dark:border-primary-700 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
             ) : (
                 <div className={`flex items-center gap-2 rounded-lg border ${accent.border} ${accent.header} px-3 py-2`}>
@@ -101,7 +101,7 @@ function SectionHeaderRow({ id, label, isDefault, onRename, onRemove }: {
                                 type="button"
                                 onClick={() => { setDraft(label); setEditing(true) }}
                                 aria-label={`Rename section ${label}`}
-                                className={`ml-auto text-[11px] px-1 ${accent.muted} hover:text-primary-700`}
+                                className={`ml-auto text-[11px] px-1 ${accent.muted} hover:text-primary-700 dark:hover:text-primary-300`}
                             >
                                 Rename
                             </button>
@@ -109,7 +109,7 @@ function SectionHeaderRow({ id, label, isDefault, onRename, onRemove }: {
                                 type="button"
                                 onClick={onRemove}
                                 aria-label={`Remove section ${label}`}
-                                className={`text-[11px] px-1 ${accent.muted} hover:text-red-600`}
+                                className={`text-[11px] px-1 ${accent.muted} hover:text-red-600 dark:hover:text-red-400`}
                             >
                                 Remove
                             </button>
@@ -144,7 +144,7 @@ function MoveMenu({ label, canMoveToTop, canMoveToBottom, otherSections, onMoveW
                     disabled={!hasMoves}
                     title="Move item"
                     aria-label={`Move ${label}`}
-                    className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 active:bg-gray-100 disabled:text-gray-200 disabled:border-gray-100 disabled:hover:bg-transparent transition-colors"
+                    className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 disabled:text-gray-200 disabled:border-gray-100 dark:disabled:border-gray-800 disabled:hover:bg-transparent transition-colors"
                 >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="5" r="1.5" />
@@ -157,12 +157,12 @@ function MoveMenu({ label, canMoveToTop, canMoveToBottom, otherSections, onMoveW
                 <DropdownMenu.Content
                     align="end"
                     sideOffset={4}
-                    className="min-w-52 max-w-72 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50"
+                    className="min-w-52 max-w-72 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1 z-50"
                 >
                     {canMoveToTop && (
                         <DropdownMenu.Item
                             onSelect={() => onMoveWithinSection('top')}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 cursor-default outline-none"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-gray-50 dark:focus:bg-gray-800 cursor-default outline-none"
                         >
                             Move to top of section
                         </DropdownMenu.Item>
@@ -170,19 +170,19 @@ function MoveMenu({ label, canMoveToTop, canMoveToBottom, otherSections, onMoveW
                     {canMoveToBottom && (
                         <DropdownMenu.Item
                             onSelect={() => onMoveWithinSection('bottom')}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 cursor-default outline-none"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-gray-50 dark:focus:bg-gray-800 cursor-default outline-none"
                         >
                             Move to bottom of section
                         </DropdownMenu.Item>
                     )}
                     {otherSections.length > 0 && (canMoveToTop || canMoveToBottom) && (
-                        <DropdownMenu.Separator className="my-1 h-px bg-gray-100" />
+                        <DropdownMenu.Separator className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
                     )}
                     {otherSections.map(section => (
                         <DropdownMenu.Item
                             key={section}
                             onSelect={() => onMoveToSection(section)}
-                            className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 cursor-default outline-none truncate"
+                            className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-gray-50 dark:focus:bg-gray-800 cursor-default outline-none truncate"
                         >
                             Move to {section}
                         </DropdownMenu.Item>
@@ -208,14 +208,14 @@ function SortableSectionItem({ id, item, canMoveToTop, canMoveToBottom, otherSec
             ref={setNodeRef}
             style={{ transform: CSS.Transform.toString(transform), transition }}
             data-reorder-row
-            className={`flex items-center gap-1 rounded-lg border bg-white p-2 ${isDragging ? 'relative z-10 border-primary-400 shadow-md opacity-95' : 'border-gray-200'}`}
+            className={`flex items-center gap-1 rounded-lg border bg-white dark:bg-gray-900 p-2 ${isDragging ? 'relative z-10 border-primary-400 dark:border-primary-600 shadow-md opacity-95' : 'border-gray-200 dark:border-gray-700'}`}
         >
             <button
                 type="button"
                 ref={setActivatorNodeRef}
                 {...attributes}
                 {...listeners}
-                className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 cursor-grab active:cursor-grabbing touch-none"
+                className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-grab active:cursor-grabbing touch-none"
                 title="Drag to reorder or move between sections"
                 aria-label={`Drag ${item.text || 'item'} to reorder`}
             >
@@ -223,8 +223,8 @@ function SortableSectionItem({ id, item, canMoveToTop, canMoveToBottom, otherSec
                     <path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z" />
                 </svg>
             </button>
-            <span className="flex-1 min-w-0 truncate text-sm text-gray-800 px-1">
-                {item.text || <span className="text-gray-400 italic">Unnamed item</span>}
+            <span className="flex-1 min-w-0 truncate text-sm text-gray-800 dark:text-gray-100 px-1">
+                {item.text || <span className="text-gray-400 dark:text-gray-500 italic">Unnamed item</span>}
             </span>
             <MoveMenu
                 label={item.text || 'item'}
@@ -336,7 +336,7 @@ export function SectionedItemReorder({ items, defaultLabel, emptySections, scrol
 
     return (
         <>
-            <div className="text-[11px] text-gray-400 mb-2 px-0.5">
+            <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-2 px-0.5">
                 Drag the handle (press and hold on touch) to reorder, or focus it and press
                 space, then the arrow keys. Each item's move menu jumps it to the top or
                 bottom of its section, or into another section.

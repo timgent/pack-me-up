@@ -57,19 +57,19 @@ export interface PersonColor {
 }
 
 export const PERSON_COLORS: readonly PersonColor[] = [
-    { id: 'blue', label: 'Blue', avatar: 'bg-blue-500 text-white', border: 'border-blue-300', soft: 'bg-blue-50', text: 'text-blue-900', ring: 'ring-blue-400' },
-    { id: 'violet', label: 'Violet', avatar: 'bg-violet-500 text-white', border: 'border-violet-300', soft: 'bg-violet-50', text: 'text-violet-900', ring: 'ring-violet-400' },
-    { id: 'emerald', label: 'Emerald', avatar: 'bg-emerald-500 text-white', border: 'border-emerald-300', soft: 'bg-emerald-50', text: 'text-emerald-900', ring: 'ring-emerald-400' },
-    { id: 'amber', label: 'Amber', avatar: 'bg-amber-500 text-white', border: 'border-amber-300', soft: 'bg-amber-50', text: 'text-amber-900', ring: 'ring-amber-400' },
-    { id: 'rose', label: 'Rose', avatar: 'bg-rose-500 text-white', border: 'border-rose-300', soft: 'bg-rose-50', text: 'text-rose-900', ring: 'ring-rose-400' },
-    { id: 'cyan', label: 'Cyan', avatar: 'bg-cyan-500 text-white', border: 'border-cyan-300', soft: 'bg-cyan-50', text: 'text-cyan-900', ring: 'ring-cyan-400' },
-    { id: 'orange', label: 'Orange', avatar: 'bg-orange-500 text-white', border: 'border-orange-300', soft: 'bg-orange-50', text: 'text-orange-900', ring: 'ring-orange-400' },
-    { id: 'indigo', label: 'Indigo', avatar: 'bg-indigo-500 text-white', border: 'border-indigo-300', soft: 'bg-indigo-50', text: 'text-indigo-900', ring: 'ring-indigo-400' },
-    { id: 'teal', label: 'Teal', avatar: 'bg-teal-500 text-white', border: 'border-teal-300', soft: 'bg-teal-50', text: 'text-teal-900', ring: 'ring-teal-400' },
-    { id: 'fuchsia', label: 'Fuchsia', avatar: 'bg-fuchsia-500 text-white', border: 'border-fuchsia-300', soft: 'bg-fuchsia-50', text: 'text-fuchsia-900', ring: 'ring-fuchsia-400' },
+    { id: 'blue', label: 'Blue', avatar: 'bg-blue-500 text-white', border: 'border-blue-300 dark:border-blue-700', soft: 'bg-blue-50 dark:bg-blue-950/40', text: 'text-blue-900 dark:text-blue-200', ring: 'ring-blue-400' },
+    { id: 'violet', label: 'Violet', avatar: 'bg-violet-500 text-white', border: 'border-violet-300 dark:border-violet-700', soft: 'bg-violet-50 dark:bg-violet-950/40', text: 'text-violet-900 dark:text-violet-200', ring: 'ring-violet-400' },
+    { id: 'emerald', label: 'Emerald', avatar: 'bg-emerald-500 text-white', border: 'border-emerald-300 dark:border-emerald-700', soft: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-900 dark:text-emerald-200', ring: 'ring-emerald-400' },
+    { id: 'amber', label: 'Amber', avatar: 'bg-amber-500 text-white', border: 'border-amber-300 dark:border-amber-700', soft: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-900 dark:text-amber-200', ring: 'ring-amber-400' },
+    { id: 'rose', label: 'Rose', avatar: 'bg-rose-500 text-white', border: 'border-rose-300 dark:border-rose-700', soft: 'bg-rose-50 dark:bg-rose-950/40', text: 'text-rose-900 dark:text-rose-200', ring: 'ring-rose-400' },
+    { id: 'cyan', label: 'Cyan', avatar: 'bg-cyan-500 text-white', border: 'border-cyan-300 dark:border-cyan-700', soft: 'bg-cyan-50 dark:bg-cyan-950/40', text: 'text-cyan-900 dark:text-cyan-200', ring: 'ring-cyan-400' },
+    { id: 'orange', label: 'Orange', avatar: 'bg-orange-500 text-white', border: 'border-orange-300 dark:border-orange-700', soft: 'bg-orange-50 dark:bg-orange-950/40', text: 'text-orange-900 dark:text-orange-200', ring: 'ring-orange-400' },
+    { id: 'indigo', label: 'Indigo', avatar: 'bg-indigo-500 text-white', border: 'border-indigo-300 dark:border-indigo-700', soft: 'bg-indigo-50 dark:bg-indigo-950/40', text: 'text-indigo-900 dark:text-indigo-200', ring: 'ring-indigo-400' },
+    { id: 'teal', label: 'Teal', avatar: 'bg-teal-500 text-white', border: 'border-teal-300 dark:border-teal-700', soft: 'bg-teal-50 dark:bg-teal-950/40', text: 'text-teal-900 dark:text-teal-200', ring: 'ring-teal-400' },
+    { id: 'fuchsia', label: 'Fuchsia', avatar: 'bg-fuchsia-500 text-white', border: 'border-fuchsia-300 dark:border-fuchsia-700', soft: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', text: 'text-fuchsia-900 dark:text-fuchsia-200', ring: 'ring-fuchsia-400' },
     // The one initial not written in white: lime is too bright to carry it.
-    { id: 'lime', label: 'Lime', avatar: 'bg-lime-400 text-lime-950', border: 'border-lime-300', soft: 'bg-lime-50', text: 'text-lime-900', ring: 'ring-lime-500' },
-    { id: 'pink', label: 'Pink', avatar: 'bg-pink-500 text-white', border: 'border-pink-300', soft: 'bg-pink-50', text: 'text-pink-900', ring: 'ring-pink-400' },
+    { id: 'lime', label: 'Lime', avatar: 'bg-lime-400 text-lime-950', border: 'border-lime-300 dark:border-lime-700', soft: 'bg-lime-50 dark:bg-lime-950/40', text: 'text-lime-900 dark:text-lime-200', ring: 'ring-lime-500' },
+    { id: 'pink', label: 'Pink', avatar: 'bg-pink-500 text-white', border: 'border-pink-300 dark:border-pink-700', soft: 'bg-pink-50 dark:bg-pink-950/40', text: 'text-pink-900 dark:text-pink-200', ring: 'ring-pink-400' },
 ]
 
 /**
@@ -88,7 +88,7 @@ export const LEGACY_AVATAR_ROTATION: readonly string[] = [
 ]
 
 /** An avatar for someone this item isn't for: present, but plainly off. */
-export const PERSON_COLOR_OFF = 'bg-gray-100 text-gray-300'
+export const PERSON_COLOR_OFF = 'bg-gray-100 dark:bg-gray-800 text-gray-300 dark:text-gray-600'
 
 const BY_ID = new Map<string, PersonColor>(PERSON_COLORS.map(color => [color.id, color]))
 

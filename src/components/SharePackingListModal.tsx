@@ -147,36 +147,36 @@ export function SharePackingListModal({
             <div className="space-y-5">
                 {/* Current access section */}
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Current access</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Current access</h3>
                     {isLoadingAccess ? (
-                        <p className="text-sm text-gray-500">Loading…</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
                     ) : !hasAnyAccess ? (
-                        <p className="text-sm text-gray-500">No one else has access yet.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No one else has access yet.</p>
                     ) : (
                         <ul className="space-y-2">
                             {isPublic && (
-                                <li className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                                    <span className="text-sm text-gray-800">🌐 Anyone with the link</span>
+                                <li className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <span className="text-sm text-gray-800 dark:text-gray-100">🌐 Anyone with the link</span>
                                     <button
                                         type="button"
                                         onClick={handleRevokePublic}
                                         disabled={isRevokingPublic}
                                         aria-label="Revoke public access"
-                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
                                     >
                                         {isRevokingPublic ? 'Revoking…' : 'Revoke'}
                                     </button>
                                 </li>
                             )}
                             {currentCollaborators.map(webId => (
-                                <li key={webId} className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                                    <span className="text-sm text-gray-800 truncate flex-1" title={webId}>{webId}</span>
+                                <li key={webId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={webId}>{webId}</span>
                                     <button
                                         type="button"
                                         onClick={() => handleRevokeCollaborator(webId)}
                                         disabled={revokingWebId === webId}
                                         aria-label={`Revoke access for ${webId}`}
-                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 transition-colors"
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
                                     >
                                         {revokingWebId === webId ? 'Revoking…' : 'Revoke'}
                                     </button>
@@ -186,21 +186,21 @@ export function SharePackingListModal({
                     )}
                 </div>
 
-                <hr className="border-gray-200" />
+                <hr className="border-gray-200 dark:border-gray-700" />
 
                 {/* Add access section */}
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Add access</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Add access</h3>
 
                     {/* Mode tabs */}
-                    <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4">
+                    <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-4">
                         <button
                             type="button"
                             onClick={() => handleModeChange('person')}
                             className={`flex-1 py-2 px-3 text-sm font-medium transition-colors ${
                                 shareMode === 'person'
                                     ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                         >
                             With a person
@@ -211,7 +211,7 @@ export function SharePackingListModal({
                             className={`flex-1 py-2 px-3 text-sm font-medium transition-colors ${
                                 shareMode === 'public'
                                     ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                         >
                             Anyone with the link
@@ -234,13 +234,13 @@ export function SharePackingListModal({
                     )}
 
                     {shareMode === 'public' && !generatedLink && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                             Anyone who follows this link can view and edit this list — no sign-in required to view.
                         </p>
                     )}
 
                     {error && (
-                        <p className="text-sm text-red-600 mt-2">{error}</p>
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
                     )}
 
                     {shareMode === 'person' && (
@@ -267,14 +267,14 @@ export function SharePackingListModal({
 
                     {generatedLink && (
                         <div className="space-y-2 mt-3">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Shareable link
                                 <input
                                     aria-label="Shareable link"
                                     type="text"
                                     readOnly
                                     value={generatedLink}
-                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 bg-gray-50"
+                                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800"
                                 />
                             </label>
                             <Button type="button" variant="secondary" onClick={handleCopy}>

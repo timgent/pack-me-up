@@ -77,9 +77,9 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
     const count = suggestions.length
 
     return (
-        <div className="bg-emerald-50 rounded-lg border border-emerald-200 p-4">
+        <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 p-4">
             <div className="flex items-start justify-between gap-4">
-                <p className="text-emerald-900 font-medium">
+                <p className="text-emerald-900 dark:text-emerald-200 font-medium">
                     ✨ We've added to the starter suggestions since you set up — {count} new suggestion{count === 1 ? '' : 's'} available.
                 </p>
                 <button
@@ -88,7 +88,7 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
                     title="No thanks — don't show these again"
                     disabled={isApplying}
                     onClick={handleDismiss}
-                    className="text-emerald-600 hover:text-emerald-900 text-xl leading-none flex-shrink-0 disabled:opacity-50"
+                    className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 text-xl leading-none flex-shrink-0 disabled:opacity-50"
                 >
                     ×
                 </button>
@@ -98,7 +98,7 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
                 <button
                     type="button"
                     onClick={() => setIsExpanded(true)}
-                    className="mt-2 text-sm text-emerald-700 underline"
+                    className="mt-2 text-sm text-emerald-700 dark:text-emerald-300 underline"
                 >
                     Review suggestions
                 </button>
@@ -106,23 +106,23 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
                 <div className="mt-4 space-y-4">
                     {groups.map(group => (
                         <div key={group.label}>
-                            <p className="text-xs uppercase tracking-wide text-emerald-600 font-semibold mb-1">{group.label}</p>
+                            <p className="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-semibold mb-1">{group.label}</p>
                             <div className="space-y-1.5">
                                 {group.items.map(s => (
                                     <label
                                         key={s.key}
-                                        className="flex items-start gap-2 text-sm text-gray-700 bg-white rounded border border-emerald-200 px-3 py-2"
+                                        className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 rounded border border-emerald-200 dark:border-emerald-800 px-3 py-2"
                                     >
                                         <input
                                             type="checkbox"
                                             checked={!unchecked.has(s.key)}
                                             onChange={() => toggleChecked(s.key)}
-                                            className="mt-0.5 h-4 w-4 text-emerald-600 rounded focus:ring-2 focus:ring-emerald-500"
+                                            className="mt-0.5 h-4 w-4 text-emerald-600 dark:text-emerald-400 rounded focus:ring-2 focus:ring-emerald-500"
                                         />
                                         <span>
-                                            <span className="font-medium text-gray-900">{s.label}</span>
+                                            <span className="font-medium text-gray-900 dark:text-gray-100">{s.label}</span>
                                             {KIND_HINT[s.kind] && (
-                                                <span className="ml-2 text-xs text-emerald-600">{KIND_HINT[s.kind]}</span>
+                                                <span className="ml-2 text-xs text-emerald-600 dark:text-emerald-400">{KIND_HINT[s.kind]}</span>
                                             )}
                                         </span>
                                     </label>
@@ -134,7 +134,7 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
                         <button
                             type="button"
                             onClick={() => setIsExpanded(false)}
-                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-emerald-100"
+                            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
                         >
                             Not now
                         </button>

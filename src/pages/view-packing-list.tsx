@@ -1590,19 +1590,19 @@ export function ViewPackingList() {
             <div className="w-full max-w-screen-2xl mb-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                        <h1 className="text-xl font-bold text-gray-900 truncate">{packingList.name}</h1>
+                        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">{packingList.name}</h1>
                         {foreignPodUrl && (
-                            <span className="text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-full px-2 py-0.5 shrink-0">
+                            <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5 shrink-0">
                                 Shared list
                             </span>
                         )}
                         {isLoggedIn && syncingFromPod && (
-                            <span className="text-xs text-blue-600 shrink-0">Syncing…</span>
+                            <span className="text-xs text-blue-600 dark:text-blue-400 shrink-0">Syncing…</span>
                         )}
                         <div className={`flex items-center gap-1 transition-opacity duration-200 shrink-0 ${autoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'}`}>
-                            {autoSaveStatus === 'saving' && <span className="text-xs text-blue-500">Saving…</span>}
-                            {autoSaveStatus === 'saved' && <span className="text-xs text-green-600">Saved</span>}
-                            {autoSaveStatus === 'error' && <span className="text-xs text-red-600">Error saving</span>}
+                            {autoSaveStatus === 'saving' && <span className="text-xs text-blue-500 dark:text-blue-400">Saving…</span>}
+                            {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                            {autoSaveStatus === 'error' && <span className="text-xs text-red-600 dark:text-red-400">Error saving</span>}
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1646,7 +1646,7 @@ export function ViewPackingList() {
                 {(packingList.destination || tripDates) && (
                     <div
                         data-testid="trip-details"
-                        className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600"
+                        className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 dark:text-gray-400"
                     >
                         {packingList.destination && <span>📍 {packingList.destination}</span>}
                         {tripDates && <span>📅 {tripDates}</span>}
@@ -1665,8 +1665,8 @@ export function ViewPackingList() {
 
             {/* Persistent "viewing someone else's list" indicator */}
             {foreignPodUrl && !foreignPodCtx && (
-                <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
-                    <p className="text-sm text-indigo-800 font-medium">
+                <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
+                    <p className="text-sm text-indigo-800 dark:text-indigo-200 font-medium">
                         👤 Viewing a list from <span className="font-semibold">{resolveOwnerDisplayName(ownerDisplayName, effectiveOwnerWebId, foreignPodUrl)}</span>
                     </p>
                 </div>
@@ -1675,12 +1675,12 @@ export function ViewPackingList() {
             {/* Slim sticky progress strip */}
             <div className="sticky top-0 z-50 w-full mb-4 flex justify-center">
                 <div className="w-full max-w-screen-2xl">
-                    <div className="backdrop-blur-md bg-white/90 border border-gray-200 shadow-sm rounded-lg px-4 py-2">
+                    <div className="backdrop-blur-md bg-white/90 dark:bg-gray-900/90 border border-gray-200 dark:border-gray-700 shadow-sm rounded-lg px-4 py-2">
                         {/* Counts and bar share a line with the controls where there is
                             room; at 390px the controls drop to a line of their own
                             rather than squeezing everything into wrapped fragments. */}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                            <span className={`text-sm font-medium whitespace-nowrap ${allPacked ? 'text-emerald-600' : 'text-gray-600'}`}>
+                            <span className={`text-sm font-medium whitespace-nowrap ${allPacked ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
                             </span>
                             {/* The bar shrinks to its minimum before the encouragement
@@ -1693,7 +1693,7 @@ export function ViewPackingList() {
                                     aria-valuenow={percentComplete}
                                     aria-valuemin={0}
                                     aria-valuemax={100}
-                                    className="flex-1 min-w-8 bg-gray-200 rounded-full h-1.5 overflow-hidden"
+                                    className="flex-1 min-w-8 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden"
                                 >
                                     <div
                                         data-testid="packing-progress-fill"
@@ -1702,7 +1702,7 @@ export function ViewPackingList() {
                                     ></div>
                                 </div>
                                 {milestoneMessage && (
-                                    <span data-testid="progress-milestone" className="text-xs font-semibold text-primary-700 whitespace-nowrap">
+                                    <span data-testid="progress-milestone" className="text-xs font-semibold text-primary-700 dark:text-primary-300 whitespace-nowrap">
                                         {milestoneMessage}
                                     </span>
                                 )}
@@ -1713,12 +1713,12 @@ export function ViewPackingList() {
                                         type="button"
                                         onClick={toggleAllSections}
                                         title={everySectionFolded ? 'Open every section' : 'Fold every section down to its header'}
-                                        className="shrink-0 flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                                        className="shrink-0 flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2.5 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                                     >
                                         {/* Same glyph the section headers use for the same
                                             state, so the toolbar and the cards never point
                                             opposite ways at each other. */}
-                                        <span aria-hidden="true" className="text-xs text-gray-400">{everySectionFolded ? '▶' : '▼'}</span>
+                                        <span aria-hidden="true" className="text-xs text-gray-400 dark:text-gray-500">{everySectionFolded ? '▶' : '▼'}</span>
                                         {/* The word "all" is what tips this row onto a second
                                             line on a phone, and the icon already says it. */}
                                         {everySectionFolded ? (isDesktop ? 'Expand all' : 'Expand') : (isDesktop ? 'Collapse all' : 'Collapse')}
@@ -1755,11 +1755,11 @@ export function ViewPackingList() {
                             wraps for the same reason the strip does — a guest's
                             row of controls is wider than a phone. */}
                         {filtering && (
-                            <div className="mt-1.5 flex min-h-[2.75rem] items-center gap-2 overflow-x-auto border-t border-gray-100 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            <div className="mt-1.5 flex min-h-[2.75rem] items-center gap-2 overflow-x-auto border-t border-gray-100 dark:border-gray-800 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                 <button
                                     type="button"
                                     onClick={handleClearFilter}
-                                    className="shrink-0 rounded-full border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+                                    className="shrink-0 rounded-full border border-blue-200 dark:border-blue-800 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
                                 >
                                     Clear
                                 </button>
@@ -1777,36 +1777,36 @@ export function ViewPackingList() {
                                                 }}
                                                 onBlur={() => handleRenameGuest(soleGuest.id, renamingGuestName)}
                                                 autoFocus
-                                                className="w-40 shrink-0 rounded-md border border-blue-400 px-2 py-1 text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-40 shrink-0 rounded-md border border-blue-400 dark:border-blue-600 px-2 py-1 text-xs font-semibold text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         ) : (
                                             <>
-                                                <span className="shrink-0 text-xs font-semibold text-gray-700">{solePerson.name}</span>
+                                                <span className="shrink-0 text-xs font-semibold text-gray-700 dark:text-gray-300">{solePerson.name}</span>
                                                 {/* On a phone the chips are faces
                                                     with no names on them, so the
                                                     numbers come off the chip and
                                                     land here beside the name. */}
-                                                <span className="shrink-0 text-xs tabular-nums text-gray-500 sm:hidden">
+                                                <span className="shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400 sm:hidden">
                                                     {solePersonTotal - solePersonUnpacked}/{solePersonTotal}
                                                 </span>
                                             </>
                                         )}
                                         {soleGuest && renamingGuestId !== soleGuest.id && (
-                                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Guest</span>
+                                            <span className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Guest</span>
                                         )}
                                         {/* One person finishing their bag is a
                                             real thing to have done. The trip's
                                             own celebration stays for the trip,
                                             but this shouldn't pass in silence. */}
                                         {solePersonUnpacked === 0 && solePersonTotal > 0 ? (
-                                            <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                            <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                                                 🎉 {solePerson.name}'s bag is packed!
                                             </span>
                                         ) : solePersonUnpacked > 0 && (
                                             <button
                                                 type="button"
                                                 onClick={() => handlePackAllFor(solePerson.name)}
-                                                className="shrink-0 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                                                className="shrink-0 whitespace-nowrap rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/40"
                                             >
                                                 {/* The number is in the button, where it
                                                     is read before the tap rather than in a
@@ -1819,14 +1819,14 @@ export function ViewPackingList() {
                                                 <button
                                                     type="button"
                                                     onClick={() => { setRenamingGuestId(soleGuest.id); setRenamingGuestName(soleGuest.name) }}
-                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                                                    className="shrink-0 rounded-full border border-gray-200 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                                                 >
                                                     Rename
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setGuestToRemove(soleGuest.id)}
-                                                    className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                                                    className="shrink-0 rounded-full border border-gray-200 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
                                                 >
                                                     Remove
                                                 </button>
@@ -1838,7 +1838,7 @@ export function ViewPackingList() {
                                     above says it in colour, which is no answer
                                     on a phone where the chips carry no names. */}
                                 {solePerson === undefined && (
-                                    <span className="shrink-0 text-xs font-semibold text-gray-700">
+                                    <span className="shrink-0 text-xs font-semibold text-gray-700 dark:text-gray-300">
                                         {filterNames(selectedPeople)}
                                     </span>
                                 )}
@@ -1884,14 +1884,14 @@ export function ViewPackingList() {
                 themselves, so it never becomes furniture. */}
             {foldedOnOpen && everySectionFolded && (
                 <div data-testid="folded-on-open-note" className="w-full max-w-screen-2xl mb-4">
-                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-                        <p className="text-sm text-blue-800">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-4 py-3">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
                             A long list, so all {listSections.length} sections start folded — tap any heading to open one.
                         </p>
                         <button
                             type="button"
                             onClick={toggleAllSections}
-                            className="shrink-0 rounded-md border border-blue-300 bg-white px-3 py-1.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                            className="shrink-0 rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-semibold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/40"
                         >
                             Expand all
                         </button>
@@ -1903,8 +1903,8 @@ export function ViewPackingList() {
                 celebration, and the Show Packed button is right there anyway */}
             {hiddenPackedCount > 0 && !allPacked && (
                 <div className="w-full max-w-screen-2xl mb-4">
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                        <p className="text-sm text-amber-800">
+                    <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
                             {hiddenPackedCount} packed item{hiddenPackedCount !== 1 ? 's' : ''} hidden — tap <strong>Show Packed</strong> to see them.
                         </p>
                     </div>
@@ -1926,7 +1926,7 @@ export function ViewPackingList() {
                             }}
                             placeholder="Guest name..."
                             autoFocus
-                            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
                             type="button"
@@ -1938,7 +1938,7 @@ export function ViewPackingList() {
                         <button
                             type="button"
                             onClick={() => { setShowAddGuest(false); setNewGuestName('') }}
-                            className="shrink-0 px-3 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-md text-sm"
+                            className="shrink-0 px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
                         >
                             Cancel
                         </button>
@@ -1982,18 +1982,18 @@ export function ViewPackingList() {
                             const isGridSection = true
                             const isSectionCollapsed = collapsedSections.has(sectionKey)
                             const sectionBorder = isComplete
-                                ? 'border-emerald-300 bg-emerald-50'
+                                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40'
                                 // Amber, because the card is a reminder rather than
                                 // a pile: nothing in it can be dealt with yet.
                                 : isLastMinute
-                                    ? 'border-amber-300 bg-amber-50'
-                                    : 'bg-white border-gray-200'
+                                    ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40'
+                                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
                             return (
                             <div key={sectionKey} data-testid="list-section" className={`border rounded-lg p-3 shadow-sm transition-colors duration-300 sm:p-4 ${sectionBorder}`} style={{ breakInside: 'avoid' }}>
                                 {/* The rule under the heading separates it from the items
                                     below; a folded card has none, so it would just be a
                                     line ruling off empty space. */}
-                                <div className={isSectionCollapsed ? undefined : 'mb-4 pb-2 border-b border-gray-200'}>
+                                <div className={isSectionCollapsed ? undefined : 'mb-4 pb-2 border-b border-gray-200 dark:border-gray-700'}>
                                     <div className="flex flex-wrap items-center gap-1 min-h-[2rem]">
                                         <button
                                             type="button"
@@ -2001,18 +2001,18 @@ export function ViewPackingList() {
                                             onClick={() => toggleSection(sectionKey)}
                                             className="flex items-center gap-2 flex-1 min-w-0 text-left"
                                         >
-                                            <span className="shrink-0 text-sm text-gray-400">{isSectionCollapsed ? '▶' : '▼'}</span>
-                                            <span className="text-xl font-semibold text-gray-800">{title}</span>
+                                            <span className="shrink-0 text-sm text-gray-400 dark:text-gray-500">{isSectionCollapsed ? '▶' : '▼'}</span>
+                                            <span className="text-xl font-semibold text-gray-800 dark:text-gray-100">{title}</span>
                                             {/* Never let a count break across lines — "9 /" above "9" is
                                                 a fraction the eye has to reassemble. */}
-                                            <span className="ml-1 shrink-0 whitespace-nowrap text-sm font-normal text-gray-500">
+                                            <span className="ml-1 shrink-0 whitespace-nowrap text-sm font-normal text-gray-500 dark:text-gray-400">
                                                 {stats.packed} / {stats.total}{filterQualifier}
                                             </span>
                                         </button>
                                         {isComplete && (
                                             <span
                                                 aria-label={`All packed for ${completeLabel}${filterQualifier}`}
-                                                className="animate-pop-in text-xs font-semibold text-emerald-700 bg-emerald-100 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0"
+                                                className="animate-pop-in text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5 shrink-0"
                                             >
                                                 🎉 All packed!
                                             </span>
@@ -2026,7 +2026,7 @@ export function ViewPackingList() {
                                                 type="button"
                                                 aria-label={`Check all${filterQualifier} in ${title}`}
                                                 onClick={() => handleCheckAll(checkableItemsOf(section))}
-                                                className="shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
+                                                className="shrink-0 rounded-full border border-gray-200 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
                                             >
                                                 Check all
                                             </button>
@@ -2037,13 +2037,13 @@ export function ViewPackingList() {
                                     {/* The card is the only one whose items can't be dealt with
                                         yet, so it says why rather than leaving that to the name. */}
                                     {isLastMinute && (
-                                        <p className="-mt-2 mb-3 text-sm text-amber-800">{LAST_MINUTE_HINT}</p>
+                                        <p className="-mt-2 mb-3 text-sm text-amber-800 dark:text-amber-200">{LAST_MINUTE_HINT}</p>
                                     )}
                                     {/* Every card can be typed into directly. What varies is which
                                         part of the target the card already knows: a person's card
                                         knows who, and asks which section; a section's card knows
                                         which section, and asks who. */}
-                                    <div className="mb-4 pb-4 border-b border-gray-200">
+                                    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                                         {/* The card knows which section it is;
                                             who it is for follows the filter when
                                             the filter names one person, so an
@@ -2062,7 +2062,7 @@ export function ViewPackingList() {
                                         />
                                     </div>
                                     {isComplete && items.length === 0 && !isGridSection && (
-                                        <p className="text-sm font-medium text-emerald-700">
+                                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                                             Nothing left to pack 🎒
                                         </p>
                                     )}
@@ -2089,11 +2089,11 @@ export function ViewPackingList() {
                         )})}
                     </div>}
                     {!sectionsPackedAway && listSections.length === 0 && filtering && (
-                        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center">
-                            <p className="text-sm font-medium text-gray-700">
+                        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-6 text-center">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Nothing on this list is{filterQualifier} yet.
                             </p>
-                            <p className="mt-1 text-sm text-gray-500">
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Clear the filter to add the first thing{filterQualifier}, or pick somebody else.
                             </p>
                         </div>

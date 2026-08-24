@@ -98,7 +98,7 @@ export function ForeignPodLayout() {
     if (!isLoggedIn) {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
-                <p className="text-gray-700">Please log in to view shared content.</p>
+                <p className="text-gray-700 dark:text-gray-300">Please log in to view shared content.</p>
             </div>
         )
     }
@@ -106,7 +106,7 @@ export function ForeignPodLayout() {
     if (accessState === 'denied') {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
-                <p className="text-red-700">Access denied to this pod. The owner may have revoked access.</p>
+                <p className="text-red-700 dark:text-red-300">Access denied to this pod. The owner may have revoked access.</p>
             </div>
         )
     }
@@ -114,14 +114,14 @@ export function ForeignPodLayout() {
     if (accessState === 'pending') {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
-                <p className="text-gray-500">Verifying access…</p>
+                <p className="text-gray-500 dark:text-gray-400">Verifying access…</p>
             </div>
         )
     }
 
     return (
         <ForeignPodContext.Provider value={{ foreignPodUrl }}>
-            <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800 -mx-4 -mt-8 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 px-4 py-2 text-sm text-blue-800 dark:text-blue-200 -mx-4 -mt-8 mb-6">
                 Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? (resolvedWebId ? friendlyPodName(resolvedWebId) : null) ?? friendlyPodName(foreignPodUrl)}</span>'s data
             </div>
             <Outlet />

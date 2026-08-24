@@ -32,7 +32,7 @@ export function ItemSearchBar({ value, onChange }: {
             <div className="relative">
                 <svg
                     aria-hidden="true"
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -51,7 +51,7 @@ export function ItemSearchBar({ value, onChange }: {
                     // and the one people already expect from a search field.
                     onKeyDown={e => { if (e.key === 'Escape') onChange('') }}
                     placeholder="Search items — e.g. sun cream"
-                    className="w-full border border-gray-300 rounded-lg pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 {typed > 0 && (
                     <button
@@ -59,7 +59,7 @@ export function ItemSearchBar({ value, onChange }: {
                         onClick={() => onChange('')}
                         aria-label="Clear search"
                         title="Clear search"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 rounded"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -70,7 +70,7 @@ export function ItemSearchBar({ value, onChange }: {
             {/* One letter matches most of a question set, so the page keeps
                 showing the set and says what it is waiting for. */}
             {typed > 0 && typed < MIN_QUERY_LENGTH && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                     Keep typing — search starts at {MIN_QUERY_LENGTH} letters
                 </p>
             )}
@@ -125,10 +125,10 @@ export function ItemSearchResults({ questionSet, query, people, allItemNames, se
     return (
         <div data-testid="item-search-results" className="space-y-2">
             {found ? (
-                <p data-testid="item-search-summary" role="status" className="text-sm text-gray-500">
+                <p data-testid="item-search-summary" role="status" className="text-sm text-gray-500 dark:text-gray-400">
                     {results.total} item{results.total === 1 ? '' : 's'} match{results.total === 1 ? 'es' : ''} “{needle}”
                     {results.shown < results.total && (
-                        <span className="text-gray-400"> — showing the first {results.shown}. Try a longer search.</span>
+                        <span className="text-gray-400 dark:text-gray-500"> — showing the first {results.shown}. Try a longer search.</span>
                     )}
                 </p>
             ) : (
@@ -137,10 +137,10 @@ export function ItemSearchResults({ questionSet, query, people, allItemNames, se
                 <div
                     data-testid="item-search-summary"
                     role="status"
-                    className="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-6 text-center"
+                    className="rounded-lg border border-dashed border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-6 text-center"
                 >
-                    <p className="text-sm text-gray-500">No items match “{needle}”</p>
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No items match “{needle}”</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                         Search looks at item names — try part of a word, or check the spelling.
                     </p>
                 </div>
@@ -150,17 +150,17 @@ export function ItemSearchResults({ questionSet, query, people, allItemNames, se
                 <div
                     key={group.key}
                     data-testid="search-group"
-                    className="rounded-lg border border-gray-200 bg-white"
+                    className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
                 >
-                    <div className="flex items-center gap-2 rounded-t-lg bg-gray-50 px-2.5 py-1.5">
+                    <div className="flex items-center gap-2 rounded-t-lg bg-gray-50 dark:bg-gray-800 px-2.5 py-1.5">
                         <span
                             data-testid="search-group-crumbs"
-                            className="flex items-baseline text-sm min-w-0 text-gray-700"
+                            className="flex items-baseline text-sm min-w-0 text-gray-700 dark:text-gray-300"
                         >
                             {group.crumbs.map((crumb, i) => (
                                 <Fragment key={`${group.key}-crumb-${i}`}>
                                     {i > 0 && (
-                                        <span aria-hidden="true" className="shrink-0 whitespace-pre text-gray-400">{' \u203a '}</span>
+                                        <span aria-hidden="true" className="shrink-0 whitespace-pre text-gray-400 dark:text-gray-500">{' \u203a '}</span>
                                     )}
                                     {/* The answer is what holds the items and what
                                         tells two cards of the same question apart,
@@ -172,7 +172,7 @@ export function ItemSearchResults({ questionSet, query, people, allItemNames, se
                                 </Fragment>
                             ))}
                         </span>
-                        <span className="ml-auto shrink-0 text-[11px] font-medium text-gray-400">
+                        <span className="ml-auto shrink-0 text-[11px] font-medium text-gray-400 dark:text-gray-500">
                             {group.count} match{group.count === 1 ? '' : 'es'}
                         </span>
                     </div>
