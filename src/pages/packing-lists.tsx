@@ -15,7 +15,8 @@ import { packingListToDataset, deletedPackingListsToDataset } from '../services/
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { generateUUID } from '../utils/uuid'
-import { formatTripDates } from '../create-packing-list/tripDetails'
+import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
+import { PastTripsSection } from '../components/PastTripsSection'
 
 type SharingStatus = 'public' | 'shared' | 'private'
 
@@ -173,6 +174,115 @@ export function PackingLists() {
         }).catch(() => {})
     }, [packingLists, isLoggedIn, session])
 
+    // Finished trips, and undated lists that have gone quiet, are folded away
+    // below rather than dropped — see splitCurrentAndPastTrips.
+    const { current: currentLists, past: pastLists, allPastFinished } = splitCurrentAndPastTrips(packingLists)
+
+    /**
+     * One list card. `index` is the card's position across both sections, not
+     * within one: the past cards carry on the gradient rotation rather than
+     * restarting it, so the first past trip never repeats the colour of the
+     * first current one.
+     */
+    const renderListCard = (list: PackingList, index: number) => {
+        const packedCount = list.items.filter(item => item.packed).length
+        const totalCount = list.items.length
+        const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
+        const displayWidth = packedCount === 0 ? 0 : Math.max(percentComplete, 4)
+
+        // Rotate through gradient colors
+        const gradients = [
+            'from-primary-50 to-primary-100 border-primary-300',
+            'from-secondary-50 to-secondary-100 border-secondary-300',
+            'from-accent-50 to-accent-100 border-accent-300',
+            'from-success-50 to-success-100 border-success-300'
+        ]
+        const gradient = gradients[index % gradients.length]
+
+        // Trip dates are what the traveller cares about; the
+        // creation date is only worth showing when there are none.
+        const tripDates = formatTripDates(list.startDate, list.endDate)
+
+        return (
+            <div
+                key={list.id}
+                data-testid="packing-list-card"
+                onClick={() => {
+                    if (list.sharedFromPodUrl) {
+                        navigate(buildSharedListPath(list.id, list.sharedFromPodUrl, list.ownerWebId))
+                    } else {
+                        navigate(`/view-lists/${list.id}`)
+                    }
+                }}
+                className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-soft border-2 p-6 hover:shadow-glow-primary hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
+            >
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
+                    <div className="min-w-0">
+                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
+                        ✈️ {list.name}
+                        {list.sharedFromPodUrl ? (
+                            <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                                👤 From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
+                            </span>
+                        ) : (
+                            <>
+                                {sharingStatus[list.id] === 'public' && (
+                                    <span className="text-xs font-medium bg-white/60 text-blue-700 px-2 py-0.5 rounded-full">🌐 Public</span>
+                                )}
+                                {sharingStatus[list.id] === 'shared' && (
+                                    <span className="text-xs font-medium bg-white/60 text-indigo-700 px-2 py-0.5 rounded-full">👤 Shared</span>
+                                )}
+                            </>
+                        )}
+                    </h3>
+                    {/* On its own line so a long destination never
+                        pushes the actions onto a second row */}
+                    {list.destination && (
+                        <p className="mt-1 text-sm text-gray-600 truncate">📍 {list.destination}</p>
+                    )}
+                    </div>
+                    <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-600 bg-white/60 px-3 py-1 rounded-lg">
+                            {tripDates
+                                ? `📅 ${tripDates}`
+                                : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
+                        </span>
+                        <button
+                            onClick={(e) => requestRenamePackingList(list.id, list.name, e)}
+                            className="text-primary-600 hover:text-primary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                        >
+                            ✏️ Rename
+                        </button>
+                        <button
+                            onClick={(e) => handleDuplicatePackingList(list, e)}
+                            className="text-secondary-600 hover:text-secondary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                        >
+                            📋 Duplicate
+                        </button>
+                        <button
+                            onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
+                            className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
+                        >
+                            🗑️ Delete
+                        </button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex-1 bg-white/40 rounded-full h-3 overflow-hidden">
+                        <div
+                            data-testid="progress-fill"
+                            className="progress-bar-fill bg-gradient-primary h-full rounded-full"
+                            style={{ width: `${displayWidth}%` }}
+                        ></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
+                        {packedCount} / {totalCount} ({percentComplete}%)
+                    </span>
+                </div>
+            </div>
+        )
+    }
+
     // The local read is the only thing worth blocking on — it resolves in
     // milliseconds. The one case that still has to wait is an empty device on
     // first login: there is nothing local to show and "No packing lists found"
@@ -218,105 +328,27 @@ export function PackingLists() {
                     </p>
                 </div>
             ) : (
-                <div className="space-y-4">
-                    {packingLists.map((list, index) => {
-                        const packedCount = list.items.filter(item => item.packed).length
-                        const totalCount = list.items.length
-                        const percentComplete = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0
-                        const displayWidth = packedCount === 0 ? 0 : Math.max(percentComplete, 4)
+                <>
+                    <div className="space-y-4">
+                        {currentLists.map((list, index) => renderListCard(list, index))}
+                    </div>
 
-                        // Rotate through gradient colors
-                        const gradients = [
-                            'from-primary-50 to-primary-100 border-primary-300',
-                            'from-secondary-50 to-secondary-100 border-secondary-300',
-                            'from-accent-50 to-accent-100 border-accent-300',
-                            'from-success-50 to-success-100 border-success-300'
-                        ]
-                        const gradient = gradients[index % gradients.length]
+                    {/* Everything is behind us, so "no packing lists found" would
+                        be wrong — say what is actually the case. */}
+                    {currentLists.length === 0 && (
+                        <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
+                            <p className="text-lg text-gray-800 font-semibold">
+                                No upcoming trips. Your past trips are below — or start a new list! 🎒
+                            </p>
+                        </div>
+                    )}
 
-                        // Trip dates are what the traveller cares about; the
-                        // creation date is only worth showing when there are none.
-                        const tripDates = formatTripDates(list.startDate, list.endDate)
-
-                        return (
-                            <div
-                                key={list.id}
-                                onClick={() => {
-                                    if (list.sharedFromPodUrl) {
-                                        navigate(buildSharedListPath(list.id, list.sharedFromPodUrl, list.ownerWebId))
-                                    } else {
-                                        navigate(`/view-lists/${list.id}`)
-                                    }
-                                }}
-                                className={`bg-gradient-to-br ${gradient} rounded-2xl shadow-soft border-2 p-6 hover:shadow-glow-primary hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
-                            >
-                                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
-                                    <div className="min-w-0">
-                                    <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
-                                        ✈️ {list.name}
-                                        {list.sharedFromPodUrl ? (
-                                            <span className="text-xs font-medium bg-white/60 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                                                👤 From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
-                                            </span>
-                                        ) : (
-                                            <>
-                                                {sharingStatus[list.id] === 'public' && (
-                                                    <span className="text-xs font-medium bg-white/60 text-blue-700 px-2 py-0.5 rounded-full">🌐 Public</span>
-                                                )}
-                                                {sharingStatus[list.id] === 'shared' && (
-                                                    <span className="text-xs font-medium bg-white/60 text-indigo-700 px-2 py-0.5 rounded-full">👤 Shared</span>
-                                                )}
-                                            </>
-                                        )}
-                                    </h3>
-                                    {/* On its own line so a long destination never
-                                        pushes the actions onto a second row */}
-                                    {list.destination && (
-                                        <p className="mt-1 text-sm text-gray-600 truncate">📍 {list.destination}</p>
-                                    )}
-                                    </div>
-                                    <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-sm font-medium text-gray-600 bg-white/60 px-3 py-1 rounded-lg">
-                                            {tripDates
-                                                ? `📅 ${tripDates}`
-                                                : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
-                                        </span>
-                                        <button
-                                            onClick={(e) => requestRenamePackingList(list.id, list.name, e)}
-                                            className="text-primary-600 hover:text-primary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
-                                        >
-                                            ✏️ Rename
-                                        </button>
-                                        <button
-                                            onClick={(e) => handleDuplicatePackingList(list, e)}
-                                            className="text-secondary-600 hover:text-secondary-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
-                                        >
-                                            📋 Duplicate
-                                        </button>
-                                        <button
-                                            onClick={(e) => requestDeletePackingList(list.id, list.name, e)}
-                                            className="text-danger-600 hover:text-danger-800 text-sm font-bold hover:scale-110 transition-transform duration-200 bg-white/60 px-3 py-1 rounded-lg"
-                                        >
-                                            🗑️ Delete
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="flex-1 bg-white/40 rounded-full h-3 overflow-hidden">
-                                        <div
-                                            data-testid="progress-fill"
-                                            className="progress-bar-fill bg-gradient-primary h-full rounded-full"
-                                            style={{ width: `${displayWidth}%` }}
-                                        ></div>
-                                    </div>
-                                    <span className="text-sm font-bold text-gray-700 bg-white/60 px-3 py-1 rounded-lg">
-                                        {packedCount} / {totalCount} ({percentComplete}%)
-                                    </span>
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
+                    {pastLists.length > 0 && (
+                        <PastTripsSection count={pastLists.length} allPastFinished={allPastFinished}>
+                            {pastLists.map((list, index) => renderListCard(list, currentLists.length + index))}
+                        </PastTripsSection>
+                    )}
+                </>
             )}
 
             <ConfirmationDialog

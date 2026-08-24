@@ -76,6 +76,24 @@ const testList = {
     items: [],
 }
 
+/**
+ * A YYYY-MM-DD date the given number of days either side of today. Trip dates
+ * in fixtures have to move with the clock: a hard-coded date would quietly slip
+ * into the past and land the list in the "Past trips" section instead.
+ */
+const daysFromToday = (days: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** The same YYYY-MM-DD date as the page renders it, in the viewer's locale. */
+const localDateOf = (isoDate: string) => {
+    const [year, month, day] = isoDate.split('-').map(Number)
+    return new Date(year, month - 1, day).toLocaleDateString()
+}
+
 function makeDb() {
     return {
         getAllPackingLists: vi.fn().mockResolvedValue([testList]),
@@ -607,17 +625,18 @@ describe('PackingLists pod sync on mutation', () => {
 
 
 describe('PackingLists trip destination and dates', () => {
+    const tripStart = daysFromToday(30)
+    const tripEnd = daysFromToday(37)
+
     const tripList = {
         id: 'list-1',
         name: 'Summer Holiday',
         createdAt: '2026-01-01T00:00:00Z',
         destination: 'Lisbon, Portugal',
-        startDate: '2026-07-12',
-        endDate: '2026-07-19',
+        startDate: tripStart,
+        endDate: tripEnd,
         items: [],
     }
-
-    const localDate = (y: number, m: number, d: number) => new Date(y, m, d).toLocaleDateString()
 
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
@@ -656,7 +675,7 @@ describe('PackingLists trip destination and dates', () => {
         renderWithList(tripList)
         await screen.findByText(/Summer Holiday/)
 
-        const expected = `${localDate(2026, 6, 12)} – ${localDate(2026, 6, 19)}`
+        const expected = `${localDateOf(tripStart)} – ${localDateOf(tripEnd)}`
         expect(screen.getByText(new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy()
         expect(screen.queryByText(/📅 Created/)).toBeNull()
     })
@@ -813,5 +832,175 @@ describe('PackingLists sync-across-devices prompt', () => {
         fireEvent.click(await screen.findByLabelText('Dismiss sync prompt'))
 
         expect(screen.queryByTestId('sync-across-devices-prompt')).toBeNull()
+    })
+})
+
+describe('PackingLists past trips', () => {
+    const listWithDates = (
+        id: string,
+        name: string,
+        startDate?: string,
+        endDate?: string,
+    ) => ({ id, name, createdAt: '2026-01-01T00:00:00Z', items: [], startDate, endDate })
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        } as unknown as ReturnType<typeof useSolidPod>)
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderWithLists(lists: Record<string, unknown>[]) {
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue(lists),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
+            } as unknown as PackingAppDatabase,
+        })
+        return renderComponent()
+    }
+
+    const pastTripsToggle = () => screen.getByRole('button', { name: /Past trips/ })
+
+    it('folds finished trips away behind a collapsed section, counted', async () => {
+        renderWithLists([
+            listWithDates('l1', 'Next Summer', daysFromToday(30), daysFromToday(37)),
+            listWithDates('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+            listWithDates('l3', 'Last Spring', daysFromToday(-20), daysFromToday(-14)),
+        ])
+
+        expect(await screen.findByText(/Next Summer/)).toBeTruthy()
+        expect(pastTripsToggle().textContent).toContain('Past trips (2)')
+        expect(pastTripsToggle().getAttribute('aria-expanded')).toBe('false')
+        expect(screen.queryByText(/Last Winter/)).toBeNull()
+        expect(screen.queryByText(/Last Spring/)).toBeNull()
+    })
+
+    it('reveals and folds the past trips again as the section is toggled', async () => {
+        renderWithLists([
+            listWithDates('l1', 'Next Summer', daysFromToday(30), daysFromToday(37)),
+            listWithDates('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+        ])
+
+        await screen.findByText(/Next Summer/)
+
+        fireEvent.click(pastTripsToggle())
+        expect(pastTripsToggle().getAttribute('aria-expanded')).toBe('true')
+        expect(screen.getByText(/Last Winter/)).toBeTruthy()
+
+        fireEvent.click(pastTripsToggle())
+        expect(pastTripsToggle().getAttribute('aria-expanded')).toBe('false')
+        expect(screen.queryByText(/Last Winter/)).toBeNull()
+    })
+
+    it('treats a trip that ends today as still current', async () => {
+        renderWithLists([listWithDates('l1', 'Ends Today', daysFromToday(-5), daysFromToday(0))])
+
+        expect(await screen.findByText(/Ends Today/)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Past trips/ })).toBeNull()
+    })
+
+    it('keeps a list with no dates in the current section', async () => {
+        renderWithLists([
+            listWithDates('l1', 'Someday Trip'),
+            listWithDates('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+        ])
+
+        expect(await screen.findByText(/Someday Trip/)).toBeTruthy()
+        expect(pastTripsToggle().textContent).toContain('Past trips (1)')
+    })
+
+    it('shows no past trips section when every trip is still to come', async () => {
+        renderWithLists([listWithDates('l1', 'Next Summer', daysFromToday(30), daysFromToday(37))])
+
+        await screen.findByText(/Next Summer/)
+        expect(screen.queryByRole('button', { name: /Past trips/ })).toBeNull()
+    })
+
+    it('carries the gradient rotation on across the current/past boundary', async () => {
+        renderWithLists([
+            listWithDates('l1', 'Next Summer', daysFromToday(30), daysFromToday(37)),
+            listWithDates('l2', 'Last Winter', daysFromToday(-60), daysFromToday(-53)),
+        ])
+
+        await screen.findByText(/Next Summer/)
+        fireEvent.click(pastTripsToggle())
+
+        const [current, past] = screen.getAllByTestId('packing-list-card')
+        expect(current.className).not.toBe(past.className)
+    })
+
+    it('keeps only the three most recently worked on undated lists in view', async () => {
+        const undated = (id: string, name: string, touchedDaysAgo: number) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00Z',
+            lastModified: new Date(Date.now() - touchedDaysAgo * 86_400_000).toISOString(),
+            items: [],
+        })
+
+        renderWithLists([
+            undated('l1', 'Touched today', 0),
+            undated('l2', 'Touched yesterday', 1),
+            undated('l3', 'Touched last week', 7),
+            undated('l4', 'Touched last month', 30),
+            undated('l5', 'Touched ages ago', 200),
+        ])
+
+        await screen.findByText(/Touched today/)
+        expect(screen.getByText(/Touched yesterday/)).toBeTruthy()
+        expect(screen.getByText(/Touched last week/)).toBeTruthy()
+        expect(screen.queryByText(/Touched last month/)).toBeNull()
+        expect(screen.queryByText(/Touched ages ago/)).toBeNull()
+    })
+
+    // "Past trips" would be a lie about a list folded for going quiet.
+    it('calls the folded section "Older trips" when it holds an undated list', async () => {
+        const undated = (id: string, name: string, touchedDaysAgo: number) => ({
+            id,
+            name,
+            createdAt: '2026-01-01T00:00:00Z',
+            lastModified: new Date(Date.now() - touchedDaysAgo * 86_400_000).toISOString(),
+            items: [],
+        })
+
+        renderWithLists([
+            undated('l1', 'A', 1),
+            undated('l2', 'B', 2),
+            undated('l3', 'C', 3),
+            undated('l4', 'D', 4),
+        ])
+
+        await screen.findByText(/A/)
+        expect(screen.getByRole('button', { name: /Older trips \(1\)/ })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /Past trips/ })).toBeNull()
+    })
+
+    it('never folds a trip that is still ahead, however many there are', async () => {
+        renderWithLists(
+            Array.from({ length: 6 }, (_, i) =>
+                listWithDates(`l${i}`, `Trip ${i}`, daysFromToday(10 + i * 7), daysFromToday(14 + i * 7)))
+        )
+
+        await screen.findByText(/Trip 0/)
+        expect(screen.getByText(/Trip 5/)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /trips/i })).toBeNull()
+    })
+
+    it('says why the main section is empty when only past trips are left', async () => {
+        renderWithLists([listWithDates('l1', 'Last Winter', daysFromToday(-60), daysFromToday(-53))])
+
+        expect(await screen.findByText(/No upcoming trips/i)).toBeTruthy()
+        expect(screen.queryByText(/No packing lists found/i)).toBeNull()
     })
 })
