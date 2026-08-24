@@ -681,8 +681,16 @@ describe('PackingLists trip destination and dates', () => {
     }
 
     it('shows the destination on the list card', async () => {
+        renderWithList({ ...tripList, startDate: undefined, endDate: undefined })
+        expect(await screen.findByText(/📍 Lisbon, Portugal/)).toBeTruthy()
+    })
+
+    // Two lines both saying Lisbon is one line too many: once the trip has
+    // dates the countdown names the destination, so the badge stands down.
+    it('folds the destination into the countdown once the trip has dates', async () => {
         renderWithList(tripList)
-        expect(await screen.findByText(/Lisbon, Portugal/)).toBeTruthy()
+        expect((await screen.findByTestId('trip-countdown')).textContent).toContain('Lisbon, Portugal')
+        expect(screen.queryByText(/📍 Lisbon, Portugal/)).toBeNull()
     })
 
     it('shows the trip dates rather than the creation date', async () => {
@@ -706,6 +714,89 @@ describe('PackingLists trip destination and dates', () => {
         await screen.findByText(/Summer Holiday/)
 
         expect(screen.queryByText(/📍/)).toBeNull()
+    })
+})
+
+describe('PackingLists trip countdown', () => {
+    const item = (id: string, packed: boolean) => ({
+        id, itemText: id, personName: 'Me', personId: 'p1', questionId: 'q1', optionId: 'o1', packed,
+    })
+
+    const countdownList = (extra: Record<string, unknown>) => ({
+        id: 'list-1',
+        name: 'Summer Holiday',
+        createdAt: '2026-01-01T00:00:00Z',
+        destination: 'Cornwall',
+        items: [item('a', false), item('b', false), item('c', true)],
+        ...extra,
+    })
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        localStorage.clear()
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderWithList(list: Record<string, unknown>) {
+        mockUseDatabase.mockReturnValue({
+            db: {
+                getAllPackingLists: vi.fn().mockResolvedValue([list]),
+                deletePackingList: vi.fn(),
+                savePackingList: vi.fn(),
+                getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
+            } as unknown as PackingAppDatabase,
+        })
+        return renderComponent()
+    }
+
+    it('counts the sleeps until a trip that is still to come', async () => {
+        renderWithList(countdownList({ startDate: daysFromToday(30), endDate: daysFromToday(37) }))
+        expect((await screen.findByTestId('trip-countdown')).textContent).toContain('30 sleeps until Cornwall')
+    })
+
+    it('carries the items still to pack once the trip is days away', async () => {
+        renderWithList(countdownList({ startDate: daysFromToday(2), endDate: daysFromToday(9) }))
+        expect((await screen.findByTestId('trip-countdown')).textContent)
+            .toContain('2 sleeps until Cornwall · 2 items left')
+    })
+
+    it('celebrates the day of the trip rather than showing zero sleeps', async () => {
+        renderWithList(countdownList({ startDate: daysFromToday(0), endDate: daysFromToday(7) }))
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('Off to Cornwall today!')
+        expect(countdown.textContent).not.toContain('0 sleeps')
+    })
+
+    it('says the trip is under way once it has started', async () => {
+        renderWithList(countdownList({ startDate: daysFromToday(-2), endDate: daysFromToday(5) }))
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('In Cornwall now')
+        expect(countdown.textContent).not.toContain('-')
+    })
+
+    it('never counts backwards for a trip that is over', async () => {
+        renderWithList(countdownList({ startDate: daysFromToday(-9), endDate: daysFromToday(-2) }))
+        // Finished trips are folded away, so open the section they fold into.
+        fireEvent.click(await screen.findByRole('button', { name: /Past trips/i }))
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('Back from Cornwall')
+        expect(countdown.textContent).not.toContain('-')
+    })
+
+    it('leaves a list with no dates without a countdown or a gap where one would be', async () => {
+        renderWithList(countdownList({}))
+        await screen.findByText(/Summer Holiday/)
+        expect(screen.queryByTestId('trip-countdown')).toBeNull()
     })
 })
 

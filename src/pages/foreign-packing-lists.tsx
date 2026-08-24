@@ -7,7 +7,8 @@ import { datasetToPackingList } from '../services/rdfSerialization'
 import { LoadingState } from '../components/LoadingState'
 import { Button } from '../components/Button'
 import type { PackingList } from '../create-packing-list/types'
-import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
+import { formatTripCountdown, formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
+import { TripCountdownBadge } from '../components/TripCountdownBadge'
 import { PastTripsSection } from '../components/PastTripsSection'
 
 export function ForeignPackingListsPage() {
@@ -77,6 +78,7 @@ export function ForeignPackingListsPage() {
         const displayWidth = packed === 0 ? 0 : Math.max(percent, 4)
         const gradient = gradients[index % gradients.length]
         const tripDates = formatTripDates(list.startDate, list.endDate)
+        const countdown = formatTripCountdown(list, total - packed)
         return (
             <div
                 key={list.id}
@@ -87,11 +89,12 @@ export function ForeignPackingListsPage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
                         ✈️ {list.name}
-                        {list.destination && (
+                        {list.destination && !countdown && (
                             <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2 py-0.5 rounded-full">
                                 📍 {list.destination}
                             </span>
                         )}
+                        <TripCountdownBadge countdown={countdown} />
                     </h3>
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg self-start sm:self-auto">
                         {tripDates
