@@ -34,6 +34,7 @@ import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { saveRdfToPod, getFullCollaborators, getCollaborators } from '../services/solidPod'
 import { useToast } from '../components/ToastContext'
+import { SUCCESS_TOAST_VARIANTS } from '../utils/successToastCopy'
 import { getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
 
 const mockUseDatabase = vi.mocked(useDatabase)
@@ -218,7 +219,10 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
         })
         fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
 
-        await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/full setup is shared/i), 'success'))
+        await waitFor(() => {
+            const success = showToast.mock.calls.find(call => call[1] === 'success')
+            expect(SUCCESS_TOAST_VARIANTS.setupShared as readonly string[]).toContain(success?.[0])
+        })
     })
 
     it('does not count a full-setup collaborator as an individual list share', async () => {

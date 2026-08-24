@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
 import { useToast } from '../components/ToastContext'
+import { successToast } from '../utils/successToastCopy'
 import { reportError } from '../errorReporting'
 import {
     grantFullCollaboratorAccess,
@@ -193,7 +194,7 @@ export function SharingSettingsPage() {
             setSharedWith(collaboratorWebId.trim())
             setCollaboratorWebId('')
             await loadCollaborators()
-            showToast('Your full setup is shared', 'success')
+            showToast(successToast('setupShared'), 'success')
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
             const details = reportError(err, 'SharingSettingsPage: failed to grant access')
@@ -207,7 +208,7 @@ export function SharingSettingsPage() {
         if (!inviteLink) return
         try {
             await navigator.clipboard.writeText(inviteLink)
-            showToast('Invite link copied', 'success')
+            showToast(successToast('inviteLinkCopied'), 'success')
         } catch (err) {
             // Clipboard access can be refused (permissions, insecure origin) —
             // the link is on screen and selectable, so say so rather than fail

@@ -7,8 +7,9 @@ vi.mock('../components/DatabaseContext', () => ({
     useDatabase: vi.fn(),
 }))
 
+const mockShowToast = vi.fn()
 vi.mock('../components/ToastContext', () => ({
-    useToast: vi.fn(() => ({ showToast: vi.fn() })),
+    useToast: vi.fn(() => ({ showToast: mockShowToast })),
 }))
 
 const mockSaveToPod = vi.fn().mockResolvedValue(true)
@@ -18,6 +19,7 @@ vi.mock('../hooks/usePodSync', () => ({
 
 import { useDatabase } from '../components/DatabaseContext'
 import type { PackingAppDatabase } from '../services/database'
+import { SUCCESS_TOAST_VARIANTS, resetSuccessToastVariety } from '../utils/successToastCopy'
 
 const mockUseDatabase = vi.mocked(useDatabase)
 
@@ -32,6 +34,33 @@ describe('useWizardGeneration', () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
         mockSaveToPod.mockClear()
+        mockShowToast.mockClear()
+        resetSuccessToastVariety()
+    })
+
+    async function generateFor(name: string) {
+        const { result } = renderHook(() => useWizardGeneration())
+        await act(async () => {
+            await result.current.generateAndSave({ people: [{ name, ageRange: 'Adult' }] })
+        })
+    }
+
+    it('confirms with one of the warm success phrasings', async () => {
+        await generateFor('Alice')
+
+        const [message, type] = mockShowToast.mock.calls[0]
+        expect(SUCCESS_TOAST_VARIANTS.questionsGenerated as readonly string[]).toContain(message)
+        expect(type).toBe('success')
+    })
+
+    // Redoing the wizard shouldn't produce the same sentence twice — see
+    // successToastCopy.
+    it('does not repeat the same confirmation on a second run', async () => {
+        await generateFor('Alice')
+        await generateFor('Bob')
+
+        const [first, second] = mockShowToast.mock.calls.map(call => call[0])
+        expect(second).not.toBe(first)
     })
 
     it('passes gender from form data through to the saved question set people', async () => {

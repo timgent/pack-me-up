@@ -117,7 +117,7 @@ test.describe('C – Packing Lists', () => {
     await createList(page, 'Original List')
     await page.goto('/#/view-lists')
     await chooseCardAction(page, 'Original List', /Duplicate/i)
-    await expect(page.getByText(/Copy of Original List/i)).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Original List (again!)')).toBeVisible({ timeout: 5_000 })
   })
 
   test('C6: delete a packing list with confirmation', async ({ freshPage: page }) => {
