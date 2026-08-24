@@ -24,6 +24,7 @@ import { SharingSettingsPage } from './pages/sharing-settings'
 import { QuestionsPage } from './pages/questions-page'
 import { PrivacyPolicyPage } from './pages/privacy-policy'
 import { YourDataPage } from './pages/your-data'
+import { OpenResourcePage } from './pages/open-resource'
 
 function DefaultRedirect() {
   const { isLoggedIn, isLoading } = useSolidPod()
@@ -48,6 +49,9 @@ function App() {
                   <Routes>
                     <Route path="/" element={<DefaultRedirect />} />
                     <Route path="/home" element={<LandingPage />} />
+                    {/* Where another app's `#open={open}` invocation lands — see
+                        src/capability/openInvocation.ts. */}
+                    <Route path="/open" element={<OpenResourcePage />} />
                     <Route path="/wizard" element={<Wizard />} />
                     <Route path="/manage-questions" element={<QuestionsPage />} />
                     <Route path="/create-packing-list" element={<CreatePackingList />} />

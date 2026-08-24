@@ -45,6 +45,33 @@ Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`
 from. `SolidPodContext.resilience.test.tsx`, `ResilientSession.test.ts` and e2e suite J
 pin the behaviour; suite J in particular asserts that a 401 does *not* sign the user out.
 
+## Application Capability description
+
+The app publishes a machine-readable description of itself at `/` — what it can
+do, how another app invokes it, what it needs from its environment — per
+[dokieli's Application Capability spec](https://dokieli.github.io/application-capability/).
+It lives in `src/capability/`, is served by `middleware.ts` (Vercel only — it
+does nothing under `npm run dev` or `vite preview`), and is restated as RDFa in
+the footer.
+
+Three rules it exists to keep:
+
+- **Never advertise a capability the app can't honour.** Every invocation
+  template must resolve to a real route. `document.test.ts` pins the template
+  list; `#open={open}` is handled by `openInvocation.ts` and `/open`
+  (`src/pages/open-resource.tsx`).
+- **The JSON-LD and the Turtle are two syntaxes for one description.** They are
+  hand-maintained separately, so `document.test.ts` parses both and compares
+  canonical N-Quads. Change one, change the other, and let that test tell you.
+- **Nothing hardcodes the deployment origin.** `capabilityDescription(origin)`
+  builds every IRI from the origin the request arrived on, so a preview
+  deployment describes itself.
+
+`middleware.ts` sits outside `src/`, where neither `tsconfig.app.json` nor
+`tsconfig.node.json` looks, so `tsconfig.middleware.json` exists purely to bring
+it into `tsc -b`. Keep it referenced from `tsconfig.json` or the one file gating
+the production homepage stops being type-checked.
+
 ## Data Access
 
 Never call `db.*` (local PouchDB) and pod storage functions directly in the same place. Use the established intermediate layers:
