@@ -26,6 +26,25 @@ Each serial suite that writes to a Solid pod **must use its own dedicated pod us
 
 When raising a PR that addresses a GitHub issue, always reference the issue in the PR description using `Closes #<issue-number>` or `Fixes #<issue-number>` so GitHub automatically links and closes the issue on merge.
 
+## Solid session
+
+Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`'s
+`SessionCore` ships no refresh lifecycle — that is this app's job, and it lives in
+`ResilientSession` (`src/services/ResilientSession.ts`). Two rules it exists to keep:
+
+- **Only the provider may end a session.** `invalid_grant`/`invalid_client`, or a DPoP
+  key that no longer matches, are terminal. Network errors, 5xx, 429, JWKS fetch
+  failures and clock skew are retried. Never call the library's `logout()` in response
+  to a 401 — it calls `database.clear()`, which deletes the refresh token and makes a
+  recoverable session unrecoverable.
+- **Bank a rotated refresh token before doing anything that can throw.** Providers
+  treat a re-presented refresh token as a replay and revoke the whole grant, so a
+  replacement that is received but not stored is a dead session.
+
+`docs/staying-signed-in.md` has the full trace of the logout bugs these rules came
+from. `SolidPodContext.resilience.test.tsx`, `ResilientSession.test.ts` and e2e suite J
+pin the behaviour; suite J in particular asserts that a 401 does *not* sign the user out.
+
 ## Data Access
 
 Never call `db.*` (local PouchDB) and pod storage functions directly in the same place. Use the established intermediate layers:

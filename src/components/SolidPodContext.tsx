@@ -1,7 +1,9 @@
-import { createContext, ReactNode, useContext, useState, useEffect, useRef } from "react";
-import { SessionCore, type SessionStateChangeDetail } from "@uvdsl/solid-oidc-client-browser/core";
+import { createContext, ReactNode, useContext, useState, useEffect, useRef, useCallback } from "react";
+import { type SessionStateChangeDetail } from "@uvdsl/solid-oidc-client-browser/core";
 import { SessionIDB } from "@uvdsl/solid-oidc-client-browser";
-import { isAuthenticationError, resetPodSessionCaches } from "../services/solidPod";
+import { ResilientSession, SessionEndedError } from "../services/ResilientSession";
+import { logAuthEvent } from "../services/authLog";
+import { resetPodSessionCaches } from "../services/solidPod";
 import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
 import { AppSession } from "../types/AppSession";
 
@@ -18,6 +20,16 @@ interface SolidPodContextValue {
 
 const SolidPodContext = createContext<SolidPodContextValue | undefined>(undefined);
 
+/** Backoff schedule for retrying a session we believe is still restorable. */
+const RECOVERY_DELAYS_MS = [1_000, 3_000, 8_000, 20_000, 45_000, 90_000];
+
+/**
+ * How long startup waits for a session to come back before rendering anyway.
+ * The restore keeps going in the background; this only decides whether the user
+ * stares at a spinner while it does.
+ */
+const STARTUP_RESTORE_BUDGET_MS = 4_000;
+
 export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [webId, setWebId] = useState<string | undefined>(undefined);
@@ -25,14 +37,21 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const intentionalLogoutRef = useRef(false);
 
-  const uvdslSessionRef = useRef<SessionCore>(null!);
+  // A session we could not restore yet but have no reason to believe is dead.
+  // While this is set, the app keeps quietly trying rather than showing the user
+  // a login prompt for what is usually a few seconds of bad network.
+  const recoveringRef = useRef(false);
+  const recoveryAttemptRef = useRef(0);
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const uvdslSessionRef = useRef<ResilientSession>(null!);
   if (!uvdslSessionRef.current) {
     const origin = window.location.origin || "http://localhost";
     // On production, VITE_CLIENT_ID_URL is set so the provider fetches the hosted Client ID
     // Document (static registration). On preview deploys and localhost it is unset, so we fall
     // back to dynamic client registration using the current origin's redirect URI.
     const clientIdUrl = import.meta.env.VITE_CLIENT_ID_URL as string | undefined;
-    uvdslSessionRef.current = new SessionCore(
+    uvdslSessionRef.current = new ResilientSession(
       clientIdUrl
         ? { client_id: clientIdUrl }
         : {
@@ -42,16 +61,23 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
             redirect_uris: [origin + "/"],
             client_name: "Pack Me Up",
           },
+      new SessionIDB(),
       {
-        database: new SessionIDB(),
         onSessionStateChange: (e) => {
           const { isActive, webId: newWebId } = (e as CustomEvent<SessionStateChangeDetail>).detail;
           setIsLoggedIn(isActive);
           setWebId(isActive ? newWebId : undefined);
-          if (isActive) setSessionExpired(false);
+          if (isActive) {
+            setSessionExpired(false);
+            recoveringRef.current = false;
+            recoveryAttemptRef.current = 0;
+          }
         },
+        // ResilientSession fires this only when the provider has rejected the
+        // grant — not for network trouble, which it retries on its own.
         onSessionExpiration: () => {
           if (!intentionalLogoutRef.current) setSessionExpired(true);
+          recoveringRef.current = false;
           setIsLoggedIn(false);
           setWebId(undefined);
           intentionalLogoutRef.current = false;
@@ -66,10 +92,49 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     ? { fetch: uvdslSession.authFetch.bind(uvdslSession), info: { isLoggedIn, webId } }
     : null;
 
+  /**
+   * Tries to restore, and keeps trying on a backoff while the failure looks
+   * temporary. Only the provider rejecting the grant stops the attempts — a
+   * refresh token that is merely unreachable is not a logged-out user.
+   */
+  const attemptRestore = useCallback(async (trigger: string): Promise<boolean> => {
+    if (uvdslSession.isActive) return true;
+    if (!(await uvdslSession.hasStoredSession())) {
+      logAuthEvent("restore.no-stored-session", { trigger });
+      recoveringRef.current = false;
+      return false;
+    }
+
+    try {
+      logAuthEvent("restore.attempt", { trigger, attempt: recoveryAttemptRef.current + 1 });
+      await uvdslSession.restore();
+      recoveringRef.current = false;
+      recoveryAttemptRef.current = 0;
+      logAuthEvent("restore.succeeded", { trigger });
+      return true;
+    } catch (error) {
+      if (error instanceof SessionEndedError) {
+        logAuthEvent("restore.session-ended", { trigger, reason: error.reason }, "error");
+        recoveringRef.current = false;
+        return false;
+      }
+      // Still recoverable. Schedule another go.
+      recoveringRef.current = true;
+      const attempt = recoveryAttemptRef.current;
+      recoveryAttemptRef.current = attempt + 1;
+      const delay = RECOVERY_DELAYS_MS[Math.min(attempt, RECOVERY_DELAYS_MS.length - 1)];
+      logAuthEvent("restore.will-retry", { trigger, attempt: attempt + 1, delay }, "warn");
+
+      clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = setTimeout(() => { void attemptRestore("backoff"); }, delay);
+      return false;
+    }
+  }, [uvdslSession]);
+
   useEffect(() => {
     const initializeSession = async () => {
       try {
-        console.log("Initializing Solid session...");
+        logAuthEvent("init.start");
 
         const searchParams = new URLSearchParams(window.location.search);
         const isOAuthCallback = searchParams.has("code") || searchParams.has("state");
@@ -78,98 +143,114 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           sessionStorage.setItem(AUTH_RETURN_TO_KEY, window.location.hash.substring(1) || "/");
         }
 
-        await uvdslSession.handleRedirectFromLogin();
+        try {
+          await uvdslSession.handleRedirectFromLogin();
+        } catch (error) {
+          // A malformed or stale callback must not cost us the session already
+          // stored on this device — fall through and restore it below.
+          logAuthEvent("login.redirect-failed", { reason: String(error) }, "warn");
+        }
 
         if (isOAuthCallback && uvdslSession.isActive) {
           // Redirect completed — navigate to the stored return route.
           // We handle this here instead of via pod-auth-callback.html so the
           // redirect_uri registered with the IdP can be the plain SPA root ("/").
+          logAuthEvent("login.completed", { webId: uvdslSession.webId });
+          uvdslSession.scheduleRenewal();
           const returnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY) || "/solid-pod-handle-redirect";
           window.location.replace("/#" + returnTo);
           return;
         }
 
         if (!uvdslSession.isActive) {
-          try {
-            await uvdslSession.restore();
-          } catch {
-            // No saved session — user starts logged out
-          }
+          // Don't hold the first paint hostage to a slow network — the retry
+          // continues in the background and signs the user in when it lands.
+          await Promise.race([
+            attemptRestore("startup"),
+            new Promise(resolve => setTimeout(resolve, STARTUP_RESTORE_BUDGET_MS)),
+          ]);
         }
-
-        console.log("Session initialized:", { isActive: uvdslSession.isActive, webId: uvdslSession.webId });
       } catch (error) {
-        console.error("Error initializing session:", error);
+        logAuthEvent("init.failed", { reason: String(error) }, "error");
       } finally {
         setIsLoading(false);
       }
     };
 
-    initializeSession();
+    void initializeSession();
+    return () => clearTimeout(recoveryTimerRef.current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Validate session when user returns to the tab
+  // Take every chance to get a stalled session back: coming online, or the user
+  // returning to the tab, are both good moments to retry ahead of the backoff.
   useEffect(() => {
-    if (!isLoggedIn || !webId) return;
-
-    const handleSessionExpired = async () => {
-      console.log("Session validation failed - session has expired");
-      await uvdslSession.logout();
-      setIsLoggedIn(false);
-      setWebId(undefined);
-      setSessionExpired(true);
+    const retryIfRecovering = (trigger: string) => {
+      if (!recoveringRef.current || uvdslSession.isActive) return;
+      clearTimeout(recoveryTimerRef.current);
+      void attemptRestore(trigger);
     };
 
-    const validateSession = async () => {
-      try {
-        const response = await uvdslSession.authFetch(webId, { method: "HEAD" });
-        if (response.status === 401 || response.status === 403) {
-          await handleSessionExpired();
-        }
-      } catch (error: unknown) {
-        if (isAuthenticationError(error)) {
-          await handleSessionExpired();
-        } else {
-          console.error("Session validation failed with non-auth error:", error);
-        }
-      }
+    const onOnline = () => retryIfRecovering("online");
+    const onVisible = () => {
+      if (document.visibilityState === "visible") retryIfRecovering("visible");
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("Tab became visible - validating session");
-        validateSession();
-      }
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
     };
+  }, [attemptRestore, uvdslSession]);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isLoggedIn, webId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Proactively refresh the access token so it doesn't silently expire between user actions.
-  // (SessionCore has no background worker, so we poll manually.)
+  // Returning to the tab is when a token is most likely to have lapsed while the
+  // device slept. Renew it before the user's first action needs it.
   useEffect(() => {
-    if (!isLoggedIn || !webId) return;
-    const intervalId = setInterval(async () => {
-      try {
-        await uvdslSession.authFetch(webId, { method: "HEAD" });
-      } catch {
-        // Best-effort; event listeners handle real auth failures
-      }
-    }, 10 * 60 * 1000);
-    return () => clearInterval(intervalId);
-  }, [isLoggedIn, webId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isLoggedIn) return;
+
+    const renewIfNeeded = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!uvdslSession.needsRenewal()) return;
+      logAuthEvent("refresh.on-visible");
+      void uvdslSession.restore().catch(() => { /* restore() reports and retries */ });
+    };
+
+    document.addEventListener("visibilitychange", renewIfNeeded);
+    window.addEventListener("online", renewIfNeeded);
+    return () => {
+      document.removeEventListener("visibilitychange", renewIfNeeded);
+      window.removeEventListener("online", renewIfNeeded);
+    };
+  }, [isLoggedIn, uvdslSession]);
+
+  // Keep the renewal timer armed for the life of the session.
+  useEffect(() => {
+    if (!isLoggedIn) {
+      uvdslSession.cancelRenewal();
+      return;
+    }
+    uvdslSession.scheduleRenewal();
+    return () => uvdslSession.cancelRenewal();
+  }, [isLoggedIn, uvdslSession]);
 
   const login = async (oidcIssuer: string, returnTo?: string) => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
     sessionStorage.setItem(AUTH_RETURN_TO_KEY, currentLocation);
     const redirectUri = (window.location.origin || "http://localhost") + "/";
+    logAuthEvent("login.redirecting", { oidcIssuer });
     await uvdslSession.login(oidcIssuer, redirectUri);
   };
 
   const logout = async () => {
     intentionalLogoutRef.current = true;
-    await uvdslSession.logout();
+    recoveringRef.current = false;
+    clearTimeout(recoveryTimerRef.current);
+    try {
+      await uvdslSession.logout();
+    } finally {
+      // Leaving this set would swallow the banner for the next genuine expiry.
+      intentionalLogoutRef.current = false;
+    }
     // Which pod a WebID lives in, and which of its containers exist, are facts
     // about the identity that just went away.
     resetPodSessionCaches();
