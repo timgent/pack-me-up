@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { LandingPage } from './landing-page'
@@ -12,11 +12,18 @@ vi.mock('../components/SolidPodContext', () => ({
     useSolidPod: vi.fn(),
 }))
 
+vi.mock('../services/solidPod', async importOriginal => ({
+    ...(await importOriginal<typeof import('../services/solidPod')>()),
+    getSolidProfile: vi.fn().mockResolvedValue({ name: null, photo: null }),
+}))
+
 import { useHasQuestions } from '../hooks/useHasQuestions'
 import { useSolidPod } from '../components/SolidPodContext'
+import { getSolidProfile } from '../services/solidPod'
 
 const mockUseHasQuestions = vi.mocked(useHasQuestions)
 const mockUseSolidPod = vi.mocked(useSolidPod)
+const mockGetSolidProfile = vi.mocked(getSolidProfile)
 
 describe('LandingPage', () => {
     beforeEach(() => {
@@ -148,5 +155,74 @@ describe('LandingPage', () => {
         const loginButton = screen.getByRole('button', { name: /get a free solid pod/i })
         fireEvent.click(loginButton)
         expect(screen.getByRole('dialog')).toBeTruthy()
+    })
+})
+
+// The nav stopped printing the raw WebID in #302; this banner sat right under it
+// still doing exactly that.
+describe('LandingPage – signed-in greeting', () => {
+    const WEB_ID = 'https://user.solidpod.example/profile/card#me'
+
+    beforeEach(() => {
+        mockUseHasQuestions.mockReturnValue(false)
+        mockGetSolidProfile.mockResolvedValue({ name: null, photo: null })
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: true,
+            webId: WEB_ID,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    function renderPage() {
+        return render(
+            <MemoryRouter>
+                <LandingPage />
+            </MemoryRouter>
+        )
+    }
+
+    it('greets you by the name on your profile card', async () => {
+        mockGetSolidProfile.mockResolvedValue({ name: 'Alice Adams', photo: null })
+
+        renderPage()
+
+        expect(await screen.findByText('Alice Adams')).toBeTruthy()
+    })
+
+    it('never prints the raw WebID', async () => {
+        renderPage()
+
+        await waitFor(() => expect(mockGetSolidProfile).toHaveBeenCalled())
+        expect(screen.queryByText(WEB_ID)).toBeNull()
+    })
+
+    it('falls back to the pod username when the card has no name', async () => {
+        renderPage()
+
+        expect(await screen.findByText('user')).toBeTruthy()
+    })
+
+    it('reads the profile through the shared cached path', async () => {
+        renderPage()
+
+        await waitFor(() => expect(mockGetSolidProfile).toHaveBeenCalledWith(null, WEB_ID))
+    })
+
+    it('says nothing at all when signed out', () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+
+        renderPage()
+
+        expect(screen.queryByText(/signed in as/i)).toBeNull()
     })
 })

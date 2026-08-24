@@ -5,6 +5,7 @@ import { useSolidPod } from '../components/SolidPodContext'
 import { loadMultipleRdfFromPod, POD_CONTAINERS } from '../services/solidPod'
 import { datasetToPackingList } from '../services/rdfSerialization'
 import { LoadingState } from '../components/LoadingState'
+import { Button } from '../components/Button'
 import type { PackingList } from '../create-packing-list/types'
 import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
 import { PastTripsSection } from '../components/PastTripsSection'
@@ -39,13 +40,15 @@ export function ForeignPackingListsPage() {
 
     const encodedPodUrl = encodeURIComponent(foreignPodUrl ?? '')
 
+    // The only way to start a list in someone else's pod. The nav dropped
+    // "Create List" (#302), and until then this page had no create affordance
+    // at all — so a collaborator could edit a shared list but never add one.
+    const createList = () => navigate(`/pod/${encodedPodUrl}/create-packing-list`)
+
     if (isLoading) {
         return (
             <div className="max-w-4xl mx-auto py-8 px-4">
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                    <p className="mt-2 text-lg text-gray-700 font-medium">Shared packing lists.</p>
-                </div>
+                <Header onCreate={createList} />
                 <LoadingState message="Loading packing lists..." rows={3} />
             </div>
         )
@@ -113,10 +116,7 @@ export function ForeignPackingListsPage() {
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
-                <p className="mt-2 text-lg text-gray-700 font-medium">Shared packing lists.</p>
-            </div>
+            <Header onCreate={createList} />
             {lists.length === 0 ? (
                 <div className="text-center py-12 bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border-2 border-primary-200 shadow-soft">
                     <p className="text-lg text-gray-800 font-semibold">No packing lists found.</p>
@@ -142,6 +142,18 @@ export function ForeignPackingListsPage() {
                     )}
                 </>
             )}
+        </div>
+    )
+}
+
+function Header({ onCreate }: { onCreate: () => void }) {
+    return (
+        <div className="mb-8 flex justify-between items-start gap-4">
+            <div className="mb-2">
+                <h1 className="text-4xl font-bold text-primary-900">📦 Packing Lists</h1>
+                <p className="mt-2 text-lg text-gray-700 font-medium">Shared packing lists.</p>
+            </div>
+            <Button variant="primary" onClick={onCreate}>➕ New List</Button>
         </div>
     )
 }

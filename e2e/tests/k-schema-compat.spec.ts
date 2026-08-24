@@ -79,11 +79,12 @@ test.describe('K – JSON Schema Compatibility', () => {
   })
 
   test('K3: new packing list can be created when question set is loaded from v1 JSON', async () => {
-    // Navigate to create-packing-list via nav link (hash change, no OIDC re-auth needed)
+    // Navigate to create-packing-list from the Lists page (hash change, no OIDC
+    // re-auth needed) — the nav no longer carries a Create List link (#302).
     await page.goto('/#/view-lists')
     await page.waitForLoadState('networkidle')
 
-    await page.getByRole('link', { name: 'Create List' }).first().click()
+    await page.getByRole('button', { name: /New List/i }).first().click()
     await page.waitForURL(/#\/create-packing-list/, { timeout: 10_000 })
 
     // The question from the fixture should appear (local DB already has it from beforeAll sync)

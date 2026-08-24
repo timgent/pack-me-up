@@ -1,4 +1,24 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+
+/**
+ * The signed-in sentinel. Logout used to be a button in the nav bar and was
+ * what every helper waited for; it now lives inside the account menu (#302),
+ * so the trigger is what stays visible once you are signed in.
+ */
+export function accountMenu(page: Page): Locator {
+  return page.getByRole('button', { name: /account menu/i })
+}
+
+/** Opens the account menu, so its Backups link and Logout button are reachable. */
+export async function openAccountMenu(page: Page): Promise<void> {
+  await accountMenu(page).first().click()
+}
+
+/** Signs out the way a user does now: open the account menu, then Logout. */
+export async function logoutViaAccountMenu(page: Page): Promise<void> {
+  await openAccountMenu(page)
+  await page.getByRole('button', { name: 'Logout' }).click()
+}
 
 /**
  * Automates the full Solid Pod OAuth login flow through the app's UI.
@@ -69,6 +89,6 @@ export async function loginToCss(
   await page.waitForURL(/localhost:4173/, { timeout: 20_000 })
   // Wait for logged-in state (skip if the caller expects a migration prompt to block the nav)
   if (options?.waitForLoggedIn !== false) {
-    await page.getByRole('button', { name: 'Logout' }).first().waitFor({ timeout: 20_000 })
+    await accountMenu(page).first().waitFor({ timeout: 20_000 })
   }
 }

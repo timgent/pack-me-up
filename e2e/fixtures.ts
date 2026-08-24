@@ -1,6 +1,6 @@
 import { test as base, BrowserContext, Page } from '@playwright/test'
 import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD, SCHEMA_COMPAT_EMAIL, SCHEMA_COMPAT_PASSWORD } from '../playwright.config'
-import { loginToCss } from './helpers/login'
+import { accountMenu, loginToCss } from './helpers/login'
 
 type MyFixtures = {
   /** A page with a fresh (empty) browser context — no auth, no local data */
@@ -38,9 +38,9 @@ export const test = base.extend<MyFixtures>({
     // The context already has a valid session from authedContext's fresh login.
     // The app will try to restore the session (prompt=none), but since the same
     // CSS process is running and consent was just given, this should succeed quickly.
-    // Wait up to 30 seconds for "Logout" to appear.
+    // Wait up to 30 seconds for the account menu — the signed-in sentinel — to appear.
     await page.goto('/')
-    await page.getByRole('button', { name: 'Logout' }).first().waitFor({ state: 'visible', timeout: 30_000 })
+    await accountMenu(page).first().waitFor({ state: 'visible', timeout: 30_000 })
     await use(page)
   },
 

@@ -62,7 +62,7 @@ export async function authenticateForPod(cssOrigin, { email, password, webId }) 
  * Drive the app's real Solid login UI (same flow as e2e/helpers/login.ts).
  */
 export async function loginToCss(page, { appOrigin, cssOrigin, email, password }) {
-  await page.getByRole('button', { name: 'Login with Solid Pod' }).click()
+  await page.getByRole('button', { name: 'Sync & Share' }).click()
   await page.getByRole('dialog').waitFor()
   await page.getByText('Other providers').click()
   await page.getByRole('button', { name: 'Use Custom Provider' }).click()
@@ -93,5 +93,6 @@ export async function loginToCss(page, { appOrigin, cssOrigin, email, password }
   await authorizeBtn.click()
 
   await page.waitForURL(new RegExp(new URL(appOrigin).host), { timeout: 20_000 })
-  await page.getByRole('button', { name: 'Logout' }).first().waitFor({ timeout: 20_000 })
+  // The signed-in sentinel: Logout moved inside the account menu (#302).
+  await page.getByRole('button', { name: /account menu/i }).first().waitFor({ timeout: 20_000 })
 }

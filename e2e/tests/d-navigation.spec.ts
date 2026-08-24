@@ -6,11 +6,19 @@ test.describe('D – Navigation & UI', () => {
     await page.getByRole('link', { name: /My Questions & Items/i }).click()
     await expect(page).toHaveURL(/#\/manage-questions/)
 
-    await page.getByRole('link', { name: /Create List/i }).click()
-    await expect(page).toHaveURL(/#\/create-packing-list/)
-
-    await page.getByRole('link', { name: /View Lists/i }).click()
+    await page.getByRole('link', { name: 'Lists' }).click()
     await expect(page).toHaveURL(/#\/view-lists/)
+  })
+
+  // Creating a list starts from Lists now, not from the nav. See #302.
+  test('D1b: Create List has left the nav, and Lists carries New List', async ({ freshPage: page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('link', { name: /Create List/i })).toHaveCount(0)
+
+    await page.getByRole('link', { name: 'Lists' }).click()
+    await page.getByRole('button', { name: /New List/i }).first().click()
+
+    await expect(page).toHaveURL(/#\/create-packing-list/)
   })
 
   test('D2: Backups nav link is hidden when not logged in', async ({ freshPage: page }) => {
