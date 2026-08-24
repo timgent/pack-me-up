@@ -6,8 +6,8 @@
 | **Issue** | [#302 — Navigation restructure: show profile photo and name, move WebID/Backups/Sharing into an account dropdown](https://github.com/timgent/pack-me-up/issues/302) |
 | **PR** | _(linked from the PR description)_ |
 | **Branch** | `claude/issue-302-8rib8j` |
-| **Commit under test** | `8297323` — *Name the signed-in account in the nav, and put the WebID behind it* |
-| **Result** | ✅ **Pass** — all 7 acceptance criteria met. One pre-existing issue found outside this change's scope (see [Bugs found](#bugs-found)). |
+| **Commit under test** | `9118059` — *Greet people by name on the landing page too, not by WebID* (on top of `8297323`) |
+| **Result** | ✅ **Pass** — all 7 acceptance criteria met. One further issue found during testing and then fixed on request (see [Bugs found](#bugs-found)). |
 
 ---
 
@@ -232,6 +232,8 @@ Visible in the nav of every screenshot.
 | Affected e2e suites | `npx playwright test d-navigation e-auth k-schema-compat z-verify-offline-share` | ✅ **14 passed** |
 | Full e2e suite | `npx playwright test` | ✅ **88 passed** |
 
+Re-run after the landing-page fix: `npm test` ✅ **1812 passed**, full e2e ✅ **88 passed**, lint ✅ 0 errors.
+
 New unit coverage added with this change:
 
 - `podUsernameFromWebId` — 6 cases (CSS/NSS, per-user subdomain, identity-provider WebID, no-username host, service subdomain, junk)
@@ -239,6 +241,8 @@ New unit coverage added with this change:
 - `AccountMenu` / `ProfileBadge` — 11 cases, including Escape + focus return, outside click, and photo `onError` fallback
 - `Navigation` — 7 new cases for the account menu, the fallback, and the mobile block
 - `foreign-packing-lists` — 2 new cases for the create entry point
+- `profileDisplayName` — 4 cases (card name wins, username fallback, no WebID, unparseable WebID)
+- `landing-page` — 5 new cases for the signed-in greeting
 - e2e: `D1b`, `E1b`, `E1c` added; `E1`–`E4`, `D1`, `K3`, `Z1` updated for the moved Logout
 
 > **Note on the first full e2e run:** `F6` failed once under 4-worker load, waiting for the transient
@@ -250,17 +254,48 @@ New unit coverage added with this change:
 
 ## Bugs found
 
-**One, pre-existing and outside this change's scope.**
+**One — found in testing, then fixed on request.**
 
-**The landing page still prints the raw WebID.** Directly under the now-fixed nav bar, the landing page
-shows a banner reading *"🎉 Logged in as: http://localhost:4000/test/profile/card#me"* — the exact
-"developer output standing in for a signed-in state" problem #302 was opened about, on a different
-component (`src/pages/landing-page.tsx`, not `Navigation.tsx`). Visible in
-[the signed-in](images/04-desktop-signed-in-photo-and-name.png) and
-[the fallback](images/09-desktop-fallback-icon-and-username.png) screenshots.
+### The landing page was still printing the raw WebID
 
-It is not in #302's acceptance criteria and was left alone rather than widening the PR, but it
-undercuts the change sitting immediately above it and is worth its own issue. The pieces to fix it
-already exist: `useSolidProfile` + `podUsernameFromWebId` + `ProfileBadge`.
+Directly under the now-fixed nav bar, the landing page showed a banner reading
+*"🎉 Logged in as: http://localhost:4000/test/profile/card#me"* — the exact "developer output standing
+in for a signed-in state" problem #302 was opened about, one component over
+(`src/pages/landing-page.tsx`, not `Navigation.tsx`). Still visible in the AC screenshots above, which
+were taken before the fix: [signed in](images/04-desktop-signed-in-photo-and-name.png) and
+[fallback](images/09-desktop-fallback-icon-and-username.png).
 
-**Nothing else.** No defects found in the change under test.
+It was outside #302's acceptance criteria, so it was reported rather than fixed unilaterally; @timgent
+asked for it, and commit `9118059` does it. The banner now reads **"🎉 Signed in as &lt;name&gt;"**,
+using the same rule as the nav — extracted to one function, `profileDisplayName`, instead of an
+expression duplicated in two places. The photo deliberately stays in the nav rather than being repeated
+an inch below it.
+
+Named profile — the nav and the greeting now agree:
+
+![Landing greeting with a profile name](images/15-landing-greeting-named.png)
+
+Card with no name — the same pod-username fallback as the nav:
+
+![Landing greeting falling back to the pod username](images/16-landing-greeting-fallback.png)
+
+Mobile, 390×844:
+
+![Landing greeting on mobile](images/17-landing-greeting-mobile.png)
+
+Verified by walking the DOM rather than by eye — every leaf element containing `profile/card#me` that
+has a non-zero bounding box, across all three cases:
+
+```
+[named]             landing banner: 🎉 Signed in as Alice Adams
+[named]             VISIBLE raw WebIDs on the page: []
+[username-fallback] landing banner: 🎉 Signed in as test
+[username-fallback] VISIBLE raw WebIDs on the page: []
+[named-mobile]      landing banner: 🎉 Signed in as Alice Adams
+[named-mobile]      VISIBLE raw WebIDs on the page: []
+```
+
+(The WebID is still *in* the DOM once — inside the mobile menu's collapsed "Signed in as" block, which
+is where AC 5 wants it. Nothing renders it visibly.)
+
+**Nothing else.** No other defects found.
