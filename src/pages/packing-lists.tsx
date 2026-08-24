@@ -16,7 +16,8 @@ import { packingListToDataset, deletedPackingListsToDataset } from '../services/
 import { usePodErrorHandler } from '../hooks/usePodErrorHandler'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { generateUUID } from '../utils/uuid'
-import { formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
+import { formatTripCountdown, formatTripDates, splitCurrentAndPastTrips } from '../create-packing-list/tripDetails'
+import { TripCountdownBadge } from '../components/TripCountdownBadge'
 import { PastTripsSection } from '../components/PastTripsSection'
 
 type SharingStatus = 'public' | 'shared' | 'private'
@@ -265,6 +266,11 @@ export function PackingLists() {
         // creation date is only worth showing when there are none.
         const tripDates = formatTripDates(list.startDate, list.endDate)
 
+        // How soon the trip is is the reason to open this card, so it gets a
+        // badge of its own under the name. It names the destination itself,
+        // which is why the destination line below stands down when it is here.
+        const countdown = formatTripCountdown(list, totalCount - packedCount)
+
         return (
             <div
                 key={list.id}
@@ -299,9 +305,10 @@ export function PackingLists() {
                     </h3>
                     {/* On its own line so a long destination never
                         pushes the actions onto a second row */}
-                    {list.destination && (
+                    {list.destination && !countdown && (
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 truncate">📍 {list.destination}</p>
                     )}
+                    <TripCountdownBadge countdown={countdown} className="mt-1" />
                     </div>
                     <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg">

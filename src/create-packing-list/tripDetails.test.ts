@@ -6,6 +6,7 @@ import {
     tripIsPast,
     splitCurrentAndPastTrips,
     MAX_UNDATED_CURRENT_TRIPS,
+    formatTripCountdown,
 } from './tripDetails'
 
 describe('formatTripDate', () => {
@@ -243,5 +244,125 @@ describe('splitCurrentAndPastTrips', () => {
 
     it('handles an empty list', () => {
         expect(splitCurrentAndPastTrips([])).toEqual({ current: [], past: [], allPastFinished: true })
+    })
+})
+
+describe('formatTripCountdown', () => {
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    /** Freezes the clock mid-afternoon on 15 June 2026, local time. */
+    const freezeClock = () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(2026, 5, 15, 14, 30))
+    }
+
+    it('returns null when the list has no dates at all', () => {
+        freezeClock()
+        expect(formatTripCountdown({ destination: 'Cornwall' })).toBeNull()
+    })
+
+    it('returns null when the only date present is unparseable', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: 'not-a-date' })).toBeNull()
+    })
+
+    it('counts the sleeps until a trip still to come, naming the destination', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-18', destination: 'Cornwall' })).toEqual({
+            status: 'upcoming',
+            sleeps: 3,
+            label: '3 sleeps until Cornwall',
+        })
+    })
+
+    it('counts sleeps without a destination when the list has none', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-25' })).toEqual({
+            status: 'upcoming',
+            sleeps: 10,
+            label: '10 sleeps to go',
+        })
+    })
+
+    it('says one sleep rather than 1 sleeps the night before', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-16', destination: 'Cornwall' })?.label)
+            .toBe('1 sleep until Cornwall')
+    })
+
+    it('counts calendar days, not 24-hour blocks, late in the evening', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(2026, 5, 15, 23, 59))
+        expect(formatTripCountdown({ startDate: '2026-06-16' })?.sleeps).toBe(1)
+    })
+
+    it('celebrates the day the trip starts instead of counting zero sleeps', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-15', endDate: '2026-06-20', destination: 'Cornwall' })).toEqual({
+            status: 'today',
+            sleeps: 0,
+            label: 'Off to Cornwall today!',
+        })
+        expect(formatTripCountdown({ startDate: '2026-06-15' })?.label).toBe("Today's the day!")
+    })
+
+    it('says the trip is under way once it has started', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-10', endDate: '2026-06-20', destination: 'Cornwall' })).toEqual({
+            status: 'in-progress',
+            label: 'In Cornwall now',
+        })
+        expect(formatTripCountdown({ startDate: '2026-06-10', endDate: '2026-06-15' })?.label)
+            .toBe('Trip in progress')
+    })
+
+    it('never counts backwards for a trip that is over', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-01', endDate: '2026-06-08', destination: 'Cornwall' })).toEqual({
+            status: 'past',
+            label: 'Back from Cornwall',
+        })
+        expect(formatTripCountdown({ startDate: '2026-06-01', endDate: '2026-06-08' })?.label)
+            .toBe('Trip finished')
+    })
+
+    it('treats an end-date-only trip as past once that date has gone', () => {
+        freezeClock()
+        expect(formatTripCountdown({ endDate: '2026-06-08' })?.status).toBe('past')
+    })
+
+    it('has nothing to count down to when only a future end date is known', () => {
+        freezeClock()
+        expect(formatTripCountdown({ endDate: '2026-06-20' })).toBeNull()
+    })
+
+    it('adds the items still to pack once the trip is close enough to matter', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-17', destination: 'Cornwall' }, 18)?.label)
+            .toBe('2 sleeps until Cornwall · 18 items left')
+        expect(formatTripCountdown({ startDate: '2026-06-15' }, 1)?.label)
+            .toBe("Today's the day! 1 item left")
+    })
+
+    it('leaves a distant trip uncluttered by the items count', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-07-12', destination: 'Cornwall' }, 18)?.label)
+            .toBe('27 sleeps until Cornwall')
+    })
+
+    it('says nothing about items when there are none left to pack', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-16', destination: 'Cornwall' }, 0)?.label)
+            .toBe('1 sleep until Cornwall')
+    })
+
+    it('does not nag about items on a trip already under way or over', () => {
+        freezeClock()
+        expect(formatTripCountdown({ startDate: '2026-06-10', endDate: '2026-06-20' }, 5)?.label)
+            .toBe('Trip in progress')
+        expect(formatTripCountdown({ startDate: '2026-06-01', endDate: '2026-06-08' }, 5)?.label)
+            .toBe('Trip finished')
     })
 })

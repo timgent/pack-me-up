@@ -140,3 +140,107 @@ export function tripDatesOutOfOrder(startDate: string | undefined, endDate: stri
     if (!start || !end) return false
     return end.getTime() < start.getTime()
 }
+
+/**
+ * Where a trip sits relative to today. Each state gets copy of its own so a
+ * trip that has started or finished never renders as a zero or negative
+ * countdown.
+ */
+export type TripCountdownStatus = 'upcoming' | 'today' | 'in-progress' | 'past'
+
+export interface TripCountdown {
+    status: TripCountdownStatus
+    /** Ready-to-render copy, e.g. "3 sleeps until Cornwall". */
+    label: string
+    /** Nights left before the trip starts; 0 on the day, absent once it has begun. */
+    sleeps?: number
+}
+
+/** The fields of a packing list a countdown is built from. */
+export interface TripCountdownInput {
+    startDate?: string
+    endDate?: string
+    destination?: string
+}
+
+/**
+ * How close a trip has to be before the countdown starts naming the items still
+ * to pack. Further out than this it is anticipation, not a to-do list, and the
+ * card already carries a packed count.
+ */
+export const URGENT_SLEEPS = 3
+
+/** Local midnight today — the day boundary every comparison here is made against. */
+function startOfToday(): Date {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+/**
+ * Whole calendar days from one local midnight to another. Rounding absorbs the
+ * hour a daylight-saving change adds to or takes off the span.
+ */
+function calendarDaysBetween(from: Date, to: Date): number {
+    return Math.round((to.getTime() - from.getTime()) / 86_400_000)
+}
+
+function pluralise(count: number, noun: string): string {
+    return `${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/**
+ * The trip's countdown as copy the traveller can read, or null when there is
+ * nothing to count down to — no dates at all, unreadable dates, or an
+ * open-ended trip that only says when it ends.
+ *
+ * `remainingItems` is folded in only for a trip within `URGENT_SLEEPS`, where
+ * "2 sleeps until Cornwall, 18 items left" is the nudge a parent actually
+ * needs; a trip under way or over is never nagged about packing.
+ */
+export function formatTripCountdown(
+    { startDate, endDate, destination }: TripCountdownInput,
+    remainingItems?: number
+): TripCountdown | null {
+    const start = parseTripDate(startDate)
+    const end = parseTripDate(endDate)
+    if (!start && !end) return null
+
+    if (tripIsPast(startDate, endDate)) {
+        return { status: 'past', label: destination ? `Back from ${destination}` : 'Trip finished' }
+    }
+
+    // Without a start date there is no moment to count towards. The trip is
+    // still ahead of its end date, but saying so would be a guess.
+    if (!start) return null
+
+    const sleeps = calendarDaysBetween(startOfToday(), start)
+
+    if (sleeps > 0) {
+        const label = destination
+            ? `${pluralise(sleeps, 'sleep')} until ${destination}`
+            : `${pluralise(sleeps, 'sleep')} to go`
+        return withRemaining({ status: 'upcoming', sleeps, label }, remainingItems)
+    }
+
+    if (sleeps === 0) {
+        const label = destination ? `Off to ${destination} today!` : "Today's the day!"
+        return withRemaining({ status: 'today', sleeps, label }, remainingItems)
+    }
+
+    return { status: 'in-progress', label: destination ? `In ${destination} now` : 'Trip in progress' }
+}
+
+/**
+ * Appends the items still to pack to a countdown that is close enough to earn
+ * it. Separated by a middot rather than a comma, which a destination can carry
+ * one of already ("Lisbon, Portugal, 2 items left" reads as three things); an
+ * exclamation closes the sentence, so there the count simply follows.
+ */
+function withRemaining(countdown: TripCountdown, remainingItems?: number): TripCountdown {
+    if (!remainingItems || remainingItems <= 0) return countdown
+    if (countdown.sleeps === undefined || countdown.sleeps > URGENT_SLEEPS) return countdown
+
+    const left = `${pluralise(remainingItems, 'item')} left`
+    const separator = countdown.label.endsWith('!') ? ' ' : ' · '
+    return { ...countdown, label: `${countdown.label}${separator}${left}` }
+}

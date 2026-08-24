@@ -2466,6 +2466,96 @@ describe('ViewPackingList trip destination and dates', () => {
     })
 })
 
+describe('ViewPackingList trip countdown', () => {
+    /**
+     * A YYYY-MM-DD date the given number of days either side of today. Hard-coded
+     * dates would drift into the past and change which state the countdown is in.
+     */
+    const daysFromToday = (days: number) => {
+        const date = new Date()
+        date.setDate(date.getDate() + days)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    }
+
+    function makeTripDb(overrides: Record<string, unknown>) {
+        return {
+            getPackingList: vi.fn().mockResolvedValue({ ...testPackingList, ...overrides }),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
+            getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
+            saveSharedListsWithMe: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+    }
+
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    function renderTrip(overrides: Record<string, unknown>) {
+        mockUseDatabase.mockReturnValue({ db: makeTripDb(overrides) as unknown as PackingAppDatabase })
+        renderComponent()
+    }
+
+    it('counts the sleeps until a trip still to come', async () => {
+        renderTrip({ destination: 'Cornwall', startDate: daysFromToday(12), endDate: daysFromToday(19) })
+        expect((await screen.findByTestId('trip-countdown')).textContent).toContain('12 sleeps until Cornwall')
+    })
+
+    it('celebrates the day of the trip rather than showing zero sleeps', async () => {
+        renderTrip({ destination: 'Cornwall', startDate: daysFromToday(0), endDate: daysFromToday(7) })
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('Off to Cornwall today!')
+        expect(countdown.textContent).not.toContain('0 sleeps')
+    })
+
+    it('says the trip is under way once it has started', async () => {
+        renderTrip({ destination: 'Cornwall', startDate: daysFromToday(-3), endDate: daysFromToday(4) })
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('In Cornwall now')
+        expect(countdown.textContent).not.toContain('-')
+    })
+
+    it('never counts backwards for a trip that is over', async () => {
+        renderTrip({ destination: 'Cornwall', startDate: daysFromToday(-10), endDate: daysFromToday(-3) })
+        const countdown = await screen.findByTestId('trip-countdown')
+        expect(countdown.textContent).toContain('Back from Cornwall')
+        expect(countdown.textContent).not.toContain('-')
+    })
+
+    it('shows no countdown at all for a list with no dates', async () => {
+        renderTrip({ destination: 'Cornwall' })
+        await screen.findByTestId('trip-details')
+        expect(screen.queryByTestId('trip-countdown')).toBeNull()
+    })
+
+    it('still shows the trip dates alongside the countdown', async () => {
+        const start = daysFromToday(12)
+        renderTrip({ destination: 'Cornwall', startDate: start, endDate: daysFromToday(19) })
+
+        const details = await screen.findByTestId('trip-details')
+        const [year, month, day] = start.split('-').map(Number)
+        expect(details.textContent).toContain(new Date(year, month - 1, day).toLocaleDateString())
+    })
+})
+
 describe('ViewPackingList check-off feedback', () => {
     // Two people so the list is never finished by a single tick — the completion
     // celebration has its own tests and would otherwise mask the per-item one.

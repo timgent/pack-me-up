@@ -25,7 +25,8 @@ import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { mergePackingLists } from '../utils/mergePackingLists'
 import { computeQuestionSetAdditions } from '../create-packing-list/updateFromQuestions'
 import { MILESTONE_MESSAGES, resolveMilestone } from './packing-milestones'
-import { formatTripDates } from '../create-packing-list/tripDetails'
+import { formatTripCountdown, formatTripDates } from '../create-packing-list/tripDetails'
+import { TripCountdownBadge } from '../components/TripCountdownBadge'
 import { tapFeedback } from '../utils/haptics'
 import { prefersReducedMotion } from '../utils/prefersReducedMotion'
 import { groupItemsByCategory, sortByOrder, type CategoryAccessors } from '../utils/groupByCategory'
@@ -1560,6 +1561,10 @@ export function ViewPackingList() {
 
     const tripDates = formatTripDates(packingList.startDate, packingList.endDate)
 
+    // The countdown names the destination itself, so the details row shows the
+    // destination separately only when there is no countdown to carry it.
+    const tripCountdown = formatTripCountdown(packingList, totalCount - packedCount)
+
     // One tap between "show me only what I'm packing right now" and the whole
     // list laid out. Worth a control of its own only once there is more than one
     // card to fold.
@@ -1651,7 +1656,10 @@ export function ViewPackingList() {
                         data-testid="trip-details"
                         className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 dark:text-gray-400"
                     >
-                        {packingList.destination && <span>📍 {packingList.destination}</span>}
+                        {/* Countdown first: how soon the trip is is what the
+                            traveller came to know; the dates back it up. */}
+                        <TripCountdownBadge countdown={tripCountdown} />
+                        {packingList.destination && !tripCountdown && <span>📍 {packingList.destination}</span>}
                         {tripDates && <span>📅 {tripDates}</span>}
                     </div>
                 )}
