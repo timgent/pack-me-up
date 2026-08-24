@@ -20,6 +20,10 @@ import type { PackingListQuestionSet, Person, Item, SavedQuestion, Option } from
  * `savePackingList` built its document from a hand-maintained field allowlist
  * and silently dropped `nights`, `questionAnswers` and `selectedPeopleIds`.
  *
+ * `duplicatePackingList.test.ts` leans on `fullyPopulatedPackingList` for the
+ * same reason (#325): duplicating a list is another place that used to name the
+ * fields to keep, so a new field has to be accounted for there too.
+ *
  * So: when the type check points you here, add the new field with a
  * distinctive value. Don't reach for `as` or a partial fixture.
  */

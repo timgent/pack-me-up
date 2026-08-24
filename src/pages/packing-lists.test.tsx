@@ -496,6 +496,72 @@ describe('PackingLists duplicate', () => {
         })
     })
 
+    it('carries the trip context and generation inputs onto the copy', async () => {
+        const richList = {
+            ...testList,
+            nights: 5,
+            destination: 'Lisbon',
+            startDate: daysFromToday(10),
+            endDate: daysFromToday(15),
+            guests: [{ id: 'g1', name: 'Zoe' }],
+            deletedItems: [{ id: 'd1', itemText: 'Umbrella', personId: '', personName: '', questionId: 'q1', optionId: 'o1', packed: false }],
+            questionAnswers: [{ questionId: 'q1', selectedOptionIds: ['o1'] }],
+            selectedPeopleIds: ['p1'],
+        }
+        const db = {
+            ...makeDb(),
+            getAllPackingLists: vi.fn().mockResolvedValue([richList]),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+        await screen.findByText(/Summer Holiday/)
+
+        chooseCardAction(/duplicate/i)
+
+        await waitFor(() => {
+            expect(db.savePackingList).toHaveBeenCalledWith(expect.objectContaining({
+                nights: 5,
+                destination: 'Lisbon',
+                guests: richList.guests,
+                deletedItems: richList.deletedItems,
+                questionAnswers: richList.questionAnswers,
+                selectedPeopleIds: richList.selectedPeopleIds,
+            }))
+        })
+        // A repeat trip has new dates, so the copy claims none.
+        const saved = db.savePackingList.mock.calls[0][0]
+        expect(saved.startDate).toBeUndefined()
+        expect(saved.endDate).toBeUndefined()
+    })
+
+    it('turns a cached copy of a shared list into a list of your own', async () => {
+        const foreignList = {
+            ...testList,
+            sharedFromPodUrl: 'https://alice.example/pod/',
+            ownerWebId: 'https://alice.example/profile/card#me',
+            _rev: '3-abcdef',
+        }
+        const db = {
+            ...makeDb(),
+            getAllPackingLists: vi.fn().mockResolvedValue([foreignList]),
+            savePackingList: vi.fn().mockResolvedValue({ rev: '1' }),
+        }
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        renderComponent()
+        await screen.findByText(/Summer Holiday/)
+
+        chooseCardAction(/duplicate/i)
+
+        await waitFor(() => expect(db.savePackingList).toHaveBeenCalled())
+        const saved = db.savePackingList.mock.calls[0][0]
+        expect(saved.sharedFromPodUrl).toBeUndefined()
+        expect(saved.ownerWebId).toBeUndefined()
+        expect(saved._rev).toBeUndefined()
+    })
+
     it('counts up rather than reusing the name of a duplicate already on the page', async () => {
         const db = {
             ...makeDb(),
