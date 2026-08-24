@@ -24,12 +24,15 @@ export function PastTripsSection({ count, allPastFinished, children }: PastTrips
 
     return (
         <div className="mt-8">
+            {/* Understated next to the list cards — it is not a trip — but still
+                a row that looks pressable, since it is the only thing on the
+                page that reveals anything. */}
             <button
                 type="button"
                 onClick={() => setIsExpanded(expanded => !expanded)}
                 aria-expanded={isExpanded}
                 aria-controls={panelId}
-                className="flex items-center gap-2 w-full text-left py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="flex items-center gap-2 w-full text-left px-4 py-3 rounded-xl border-2 border-gray-200 bg-white/60 text-gray-600 hover:bg-white hover:border-gray-300 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors"
             >
                 <span className="shrink-0 text-sm text-gray-400">{isExpanded ? '▼' : '▶'}</span>
                 <span className="text-lg font-semibold">{label} ({count})</span>
