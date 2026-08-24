@@ -130,6 +130,20 @@ body {
   overscroll-behavior: none;
 }
 
+/*
+ * The page's own ground colour, painted before React mounts. Without it the
+ * browser — and the Capacitor WebView especially — shows white while the
+ * bundle loads, which is the flash the pre-paint script in index.html exists
+ * to avoid.
+ */
+html {
+  background-color: #ffffff;
+}
+
+html.dark {
+  background-color: #030712;
+}
+
 /* Wizard generation reveal: each line eases in as it is added */
 @keyframes reveal-line-in {
   from { opacity: 0; transform: translateY(6px); }

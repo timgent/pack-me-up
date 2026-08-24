@@ -42,7 +42,7 @@ export function SyncAcrossDevicesPrompt() {
         <>
             <div
                 data-testid="sync-across-devices-prompt"
-                className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/70 px-4 py-3"
+                className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 px-4 py-3"
             >
                 <p className="flex-1 min-w-50 text-sm text-gray-700 dark:text-gray-300">
                     <span className="font-bold text-primary-900 dark:text-primary-200">📱 Sync across devices</span>

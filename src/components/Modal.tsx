@@ -13,7 +13,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
+                <div className="fixed inset-0 bg-gray-500/75 dark:bg-black/70 transition-opacity" onClick={onClose} />
 
                 <div role="dialog" aria-modal="true" className="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 w-full sm:max-w-lg sm:p-6">
                     <div className="absolute right-0 top-0 pr-4 pt-4">

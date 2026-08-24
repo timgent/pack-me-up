@@ -15,7 +15,7 @@ const linkStyles = 'text-gray-500 dark:text-gray-400 hover:text-primary-700 dark
  */
 export function Footer() {
     return (
-        <footer className="border-t border-primary-100 dark:border-primary-900 bg-white/40 safe-area-bottom">
+        <footer className="border-t border-primary-100 dark:border-primary-900 bg-white/40 dark:bg-gray-900/40 safe-area-bottom">
             {/*
               * pb-24 on mobile keeps the last row above Sentry's fixed feedback
               * widget, which otherwise sits on top of the "Feedback" link once you
