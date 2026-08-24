@@ -4,8 +4,7 @@ import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
 import { AccountMenu, ProfileBadge } from './AccountMenu'
-import { useSolidProfile } from '../hooks/useSolidProfile'
-import { podUsernameFromWebId } from '../services/solidPod'
+import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
 
 export const Navigation = () => {
@@ -24,9 +23,7 @@ export const Navigation = () => {
     }, [db, loginSyncVersion])
 
     const profile = useSolidProfile(webId, session)
-    // Their name if their card has one, otherwise the username their WebID
-    // carries. Both beat printing the WebID, which is what used to sit here.
-    const displayName = profile.name ?? (webId ? podUsernameFromWebId(webId) : null) ?? 'Your account'
+    const displayName = profileDisplayName(profile, webId)
 
     const podMatch = /^\/pod\/([^/]+)/.exec(location.pathname)
     const currentForeignEncoded = podMatch?.[1] ?? null

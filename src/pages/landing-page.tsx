@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useHasQuestions } from '../hooks/useHasQuestions'
+import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 
 export const LandingPage = () => {
-    const { isLoggedIn, webId, login } = useSolidPod()
+    const { isLoggedIn, webId, session, login } = useSolidPod()
+    const profile = useSolidProfile(webId, session)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const hasQuestions = useHasQuestions()
     const primaryCta = hasQuestions ? (
@@ -27,8 +29,14 @@ export const LandingPage = () => {
         <>
             {isLoggedIn && (
                 <div className="mb-6 p-4 bg-gradient-to-r from-success-50 to-primary-50 border-2 border-success-300 rounded-2xl shadow-soft animate-fade-in">
+                    {/*
+                      * Their name, not their WebID. The nav stopped printing the
+                      * raw WebID in #302 and this greeting sits right under it —
+                      * a URL is not what being signed in looks like. The photo
+                      * stays in the nav rather than being repeated an inch away.
+                      */}
                     <p className="text-success-800 font-semibold">
-                        🎉 Logged in as: <span className="font-bold">{webId}</span>
+                        🎉 Signed in as <span className="font-bold">{profileDisplayName(profile, webId)}</span>
                     </p>
                 </div>
             )}

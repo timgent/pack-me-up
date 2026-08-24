@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getSolidProfile, type SolidProfile } from '../services/solidPod'
+import { getSolidProfile, podUsernameFromWebId, type SolidProfile } from '../services/solidPod'
 import type { AppSession } from '../types/AppSession'
 
 const UNREAD: SolidProfile = { name: null, photo: null }
@@ -38,4 +38,16 @@ export function useSolidProfile(
     }, [webId, session])
 
     return profile
+}
+
+/**
+ * What to call the person behind a WebID, in the two places that name the
+ * signed-in user: the nav's account menu and the landing page's greeting.
+ *
+ * Their card's name if it has one, otherwise the username the WebID carries,
+ * and only failing both a generic label. Never the WebID itself — printing that
+ * at a person is what #302 was opened about.
+ */
+export function profileDisplayName(profile: SolidProfile, webId: string | undefined): string {
+    return profile.name ?? (webId ? podUsernameFromWebId(webId) : null) ?? 'Your account'
 }

@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { AppSession } from '../types/AppSession'
-import { useSolidProfile } from './useSolidProfile'
+import { profileDisplayName, useSolidProfile } from './useSolidProfile'
 
-vi.mock('../services/solidPod', () => ({
+// podUsernameFromWebId stays real: the fallback these tests assert on should be
+// the fallback that ships.
+vi.mock('../services/solidPod', async importOriginal => ({
+    ...(await importOriginal<typeof import('../services/solidPod')>()),
     getSolidProfile: vi.fn(),
 }))
 
@@ -72,5 +75,26 @@ describe('useSolidProfile', () => {
 
         expect(errors).not.toHaveBeenCalled()
         errors.mockRestore()
+    })
+})
+
+describe('profileDisplayName', () => {
+    const WEB_ID = 'http://localhost:4000/testuser/profile/card#me'
+
+    it('prefers the name the profile card gives', () => {
+        expect(profileDisplayName({ name: 'Alice Adams', photo: null }, WEB_ID)).toBe('Alice Adams')
+    })
+
+    it('falls back to the username the WebID carries', () => {
+        expect(profileDisplayName({ name: null, photo: null }, WEB_ID)).toBe('testuser')
+    })
+
+    // Signed in, but the WebID has not landed yet — better than an empty gap.
+    it('falls back again when there is no WebID to read', () => {
+        expect(profileDisplayName({ name: null, photo: null }, undefined)).toBe('Your account')
+    })
+
+    it('falls back again when the WebID cannot be parsed', () => {
+        expect(profileDisplayName({ name: null, photo: null }, 'not-a-url')).toBe('Your account')
     })
 })
