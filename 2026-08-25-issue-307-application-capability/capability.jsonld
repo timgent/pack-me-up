@@ -1,0 +1,220 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/ac.jsonld",
+    {
+      "pmu": "https://pack-me-up.app/vocab#",
+      "schema": "https://schema.org/",
+      "dcterms": "http://purl.org/dc/terms/",
+      "xsd": "http://www.w3.org/2001/XMLSchema#",
+      "sh": "http://www.w3.org/ns/shacl#",
+      "sh:targetClass": {
+        "@type": "@id"
+      },
+      "sh:path": {
+        "@type": "@id"
+      },
+      "sh:class": {
+        "@type": "@id"
+      },
+      "sh:datatype": {
+        "@type": "@id"
+      },
+      "sh:nodeKind": {
+        "@type": "@id"
+      }
+    }
+  ],
+  "@graph": [
+    {
+      "id": "https://packmeup.tim-gent.com/#i",
+      "type": "ac:Application",
+      "as:name": "Pack Me Up",
+      "capability": [
+        "https://packmeup.tim-gent.com/#capability-view-packing-list",
+        "https://packmeup.tim-gent.com/#capability-view-question-set",
+        "https://packmeup.tim-gent.com/#capability-create-packing-list",
+        "https://packmeup.tim-gent.com/#capability-setup-wizard"
+      ],
+      "requirement": [
+        "https://packmeup.tim-gent.com/#requirement-scripts",
+        "https://packmeup.tim-gent.com/#requirement-connect",
+        "https://packmeup.tim-gent.com/#requirement-clipboard"
+      ]
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#capability-view-packing-list",
+      "type": "Capability",
+      "action": "odrl:display",
+      "output": "text/html",
+      "resourceType": "pmu:PackingList",
+      "shape": "https://packmeup.tim-gent.com/#PackingListShape",
+      "invocation": "https://packmeup.tim-gent.com/#invoke-open"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#capability-view-question-set",
+      "type": "Capability",
+      "action": "odrl:display",
+      "output": "text/html",
+      "resourceType": "pmu:QuestionSet",
+      "shape": "https://packmeup.tim-gent.com/#QuestionSetShape",
+      "invocation": "https://packmeup.tim-gent.com/#invoke-open"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#capability-create-packing-list",
+      "type": "Capability",
+      "action": "as:Create",
+      "output": "text/html",
+      "resourceType": "pmu:PackingList",
+      "invocation": "https://packmeup.tim-gent.com/#invoke-create-packing-list"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#capability-setup-wizard",
+      "type": "Capability",
+      "action": "as:Create",
+      "output": "text/html",
+      "resourceType": "pmu:QuestionSet",
+      "invocation": "https://packmeup.tim-gent.com/#invoke-setup-wizard"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#invoke-open",
+      "type": "UriTemplateInvocation",
+      "template": "#open={open}",
+      "mapping": [
+        {
+          "variable": "open",
+          "property": "ac:open"
+        }
+      ]
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#invoke-create-packing-list",
+      "type": "UriTemplateInvocation",
+      "template": "#/create-packing-list"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#invoke-setup-wizard",
+      "type": "UriTemplateInvocation",
+      "template": "#/wizard"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#requirement-scripts",
+      "type": "Requirement",
+      "cspDirective": "script-src 'self'",
+      "hasPurpose": "dpv:ServiceProvision"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#requirement-connect",
+      "type": "Requirement",
+      "cspDirective": "connect-src 'self' https:",
+      "hasPurpose": "dpv:ServiceProvision"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#requirement-clipboard",
+      "type": "Requirement",
+      "browserPermission": "clipboard-write",
+      "hasPurpose": "dpv:ServiceProvision"
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#PackingListShape",
+      "type": "sh:NodeShape",
+      "sh:targetClass": "pmu:PackingList",
+      "sh:property": [
+        {
+          "sh:path": "schema:name",
+          "sh:datatype": "xsd:string",
+          "sh:minCount": 1,
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "dcterms:created",
+          "sh:datatype": "xsd:dateTime",
+          "sh:minCount": 1,
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "dcterms:modified",
+          "sh:datatype": "xsd:dateTime",
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "pmu:destination",
+          "sh:datatype": "xsd:string",
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "pmu:tripStartDate",
+          "sh:datatype": "xsd:string",
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "pmu:tripEndDate",
+          "sh:datatype": "xsd:string",
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "pmu:hasItem",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:PackingListItem"
+        },
+        {
+          "sh:path": "pmu:hasDeletedItem",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:PackingListItem"
+        },
+        {
+          "sh:path": "pmu:hasGuest",
+          "sh:nodeKind": "sh:IRI"
+        },
+        {
+          "sh:path": "pmu:selectedPersonId",
+          "sh:datatype": "xsd:string"
+        },
+        {
+          "sh:path": "pmu:hasAnswer",
+          "sh:nodeKind": "sh:IRI"
+        }
+      ]
+    },
+    {
+      "id": "https://packmeup.tim-gent.com/#QuestionSetShape",
+      "type": "sh:NodeShape",
+      "sh:targetClass": "pmu:QuestionSet",
+      "sh:property": [
+        {
+          "sh:path": "dcterms:modified",
+          "sh:datatype": "xsd:dateTime",
+          "sh:maxCount": 1
+        },
+        {
+          "sh:path": "pmu:hasPerson",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:Person"
+        },
+        {
+          "sh:path": "pmu:hasQuestion",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:Question"
+        },
+        {
+          "sh:path": "pmu:hasAlwaysNeededItem",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:QuestionItem"
+        },
+        {
+          "sh:path": "pmu:alwaysNeededEmptySection",
+          "sh:datatype": "xsd:string"
+        },
+        {
+          "sh:path": "pmu:hasSectionOrderEntry",
+          "sh:nodeKind": "sh:IRI",
+          "sh:class": "pmu:SectionOrderEntry"
+        },
+        {
+          "sh:path": "pmu:templateVersion",
+          "sh:datatype": "xsd:integer",
+          "sh:maxCount": 1
+        }
+      ]
+    }
+  ]
+}

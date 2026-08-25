@@ -1,0 +1,104 @@
+@prefix ac: <https://www.w3.org/ns/ac#> .
+@prefix as: <https://www.w3.org/ns/activitystreams#> .
+@prefix hydra: <http://www.w3.org/ns/hydra/core#> .
+@prefix odrl: <http://www.w3.org/ns/odrl/2/> .
+@prefix dpv: <https://w3id.org/dpv#> .
+@prefix pmu: <https://pack-me-up.app/vocab#> .
+@prefix schema: <https://schema.org/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+<https://packmeup.tim-gent.com/#i> a ac:Application ;
+    as:name "Pack Me Up" ;
+    ac:capability
+        <https://packmeup.tim-gent.com/#capability-view-packing-list>,
+        <https://packmeup.tim-gent.com/#capability-view-question-set>,
+        <https://packmeup.tim-gent.com/#capability-create-packing-list>,
+        <https://packmeup.tim-gent.com/#capability-setup-wizard> ;
+    ac:requirement
+        <https://packmeup.tim-gent.com/#requirement-scripts>,
+        <https://packmeup.tim-gent.com/#requirement-connect>,
+        <https://packmeup.tim-gent.com/#requirement-clipboard> .
+
+# Open a packing list by IRI — your own, or one shared from another pod.
+<https://packmeup.tim-gent.com/#capability-view-packing-list> a ac:Capability ;
+    ac:action odrl:display ;
+    ac:output "text/html" ;
+    ac:resourceType pmu:PackingList ;
+    ac:shape <https://packmeup.tim-gent.com/#PackingListShape> ;
+    ac:invocation <https://packmeup.tim-gent.com/#invoke-open> .
+
+# Open a question/items set by IRI — your own, or another pod's.
+<https://packmeup.tim-gent.com/#capability-view-question-set> a ac:Capability ;
+    ac:action odrl:display ;
+    ac:output "text/html" ;
+    ac:resourceType pmu:QuestionSet ;
+    ac:shape <https://packmeup.tim-gent.com/#QuestionSetShape> ;
+    ac:invocation <https://packmeup.tim-gent.com/#invoke-open> .
+
+# Start the "create a new packing list" flow.
+<https://packmeup.tim-gent.com/#capability-create-packing-list> a ac:Capability ;
+    ac:action as:Create ;
+    ac:output "text/html" ;
+    ac:resourceType pmu:PackingList ;
+    ac:invocation <https://packmeup.tim-gent.com/#invoke-create-packing-list> .
+
+# Run the guided setup wizard, which generates a starter QuestionSet.
+<https://packmeup.tim-gent.com/#capability-setup-wizard> a ac:Capability ;
+    ac:action as:Create ;
+    ac:output "text/html" ;
+    ac:resourceType pmu:QuestionSet ;
+    ac:invocation <https://packmeup.tim-gent.com/#invoke-setup-wizard> .
+
+# Shared by both view capabilities: the app resolves the IRI it is handed.
+<https://packmeup.tim-gent.com/#invoke-open> a ac:UriTemplateInvocation ;
+    hydra:template "#open={open}" ;
+    hydra:mapping [ hydra:variable "open" ; hydra:property ac:open ] .
+
+<https://packmeup.tim-gent.com/#invoke-create-packing-list> a ac:UriTemplateInvocation ;
+    hydra:template "#/create-packing-list" .
+
+<https://packmeup.tim-gent.com/#invoke-setup-wizard> a ac:UriTemplateInvocation ;
+    hydra:template "#/wizard" .
+
+<https://packmeup.tim-gent.com/#requirement-scripts> a ac:Requirement ;
+    ac:cspDirective "script-src 'self'" ;
+    dpv:hasPurpose dpv:ServiceProvision .
+
+# Solid pods are arbitrary, user-chosen HTTPS origins, so this can't be a
+# fixed allowlist. Sentry error reporting is covered by the same https: wildcard.
+<https://packmeup.tim-gent.com/#requirement-connect> a ac:Requirement ;
+    ac:cspDirective "connect-src 'self' https:" ;
+    dpv:hasPurpose dpv:ServiceProvision .
+
+# navigator.clipboard.writeText — copying a share link, error details or the sign-in log.
+<https://packmeup.tim-gent.com/#requirement-clipboard> a ac:Requirement ;
+    ac:browserPermission "clipboard-write" ;
+    dpv:hasPurpose dpv:ServiceProvision .
+
+<https://packmeup.tim-gent.com/#PackingListShape> a sh:NodeShape ;
+    sh:targetClass pmu:PackingList ;
+    sh:property
+        [ sh:path schema:name ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ],
+        [ sh:path dcterms:created ; sh:datatype xsd:dateTime ; sh:minCount 1 ; sh:maxCount 1 ],
+        [ sh:path dcterms:modified ; sh:datatype xsd:dateTime ; sh:maxCount 1 ],
+        [ sh:path pmu:destination ; sh:datatype xsd:string ; sh:maxCount 1 ],
+        [ sh:path pmu:tripStartDate ; sh:datatype xsd:string ; sh:maxCount 1 ],
+        [ sh:path pmu:tripEndDate ; sh:datatype xsd:string ; sh:maxCount 1 ],
+        [ sh:path pmu:hasItem ; sh:nodeKind sh:IRI ; sh:class pmu:PackingListItem ],
+        [ sh:path pmu:hasDeletedItem ; sh:nodeKind sh:IRI ; sh:class pmu:PackingListItem ],
+        [ sh:path pmu:hasGuest ; sh:nodeKind sh:IRI ],
+        [ sh:path pmu:selectedPersonId ; sh:datatype xsd:string ],
+        [ sh:path pmu:hasAnswer ; sh:nodeKind sh:IRI ] .
+
+<https://packmeup.tim-gent.com/#QuestionSetShape> a sh:NodeShape ;
+    sh:targetClass pmu:QuestionSet ;
+    sh:property
+        [ sh:path dcterms:modified ; sh:datatype xsd:dateTime ; sh:maxCount 1 ],
+        [ sh:path pmu:hasPerson ; sh:nodeKind sh:IRI ; sh:class pmu:Person ],
+        [ sh:path pmu:hasQuestion ; sh:nodeKind sh:IRI ; sh:class pmu:Question ],
+        [ sh:path pmu:hasAlwaysNeededItem ; sh:nodeKind sh:IRI ; sh:class pmu:QuestionItem ],
+        [ sh:path pmu:alwaysNeededEmptySection ; sh:datatype xsd:string ],
+        [ sh:path pmu:hasSectionOrderEntry ; sh:nodeKind sh:IRI ; sh:class pmu:SectionOrderEntry ],
+        [ sh:path pmu:templateVersion ; sh:datatype xsd:integer ; sh:maxCount 1 ] .
