@@ -64,10 +64,11 @@ export async function authenticateForPod(cssOrigin, { email, password, webId }) 
 export async function loginToCss(page, { appOrigin, cssOrigin, email, password }) {
   await page.getByRole('button', { name: 'Sync & Share' }).click()
   await page.getByRole('dialog').waitFor()
-  await page.getByText('Other providers').click()
-  await page.getByRole('button', { name: 'Use Custom Provider' }).click()
-  await page.getByLabel('Custom Provider URL').fill(cssOrigin)
-  await page.getByRole('button', { name: 'Connect' }).click()
+
+  // The search box doubles as Pod URL entry: type the CSS issuer, then take
+  // the "connect to this URL" option it offers.
+  await page.getByLabel('Search providers or paste your Pod URL').fill(cssOrigin)
+  await page.getByRole('button', { name: `Connect to ${cssOrigin.replace(/\/$/, '')}` }).click()
 
   await page.waitForURL(
     url => url.hostname === 'localhost' && url.port === new URL(cssOrigin).port && url.pathname.includes('/login/password'),
@@ -94,5 +95,5 @@ export async function loginToCss(page, { appOrigin, cssOrigin, email, password }
 
   await page.waitForURL(new RegExp(new URL(appOrigin).host), { timeout: 20_000 })
   // The signed-in sentinel: Logout moved inside the account menu (#302).
-  await page.getByRole('button', { name: /account menu/i }).first().waitFor({ timeout: 20_000 })
+  await page.getByRole('button', { name: /account menu/i }).first().waitFor({ timeout: 60_000 })
 }

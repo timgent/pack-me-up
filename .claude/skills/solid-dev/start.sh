@@ -22,10 +22,12 @@ done
 ACCOUNT_RESP=$(curl -s -X POST http://localhost:$PORT/.account/account/ \
   -H 'Content-Type: application/json' -d '{}')
 TOKEN=$(echo "$ACCOUNT_RESP" | grep -o '"authorization":"[^"]*"' | cut -d'"' -f4)
-# Discover account-specific URLs via authenticated GET
+# Discover account-specific URLs via authenticated GET. CSS lists each control
+# twice — once under `controls`, once again under `controls.html` — so take the
+# first match only; two URLs joined by a newline make the POSTs below fail.
 CONTROLS=$(curl -s -H "Authorization: CSS-Account-Token $TOKEN" http://localhost:$PORT/.account/)
-POD_URL=$(echo "$CONTROLS" | grep -o '"pod":"http://[^"]*"' | cut -d'"' -f4)
-PASSWORD_URL=$(echo "$CONTROLS" | grep -o '"create":"http://[^"]*password[^"]*"' | cut -d'"' -f4)
+POD_URL=$(echo "$CONTROLS" | grep -o '"pod":"http://[^"]*"' | cut -d'"' -f4) | head -1
+PASSWORD_URL=$(echo "$CONTROLS" | grep -o '"create":"http://[^"]*password[^"]*"' | cut -d'"' -f4) | head -1
 
 # 4b. Register email/password login
 curl -s -X POST "$PASSWORD_URL" \
