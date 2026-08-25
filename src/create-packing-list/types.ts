@@ -43,6 +43,18 @@ export interface PackingListItem {
     // toothbrush, passport in a pocket. Shown in a section of its own at the
     // end of the list rather than among the items that can be packed now.
     lastMinute?: boolean
+    // The user has renamed / re-quantified this generated item by hand, so it
+    // is theirs rather than the question set's. Both optional and additive:
+    // absent means "still whatever my questions say", which is what every item
+    // was before "Update from questions" could do anything but add.
+    //
+    // They exist because the two sides are otherwise indistinguishable. A
+    // question-set rename and a list rename both end as "these two strings
+    // differ", so without a record of which side moved, updating a list would
+    // offer to undo the user's own edits every time. See `buildUpdate` in
+    // updateFromQuestions.ts.
+    textEdited?: boolean
+    quantityEdited?: boolean
     lastModified?: string // ISO timestamp; absent on legacy items
 }
 

@@ -42,6 +42,8 @@ const fullyPopulatedItem: Required<PackingListItem> = {
     order: 2,
     reviewed: true,
     lastMinute: true,
+    textEdited: true,
+    quantityEdited: true,
     lastModified: '2025-01-02T00:00:00.000Z',
 }
 

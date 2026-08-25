@@ -1,6 +1,9 @@
 import { Question, Person, Item } from '../edit-questions/types'
 import { ALWAYS_NEEDED_CATEGORY, defaultCategoryFor } from '../edit-questions/item-sections'
 import { PackingListItem } from './types'
+// Not crypto.randomUUID directly: it is missing from older WebViews, which is
+// exactly where the Capacitor builds run.
+import { generateUUID } from '../utils/uuid'
 
 interface ItemContext {
     questionId: string
@@ -46,7 +49,7 @@ function generateItemInstances(
             || item.personSelections.some(ps => ps.selected && selectedPeopleIds.includes(ps.personId))
         if (!triggered) return []
         return [{
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             itemText: item.text,
             personId: '',
             personName: '',
@@ -65,7 +68,7 @@ function generateItemInstances(
     return selectedPeople.flatMap(ps => {
         const person = people.find(p => p.id === ps.personId)!
         return {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             itemText: item.text,
             personId: ps.personId,
             personName: person.name,
