@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ApplicationCapabilityRdfa } from './ApplicationCapabilityRdfa'
 
 export const FEEDBACK_EMAIL = 'tim.packmeup@gmail.com'
 
@@ -36,6 +37,10 @@ export function Footer() {
                     Feedback
                 </a>
             </nav>
+            {/* Invisible: the app's Application Capability description as RDFa,
+                so the triples travel with the HTML too. See
+                ./ApplicationCapabilityRdfa.tsx. */}
+            <ApplicationCapabilityRdfa />
         </footer>
     )
 }
