@@ -9,24 +9,35 @@ vi.mock('../components/SolidPodContext', () => ({
   useSolidPod: vi.fn(),
 }))
 
-vi.mock('../services/solidPod', () => ({
-  getPrimaryPodUrl: vi.fn(),
-  loadRdfFromPod: vi.fn(),
-  saveRdfToPod: vi.fn(),
-  AuthenticationError: class AuthenticationError extends Error {
-    constructor(message: string) {
-      super(message)
-      this.name = 'AuthenticationError'
+vi.mock('../services/solidPod', () => {
+  class PodUrlUnavailableError extends Error {
+    constructor(public readonly reason: string) {
+      super(`pod url unavailable: ${reason}`)
+      this.name = 'PodUrlUnavailableError'
     }
-  },
-}))
+  }
+  return {
+    resolvePodUrl: vi.fn(),
+    loadRdfFromPod: vi.fn(),
+    saveRdfToPod: vi.fn(),
+    PodUrlUnavailableError,
+    isRetryablePodUrlFailure: (error: unknown) =>
+      error instanceof PodUrlUnavailableError && error.reason !== 'no-storage-declared',
+    AuthenticationError: class AuthenticationError extends Error {
+      constructor(message: string) {
+        super(message)
+        this.name = 'AuthenticationError'
+      }
+    },
+  }
+})
 
 import { useSolidPod } from '../components/SolidPodContext'
-import { getPrimaryPodUrl, loadRdfFromPod, saveRdfToPod } from '../services/solidPod'
+import { resolvePodUrl, loadRdfFromPod, saveRdfToPod } from '../services/solidPod'
 import type { AppSession as Session } from '../../types/AppSession'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
-const mockGetPrimaryPodUrl = vi.mocked(getPrimaryPodUrl)
+const mockResolvePodUrl = vi.mocked(resolvePodUrl)
 const mockLoadRdfFromPod = vi.mocked(loadRdfFromPod)
 const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
 
@@ -51,7 +62,7 @@ function setupLoggedIn() {
     login: vi.fn(),
     logout: vi.fn(),
   })
-  mockGetPrimaryPodUrl.mockResolvedValue(POD_URL)
+  mockResolvePodUrl.mockResolvedValue({ podUrl: POD_URL })
   mockLoadRdfFromPod.mockResolvedValue(QUESTION_SET_DATA)
 }
 
@@ -77,7 +88,7 @@ describe('usePodSync', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    mockGetPrimaryPodUrl.mockReset()
+    mockResolvePodUrl.mockReset()
     mockLoadRdfFromPod.mockReset()
     mockSaveRdfToPod.mockReset()
   })
@@ -360,7 +371,7 @@ describe('usePodSync', () => {
       })
 
       expect(success).toBe(false)
-      expect(onSaveError).toHaveBeenCalledWith('network error')
+      expect(onSaveError).toHaveBeenCalledWith('network error', expect.any(Error))
     })
 
     it('does not save when not logged in and no foreign pod configured', async () => {
@@ -459,14 +470,78 @@ describe('usePodSync', () => {
         await result.current.syncFromPod()
       })
 
-      expect(onSyncError).toHaveBeenCalledWith(expect.stringContaining('Not Found'))
+      expect(onSyncError).toHaveBeenCalledWith(expect.stringContaining('Not Found'), expect.any(Error))
+    })
+  })
+
+  describe('unknown Pod location', () => {
+    it('does not report a sync when the Pod location is only temporarily unknown', async () => {
+      // The poll runs every few seconds; reporting a bad minute of network would
+      // mean an error per tick for something the next tick fixes.
+      setupLoggedIn()
+      mockResolvePodUrl.mockResolvedValue({ podUrl: null, reason: 'profile-unreachable' })
+      const onSyncError = vi.fn()
+
+      const { result } = renderHook(() =>
+        usePodSync({ pathConfig: staticPathConfig, enabled: true, onSyncError, rdf: rdfOptions })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(onSyncError).not.toHaveBeenCalled()
+      expect(mockLoadRdfFromPod).not.toHaveBeenCalled()
+    })
+
+    it('reports a sync when the account declares no storage at all', async () => {
+      // Nothing about this one gets better on the next poll.
+      setupLoggedIn()
+      mockResolvePodUrl.mockResolvedValue({ podUrl: null, reason: 'no-storage-declared' })
+      const onSyncError = vi.fn()
+
+      const { result } = renderHook(() =>
+        usePodSync({ pathConfig: staticPathConfig, enabled: true, onSyncError, rdf: rdfOptions })
+      )
+
+      await act(async () => {
+        await result.current.syncFromPod()
+      })
+
+      expect(onSyncError).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ name: 'PodUrlUnavailableError', reason: 'no-storage-declared' })
+      )
+    })
+
+    it('fails a save loudly, and hands the reason to onSaveError', async () => {
+      // A dropped write is never silent — the local copy is the only one left.
+      setupLoggedIn()
+      mockResolvePodUrl.mockResolvedValue({ podUrl: null, reason: 'profile-unreachable' })
+      const onSaveError = vi.fn()
+
+      const { result } = renderHook(() =>
+        usePodSync({ pathConfig: staticPathConfig, enabled: true, onSaveError, rdf: rdfOptions })
+      )
+
+      let success: boolean | undefined
+      await act(async () => {
+        success = await result.current.saveToPod(QUESTION_SET_DATA)
+      })
+
+      expect(success).toBe(false)
+      expect(mockSaveRdfToPod).not.toHaveBeenCalled()
+      expect(onSaveError).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ name: 'PodUrlUnavailableError', reason: 'profile-unreachable' })
+      )
     })
   })
 
   describe('podUrl override in pathConfig', () => {
     const FOREIGN_POD_URL = 'https://alice.solidcommunity.net/'
 
-    it('syncFromPod uses pathConfig.podUrl instead of getPrimaryPodUrl when provided', async () => {
+    it('syncFromPod uses pathConfig.podUrl instead of resolving the signed-in Pod', async () => {
       setupLoggedIn()
 
       const { result } = renderHook(() =>
@@ -486,7 +561,7 @@ describe('usePodSync', () => {
         await result.current.syncFromPod()
       })
 
-      expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
+      expect(mockResolvePodUrl).not.toHaveBeenCalled()
       expect(mockLoadRdfFromPod).toHaveBeenCalledWith(
         mockSession,
         `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.ttl`,
@@ -494,7 +569,7 @@ describe('usePodSync', () => {
       )
     })
 
-    it('saveToPod uses pathConfig.podUrl instead of getPrimaryPodUrl when provided', async () => {
+    it('saveToPod uses pathConfig.podUrl instead of resolving the signed-in Pod', async () => {
       setupLoggedIn()
 
       const { result } = renderHook(() =>
@@ -514,7 +589,7 @@ describe('usePodSync', () => {
         await result.current.saveToPod({ id: 'list-abc', name: 'Test' })
       })
 
-      expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
+      expect(mockResolvePodUrl).not.toHaveBeenCalled()
       expect(mockSaveRdfToPod).toHaveBeenCalledWith(
         expect.objectContaining({
           fileUrl: `${FOREIGN_POD_URL}pack-me-up/packing-lists/list-abc.ttl`,
@@ -522,7 +597,7 @@ describe('usePodSync', () => {
       )
     })
 
-    it('falls back to getPrimaryPodUrl when pathConfig.podUrl is absent', async () => {
+    it('resolves the signed-in Pod when pathConfig.podUrl is absent', async () => {
       setupLoggedIn()
 
       const { result } = renderHook(() =>
@@ -536,7 +611,7 @@ describe('usePodSync', () => {
         await result.current.syncFromPod()
       })
 
-      expect(mockGetPrimaryPodUrl).toHaveBeenCalled()
+      expect(mockResolvePodUrl).toHaveBeenCalled()
     })
   })
 })

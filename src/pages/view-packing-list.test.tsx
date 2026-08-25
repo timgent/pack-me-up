@@ -45,7 +45,11 @@ vi.mock('../services/solidPod', () => ({
     resolveOwnerDisplayName: vi.fn((foafName: string | null | undefined, ownerWebId: string | null | undefined, podUrl: string) => foafName ?? ownerWebId ?? podUrl),
     getPodOwnerName: vi.fn().mockResolvedValue(null),
     deriveWebIdFromPodUrl: vi.fn((url: string) => `${url.replace(/\/+$/, '')}/profile/card#me`),
+    isRetryablePodUrlFailure: (error: unknown) =>
+        error instanceof Error && error.name === 'PodUrlUnavailableError'
+        && (error as { reason?: string }).reason !== 'no-storage-declared',
 }))
+
 
 vi.mock('../components/SharePackingListModal', () => ({
     SharePackingListModal: vi.fn(() => null),
@@ -4051,5 +4055,89 @@ describe('a section named after a question', () => {
         expect(saved.items.find(item => item.itemText === 'Eye mask')?.category).toBe(QUESTION_CATEGORY)
 
         await waitFor(() => expect(screen.getAllByTestId('list-section').length).toBe(1))
+    })
+})
+
+
+// ─── Reporting a save that never reached the Pod ─────────────────────────────
+
+describe('ViewPackingList save-to-Pod failures', () => {
+    class PodUrlUnavailableError extends Error {
+        constructor(public readonly reason: string) {
+            super(reason === 'no-storage-declared' ? 'No pod found for your account' : "Couldn't reach your Pod. This change is saved on this device only.")
+            this.name = 'PodUrlUnavailableError'
+        }
+    }
+
+    beforeEach(() => {
+        mockShowToast.mockClear()
+        mockCaptureException.mockClear()
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({ db: makeDb() as unknown as PackingAppDatabase })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    /** The onSaveError the page handed to usePodSync. */
+    async function saveErrorHandler() {
+        renderComponent()
+        await waitFor(() => expect(mockUsePodSync).toHaveBeenCalled())
+        const options = mockUsePodSync.mock.calls.at(-1)![0] as { onSaveError: (message: string, cause?: unknown) => void }
+        return options.onSaveError
+    }
+
+    it('keeps a Pod we could not reach out of Sentry, and says what happened', async () => {
+        // This is the "No pod URL found" issue: a few seconds of bad network
+        // reported as an exception, and shown to the user as an internal string.
+        const onSaveError = await saveErrorHandler()
+        const cause = new PodUrlUnavailableError('profile-unreachable')
+
+        act(() => onSaveError(cause.message, cause))
+
+        expect(mockCaptureException).not.toHaveBeenCalled()
+        expect(mockShowToast).toHaveBeenCalledWith(cause.message, 'error')
+    })
+
+    it('still reports a save that failed for any other reason', async () => {
+        const onSaveError = await saveErrorHandler()
+        const cause = new Error('500 Internal Server Error')
+
+        act(() => onSaveError(cause.message, cause))
+
+        // The error itself, not its message: a string reaches Sentry with only
+        // errorReporting's own frames for a stack.
+        expect(mockCaptureException).toHaveBeenCalledWith(cause)
+        expect(mockShowToast).toHaveBeenCalledWith(
+            'Failed to save to Pod: 500 Internal Server Error',
+            'error',
+            expect.stringContaining('500 Internal Server Error')
+        )
+    })
+
+    it('reports an account with no Pod, which no later save will fix', async () => {
+        const onSaveError = await saveErrorHandler()
+        const cause = new PodUrlUnavailableError('no-storage-declared')
+
+        act(() => onSaveError(cause.message, cause))
+
+        expect(mockCaptureException).toHaveBeenCalledWith(cause)
     })
 })

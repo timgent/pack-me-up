@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { SolidDataset } from '@inrupt/solid-client';
 import { useSolidPod } from '../components/SolidPodContext';
-import { getPrimaryPodUrl, loadRdfFromPod, saveRdfToPod, AuthenticationError } from '../services/solidPod';
+import { resolvePodUrl, loadRdfFromPod, saveRdfToPod, AuthenticationError, PodUrlUnavailableError, isRetryablePodUrlFailure } from '../services/solidPod';
+import type { AppSession } from '../types/AppSession';
 import { profile, profileEvent } from '../utils/profiling';
 
 /**
@@ -26,7 +27,7 @@ export interface PodPathConfig {
   resourceId?: string | null;
 
   /**
-   * Override the pod URL — bypasses getPrimaryPodUrl when set.
+   * Override the pod URL — bypasses resolvePodUrl when set.
    * Use this to sync with a foreign user's pod (e.g. a shared list).
    */
   podUrl?: string;
@@ -63,9 +64,11 @@ export interface PodSyncOptions<T> {
   onSyncSuccess?: (data: T) => void;
 
   /**
-   * Callback when sync from Pod fails
+   * Callback when sync from Pod fails.
+   * `cause` is the error itself, so callers can tell a Pod we couldn't reach
+   * this second from a real fault worth reporting.
    */
-  onSyncError?: (error: string) => void;
+  onSyncError?: (error: string, cause?: unknown) => void;
 
   /**
    * Callback when save to Pod succeeds
@@ -73,9 +76,10 @@ export interface PodSyncOptions<T> {
   onSaveSuccess?: () => void;
 
   /**
-   * Callback when save to Pod fails
+   * Callback when save to Pod fails.
+   * `cause` is the error itself — see `onSyncError`.
    */
-  onSaveError?: (error: string) => void;
+  onSaveError?: (error: string, cause?: unknown) => void;
 
   /**
    * Whether sync is enabled
@@ -89,6 +93,20 @@ export interface PodSyncState<T> {
   error: string | null;
   saveToPod: (data: T) => Promise<boolean>;
   syncFromPod: () => Promise<void>;
+}
+
+/**
+ * Where this user's Pod lives, or a `PodUrlUnavailableError` saying why we don't
+ * know. Throwing rather than returning null keeps the reason attached all the
+ * way to the callbacks, which is what lets a momentary blip stay out of the
+ * user's face and out of Sentry.
+ */
+async function requirePodUrl(session: AppSession | null): Promise<string> {
+  const { podUrl, reason } = await resolvePodUrl(session);
+  if (!podUrl) {
+    throw new PodUrlUnavailableError(reason ?? 'no-session');
+  }
+  return podUrl;
 }
 
 /**
@@ -219,11 +237,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     setError(null);
 
     try {
-      const podUrl = pathConfigRef.current.podUrl ?? await getPrimaryPodUrl(session);
-
-      if (!podUrl) {
-        throw new Error('No pod URL found');
-      }
+      const podUrl = pathConfigRef.current.podUrl ?? await requirePodUrl(session);
 
       const fileUrl = getFileUrl(podUrl);
 
@@ -244,7 +258,14 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       // 404 on own pod = file not yet created (expected) → silent
       // 404 on foreign pod (pathConfig.podUrl set) = file missing or access denied → report
       const isSilentMiss = statusCode === 404 && !pathConfigRef.current.podUrl
-      if (!isSilentMiss) {
+      // Not knowing where the Pod is yet is not a failed sync, it is a sync that
+      // hasn't started. This poll runs every few seconds, so the next one picks
+      // it up — reporting it would mean an error per tick for a bad minute of
+      // network. An account that declares no storage at all is not retryable and
+      // still reports.
+      if (isRetryablePodUrlFailure(err)) {
+        console.warn('Skipping sync from Pod:', (err as Error).message)
+      } else if (!isSilentMiss) {
         // Authentication errors use their own message
         const errorMessage = err instanceof AuthenticationError
           ? err.message
@@ -252,7 +273,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
         setError(errorMessage);
 
         if (onSyncErrorRef.current) {
-          onSyncErrorRef.current(errorMessage);
+          onSyncErrorRef.current(errorMessage, err);
         }
       }
     } finally {
@@ -273,11 +294,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
     profileEvent('podSync.saveToPod.start');
 
     try {
-      const podUrl = pathConfigRef.current.podUrl ?? await getPrimaryPodUrl(session!);
-
-      if (!podUrl) {
-        throw new Error('No pod URL found');
-      }
+      const podUrl = pathConfigRef.current.podUrl ?? await requirePodUrl(session);
 
       const fileUrl = getFileUrl(podUrl);
 
@@ -307,7 +324,7 @@ export function usePodSync<T>(options: PodSyncOptions<T>): PodSyncState<T> {
       setError(errorMessage);
 
       if (onSaveErrorRef.current) {
-        onSaveErrorRef.current(errorMessage);
+        onSaveErrorRef.current(errorMessage, err);
       }
 
       return false;

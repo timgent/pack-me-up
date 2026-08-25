@@ -35,6 +35,7 @@ export const POD_ERROR_MESSAGES = {
     NOT_LOGGED_IN: 'You must be logged in to save to Pod',
     NOT_LOGGED_IN_LOAD: 'You must be logged in to load from Pod',
     NO_POD_FOUND: 'No pod found for your account',
+    POD_UNREACHABLE: "Couldn't reach your Pod. This change is saved on this device only.",
     SAVE_FAILED: 'Failed to save to Pod. Please try again.',
     LOAD_FAILED: 'Failed to load from Pod. Please try again.',
     NO_DATA_FOUND: (resourceType: string) => `No ${resourceType} found in Pod`,
@@ -611,17 +612,60 @@ function cachePodUrl(webId: string, podUrl: string): void {
 }
 
 /**
- * Validates session and retrieves the user's primary Pod URL.
+ * Why the app could not work out where a user's Pod lives.
+ *
+ * The distinction is the whole point: `profile-unreachable` and `no-session`
+ * describe a moment, and the next attempt may well succeed, so they belong in
+ * the console rather than in the user's face or in Sentry. `no-storage-declared`
+ * is a settled fact about the account that will never fix itself.
+ */
+export type PodUrlUnavailableReason = 'no-session' | 'profile-unreachable' | 'no-storage-declared'
+
+const POD_URL_UNAVAILABLE_MESSAGES: Record<PodUrlUnavailableReason, string> = {
+    'no-session': POD_ERROR_MESSAGES.NOT_LOGGED_IN,
+    'profile-unreachable': POD_ERROR_MESSAGES.POD_UNREACHABLE,
+    'no-storage-declared': POD_ERROR_MESSAGES.NO_POD_FOUND,
+}
+
+/**
+ * Thrown when a Pod read or write cannot start because the Pod's location is
+ * unknown. It carries the reason so callers can tell a blip from a dead end —
+ * this used to be a bare `new Error('No pod URL found')`, which reached the user
+ * as "Failed to save to Pod: No pod URL found" and Sentry as an exception with
+ * no stack of its own, for what is usually a few seconds of bad network.
+ */
+export class PodUrlUnavailableError extends Error {
+    constructor(public readonly reason: PodUrlUnavailableReason) {
+        super(POD_URL_UNAVAILABLE_MESSAGES[reason])
+        this.name = 'PodUrlUnavailableError'
+    }
+}
+
+/** True for an unknown Pod location that a later attempt can still resolve. */
+export function isRetryablePodUrlFailure(error: unknown): boolean {
+    return error instanceof PodUrlUnavailableError && error.reason !== 'no-storage-declared'
+}
+
+/**
+ * Where a user's Pod lives, or why we don't know.
+ */
+export interface PodUrlResolution {
+    podUrl: string | null
+    /** Set only when `podUrl` is null. */
+    reason?: PodUrlUnavailableReason
+}
+
+/**
+ * Validates session and retrieves the user's primary Pod URL, saying why when
+ * it can't.
  *
  * The `pim:storage` triple in the WebID profile is the only authoritative source
  * for where a Pod lives, so an unreadable profile means "unknown", never "guess
  * from the WebID host".
- *
- * @returns Pod URL if it can be determined, null otherwise
  */
-export async function getPrimaryPodUrl(session: Session | null): Promise<string | null> {
+export async function resolvePodUrl(session: Session | null): Promise<PodUrlResolution> {
     if (!session || !session.info.isLoggedIn || !session.info.webId) {
-        return null
+        return { podUrl: null, reason: 'no-session' }
     }
 
     const webId = session.info.webId
@@ -633,24 +677,32 @@ export async function getPrimaryPodUrl(session: Session | null): Promise<string 
     const inFlight = podUrlByWebId.get(webId)
     if (inFlight) return inFlight
 
-    const resolution = resolvePrimaryPodUrl(session, webId)
-    const podUrl = resolution.then(result => result.podUrl)
-    podUrlByWebId.set(webId, podUrl)
+    const attempt = resolvePrimaryPodUrl(session, webId)
+    const resolution = attempt.then(result => result.resolution)
+    podUrlByWebId.set(webId, resolution)
     // Only an answer actually read from the profile is worth keeping for the
     // session. A fallback — or a failure — says nothing about where the Pod is,
     // and caching it would leave the app stuck on one dropped request.
-    resolution.then(
+    attempt.then(
         result => { if (!result.authoritative) podUrlByWebId.delete(webId) },
         () => podUrlByWebId.delete(webId)
     )
-    return podUrl
+    return resolution
+}
+
+/**
+ * The user's primary Pod URL, or null when it can't be determined. Callers that
+ * need to tell a blip from a dead end should use `resolvePodUrl` instead.
+ */
+export async function getPrimaryPodUrl(session: Session | null): Promise<string | null> {
+    return (await resolvePodUrl(session)).podUrl
 }
 
 /**
  * The pod URL resolved for each WebID this session has asked about, including
  * requests still in flight. Cleared by `resetPodSessionCaches`.
  */
-const podUrlByWebId = new Map<string, Promise<string | null>>()
+const podUrlByWebId = new Map<string, Promise<PodUrlResolution>>()
 
 /**
  * Forget everything cached for the length of a session: which pod a WebID
@@ -664,28 +716,48 @@ export function resetPodSessionCaches(): void {
 }
 
 /**
+ * The storage locations a WebID profile advertises.
+ *
+ * A WebID profile document is public by design — it is what an unauthenticated
+ * client reads to discover where a Pod lives — so when the *authenticated* read
+ * fails, the token is the likeliest culprit: an access token that expired
+ * between the check and the request, a DPoP nonce race, a refresh still in
+ * flight. A plain fetch of the same document sidesteps all of those, and costs
+ * one request in the only case where we would otherwise have given up. That
+ * matters because giving up here does not just skip a poll: it drops a save.
+ */
+async function readPodUrlsFromProfile(session: Session, webId: string): Promise<string[]> {
+    try {
+        return await profile('pod.getPrimaryPodUrl', () => getPodUrlAll(webId, { fetch: session.fetch }), { webId })
+    } catch (err) {
+        console.warn('getPrimaryPodUrl: authenticated profile read failed, retrying unauthenticated', err)
+        return await profile('pod.getPrimaryPodUrl.unauthenticated', () => getPodUrlAll(webId), { webId })
+    }
+}
+
+/**
  * `authoritative` marks an answer that came from the profile itself, as opposed
  * to a last-known-good fallback — only the former is worth remembering.
  */
 async function resolvePrimaryPodUrl(
     session: Session,
     webId: string
-): Promise<{ podUrl: string | null; authoritative: boolean }> {
+): Promise<{ resolution: PodUrlResolution; authoritative: boolean }> {
     let podUrls: string[]
     try {
-        podUrls = await profile('pod.getPrimaryPodUrl', () => getPodUrlAll(webId, { fetch: session.fetch }), { webId })
+        podUrls = await readPodUrlsFromProfile(session, webId)
     } catch (err) {
-        // The profile document itself couldn't be fetched (transient network
-        // error, DPoP nonce race, expired token). We know nothing about the
+        // The profile document itself couldn't be fetched, signed in or not
+        // (transient network error, provider outage). We know nothing about the
         // Pod's location, so reuse the last known one and otherwise give up —
-        // callers report "no pod" and retry on the next sync.
+        // callers retry on the next sync.
         console.warn('getPrimaryPodUrl: could not read the WebID profile', err)
-        return { podUrl: readCachedPodUrl(webId), authoritative: false }
+        return { resolution: fallbackResolution(webId, 'profile-unreachable'), authoritative: false }
     }
 
     if (podUrls && podUrls.length > 0) {
         cachePodUrl(webId, podUrls[0])
-        return { podUrl: podUrls[0], authoritative: true }
+        return { resolution: { podUrl: podUrls[0] }, authoritative: true }
     }
 
     // Profile was readable but declares no pim:storage — the case for CSS v7,
@@ -693,10 +765,15 @@ async function resolvePrimaryPodUrl(
     const derivedPodUrl = derivePodUrlFromWebId(webId)
     if (derivedPodUrl) {
         cachePodUrl(webId, derivedPodUrl)
-        return { podUrl: derivedPodUrl, authoritative: true }
+        return { resolution: { podUrl: derivedPodUrl }, authoritative: true }
     }
 
-    return { podUrl: readCachedPodUrl(webId), authoritative: false }
+    return { resolution: fallbackResolution(webId, 'no-storage-declared'), authoritative: false }
+}
+
+function fallbackResolution(webId: string, reason: PodUrlUnavailableReason): PodUrlResolution {
+    const cached = readCachedPodUrl(webId)
+    return cached ? { podUrl: cached } : { podUrl: null, reason }
 }
 
 /**
