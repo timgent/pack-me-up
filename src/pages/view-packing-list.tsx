@@ -23,7 +23,7 @@ import { UpdateFromQuestionsModal } from '../components/UpdateFromQuestionsModal
 import { useForeignPod } from '../components/ForeignPodContext'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { mergePackingLists } from '../utils/mergePackingLists'
-import { computeQuestionSetAdditions } from '../create-packing-list/updateFromQuestions'
+import { applyQuestionSetChanges, computeQuestionSetChanges, type QuestionSetChange } from '../create-packing-list/updateFromQuestions'
 import { MILESTONE_MESSAGES, resolveMilestone } from './packing-milestones'
 import { formatTripCountdown, formatTripDates } from '../create-packing-list/tripDetails'
 import { TripCountdownBadge } from '../components/TripCountdownBadge'
@@ -68,6 +68,27 @@ const LAST_MINUTE_SECTION_KEY = '__last_minute__'
 // items that can be packed now, whichever way the list is grouped.
 const LAST_MINUTE_TITLE = 'Last Minute'
 const LAST_MINUTE_HINT = 'Pack these just before you go.'
+
+// Stable empty diff for the closed preview, so the modal isn't handed a new
+// array — and told its choices have changed — on every render of this page.
+const NO_QUESTION_UPDATES: QuestionSetChange[] = []
+
+/** What actually happened, in the order the preview listed it. */
+function questionUpdateSummary(applied: readonly QuestionSetChange[]): string {
+    const added = applied.reduce((total, change) => total + change.additions.length, 0)
+    const removed = applied.reduce((total, change) => total + change.removedIds.length, 0)
+    const changed = applied.filter(change => change.type === 'update').length
+
+    if (removed === 0 && changed === 0) {
+        return `Added ${added} item${added === 1 ? '' : 's'} from your questions`
+    }
+    const parts = [
+        added > 0 ? `${added} added` : null,
+        changed > 0 ? `${changed} updated` : null,
+        removed > 0 ? `${removed} removed` : null,
+    ].filter(Boolean)
+    return `Updated from your questions: ${parts.join(', ')}`
+}
 
 // Long enough for the last (delayed) confetti piece to finish falling
 const CONFETTI_DURATION_MS = 4000
@@ -238,8 +259,11 @@ export function ViewPackingList() {
     // Sharing needs a pod, so a logged-out sharer gets the ask framed around
     // sharing rather than a generic "set up a pod" pitch.
     const [signInToSharePromptOpen, setSignInToSharePromptOpen] = useState(false)
-    // Additions computed from the question set; non-null opens the preview modal.
-    const [questionUpdateAdditions, setQuestionUpdateAdditions] = useState<PackingListItem[] | null>(null)
+    // Changes computed from the question set; non-null opens the preview modal.
+    // Computed on demand rather than watched: the diff regenerates the whole
+    // list from the question set, which is not something to re-run every time a
+    // checkbox is ticked.
+    const [questionUpdateChanges, setQuestionUpdateChanges] = useState<QuestionSetChange[] | null>(null)
     // Whether the question set exists locally (gates the "Update from questions" button).
     const [hasQuestionSet, setHasQuestionSet] = useState(false)
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
@@ -880,38 +904,53 @@ export function ViewPackingList() {
     const handleOpenQuestionUpdate = async () => {
         if (!packingList) return
         try {
-            const questionSet = await db.getQuestionSet()
-            const additions = computeQuestionSetAdditions(packingList, questionSet)
-            if (additions.length === 0) {
+            // No question set on this device is a state, not a failure: say so
+            // and take the button away, rather than letting the generator throw
+            // on `questionSet.people` and reporting it as an error.
+            const questionSet = await db.getQuestionSet().catch(() => null)
+            if (!questionSet) {
+                setHasQuestionSet(false)
+                showToast('There are no questions saved on this device to update from', 'error')
+                return
+            }
+            const changes = computeQuestionSetChanges(packingList, questionSet)
+            if (changes.length === 0) {
                 showToast('This list already matches your questions', 'success')
                 return
             }
-            setQuestionUpdateAdditions(additions)
+            setQuestionUpdateChanges(changes)
         } catch (err) {
             const details = reportError(err, 'Error computing question updates')
             showToast('Failed to check for question updates', 'error', details)
         }
     }
 
-    const handleConfirmQuestionUpdate = async (selected: PackingListItem[]) => {
+    const handleConfirmQuestionUpdate = async (selected: QuestionSetChange[]) => {
         if (!packingList || selected.length === 0) {
-            setQuestionUpdateAdditions(null)
+            setQuestionUpdateChanges(null)
             return
         }
-        // Close the preview first. The items appear on the list as soon as they
-        // are added now, and leaving the preview up over a list that already has
-        // them reads as the click not having worked.
-        setQuestionUpdateAdditions(null)
+        // Close the preview first. The items change on the list as soon as they
+        // are applied now, and leaving the preview up over a list that already
+        // shows them reads as the click not having worked.
+        setQuestionUpdateChanges(null)
         try {
-            const updatedList: PackingList = {
-                ...packingList,
-                items: [...packingList.items, ...selected],
+            const updatedList = applyQuestionSetChanges(packingList, selected)
+            // Items the questions no longer produce come off without a tombstone
+            // (see QuestionSetChange), so drop any stale form entries by hand.
+            const formValues = getValues('items')
+            for (const change of selected) {
+                for (const removedId of change.removedIds) delete formValues[removedId]
             }
+            for (const change of selected) {
+                for (const addition of change.additions) formValues[addition.id] = addition.packed
+            }
+            setValue('items', formValues)
             await persistPackingList(updatedList)
-            showToast(`Added ${selected.length} item${selected.length === 1 ? '' : 's'} from your questions`, 'success')
+            showToast(questionUpdateSummary(selected), 'success')
         } catch (err) {
-            const details = reportError(err, 'Error adding question updates')
-            showToast('Failed to add items', 'error', details)
+            const details = reportError(err, 'Error applying question updates')
+            showToast('Failed to update the list', 'error', details)
         }
     }
 
@@ -1040,7 +1079,13 @@ export function ViewPackingList() {
         return persistItemChanges(
             list => ({
                 ...list,
-                items: list.items.map(item => ids.has(item.id) ? { ...item, itemText: trimmed, lastModified: now } : item),
+                items: list.items.map(item => ids.has(item.id)
+                    // The name is now the user's, not the question set's. Without
+                    // this, updating from questions could not tell a rename the
+                    // user made here from one they made in their questions, and
+                    // would offer to undo this one. See `buildUpdate`.
+                    ? { ...item, itemText: trimmed, ...(item.questionId !== '' ? { textEdited: true } : {}), lastModified: now }
+                    : item),
             }),
             'Error renaming item',
         )
@@ -1056,7 +1101,14 @@ export function ViewPackingList() {
                     // Absent rather than 1: an explicit 1 says nothing the default
                     // doesn't, and it would travel to the pod saying it.
                     const { quantity: _previous, ...rest } = item
-                    return { ...rest, ...(quantity !== undefined && quantity > 1 ? { quantity } : {}), lastModified: now }
+                    // Hand-set amounts belong to the trip, not to the questions;
+                    // the same reasoning as `textEdited` above.
+                    return {
+                        ...rest,
+                        ...(quantity !== undefined && quantity > 1 ? { quantity } : {}),
+                        ...(item.questionId !== '' ? { quantityEdited: true } : {}),
+                        lastModified: now,
+                    }
                 }),
             }),
             'Error saving quantity',
@@ -2226,9 +2278,9 @@ export function ViewPackingList() {
             />
         )}
         <UpdateFromQuestionsModal
-            isOpen={questionUpdateAdditions !== null}
-            onClose={() => setQuestionUpdateAdditions(null)}
-            additions={questionUpdateAdditions ?? []}
+            isOpen={questionUpdateChanges !== null}
+            onClose={() => setQuestionUpdateChanges(null)}
+            changes={questionUpdateChanges ?? NO_QUESTION_UPDATES}
             onConfirm={handleConfirmQuestionUpdate}
         />
         </>

@@ -184,6 +184,121 @@ test.describe('C – Packing Lists', () => {
     await expect(page.getByRole('button', { name: /Add \d+ item/i })).not.toBeVisible()
   })
 
+  // Open the always-needed row for `itemName` in its inline editor.
+  async function editAlwaysNeededItem(page: import('@playwright/test').Page, itemName: string) {
+    await page.goto('/#/manage-questions')
+    await expect(page.getByRole('heading', { name: 'My Questions & Items' })).toBeVisible({ timeout: 8_000 })
+    await page.getByRole('button', { name: /Always Needed Items/i }).first().click()
+    await page.getByTestId('item-row').filter({ hasText: itemName }).first().click()
+    const editor = page.getByTestId('item-inline-editor')
+    await expect(editor).toBeVisible({ timeout: 3_000 })
+    return editor
+  }
+
+  /** Put `itemName` on `listUrl` via the update preview, so a later test step can change it. */
+  async function seedListWithQuestionItem(
+    page: import('@playwright/test').Page,
+    listUrl: string,
+    itemName: string,
+  ) {
+    await addAlwaysNeededItem(page, itemName)
+    await page.goto(listUrl)
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await page.getByRole('button', { name: /Add 1 item/i }).click()
+    await expandAllSections(page)
+    await expect(page.getByText(itemName)).toBeVisible({ timeout: 5_000 })
+  }
+
+  // The three change kinds beyond "add" — each takes its own path through the
+  // matcher, and none of them existed before #304.
+  test('C10: a renamed question item is offered as a change, not a second item', async ({ freshPage: page }) => {
+    await runWizard(page)
+    await createList(page, 'Renaming Trip')
+    const listUrl = page.url()
+    await seedListWithQuestionItem(page, listUrl, 'RenameMeTest')
+
+    // Rename it in the question set
+    const editor = await editAlwaysNeededItem(page, 'RenameMeTest')
+    await editor.getByTestId('item-name-field').locator('.cursor-text').click()
+    const control = page.locator('.react-select__control').last()
+    await control.click()
+    // The name field opens seeded with the current name, so it has to be
+    // cleared before the new one is typed or the two run together.
+    await page.keyboard.press('ControlOrMeta+a')
+    await page.keyboard.type('RenamedTest')
+    await page.locator('.react-select__option').filter({ hasText: /RenamedTest/i }).first().click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await page.waitForTimeout(800)
+
+    await page.goto(listUrl)
+    await expandAllSections(page)
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+
+    // Grouped as a change, with the old name shown, rather than as a new item
+    await expect(page.getByText('Changed items')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/Renamed from .RenameMeTest./)).toBeVisible()
+    await page.getByRole('button', { name: /Apply 1 change/i }).click()
+
+    await expect(page.getByText('RenamedTest')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('RenameMeTest')).not.toBeVisible()
+
+    // And the list now matches, so the rename was applied rather than duplicated
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('C11: an item deleted from the questions is offered for removal, unticked', async ({ freshPage: page }) => {
+    await runWizard(page)
+    await createList(page, 'Shrinking Trip')
+    const listUrl = page.url()
+    await seedListWithQuestionItem(page, listUrl, 'DeleteMeTest')
+
+    const editor = await editAlwaysNeededItem(page, 'DeleteMeTest')
+    await editor.getByRole('button', { name: 'Delete DeleteMeTest' }).click()
+    await expect(editor).not.toBeVisible({ timeout: 3_000 })
+    await page.waitForTimeout(800)
+
+    await page.goto(listUrl)
+    await expandAllSections(page)
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+
+    await expect(page.getByText('No longer in your questions')).toBeVisible({ timeout: 5_000 })
+    // Removals arrive unticked: nothing comes off the list without being asked for
+    const removal = page.getByLabel('Remove DeleteMeTest')
+    await expect(removal).not.toBeChecked()
+    await expect(page.getByRole('button', { name: 'Update list' })).toBeDisabled()
+
+    await removal.check()
+    await page.getByRole('button', { name: /Apply 1 change/i }).click()
+    await expect(page.getByText('DeleteMeTest')).not.toBeVisible({ timeout: 5_000 })
+  })
+
+  test('C12: an item that becomes shared replaces the personal copy', async ({ freshPage: page }) => {
+    await runWizard(page)
+    await createList(page, 'Sharing Trip')
+    const listUrl = page.url()
+    await seedListWithQuestionItem(page, listUrl, 'ShareMeTest')
+
+    const editor = await editAlwaysNeededItem(page, 'ShareMeTest')
+    await editor.getByRole('button', { name: 'Toggle shared for ShareMeTest' }).click()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await page.waitForTimeout(800)
+
+    await page.goto(listUrl)
+    await expandAllSections(page)
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+
+    await expect(page.getByText('Changed items')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/Now shared for everyone/)).toBeVisible()
+    await page.getByRole('button', { name: /Apply 1 change/i }).click()
+
+    // Still one item, not two: the personal copy went as the shared one arrived
+    await expandAllSections(page)
+    await expect(page.getByText('ShareMeTest')).toHaveCount(1, { timeout: 5_000 })
+    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
+  })
+
   test('C9: a person’s chosen colour follows them onto a packing list', async ({ freshPage: page }) => {
     await runWizard(page)
 

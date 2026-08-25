@@ -44,6 +44,10 @@ export const PMU = {
     // Item that can only be packed on the way out of the door, kept in a
     // section of its own at the end of the list
     lastMinute: `${PMU_NS}lastMinute`,
+    // The user has made this generated item's name / amount their own, so an
+    // update from the question set leaves that field alone
+    textEdited: `${PMU_NS}textEdited`,
+    quantityEdited: `${PMU_NS}quantityEdited`,
     itemLastModified: `${PMU_NS}itemLastModified`,
     // Shared by PackingListItem and QuestionItem: item is packed once for the
     // whole group rather than per person
