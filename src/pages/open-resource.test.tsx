@@ -78,6 +78,14 @@ describe('OpenResourcePage', () => {
         expect(screen.getByText(`${OTHER_POD}notes/shopping.ttl`)).toBeDefined()
     })
 
+    it('says so plainly when handed a scheme it refuses to navigate to', async () => {
+        renderAt('javascript:alert(1)')
+        expect(await screen.findByText(/can't open/i)).toBeDefined()
+        // Shown as text, never as somewhere to go.
+        expect(screen.getByText('javascript:alert(1)')).toBeDefined()
+        expect(document.querySelector('a[href^="javascript"]')).toBeNull()
+    })
+
     it('says so plainly when no resource was given at all', async () => {
         render(
             <MemoryRouter initialEntries={['/open']}>

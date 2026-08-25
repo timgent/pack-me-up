@@ -45,17 +45,16 @@ describe('parseOpenInvocation', () => {
         expect(parseOpenInvocation('#')).toBeNull()
     })
 
-    it('refuses schemes that are not http(s), which an invocation must never navigate to', () => {
-        expect(parseOpenInvocation(`#open=${encodeURIComponent('javascript:alert(1)')}`)).toBeNull()
-        expect(parseOpenInvocation(`#open=${encodeURIComponent('data:text/html,<script>')}`)).toBeNull()
-        expect(parseOpenInvocation(`#open=${encodeURIComponent('file:///etc/passwd')}`)).toBeNull()
+    it('reports an empty or undecodable value as present but unusable', () => {
+        // Not null: the invocation was made, so the app owes the person an
+        // explanation rather than a blank page.
+        expect(parseOpenInvocation('#open=')).toBe('')
+        expect(parseOpenInvocation('#open=%E0%A4%A')).toBe('')
     })
 
-    it('fails safe on an empty, absent or undecodable value', () => {
-        expect(parseOpenInvocation('#open=')).toBeNull()
+    it('reports no invocation at all when there is no open variable', () => {
         expect(parseOpenInvocation('#open')).toBeNull()
-        expect(parseOpenInvocation('#open=%E0%A4%A')).toBeNull()
-        expect(parseOpenInvocation('#open=not-an-iri')).toBeNull()
+        expect(parseOpenInvocation('#login=whoever')).toBeNull()
     })
 })
 
@@ -79,6 +78,14 @@ describe('resolvePackMeUpResource', () => {
         expect(resolvePackMeUpResource(`${POD}notes/shopping.ttl`)).toBeNull()
         expect(resolvePackMeUpResource(`${POD}pack-me-up/backups/2026-01-01.ttl`)).toBeNull()
         expect(resolvePackMeUpResource(`${POD}pack-me-up/packing-lists/`)).toBeNull()
+    })
+
+    it('refuses schemes an invocation must never navigate to', () => {
+        expect(resolvePackMeUpResource('javascript:alert(1)')).toBeNull()
+        expect(resolvePackMeUpResource('data:text/html,<script>')).toBeNull()
+        expect(resolvePackMeUpResource('file:///etc/passwd')).toBeNull()
+        expect(resolvePackMeUpResource('not-an-iri')).toBeNull()
+        expect(resolvePackMeUpResource('')).toBeNull()
     })
 })
 
@@ -117,7 +124,15 @@ describe('rewriteOpenInvocationHash', () => {
 
     it('leaves anything that is not an invocation untouched', () => {
         expect(rewriteOpenInvocationHash('#/view-lists/list-42')).toBeNull()
-        expect(rewriteOpenInvocationHash('#open=javascript:alert(1)')).toBeNull()
+        expect(rewriteOpenInvocationHash('#/manage-questions')).toBeNull()
+        expect(rewriteOpenInvocationHash('')).toBeNull()
+    })
+
+    it('routes an invocation the app will refuse, so the refusal has somewhere to be said', () => {
+        expect(rewriteOpenInvocationHash('#open=javascript:alert(1)')).toBe(
+            `#/open?resource=${encodeURIComponent('javascript:alert(1)')}`
+        )
+        expect(rewriteOpenInvocationHash('#open=')).toBe('#/open?resource=')
     })
 })
 
@@ -138,6 +153,29 @@ describe('installOpenInvocationHandler', () => {
         window.dispatchEvent(new window.HashChangeEvent('hashchange'))
 
         expect(window.location.hash).toBe(`#/open?resource=${encodeURIComponent(QUESTIONS_IRI)}`)
+    })
+
+    it('also catches the popstate a fragment change fires, which is what the router listens on', () => {
+        window.location.hash = '#/view-lists'
+        installOpenInvocationHandler(window)
+
+        window.location.hash = `#open=${encodeURIComponent(LIST_IRI)}`
+        window.dispatchEvent(new window.PopStateEvent('popstate'))
+
+        expect(window.location.hash).toBe(`#/open?resource=${encodeURIComponent(LIST_IRI)}`)
+    })
+
+    it('tells the router to look again once it has rewritten the fragment', () => {
+        window.location.hash = '#/view-lists'
+        installOpenInvocationHandler(window)
+
+        const seen: string[] = []
+        window.addEventListener('popstate', () => seen.push(window.location.hash))
+
+        window.location.hash = `#open=${encodeURIComponent(LIST_IRI)}`
+        window.dispatchEvent(new window.HashChangeEvent('hashchange'))
+
+        expect(seen).toContain(`#/open?resource=${encodeURIComponent(LIST_IRI)}`)
     })
 
     it('leaves ordinary navigation alone', () => {
