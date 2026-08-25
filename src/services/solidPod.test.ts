@@ -30,7 +30,7 @@ import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
 import type { PackingListQuestionSet } from '../edit-questions/types'
 import type { PackingList } from '../create-packing-list/types'
-import { packingListToDataset, questionSetToDataset, deletedPackingListsToDataset } from './rdfSerialization'
+import { packingListToDataset, questionSetToDataset, deletedPackingListsToDataset, datasetToPackingList } from './rdfSerialization'
 import type { DeletedPackingLists } from './rdfSerialization'
 import { emptyDeletedPackingLists } from '../utils/packingListDeletions'
 import { fullyPopulatedPackingList, withoutLocalOnlyFields } from '../test-utils/fullyPopulatedFixtures'
@@ -69,7 +69,7 @@ vi.mock('@inrupt/solid-client', async (importOriginal) => {
     }
 })
 
-import { getFile, getSolidDataset, getContainedResourceUrlAll, getPodUrlAll, overwriteFile, createSolidDataset, createContainerAt, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, deleteFile } from '@inrupt/solid-client'
+import { getFile, getSolidDataset, solidDatasetAsTurtle, getContainedResourceUrlAll, getPodUrlAll, overwriteFile, createSolidDataset, createContainerAt, universalAccess, getResourceInfoWithAcl, hasResourceAcl, hasFallbackAcl, hasAccessibleAcl, getResourceAcl, createAclFromFallbackAcl, saveAclFor, setAgentResourceAccess, setAgentDefaultAccess, deleteFile } from '@inrupt/solid-client'
 
 const mockGetPodUrlAll = vi.mocked(getPodUrlAll)
 const mockGetFile = vi.mocked(getFile)
@@ -309,8 +309,31 @@ const DELETIONS_URL = `${POD_URL}${POD_CONTAINERS.DELETED_PACKING_LISTS}`
 
 const EMPTY_DATASET = {} as SolidDataset & WithServerResourceInfo
 
+/** A pod response the app can parse, with the `url` the real thing would carry. */
+function turtleResponse(turtle: string, url: string, headers: Record<string, string> = {}): Response {
+    const response = new Response(turtle, {
+        status: 200,
+        headers: { 'Content-Type': 'text/turtle', ...headers },
+    })
+    // `new Response()` always has an empty url; the parser reads it as the
+    // source IRI, and it is what the deserializers resolve subjects against.
+    Object.defineProperty(response, 'url', { value: url })
+    return response
+}
+
+function statusResponse(status: number, url: string, headers: Record<string, string> = {}): Response {
+    const response = new Response(null, { status, headers })
+    Object.defineProperty(response, 'url', { value: url })
+    return response
+}
+
+/** The Turtle a dataset built by the app's own serializers would be stored as. */
+async function asTurtle(dataset: SolidDataset): Promise<string> {
+    return solidDatasetAsTurtle(dataset)
+}
+
 /**
- * Answers getSolidDataset by URL rather than by call order.
+ * Answers the pod by URL rather than by call order.
  *
  * syncAllDataFromPod asks for the question set, the packing-list container and
  * the deletion tombstones concurrently, so a queue of mockResolvedValueOnce
@@ -318,6 +341,12 @@ const EMPTY_DATASET = {} as SolidDataset & WithServerResourceInfo
  * read would silently re-point the other three. Anything not listed here (a
  * missing question set, an absent tombstone file) answers 404, which is what a
  * pod without that resource does.
+ *
+ * Documents are served as real Turtle over `session.fetch` and parsed by the
+ * app's own parser, because that is now the whole of the read path:
+ * `getSolidDataset` is left only for container listings. Stubbing the bytes
+ * rather than the parsed dataset also means these tests exercise the
+ * serialise → parse → deserialise round trip the pod really does.
  */
 function stubPod(contents: {
     questionSet?: PackingListQuestionSet
@@ -326,21 +355,25 @@ function stubPod(contents: {
 }) {
     const { questionSet, lists = [], deletions } = contents
     mockGetContainedResourceUrlAll.mockReturnValue(lists.map(l => `${LISTS_CONTAINER_URL}${l.id}.ttl`))
-    mockGetSolidDataset.mockImplementation(async (url: string) => {
+    // The list container itself, and the container probes ensureContainerExists
+    // makes before a write.
+    mockGetSolidDataset.mockResolvedValue(EMPTY_DATASET)
+    vi.mocked(mockSession.fetch).mockImplementation((async (input: RequestInfo | URL) => {
+        const url = String(input)
         if (url === QUESTIONS_URL) {
-            if (!questionSet) throw { statusCode: 404 }
-            return makeRdfQsDataset(questionSet)
+            return questionSet
+                ? turtleResponse(await asTurtle(makeRdfQsDataset(questionSet)), url)
+                : statusResponse(404, url)
         }
         if (url === DELETIONS_URL) {
-            if (!deletions) throw { statusCode: 404 }
-            return deletedPackingListsToDataset(deletions, DELETIONS_URL) as unknown as SolidDataset & WithServerResourceInfo
+            return deletions
+                ? turtleResponse(await asTurtle(deletedPackingListsToDataset(deletions, DELETIONS_URL)), url)
+                : statusResponse(404, url)
         }
         const list = lists.find(l => `${LISTS_CONTAINER_URL}${l.id}.ttl` === url)
-        if (list) return makeRdfListDataset(list)
-        // The list container itself, and the container probes ensureContainerExists
-        // makes before a write.
-        return EMPTY_DATASET
-    })
+        if (list) return turtleResponse(await asTurtle(makeRdfListDataset(list)), url)
+        return statusResponse(404, url)
+    }) as unknown as typeof fetch)
 }
 
 describe('syncAllDataFromPod', () => {
@@ -358,9 +391,7 @@ describe('syncAllDataFromPod', () => {
             const localQs = makeQuestionSet({ lastModified: '2024-01-01T10:00:00.000Z' })
             const db = makeDb({ questionSet: localQs, packingLists: [] })
 
-            mockGetSolidDataset
-                .mockResolvedValueOnce(makeRdfQsDataset(podQs))
-                .mockRejectedValueOnce({ statusCode: 404 }) // empty container
+            stubPod({ questionSet: podQs })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
@@ -375,9 +406,7 @@ describe('syncAllDataFromPod', () => {
             const localQs = makeQuestionSet({ lastModified: '2024-06-01T12:00:00.000Z' })
             const db = makeDb({ questionSet: localQs, packingLists: [] })
 
-            mockGetSolidDataset
-                .mockResolvedValueOnce(makeRdfQsDataset(podQs))
-                .mockRejectedValueOnce({ statusCode: 404 })
+            stubPod({ questionSet: podQs })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
@@ -389,9 +418,7 @@ describe('syncAllDataFromPod', () => {
             const podQs = makeQuestionSet()
             const db = makeDb({ questionSet: null, packingLists: [] })
 
-            mockGetSolidDataset
-                .mockResolvedValueOnce(makeRdfQsDataset(podQs))
-                .mockRejectedValueOnce({ statusCode: 404 })
+            stubPod({ questionSet: podQs })
 
             const result = await syncAllDataFromPod(mockSession, POD_URL, db)
 
@@ -698,108 +725,84 @@ describe('syncAllDataFromPod', () => {
 describe('loadRdfFromPod', () => {
     afterEach(() => { vi.restoreAllMocks() })
 
+    /** Serves one document, and reports what the app asked for. */
+    function servePodDocument(url: string, responses: Array<() => Promise<Response> | Response>) {
+        const queue = [...responses]
+        vi.mocked(mockSession.fetch).mockImplementation((async () => {
+            const next = queue.shift()
+            if (!next) throw new Error(`No stubbed response left for ${url}`)
+            return next()
+        }) as unknown as typeof fetch)
+    }
+
     it('loads a dataset and applies the deserializer', async () => {
         const list = makePackingList('test-id')
         const url = `${POD_URL}pack-me-up/packing-lists/test-id.ttl`
-        mockGetSolidDataset.mockResolvedValueOnce(
-            packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
-        )
+        const turtle = await asTurtle(packingListToDataset(list, url))
+        servePodDocument(url, [() => turtleResponse(turtle, url)])
 
         const result = await loadRdfFromPod(mockSession, url, (_ds, _u) => {
             return { id: 'test-id', name: 'Test', createdAt: new Date().toISOString(), items: [] }
         })
 
         expect(result.id).toBe('test-id')
-        // The `fetch` passed to getSolidDataset is a conditional-GET wrapper
-        // (see the loadRdfFromPod tests below), not the session's fetch
-        // directly — assert it delegates to the session's fetch instead of
-        // checking identity.
-        const passedFetch = mockGetSolidDataset.mock.calls[0][1]?.fetch
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200 }))
-        await passedFetch?.(url)
         expect(mockSession.fetch).toHaveBeenCalledWith(url, expect.anything())
     })
 
     it('throws AuthenticationError on 401', async () => {
-        mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 401 })
-        await expect(
-            loadRdfFromPod(mockSession, 'https://pod.example.com/test.ttl', () => null)
-        ).rejects.toThrow(AuthenticationError)
+        const url = 'https://pod.example.com/test.ttl'
+        servePodDocument(url, [() => statusResponse(401, url)])
+
+        await expect(loadRdfFromPod(mockSession, url, () => null)).rejects.toThrow(AuthenticationError)
     })
 
     it('re-throws non-auth errors', async () => {
-        const err = { statusCode: 500 }
-        mockGetSolidDataset.mockRejectedValueOnce(err)
-        await expect(
-            loadRdfFromPod(mockSession, 'https://pod.example.com/test.ttl', () => null)
-        ).rejects.toEqual(err)
+        const url = 'https://pod.example.com/test.ttl'
+        servePodDocument(url, [() => statusResponse(500, url)])
+
+        await expect(loadRdfFromPod(mockSession, url, () => null)).rejects.toMatchObject({ statusCode: 500 })
     })
 
     it('uses globalThis.fetch when session is null (public access)', async () => {
         const url = 'https://pod.example.com/public.ttl'
-        const list = makePackingList('pub-id')
-        mockGetSolidDataset.mockResolvedValueOnce(
-            packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
-        )
-        const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(null, { status: 200 }))
+        const turtle = await asTurtle(packingListToDataset(makePackingList('pub-id'), url))
+        const globalFetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(turtleResponse(turtle, url))
 
         await loadRdfFromPod(null, url, (_ds, _u) => ({ id: 'pub-id', name: 'Public', createdAt: '', items: [] }))
 
-        const passedFetch = mockGetSolidDataset.mock.calls[0][1]?.fetch
-        await passedFetch?.(url)
         expect(globalFetchSpy).toHaveBeenCalledWith(url, expect.anything())
     })
 
     it('sends the previously seen ETag as If-None-Match on the next load of the same URL', async () => {
         const url = `${POD_URL}pack-me-up/packing-lists/etag-test.ttl`
-        const list = makePackingList('etag-id')
-        const dataset = packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
+        const turtle = await asTurtle(packingListToDataset(makePackingList('etag-id'), url))
+        const deserializer = () => ({ id: 'etag-id', name: '', createdAt: '', items: [] })
+        servePodDocument(url, [
+            () => turtleResponse(turtle, url, { etag: '"v1"' }),
+            () => turtleResponse(turtle, url, { etag: '"v1"' }),
+        ])
 
-        // First load: the pod responds with an ETag, which getSolidDataset's
-        // fetch wrapper should observe.
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            await options!.fetch!(u as string)
-            return dataset
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
-        await loadRdfFromPod(mockSession, url, () => ({ id: 'etag-id', name: '', createdAt: '', items: [] }))
-
-        // Second load: getSolidDataset's fetch wrapper should now send
-        // If-None-Match with the ETag observed above.
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            await options!.fetch!(u as string)
-            return dataset
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200 }))
-        await loadRdfFromPod(mockSession, url, () => ({ id: 'etag-id', name: '', createdAt: '', items: [] }))
+        await loadRdfFromPod(mockSession, url, deserializer)
+        await loadRdfFromPod(mockSession, url, deserializer)
 
         const secondCallHeaders = new Headers(mockSession.fetch.mock.calls[1][1]?.headers)
         expect(secondCallHeaders.get('If-None-Match')).toBe('"v1"')
     })
 
     it('returns the cached result without re-running the deserializer when the pod responds 304', async () => {
+        // A real 304 is why this path exists: the pod sends no body, so the
+        // only correct answer is the result parsed from the last 200.
         const url = `${POD_URL}pack-me-up/packing-lists/not-modified.ttl`
-        const list = makePackingList('cached-id')
-        const dataset = packingListToDataset(list, url) as unknown as SolidDataset & WithServerResourceInfo
+        const turtle = await asTurtle(packingListToDataset(makePackingList('cached-id'), url))
         const deserializer = vi.fn(() => ({ id: 'cached-id', name: 'Cached', createdAt: '', items: [] }))
+        servePodDocument(url, [
+            () => turtleResponse(turtle, url, { etag: '"v1"' }),
+            () => statusResponse(304, url),
+        ])
 
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            await options!.fetch!(u as string)
-            return dataset
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
         const first = await loadRdfFromPod(mockSession, url, deserializer)
         expect(deserializer).toHaveBeenCalledTimes(1)
 
-        // Mirrors what getSolidDataset itself does for any non-2xx response
-        // (see @inrupt/solid-client's internal_isUnsuccessfulResponse): a 304
-        // makes it throw before ever reaching the parser.
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            const response = await options!.fetch!(u as string)
-            if (!response.ok) throw { statusCode: response.status }
-            return dataset
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 304 }))
         const second = await loadRdfFromPod(mockSession, url, deserializer)
 
         expect(second).toEqual(first)
@@ -808,35 +811,23 @@ describe('loadRdfFromPod', () => {
 
     it('re-parses and returns fresh data when the pod content actually changed (new ETag)', async () => {
         const url = `${POD_URL}pack-me-up/packing-lists/changed.ttl`
-        const datasetV1 = packingListToDataset(makePackingList('v1'), url) as unknown as SolidDataset & WithServerResourceInfo
-        const datasetV2 = packingListToDataset(makePackingList('v2'), url) as unknown as SolidDataset & WithServerResourceInfo
-        const deserializer = vi.fn((ds: SolidDataset) => ds === datasetV2
-            ? { id: 'v2', name: 'Updated', createdAt: '', items: [] }
-            : { id: 'v1', name: 'Original', createdAt: '', items: [] })
+        const turtleV1 = await asTurtle(packingListToDataset(makePackingList('changed', { name: 'Original' }), url))
+        const turtleV2 = await asTurtle(packingListToDataset(makePackingList('changed', { name: 'Updated' }), url))
+        const deserializer = vi.fn((ds: SolidDataset) => datasetToPackingList(ds, url))
+        servePodDocument(url, [
+            () => turtleResponse(turtleV1, url, { etag: '"v1"' }),
+            () => turtleResponse(turtleV2, url, { etag: '"v2"' }),
+        ])
 
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            await options!.fetch!(u as string)
-            return datasetV1
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v1"' } }))
         const first = await loadRdfFromPod(mockSession, url, deserializer)
-        expect(first.id).toBe('v1')
+        expect(first.name).toBe('Original')
 
-        // Another device changed the pod resource: server returns 200 with a
-        // new ETag and body, same as a first-ever load.
-        mockGetSolidDataset.mockImplementationOnce(async (u, options) => {
-            await options!.fetch!(u as string)
-            return datasetV2
-        })
-        mockSession.fetch.mockResolvedValueOnce(new Response(null, { status: 200, headers: { etag: '"v2"' } }))
         const second = await loadRdfFromPod(mockSession, url, deserializer)
 
-        expect(second.id).toBe('v2')
+        expect(second.name).toBe('Updated')
         expect(deserializer).toHaveBeenCalledTimes(2)
     })
 })
-
-// ─── saveRdfToPod ────────────────────────────────────────────────────────────
 
 describe('saveRdfToPod', () => {
     afterEach(() => { vi.restoreAllMocks() })
@@ -982,20 +973,38 @@ describe('deleteFileFromPod', () => {
 
 // ─── loadMultipleRdfFromPod ──────────────────────────────────────────────────
 
+/**
+ * Serves a container full of readable packing lists, one Turtle document per
+ * URL. Per-file loads are a plain `session.fetch` now — the parse is the app's
+ * own, spread across tasks rather than run back to back — so stubbing the bytes
+ * is all a test needs. `overrides` maps a URL to a status to answer with
+ * instead, for the failure cases.
+ */
+/** `.../packing-lists/list-1.ttl` → `list-1`. */
+function idFromUrl(url: string): string {
+    return url.split('/').pop()!.replace('.ttl', '')
+}
+
+function mockFetchTurtle(urls: string[], overrides: Map<string, number> = new Map()): void {
+    vi.mocked(mockSession.fetch).mockImplementation((async (input: RequestInfo | URL) => {
+        const url = String(input)
+        const status = overrides.get(url)
+        if (status !== undefined) return statusResponse(status, url)
+        if (!urls.includes(url)) return statusResponse(404, url)
+        return turtleResponse(await asTurtle(packingListToDataset(makePackingList(idFromUrl(url)), url)), url)
+    }) as unknown as typeof fetch)
+}
+
 describe('loadMultipleRdfFromPod', () => {
     afterEach(() => { vi.restoreAllMocks() })
 
     it('loads all ttl files from a container', async () => {
-        const list1 = makePackingList('list-1')
-        const list2 = makePackingList('list-2')
         const url1 = `${LISTS_CONTAINER_URL}list-1.ttl`
         const url2 = `${LISTS_CONTAINER_URL}list-2.ttl`
 
-        mockGetSolidDataset
-            .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container
-            .mockResolvedValueOnce(packingListToDataset(list1, url1) as unknown as SolidDataset & WithServerResourceInfo)
-            .mockResolvedValueOnce(packingListToDataset(list2, url2) as unknown as SolidDataset & WithServerResourceInfo)
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container
         mockGetContainedResourceUrlAll.mockReturnValueOnce([url1, url2])
+        mockFetchTurtle([url1, url2])
 
         const { data, result } = await loadMultipleRdfFromPod(
             mockSession, LISTS_CONTAINER_URL,
@@ -1018,27 +1027,26 @@ describe('loadMultipleRdfFromPod', () => {
     it('fetches the files in parallel rather than one round trip at a time', async () => {
         const urls = ['a', 'b', 'c'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
         mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container
 
         let inFlight = 0
         let peakInFlight = 0
         const release: Array<() => void> = []
 
-        mockGetSolidDataset.mockImplementation((url: string) => {
-            if (url === LISTS_CONTAINER_URL) {
-                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
-            }
+        vi.mocked(mockSession.fetch).mockImplementation(((input: RequestInfo | URL) => {
+            const url = String(input)
             inFlight++
             peakInFlight = Math.max(peakInFlight, inFlight)
             return new Promise(resolve => {
-                release.push(() => {
+                release.push(async () => {
                     inFlight--
-                    resolve({} as unknown as SolidDataset & WithServerResourceInfo)
+                    resolve(turtleResponse(await asTurtle(packingListToDataset(makePackingList(idFromUrl(url)), url)), url))
                 })
             })
-        })
+        }) as unknown as typeof fetch)
 
         const pending = loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
-            (_ds, url) => ({ id: url, name: '', createdAt: '', items: [] }))
+            (_ds, url) => ({ id: idFromUrl(url), name: '', createdAt: '', items: [] }))
 
         // Let the container listing settle so the file requests get issued.
         await vi.waitFor(() => expect(release).toHaveLength(urls.length))
@@ -1056,14 +1064,15 @@ describe('loadMultipleRdfFromPod', () => {
         mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
 
         const resolvers = new Map<string, () => void>()
-        mockGetSolidDataset.mockImplementation((url: string) => {
-            if (url === LISTS_CONTAINER_URL) {
-                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
-            }
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container
+        vi.mocked(mockSession.fetch).mockImplementation(((input: RequestInfo | URL) => {
+            const url = String(input)
             return new Promise(resolve => {
-                resolvers.set(url, () => resolve({} as unknown as SolidDataset & WithServerResourceInfo))
+                resolvers.set(url, async () => resolve(
+                    turtleResponse(await asTurtle(packingListToDataset(makePackingList(idFromUrl(url)), url)), url)
+                ))
             })
-        })
+        }) as unknown as typeof fetch)
 
         const pending = loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
             (_ds, url) => ({ id: url.split('/').pop()!.replace('.ttl', ''), name: '', createdAt: '', items: [] }))
@@ -1083,13 +1092,8 @@ describe('loadMultipleRdfFromPod', () => {
         const urls = ['ok', 'bad'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
         mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
 
-        mockGetSolidDataset.mockImplementation((url: string) => {
-            if (url === LISTS_CONTAINER_URL) {
-                return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
-            }
-            if (url.endsWith('bad.ttl')) return Promise.reject({ statusCode: 500 })
-            return Promise.resolve({} as unknown as SolidDataset & WithServerResourceInfo)
-        })
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // container
+        mockFetchTurtle(urls, new Map([[urls[1], 500]]))
 
         const onError = vi.fn()
         const { data, result } = await loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
@@ -1102,15 +1106,38 @@ describe('loadMultipleRdfFromPod', () => {
         expect(onError).toHaveBeenCalledWith(urls[1], expect.anything())
     })
 
+    it('lets the browser back in between files instead of parsing them all in one task', async () => {
+        // The parses are the app's biggest chunk of main-thread work on login.
+        // Running them back to back froze the UI for seconds (see
+        // docs/login-performance.md), so the loop has to give the event loop a
+        // turn between files. A timer queued while the first file is being
+        // deserialized must therefore get to run before the last one is.
+        const urls = ['a', 'b', 'c'].map(id => `${LISTS_CONTAINER_URL}${id}.ttl`)
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo)
+        mockGetContainedResourceUrlAll.mockReturnValueOnce(urls)
+        mockFetchTurtle(urls)
+
+        let timerRan = false
+        let timerRanBeforeLastFile: boolean | null = null
+
+        const { data } = await loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL, (_ds, url) => {
+            if (url === urls[0]) setTimeout(() => { timerRan = true }, 0)
+            if (url === urls[urls.length - 1]) timerRanBeforeLastFile = timerRan
+            return { id: url, name: '', createdAt: '', items: [] }
+        })
+
+        expect(data).toHaveLength(urls.length)
+        expect(timerRanBeforeLastFile).toBe(true)
+    })
+
     it('ignores non-ttl files', async () => {
         mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo)
         mockGetContainedResourceUrlAll.mockReturnValueOnce([
             `${LISTS_CONTAINER_URL}list-1.json`,  // should be ignored
             `${LISTS_CONTAINER_URL}list-2.ttl`,   // should be loaded
         ])
-        const list2 = makePackingList('list-2')
         const url2 = `${LISTS_CONTAINER_URL}list-2.ttl`
-        mockGetSolidDataset.mockResolvedValueOnce(packingListToDataset(list2, url2) as unknown as SolidDataset & WithServerResourceInfo)
+        mockFetchTurtle([url2])
 
         const { data } = await loadMultipleRdfFromPod(mockSession, LISTS_CONTAINER_URL,
             (ds, url) => ({ id: url.split('/').pop()!.replace('.ttl', ''), name: '', createdAt: '', items: [] }))

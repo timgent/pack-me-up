@@ -1,7 +1,7 @@
 # Performance repro harnesses
 
-Two standalone diagnostic scripts, neither part of `npm test` or
-`npm run test:e2e`. Both need a local Community Solid Server and the app's
+Three standalone diagnostic scripts, none part of `npm test` or
+`npm run test:e2e`. All need a local Community Solid Server and the app's
 production build being served.
 
 - `mobile-repro.mjs` — main-thread blocking on the "My Questions & Items"
@@ -9,6 +9,8 @@ production build being served.
 - `delete-item-repro.mjs` — how long deleting an item from a packing list
   takes to show on screen ("Deleting an item from a packing list", further
   down).
+- `login-repro.mjs` — the wait and the freeze after logging in ("Logging in",
+  last section).
 
 ## `mobile-repro.mjs`
 
@@ -128,3 +130,46 @@ write, pod URL lookup, container check, RDF serialisation, PUT — alongside
 `medianPerceivedMs` and `medianMaxFrameGapMs`. Against a build without those
 marks it falls back to timing from the click, so before/after comparisons
 across a revert still work.
+
+## Logging in
+
+`login-repro.mjs` measures what a user sits through after the OIDC redirect
+drops them back on the app: how long the page is blank, when the lists show up,
+and — the part that mattered — how long the UI is frozen once it is on screen.
+Background and findings: `docs/login-performance.md`.
+
+Like `delete-item-repro.mjs` it seeds its own data: it writes a backup into the
+pod over the CSS account API and restores it through the app's Backups page, so
+the pod ends up holding real RDF written by the app itself. The measured login
+then runs in a **fresh browser context** — empty local database, full pod — which
+is a first login on a new device.
+
+```
+node scripts/perf/login-repro.mjs --label=before --lists=25 --cpu=4 --podLatency=150
+```
+
+| flag | default | meaning |
+|---|---|---|
+| `--lists` | `25` | packing lists to seed into the pod |
+| `--items` | `40` | items per seeded list |
+| `--cpu` | `4` | CDP CPU throttle multiplier |
+| `--podLatency` | `150` | delay (ms) injected on every request to the pod |
+| `--settleMs` | `6000` | how long to keep recording after the lists appear |
+| `--skipSeed` | off | reuse the pod contents from a previous run (much faster) |
+| `--label` | `login` | output filename prefix |
+
+`--cpu` and `--podLatency` are the attribution levers, same as above: a number
+that tracks the throttle is main-thread work, one that tracks the latency is
+the network.
+
+The headline numbers in `<label>.summary.json`:
+
+- `firstContentMs` — how long the page is blank.
+- `blankScreenLongTaskMs` — how much of that blank stretch was CPU rather than
+  waiting.
+- `firstListMs` — when the lists are actually on screen.
+- `maxFrameGapMs` / `longestTaskMs` — the freeze: the longest the main thread
+  went without giving a frame back, once there was something on screen to
+  freeze.
+- `phases` — the app's own profiling marks grouped by label, so a slow login can
+  be pinned to the pod URL lookup, a fetch, a parse or a deserialize.

@@ -10,6 +10,8 @@ import type { SharedWithMeList, SharedListsWithMe, DeletedPackingLists } from '.
 import { deletionsById, emptyDeletedPackingLists, isNewerThanDeletion, mergeDeletedPackingLists, pruneDeletions, registriesEqual, withoutDeletion } from '../utils/packingListDeletions'
 import { mergePackingLists } from '../utils/mergePackingLists'
 import { profile } from '../utils/profiling'
+import { yieldToEventLoop } from '../utils/yieldToEventLoop'
+import { responseToDataset } from './rdfDataset'
 
 /**
  * Pod container paths under the user's Pod root
@@ -832,9 +834,15 @@ const lastSeenByUrl = new Map<string, { etag: string; result: unknown }>()
  * on a timer (see `usePodSync`'s `pollInterval`) was paying that cost on
  * every tick even when the pod hadn't changed since the last one. See
  * docs/questions-page-mobile-performance.md for the investigation that found
- * this. A 304 makes `getSolidDataset` throw (it treats any non-2xx as an
+ * this. A 304 makes `responseToDataset` throw (it treats any non-2xx as an
  * error) before it ever reaches the parser, which is exactly the point —
  * the cached result from last time is still correct and is returned instead.
+ *
+ * That only started working once this stopped going through
+ * `getSolidDataset`: @inrupt/solid-client cannot build its `FetchError` for a
+ * 304 at all, so the error this branch used to receive carried no
+ * `statusCode` to match on and the cache never hit. See
+ * `PodResponseError` in rdfDataset.ts.
  */
 export async function loadRdfFromPod<T>(
     session: Session | null,
@@ -853,7 +861,8 @@ export async function loadRdfFromPod<T>(
         })
     }
     try {
-        const dataset = await profile('pod.load.fetch', () => getSolidDataset(fileUrl, { fetch: conditionalFetch }), { fileUrl })
+        const response = await profile('pod.load.fetch', () => conditionalFetch(fileUrl, { headers: { Accept: 'text/turtle' } }), { fileUrl })
+        const dataset = await profile('pod.load.parse', () => responseToDataset(response), { fileUrl })
         const result = profile('pod.load.deserialize', () => deserializer(dataset, fileUrl), { fileUrl })
         if (observedEtag) lastSeenByUrl.set(fileUrl, { etag: observedEtag, result })
         else lastSeenByUrl.delete(fileUrl)
@@ -890,6 +899,17 @@ export async function saveRdfToPod<T>(options: SaveRdfToPodOptions<T>): Promise<
 }
 
 /**
+ * The fetch half of `getSolidDataset`: asks for Turtle and hands back the raw
+ * response, leaving the parse to the caller so it can decide when to pay for
+ * it. Errors keep the same shape the rest of this module reads
+ * (`statusCode`) — a response that wasn't a success is turned into a
+ * `PodResponseError` by `responseToDataset` when the caller parses it.
+ */
+function fetchTurtle(session: Session, fileUrl: string): Promise<Response> {
+    return session.fetch(fileUrl, { headers: { Accept: 'text/turtle' } })
+}
+
+/**
  * Loads all .ttl files from a Pod container, deserializing each via the provided function.
  */
 export async function loadMultipleRdfFromPod<T>(
@@ -915,12 +935,24 @@ export async function loadMultipleRdfFromPod<T>(
         return { data: [], result: { success: true, successCount: 0, failCount: 0, totalCount: 0 } }
     }
 
-    // Load all files in parallel for faster sync — one round trip per list adds
-    // up to a long wait on login for anyone with more than a handful of lists.
+    // Fetch every file in parallel — one round trip per list adds up to a long
+    // wait on login for anyone with more than a handful of lists — but turn the
+    // responses into datasets one at a time, giving the browser a turn in
+    // between.
+    //
+    // The split is the point. `getSolidDataset` does the fetch and the Turtle
+    // parse in one call, so firing it at a whole container meant every response
+    // parsed as it landed, back to back, in a single task: on a first login to
+    // a pod with 25 lists that was one 4.5s block with the app already on
+    // screen and unable to repaint. Parsing is the expensive half (it is
+    // main-thread CPU, and @inrupt/solid-client rebuilds its graph structure
+    // once per quad), so it is the half that gets spread out. The network stays
+    // exactly as parallel as it was. See docs/login-performance.md.
+    //
     // Settled results stay in ttlUrls order, so the caller sees container order
     // regardless of which responses arrive first.
     const settled = await Promise.allSettled(
-        ttlUrls.map(fileUrl => getSolidDataset(fileUrl, { fetch: session.fetch }))
+        ttlUrls.map(fileUrl => profile('pod.loadMany.fetch', () => fetchTurtle(session, fileUrl), { fileUrl }))
     )
 
     const loadedData: T[] = []
@@ -932,9 +964,12 @@ export async function loadMultipleRdfFromPod<T>(
         const fileUrl = ttlUrls[i]
         try {
             if (outcome.status === 'rejected') throw outcome.reason
-            // Deserialization stays inside the try: a malformed file must count
-            // as one failure, not abandon the rest of the container.
-            loadedData.push(deserializer(outcome.value, fileUrl))
+            // Parsing and deserialization stay inside the try: a malformed file
+            // must count as one failure, not abandon the rest of the container.
+            // `responseToDataset` is also what raises the error for a response
+            // that wasn't a success, so non-2xx lands here too.
+            const fileDataset = await profile('pod.loadMany.parse', () => responseToDataset(outcome.value), { fileUrl })
+            loadedData.push(profile('pod.loadMany.deserialize', () => deserializer(fileDataset, fileUrl), { fileUrl }))
             successCount++
         } catch (error: unknown) {
             if (isAuthenticationError(error)) handlePodError(error)
@@ -942,6 +977,7 @@ export async function loadMultipleRdfFromPod<T>(
             failCount++
             if (onError) onError(fileUrl, error instanceof Error ? error : new Error(String(error)))
         }
+        await yieldToEventLoop()
     }
 
     return {
