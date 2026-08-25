@@ -14,7 +14,7 @@ import { reportError } from '../errorReporting'
 import { usePodSync } from '../hooks/usePodSync'
 import { useLocalFirstLoad } from '../hooks/useLocalFirstLoad'
 import { useSyncCoordinator } from '../hooks/useSyncCoordinator'
-import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName, deriveWebIdFromPodUrl } from '../services/solidPod'
+import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName, deriveWebIdFromPodUrl, isRetryablePodUrlFailure } from '../services/solidPod'
 import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
@@ -704,8 +704,18 @@ export function ViewPackingList() {
     }, []);
 
     // Callback when save to Pod fails
-    const handleSaveError = useCallback((error: string) => {
-        const details = reportError(error, 'Save to Pod error');
+    const handleSaveError = useCallback((error: string, cause?: unknown) => {
+        // A Pod whose address we couldn't look up this second is a network
+        // condition, not a fault: the edit is already in the local database, and
+        // the next save carries it up. Say that in words the user can act on, and
+        // keep it out of Sentry — it arrived there as a bare "No pod URL found"
+        // with only errorReporting's own frames for a stack.
+        if (isRetryablePodUrlFailure(cause)) {
+            console.warn('Save to Pod skipped:', error);
+            showToast(error, 'error');
+            return;
+        }
+        const details = reportError(cause ?? error, 'Save to Pod error');
         showToast(`Failed to save to Pod: ${error}`, 'error', details);
     }, [showToast]);
 

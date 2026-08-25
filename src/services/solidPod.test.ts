@@ -25,6 +25,10 @@ import {
     derivePodUrlFromWebId,
     podUsernameFromWebId,
     resetPodSessionCaches,
+    resolvePodUrl,
+    isRetryablePodUrlFailure,
+    PodUrlUnavailableError,
+    POD_ERROR_MESSAGES,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
@@ -1754,6 +1758,98 @@ describe('getPrimaryPodUrl', () => {
         mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
 
         expect(await getPrimaryPodUrl(sessionFor('https://id.inrupt.com/someoneelse'))).toBeNull()
+    })
+
+    it('reads the profile unauthenticated when the authenticated read fails', async () => {
+        // A WebID profile is public by design, so a token problem is the likeliest
+        // reason the authenticated read failed — and a plain fetch sidesteps it.
+        mockGetPodUrlAll.mockRejectedValueOnce(Object.assign(new Error('Unauthorized'), { statusCode: 401 }))
+        mockGetPodUrlAll.mockResolvedValueOnce([ESS_POD_URL])
+        const session = sessionFor(ESS_WEB_ID)
+
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+        expect(mockGetPodUrlAll).toHaveBeenNthCalledWith(1, ESS_WEB_ID, expect.objectContaining({ fetch: session.fetch }))
+        expect(mockGetPodUrlAll).toHaveBeenNthCalledWith(2, ESS_WEB_ID)
+    })
+
+    it('caches an unauthenticated answer like any other, so it is read once', async () => {
+        mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        mockGetPodUrlAll.mockResolvedValue([ESS_POD_URL])
+        const session = sessionFor(ESS_WEB_ID)
+
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+        expect(await getPrimaryPodUrl(session)).toBe(ESS_POD_URL)
+
+        expect(mockGetPodUrlAll).toHaveBeenCalledTimes(2)
+    })
+
+    it('gives up only when the unauthenticated read fails too', async () => {
+        mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        mockGetPodUrlAll.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+        expect(await getPrimaryPodUrl(sessionFor(ESS_WEB_ID))).toBeNull()
+    })
+})
+
+// ─── resolvePodUrl ──────────────────────────────────────────────────────────
+
+describe('resolvePodUrl', () => {
+    const ESS_WEB_ID = 'https://id.inrupt.com/hannahwprior'
+    const ESS_POD_URL = 'https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/'
+
+    const sessionFor = (webId: string) => ({
+        info: { isLoggedIn: true, webId },
+        fetch: vi.fn(),
+    } as unknown as Session)
+
+    beforeEach(() => {
+        localStorage.clear()
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('reports a signed-out session as no-session', async () => {
+        expect(await resolvePodUrl(null)).toEqual({ podUrl: null, reason: 'no-session' })
+    })
+
+    it('reports an unreadable profile as profile-unreachable', async () => {
+        mockGetPodUrlAll.mockRejectedValue(new TypeError('Failed to fetch'))
+
+        expect(await resolvePodUrl(sessionFor(ESS_WEB_ID)))
+            .toEqual({ podUrl: null, reason: 'profile-unreachable' })
+    })
+
+    it('reports a readable profile that declares no storage as no-storage-declared', async () => {
+        mockGetPodUrlAll.mockResolvedValueOnce([])
+
+        expect(await resolvePodUrl(sessionFor(ESS_WEB_ID)))
+            .toEqual({ podUrl: null, reason: 'no-storage-declared' })
+    })
+
+    it('reports no reason when the Pod URL is known', async () => {
+        mockGetPodUrlAll.mockResolvedValueOnce([ESS_POD_URL])
+
+        expect(await resolvePodUrl(sessionFor(ESS_WEB_ID))).toEqual({ podUrl: ESS_POD_URL })
+    })
+
+    it('separates the failures a later attempt can fix from the ones it cannot', () => {
+        expect(isRetryablePodUrlFailure(new PodUrlUnavailableError('profile-unreachable'))).toBe(true)
+        expect(isRetryablePodUrlFailure(new PodUrlUnavailableError('no-session'))).toBe(true)
+        expect(isRetryablePodUrlFailure(new PodUrlUnavailableError('no-storage-declared'))).toBe(false)
+        expect(isRetryablePodUrlFailure(new Error('Failed to fetch'))).toBe(false)
+        expect(isRetryablePodUrlFailure('No pod URL found')).toBe(false)
+    })
+
+    it('gives each reason a message that says what actually happened', () => {
+        expect(new PodUrlUnavailableError('profile-unreachable').message)
+            .toBe(POD_ERROR_MESSAGES.POD_UNREACHABLE)
+        expect(new PodUrlUnavailableError('no-storage-declared').message)
+            .toBe(POD_ERROR_MESSAGES.NO_POD_FOUND)
+        expect(new PodUrlUnavailableError('no-session').message)
+            .toBe(POD_ERROR_MESSAGES.NOT_LOGGED_IN)
     })
 })
 
