@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
-import { chipInput, chipsForPerson, expandAllSections, firstItemChip } from '../helpers/packing-list'
+import { chipInput, chipsForPerson, chooseListAction, expandAllSections, firstItemChip, openListActions } from '../helpers/packing-list'
 import { personEmojiAt } from '../../src/edit-questions/person-emoji'
 
 async function runWizard(page: import('@playwright/test').Page) {
@@ -163,7 +163,7 @@ test.describe('C – Packing Lists', () => {
     await expect(page.getByRole('heading', { name: 'Evolving Trip' })).toBeVisible({ timeout: 8_000 })
 
     // Update from questions surfaces the new item in a preview
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
     await expect(page.getByRole('button', { name: /Add 1 item/i })).toBeVisible({ timeout: 5_000 })
     await expect(page.getByLabel(/Add GadgetTest/i)).toBeVisible()
     await page.getByRole('button', { name: /Add 1 item/i }).click()
@@ -178,7 +178,7 @@ test.describe('C – Packing Lists', () => {
     await page.getByRole('button', { name: /^Remove$/ }).click()
     await expect(page.getByText('GadgetTest')).not.toBeVisible({ timeout: 5_000 })
 
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
     // No preview — the list already matches (the deleted item is not resurrected)
     await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByRole('button', { name: /Add \d+ item/i })).not.toBeVisible()
@@ -203,7 +203,7 @@ test.describe('C – Packing Lists', () => {
   ) {
     await addAlwaysNeededItem(page, itemName)
     await page.goto(listUrl)
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
     await page.getByRole('button', { name: /Add 1 item/i }).click()
     await expandAllSections(page)
     await expect(page.getByText(itemName)).toBeVisible({ timeout: 5_000 })
@@ -232,7 +232,7 @@ test.describe('C – Packing Lists', () => {
 
     await page.goto(listUrl)
     await expandAllSections(page)
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
 
     // Grouped as a change, with the old name shown, rather than as a new item
     await expect(page.getByText('Changed items')).toBeVisible({ timeout: 5_000 })
@@ -243,7 +243,7 @@ test.describe('C – Packing Lists', () => {
     await expect(page.getByText('RenameMeTest')).not.toBeVisible()
 
     // And the list now matches, so the rename was applied rather than duplicated
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
     await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
   })
 
@@ -260,7 +260,7 @@ test.describe('C – Packing Lists', () => {
 
     await page.goto(listUrl)
     await expandAllSections(page)
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
 
     await expect(page.getByText('No longer in your questions')).toBeVisible({ timeout: 5_000 })
     // Removals arrive unticked: nothing comes off the list without being asked for
@@ -286,7 +286,7 @@ test.describe('C – Packing Lists', () => {
 
     await page.goto(listUrl)
     await expandAllSections(page)
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
 
     await expect(page.getByText('Changed items')).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText(/Now shared for everyone/)).toBeVisible()
@@ -295,7 +295,7 @@ test.describe('C – Packing Lists', () => {
     // Still one item, not two: the personal copy went as the shared one arrived
     await expandAllSections(page)
     await expect(page.getByText('ShareMeTest')).toHaveCount(1, { timeout: 5_000 })
-    await page.getByRole('button', { name: /Update from questions/i }).click()
+    await chooseListAction(page, /Update from questions/i)
     await expect(page.getByText('This list already matches your questions')).toBeVisible({ timeout: 5_000 })
   })
 
@@ -521,14 +521,15 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await runWizard(page)
     await createList(page, 'Share Prompt Trip')
 
-    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    await chooseListAction(page, 'Share')
     await expect(page.getByRole('heading', { name: /Sign in to share this list/i })).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText(/Send a friend a link/i)).toBeVisible()
 
     // Backing out leaves the list exactly as it was
     await page.getByRole('button', { name: 'Not now' }).click()
     await expect(page.getByRole('heading', { name: /Sign in to share this list/i })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Share', exact: true })).toBeVisible()
+    await expect((await openListActions(page)).getByRole('menuitem', { name: 'Share' })).toBeVisible()
+    await page.keyboard.press('Escape')
   })
 
   test('C13: both contextual prompts work on a phone-sized screen', async ({ freshPage: page }) => {
@@ -537,7 +538,7 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await createList(page, 'Mobile Prompt Trip')
 
     // Share prompt: the modal and both of its buttons fit the viewport
-    await page.getByRole('button', { name: 'Share', exact: true }).click()
+    await chooseListAction(page, 'Share')
     const signInButton = page.getByRole('button', { name: /Sign in to share/i })
     await expect(signInButton).toBeVisible({ timeout: 5_000 })
     const signInBox = await signInButton.boundingBox()

@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { loginToCss } from '../helpers/login'
 import { CSS_ISSUER, CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME, COLLAB_EMAIL, COLLAB_PASSWORD, COLLAB_POD_NAME } from '../../playwright.config'
-import { expandAllSections, firstItemChip } from '../helpers/packing-list'
+import { chooseListAction, expandAllSections, firstItemChip, openListActions } from '../helpers/packing-list'
 
 // L tests use two pod users. Serial mode gives exclusive pod access.
 test.describe.configure({ mode: 'serial' })
@@ -56,12 +56,15 @@ test.describe('L – Sharing a packing list', () => {
     })
 
     test('L1: User A shares a list; shareable link contains expected params', async () => {
-        // Share button renders immediately, enabled once pod URL resolves (~1 network round-trip)
-        // exact: true — the packing list's "Collapse the shared items list" section header also matches a bare 'Share' substring
-        await expect(pageA.getByRole('button', { name: 'Share', exact: true })).toBeEnabled({ timeout: 10_000 })
+        // Share renders immediately, enabled once the pod URL resolves (~1 network
+        // round-trip). It lives in the header's actions menu; a `menuitem` query
+        // scoped to that menu also keeps the packing list's own "Collapse the
+        // shared items list" section header out of the way.
+        const actions = await openListActions(pageA)
+        await expect(actions.getByRole('menuitem', { name: 'Share' })).toBeEnabled({ timeout: 10_000 })
 
         // Open share modal
-        await pageA.getByRole('button', { name: 'Share', exact: true }).click()
+        await actions.getByRole('menuitem', { name: 'Share' }).click()
         await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
 
         // Enter User B's WebID then submit via the dialog's Share button (not the toolbar one)
@@ -101,8 +104,10 @@ test.describe('L – Sharing a packing list', () => {
             // List name must match what User A created
             await expect(pageB.getByText(listName)).toBeVisible({ timeout: 15_000 })
 
-            // Share button must NOT be visible on a shared list
-            await expect(pageB.getByRole('button', { name: 'Share', exact: true })).not.toBeVisible()
+            // Someone else's list carries none of the owner's actions, so the
+            // menu that would hold Share is not there either.
+            await expect(pageB.getByRole('button', { name: 'List actions' })).not.toBeVisible()
+            await expect(pageB.getByRole('menuitem', { name: 'Share' })).not.toBeVisible()
         } finally {
             await ctxB.close()
         }
@@ -149,8 +154,8 @@ test.describe('L – Sharing a packing list', () => {
             await residualDialog.getByRole('button', { name: 'Close' }).click()
             await expect(residualDialog).toHaveCount(0)
         }
-        // Now the toolbar Share button is the only one visible
-        await pageA.getByRole('button', { name: 'Share', exact: true }).click()
+        // With the dialog gone, the header's own Share is reachable again
+        await chooseListAction(pageA, 'Share')
         await expect(pageA.getByText('Manage sharing')).toBeVisible({ timeout: 5_000 })
         await pageA.getByRole('button', { name: 'Anyone with the link' }).click()
         await pageA.getByRole('dialog').getByRole('button', { name: /^Share publicly/i }).click()

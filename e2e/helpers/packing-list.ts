@@ -65,3 +65,23 @@ export async function expandAllSections(page: Page): Promise<void> {
     const expandAll = page.getByRole('button', { name: /^Expand all$/ }).first()
     if (await expandAll.count() > 0) await expandAll.click()
 }
+
+/**
+ * A list's occasional actions — Share, Update from questions — live behind the
+ * kebab in the page header, so reaching either starts by opening it.
+ *
+ * Returns the open menu, so callers can scope a `menuitem` query to it and not
+ * to whatever else on the page happens to carry the same word.
+ */
+export async function openListActions(page: Page): Promise<Locator> {
+    await page.getByRole('button', { name: 'List actions' }).click()
+    const menu = page.getByRole('menu')
+    await expect(menu).toBeVisible({ timeout: 5_000 })
+    return menu
+}
+
+/** Open the header's actions menu and pick one of its entries. */
+export async function chooseListAction(page: Page, action: RegExp | string): Promise<void> {
+    const menu = await openListActions(page)
+    await menu.getByRole('menuitem', { name: action }).click()
+}

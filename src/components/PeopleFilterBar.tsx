@@ -50,6 +50,12 @@ export interface PeopleFilterBarProps {
     sharedStat?: PersonStat
     /** Names the region the strip filters, for assistive tech. */
     controlsId: string
+    /**
+     * Adding another person, on a list the viewer is allowed to change. Given,
+     * the strip grows a plus on the end; omitted, it is a filter and nothing
+     * more. The name arrives trimmed and non-empty.
+     */
+    onAddGuest?: (name: string) => void
 }
 
 /** Finished packing — said on the face, so the chip's fill can stay the answer
@@ -78,6 +84,7 @@ export function PeopleFilterBar({
     onToggle,
     sharedStat,
     controlsId,
+    onAddGuest,
 }: PeopleFilterBarProps) {
     /**
      * Who a chip belongs to, on a screen with no room to write it beside them.
@@ -93,6 +100,28 @@ export function PeopleFilterBar({
     const [revealed, setRevealed] = useState<{ name: string; left: number; top: number } | null>(null)
     const pressTimer = useRef<number | null>(null)
     const wasLongPress = useRef(false)
+
+    /**
+     * Adding a guest is a name and nothing else, so it is a field on the strip
+     * rather than a dialog over it. It used to be a button in the page header
+     * that opened this field several hundred pixels below, past the sticky bar
+     * — on a phone the field could open off-screen, and the only feedback for
+     * pressing the button was the page not appearing to change.
+     */
+    const [addingGuest, setAddingGuest] = useState(false)
+    const [guestName, setGuestName] = useState('')
+
+    const closeGuestForm = useCallback(() => {
+        setAddingGuest(false)
+        setGuestName('')
+    }, [])
+
+    const submitGuest = useCallback(() => {
+        const trimmed = guestName.trim()
+        if (!trimmed) return
+        onAddGuest?.(trimmed)
+        closeGuestForm()
+    }, [guestName, onAddGuest, closeGuestForm])
 
     const cancelPress = useCallback(() => {
         if (pressTimer.current !== null) {
@@ -139,7 +168,11 @@ export function PeopleFilterBar({
 
     // One person is not a choice, and neither is nobody — unless the group's
     // own items are also on offer, which makes it a choice again.
-    if (columns.length <= 1 && sharedStat === undefined) return null
+    const offersFilters = columns.length > 1 || sharedStat !== undefined
+    // With no choice to offer, the strip used to disappear entirely. That is
+    // right for a filter and wrong for the plus on the end of it: a list with
+    // one person on it is exactly the list a second person gets added to.
+    if (!offersFilters && !onAddGuest) return null
 
     return (
         <div className="mt-1.5 flex items-center gap-2 border-t border-gray-100 dark:border-gray-800 pt-1.5">
@@ -160,7 +193,20 @@ export function PeopleFilterBar({
                 aria-controls={controlsId}
                 className="flex flex-wrap items-center gap-1.5"
             >
-                {columns.map(column => {
+                {/* A lone person gets named but not offered as a filter: one
+                    chip that selects everything and deselects everything is a
+                    control with one state wearing two. */}
+                {!offersFilters && columns.map(column => (
+                    <span
+                        key={column.key}
+                        data-testid="sole-person"
+                        className="flex min-h-[44px] shrink-0 items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300"
+                    >
+                        <PersonAvatar name={column.name} identity={personIdentity({ id: column.personId, name: column.name })} initial={column.initial} />
+                        <span className="whitespace-nowrap">{column.name}</span>
+                    </span>
+                ))}
+                {offersFilters && columns.map(column => {
                     const isSelected = selected.has(column.key)
                     // Somebody with nothing of their own still has a total, and
                     // it is worth saying: a bare chip where every other selected
@@ -232,6 +278,59 @@ export function PeopleFilterBar({
                         </button>
                     )
                 })()}
+                {/* Last of all, and the only chip that is not a person: the way
+                    the strip gets another one. Dashed, so it never reads as
+                    somebody who failed to load a face. */}
+                {onAddGuest && !addingGuest && (
+                    <button
+                        type="button"
+                        onClick={() => setAddingGuest(true)}
+                        aria-label="Add guest"
+                        title="Add guest"
+                        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 bg-transparent p-2 text-gray-500 dark:text-gray-400 transition-colors hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 sm:py-1.5 sm:pl-2 sm:pr-3"
+                    >
+                        <span aria-hidden="true" className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-current text-base leading-none">+</span>
+                        <span aria-hidden="true" className="hidden whitespace-nowrap text-xs font-medium sm:inline">Guest</span>
+                    </button>
+                )}
+                {/* Opening on a line of its own, directly under the chips: a
+                    name needs the width, and sharing the chips' row left the
+                    field about four characters wide on a phone. */}
+                {onAddGuest && addingGuest && (
+                    <span className="flex min-h-[44px] w-full basis-full items-center gap-1.5">
+                        <input
+                            type="text"
+                            value={guestName}
+                            onChange={e => setGuestName(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') { e.preventDefault(); submitGuest() }
+                                if (e.key === 'Escape') { e.preventDefault(); closeGuestForm() }
+                            }}
+                            placeholder="Guest name…"
+                            aria-label="Guest name"
+                            autoFocus
+                            className="min-w-0 flex-1 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        {/* Named in full for anything reading the page rather
+                            than looking at it: every category composer on the
+                            list below also has a button that says "Add". */}
+                        <button
+                            type="button"
+                            onClick={submitGuest}
+                            aria-label="Add guest"
+                            className="min-h-[44px] shrink-0 rounded-full bg-blue-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                        >
+                            Add
+                        </button>
+                        <button
+                            type="button"
+                            onClick={closeGuestForm}
+                            className="min-h-[44px] min-w-[44px] shrink-0 rounded-full px-2 text-sm font-medium text-gray-500 dark:text-gray-400 transition-colors hover:text-gray-900 dark:hover:text-gray-100"
+                        >
+                            Cancel
+                        </button>
+                    </span>
+                )}
             </div>
             {revealed && (
                 <span

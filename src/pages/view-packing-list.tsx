@@ -40,6 +40,7 @@ import { CategoryItemGrid } from '../components/CategoryItemGrid'
 import { ItemRowPanel } from '../components/ItemRowPanel'
 import { buildCategoryRows, buildGridColumns, UNASSIGNED_COLUMN_KEY, type GridRow } from '../utils/categoryItemGrid'
 import { PeopleFilterBar } from '../components/PeopleFilterBar'
+import { ActionMenu, ActionMenuItem } from '../components/ActionMenu'
 import { togglePerson, isFiltered, personTotals, filterSummary, sharedTotal, sharedSelected, filterLabel, filterNames } from '../utils/peopleFilter'
 import { buildSuggestionIndex } from '../utils/itemSuggestions'
 import { useIsDesktop } from '../hooks/useIsDesktop'
@@ -312,10 +313,8 @@ export function ViewPackingList() {
     const hasFoldedOnOpenRef = useRef(false)
     // The first-open fold happens once per mount at most, whatever else changes.
     const hasSeededFoldRef = useRef(false)
-    const [showAddGuest, setShowAddGuest] = useState(false)
     // Reveals an empty Shared Items section on lists that have no communal
     // items yet; once an item is added the section persists from the data.
-    const [newGuestName, setNewGuestName] = useState('')
     const [renamingGuestId, setRenamingGuestId] = useState<string | null>(null)
     const [renamingGuestName, setRenamingGuestName] = useState('')
     const [guestToRemove, setGuestToRemove] = useState<string | null>(null)
@@ -1228,15 +1227,15 @@ export function ViewPackingList() {
         (target: AddItemTarget, itemText: string, quantity?: number) => {
             addItemRef.current(target, itemText, quantity)
         }, [])
-    const handleAddGuest = async () => {
-        if (!packingList || !newGuestName.trim()) return
-        const guest = { id: crypto.randomUUID(), name: newGuestName.trim() }
+    // The name arrives trimmed and non-empty from the strip's own field; this
+    // end only has to put the guest on the list.
+    const handleAddGuest = async (name: string) => {
+        if (!packingList) return
+        const guest = { id: crypto.randomUUID(), name }
         await persistPackingList({
             ...packingList,
             guests: [...(packingList.guests ?? []), guest],
         })
-        setNewGuestName('')
-        setShowAddGuest(false)
     }
 
     const handleRenameGuest = async (guestId: string, newName: string) => {
@@ -1658,8 +1657,23 @@ export function ViewPackingList() {
         <div className="w-full flex flex-col items-center py-8 px-0 sm:px-4">
             {/* Non-sticky header: name, actions */}
             <div className="w-full max-w-screen-2xl mb-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                        {/* Going up a level is navigation, not an action: a
+                            breadcrumb's weight, in the place a breadcrumb sits.
+                            The nav bar already carries "Lists" — this said it a
+                            second time in a filled button three times the size. */}
+                        <button
+                            type="button"
+                            onClick={() => navigate(backPath)}
+                            aria-label="Back to lists"
+                            title="Back to lists"
+                            className="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        >
+                            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-5 w-5">
+                                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 0 1 .02 1.06L9.06 10l3.75 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.24a.75.75 0 0 1 0-1.06l4.25-4.24a.75.75 0 0 1 1.04 0Z" clipRule="evenodd" />
+                            </svg>
+                        </button>
                         <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">{packingList.name}</h1>
                         {foreignPodUrl && (
                             <span className="text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-full px-2 py-0.5 shrink-0">
@@ -1675,43 +1689,34 @@ export function ViewPackingList() {
                             {autoSaveStatus === 'error' && <span className="text-xs text-red-600 dark:text-red-400">Error saving</span>}
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {!foreignPodUrl && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => { setShowAddGuest(v => !v); setNewGuestName('') }}
-                            >
-                                + Add Guest
-                            </Button>
-                        )}
-                        {!foreignPodUrl && hasQuestionSet && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={handleOpenQuestionUpdate}
-                            >
-                                Update from questions
-                            </Button>
-                        )}
-                        {!foreignPodUrl && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => isLoggedIn ? setShareModalOpen(true) : setSignInToSharePromptOpen(true)}
+                    {/* What is left of a row of four filled buttons. None of
+                        these is what the page is for — the page is for ticking
+                        items off — and rendering them at full weight above the
+                        list put the loudest thing on the screen on the least
+                        frequent action. "Add guest" went to the people strip,
+                        where the people are; "back" is the chevron above. */}
+                    {!foreignPodUrl && (
+                        <ActionMenu label="List actions">
+                            <ActionMenuItem
+                                icon="🔗"
                                 disabled={isLoggedIn && !ownPodUrl}
+                                onSelect={() => {
+                                    if (isLoggedIn) setShareModalOpen(true)
+                                    else setSignInToSharePromptOpen(true)
+                                }}
                             >
                                 Share
-                            </Button>
-                        )}
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => navigate(backPath)}
-                        >
-                            Back to Lists
-                        </Button>
-                    </div>
+                            </ActionMenuItem>
+                            {hasQuestionSet && (
+                                <ActionMenuItem
+                                    icon="🔄"
+                                    onSelect={handleOpenQuestionUpdate}
+                                >
+                                    Update from questions
+                                </ActionMenuItem>
+                            )}
+                        </ActionMenu>
+                    )}
                 </div>
                 {(packingList.destination || tripDates) && (
                     <div
@@ -1797,9 +1802,13 @@ export function ViewPackingList() {
                                         {everySectionFolded ? (isDesktop ? 'Expand all' : 'Expand') : (isDesktop ? 'Collapse all' : 'Collapse')}
                                     </button>
                                 )}
+                                {/* Loud only while there is something behind it:
+                                    with nothing packed yet this button reveals
+                                    an empty set, and it was the brightest thing
+                                    on the screen for it. */}
                                 <Button
                                     type="button"
-                                    variant={hiddenPackedCount > 0 ? 'primary' : 'secondary'}
+                                    variant={hiddenPackedCount > 0 ? 'primary' : 'subtle'}
                                     onClick={() => setShowPacked(!showPacked)}
                                 >
                                     {showPacked ? 'Hide Packed' : 'Show Packed'}
@@ -1818,6 +1827,7 @@ export function ViewPackingList() {
                                 personIdentity={personIdentity}
                                 onToggle={handleTogglePerson}
                                 controlsId={LIST_SECTIONS_ID}
+                                onAddGuest={foreignPodUrl ? undefined : handleAddGuest}
                             />
                         </div>
                         {/* Only while a filter is on: unfiltered it held a line
@@ -1986,37 +1996,6 @@ export function ViewPackingList() {
 
             {/* Main content */}
             <div className="w-full">
-                {/* Add Guest inline form — appears just above the grid */}
-                {showAddGuest && (
-                    <div className="mb-4 flex gap-2 max-w-sm">
-                        <input
-                            type="text"
-                            value={newGuestName}
-                            onChange={(e) => setNewGuestName(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') { e.preventDefault(); handleAddGuest() }
-                                if (e.key === 'Escape') { setShowAddGuest(false); setNewGuestName('') }
-                            }}
-                            placeholder="Guest name..."
-                            autoFocus
-                            className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <button
-                            type="button"
-                            onClick={handleAddGuest}
-                            className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                        >
-                            Add
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setShowAddGuest(false); setNewGuestName('') }}
-                            className="shrink-0 px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                )}
                 <div>
                     {/* Once everything is packed the cards hold nothing but empty
                         celebrations, so they fold away and leave the banner as the
