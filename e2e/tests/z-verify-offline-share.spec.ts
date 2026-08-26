@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures'
 import { accountMenu, loginToCss } from '../helpers/login'
 import { fillPersonRequiredFields } from '../helpers/wizard'
+import { chooseListAction, openListActions } from '../helpers/packing-list'
 import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
 
 // Verify fix: offline-created list can be shared without 404
@@ -40,8 +41,10 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
 
         // ── 3. Navigate to the list ──────────────────────────────────────────
         await page.goto(`/#/view-lists/${listId}`)
-        const shareBtn = page.getByRole('button', { name: /^share$/i })
-        await expect(shareBtn).toBeVisible({ timeout: 10_000 })
+        // Share lives in the header's actions menu, and stays disabled until the
+        // pod URL resolves (~1 network round-trip after login).
+        const shareBtn = (await openListActions(page)).getByRole('menuitem', { name: /^share$/i })
+        await expect(shareBtn).toBeEnabled({ timeout: 10_000 })
         await shareBtn.click()
 
         // ── 4. Check current access loaded cleanly (not frozen on "Loading…") ─
@@ -74,7 +77,7 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         await closeBtn.click({ timeout: 3_000 }).catch(() => page.keyboard.press('Escape'))
         // Wait for modal to be fully gone before clicking Share again
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 })
-        await shareBtn.click()
+        await chooseListAction(page, /^share$/i)
         await expect(page.getByText('🌐 Anyone with the link')).toBeVisible({ timeout: 8_000 })
         console.log('"Anyone with the link" row visible ✓')
 
