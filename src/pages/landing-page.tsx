@@ -13,14 +13,14 @@ export const LandingPage = () => {
     const primaryCta = hasQuestions ? (
         <Link
             to="/view-lists"
-            className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+            className="inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
         >
             📋 View Packing Lists
         </Link>
     ) : (
         <Link
             to="/wizard"
-            className="inline-block bg-gradient-primary text-white px-8 py-4 rounded-2xl text-lg font-bold hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+            className="inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
         >
             ✨ Get Started with the Wizard
         </Link>

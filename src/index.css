@@ -91,6 +91,15 @@
   --background-image-gradient-secondary: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   --background-image-gradient-accent: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
 
+  /* The same two ramps, dropped to the shades that can carry white text.
+     White on `#f97316` is 2.80:1 and on `#14b8a6` 2.49:1 — a filled button's
+     label is 14px semibold, which WCAG counts as small text and holds to
+     4.5:1. These start at 5.15:1 and 5.46:1 and darken from there. The
+     decorative gradients above stay bright on purpose: a progress bar is a
+     fill nobody reads words off, and it answers to the 3:1 non-text rule. */
+  --background-image-gradient-primary-button: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+  --background-image-gradient-secondary-button: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
+
   /* Custom Box Shadows — the `--shadow-*` namespace is what Tailwind v4 turns
      into `shadow-soft`, `shadow-glow-primary`, … utilities. */
   --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);

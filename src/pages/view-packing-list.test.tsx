@@ -117,6 +117,15 @@ function renderComponent() {
 }
 
 /**
+ * Share and "Update from questions" live in the header's actions menu now, so
+ * reaching either of them starts by opening it. See ActionMenu.
+ */
+async function openListActions() {
+    // pointerDown, not click: Radix's dropdown opens on the pointer going down.
+    fireEvent.pointerDown(await screen.findByRole('button', { name: /list actions/i }), { button: 0 })
+}
+
+/**
  * A row of the category grid, by the button carrying its name.
  *
  * Not `getByText`: a row's name is split so that its last word can hold on to
@@ -1417,7 +1426,10 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
 
         await waitFor(() => expect(screen.getByText('Test Trip')).toBeTruthy())
 
-        expect(screen.queryByRole('button', { name: /^share$/i })).toBeNull()
+        // Someone else's list has none of these actions, so the menu holding
+        // them is not there either — and Share with it.
+        expect(screen.queryByRole('button', { name: /list actions/i })).toBeNull()
+        expect(screen.queryByRole('menuitem', { name: /^share$/i })).toBeNull()
     })
 
     it('shows Share button when logged in and no ?pod= param', async () => {
@@ -1425,7 +1437,8 @@ describe('ViewPackingList foreign pod (?pod= param)', () => {
 
         await waitFor(() => expect(screen.getByText('Test Trip')).toBeTruthy())
 
-        await waitFor(() => expect(screen.getByRole('button', { name: /^share$/i })).toBeTruthy())
+        await openListActions()
+        await waitFor(() => expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeTruthy())
     })
 
     it('keeps loading state when getPackingList throws not_found on a foreign pod', async () => {
@@ -2044,14 +2057,19 @@ describe('ViewPackingList update from questions', () => {
     it('hides the button when no question set exists', async () => {
         renderUpdatable({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
         await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
-        expect(screen.queryByRole('button', { name: /update from questions/i })).toBeNull()
+        await openListActions()
+        // The menu is open and still has Share in it — it is this one entry
+        // that is missing, not the whole menu.
+        expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeTruthy()
+        expect(screen.queryByRole('menuitem', { name: /update from questions/i })).toBeNull()
     })
 
     it('shows new items in a preview when the question set has additions', async () => {
         renderUpdatable()
         await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
 
-        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: /update from questions/i }))
 
         // Preview modal lists the new item, not the one already on the list
         await waitFor(() => expect(screen.getByRole('button', { name: /add 1 item/i })).toBeTruthy())
@@ -2073,7 +2091,8 @@ describe('ViewPackingList update from questions', () => {
         renderUpdatable({ getQuestionSet: vi.fn().mockResolvedValue(matchingQs) })
         await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
 
-        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: /update from questions/i }))
 
         await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('This list already matches your questions', 'success'))
         expect(screen.queryByRole('button', { name: /add 1 item/i })).toBeNull()
@@ -2089,7 +2108,8 @@ describe('ViewPackingList update from questions', () => {
         })
         await waitFor(() => expect(screen.getByRole('heading', { name: 'Updatable Trip' })).toBeTruthy())
 
-        fireEvent.click(await screen.findByRole('button', { name: /update from questions/i }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: /update from questions/i }))
         await screen.findByRole('button', { name: /add 2 items/i })
 
         // Uncheck Swimsuit, leaving only Goggles
@@ -2118,7 +2138,8 @@ describe('ViewPackingList update from questions', () => {
             </MemoryRouter>
         )
         await waitFor(() => expect(screen.getByText('Swimsuit')).toBeTruthy())
-        expect(screen.queryByRole('button', { name: /update from questions/i })).toBeNull()
+        expect(screen.queryByRole('button', { name: /list actions/i })).toBeNull()
+        expect(screen.queryByRole('menuitem', { name: /update from questions/i })).toBeNull()
     })
 })
 
@@ -3359,15 +3380,17 @@ describe('ViewPackingList contextual sign-in to share', () => {
         mockLoggedOut()
         renderComponent()
 
-        const shareButton = await screen.findByRole('button', { name: 'Share' })
-        expect((shareButton as HTMLButtonElement).disabled).toBe(false)
+        await openListActions()
+        const shareButton = await screen.findByRole('menuitem', { name: 'Share' })
+        expect(shareButton.getAttribute('aria-disabled')).not.toBe('true')
     })
 
     it('frames the sign-in ask around sharing when a logged-out user shares', async () => {
         mockLoggedOut()
         renderComponent()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Share' }))
 
         expect(screen.getByText(/sign in to share this list/i)).toBeTruthy()
         expect(screen.getByRole('button', { name: /sign in to share/i })).toBeTruthy()
@@ -3377,7 +3400,8 @@ describe('ViewPackingList contextual sign-in to share', () => {
         mockLoggedOut()
         renderComponent()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Share' }))
         fireEvent.click(screen.getByRole('button', { name: /sign in to share/i }))
         fireEvent.click(screen.getByLabelText('Inrupt PodSpaces'))
 
@@ -3389,7 +3413,8 @@ describe('ViewPackingList contextual sign-in to share', () => {
         mockLoggedOut()
         renderComponent()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+        await openListActions()
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Share' }))
         fireEvent.click(screen.getByRole('button', { name: /not now/i }))
 
         await waitFor(() => expect(screen.queryByText(/sign in to share this list/i)).toBeNull())
@@ -4139,5 +4164,104 @@ describe('ViewPackingList save-to-Pod failures', () => {
         act(() => onSaveError(cause.message, cause))
 
         expect(mockCaptureException).toHaveBeenCalledWith(cause)
+    })
+})
+
+/**
+ * The header used to open with four filled orange buttons — Add Guest, Update
+ * from questions, Share, Back to Lists — stacked two rows deep above the list
+ * they were all less important than. Each of these pins one part of the way
+ * back out of that.
+ */
+describe('ViewPackingList header emphasis', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn().mockResolvedValue({ ...testPackingList, _rev: '2' }),
+        })
+        mockUseDatabase.mockReturnValue({
+            db: { ...makeDb(), getQuestionSet: vi.fn().mockResolvedValue({ people: [] }) } as unknown as PackingAppDatabase,
+        })
+    })
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    /** Every button in the non-sticky header above the list. */
+    function headerButtons() {
+        const heading = screen.getByRole('heading', { name: 'Test Trip' })
+        const header = heading.closest('div')?.parentElement as HTMLElement
+        return Array.from(header.querySelectorAll('button'))
+    }
+
+    it('spends no filled button on an action the page is not for', async () => {
+        renderComponent()
+        await screen.findByRole('heading', { name: 'Test Trip' })
+
+        for (const button of headerButtons()) {
+            expect(button.className).not.toContain('bg-gradient-secondary')
+            expect(button.className).not.toContain('bg-gradient-primary')
+        }
+    })
+
+    it('leaves the header two controls, not four', async () => {
+        renderComponent()
+        await screen.findByRole('heading', { name: 'Test Trip' })
+
+        expect(headerButtons().map(b => b.getAttribute('aria-label')))
+            .toEqual(['Back to lists', 'List actions'])
+    })
+
+    it('goes up a level from a chevron rather than a button the size of the title', async () => {
+        renderComponent()
+
+        const back = await screen.findByRole('button', { name: /back to lists/i })
+        fireEvent.click(back)
+
+        // A breadcrumb carries no words of its own; the label is for the
+        // people who cannot see the chevron.
+        expect(back.textContent).toBe('')
+    })
+
+    it('keeps both occasional actions one press away', async () => {
+        renderComponent()
+        await screen.findByRole('heading', { name: 'Test Trip' })
+
+        expect(screen.queryByRole('menuitem', { name: /^share$/i })).toBeNull()
+        await openListActions()
+
+        expect(screen.getByRole('menuitem', { name: /^share$/i })).toBeTruthy()
+        await waitFor(() => expect(screen.getByRole('menuitem', { name: /update from questions/i })).toBeTruthy())
+    })
+
+    it('gathers them into a real menu, the same one the list cards use', async () => {
+        renderComponent()
+        await openListActions()
+
+        // role="menu" is the promise of arrow-key focus and Escape, which is
+        // Radix's to keep — and only if the menu is actually one.
+        const menu = screen.getByRole('menu')
+        await waitFor(() => expect(within(menu).getAllByRole('menuitem').map(i => i.textContent))
+            .toEqual(['🔗Share', '🔄Update from questions']))
+    })
+
+    it('adds a guest from the strip the guests are on, not from the header', async () => {
+        renderComponent()
+        await screen.findByRole('heading', { name: 'Test Trip' })
+
+        expect(headerButtons().some(b => /guest/i.test(b.getAttribute('aria-label') ?? ''))).toBe(false)
+        expect(screen.getByRole('button', { name: /add guest/i })).toBeTruthy()
     })
 })

@@ -184,7 +184,8 @@ test.describe('F – Solid Pod Sync', () => {
     const customItemName = 'super special sunscreen'
     const addItemInput = page.getByPlaceholder('Add new item...').first()
     await addItemInput.fill(customItemName)
-    // Use Enter to submit — avoids ambiguity with the "+ Add Guest" button which also matches 'Add'
+    // Use Enter to submit — the composer's own Add is not the only thing on the
+    // page matching 'Add' once the people strip's guest field is open
     await addItemInput.press('Enter')
     await expect(page.locator('span.text-green-600').first()).toBeVisible({ timeout: 8_000 })
     await expect(page.locator('span.text-green-600').first()).not.toBeVisible({ timeout: 8_000 })

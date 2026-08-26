@@ -124,3 +124,120 @@ describe('what a chip says without being asked', () => {
         expect(screen.getByRole('button', { name: /^Shared/ }).getAttribute('aria-pressed')).toBe('true')
     })
 })
+
+describe('adding somebody to the strip', () => {
+    function renderWithAdd(
+        onAddGuest = vi.fn(),
+        people: { name: string; id: string }[] = [{ name: 'Alice', id: 'p1' }, { name: 'Amy', id: 'p2' }],
+    ) {
+        render(
+            <PeopleFilterBar
+                columns={buildGridColumns(people, [])}
+                selected={new Set()}
+                totals={totals}
+                personIdentity={() => ({ color: PERSON_COLORS[0] })}
+                onToggle={vi.fn()}
+                onAddGuest={onAddGuest}
+                controlsId="sections"
+            />
+        )
+        return onAddGuest
+    }
+
+    const addChip = () => screen.getByRole('button', { name: /add guest/i })
+
+    it('offers the plus where the people already are, not in the page header', () => {
+        renderWithAdd()
+
+        // Inside the group the chips live in: "add another one of these" is a
+        // sentence about the strip, and it should be read off the strip.
+        const group = screen.getByRole('group', { name: 'Filter by person' })
+        expect(group.contains(addChip())).toBe(true)
+    })
+
+    it('leaves the strip alone on a list nobody can be added to', () => {
+        render(
+            <PeopleFilterBar
+                columns={columns}
+                selected={new Set()}
+                totals={totals}
+                personIdentity={() => ({ color: PERSON_COLORS[0] })}
+                onToggle={vi.fn()}
+                controlsId="sections"
+            />
+        )
+
+        expect(screen.queryByRole('button', { name: /add guest/i })).toBeNull()
+    })
+
+    it('opens the name field next to the plus that opened it', () => {
+        renderWithAdd()
+        fireEvent.click(addChip())
+
+        const field = screen.getByPlaceholderText(/guest name/i)
+        expect(field).toBeTruthy()
+        expect(document.activeElement).toBe(field)
+    })
+
+    it('hands the trimmed name back and closes', async () => {
+        const onAddGuest = renderWithAdd()
+        fireEvent.click(addChip())
+
+        fireEvent.change(screen.getByPlaceholderText(/guest name/i), { target: { value: '  Dan  ' } })
+        fireEvent.click(screen.getByRole('button', { name: /^Add guest$/i }))
+
+        expect(onAddGuest).toHaveBeenCalledWith('Dan')
+        expect(screen.queryByPlaceholderText(/guest name/i)).toBeNull()
+    })
+
+    it('takes Enter as the submit, because a name is one field', () => {
+        const onAddGuest = renderWithAdd()
+        fireEvent.click(addChip())
+
+        const field = screen.getByPlaceholderText(/guest name/i)
+        fireEvent.change(field, { target: { value: 'Dan' } })
+        fireEvent.keyDown(field, { key: 'Enter' })
+
+        expect(onAddGuest).toHaveBeenCalledWith('Dan')
+    })
+
+    it('asks for nobody when the name is blank', () => {
+        const onAddGuest = renderWithAdd()
+        fireEvent.click(addChip())
+
+        fireEvent.change(screen.getByPlaceholderText(/guest name/i), { target: { value: '   ' } })
+        fireEvent.click(screen.getByRole('button', { name: /^Add guest$/i }))
+
+        expect(onAddGuest).not.toHaveBeenCalled()
+    })
+
+    it('backs out on Escape without adding anybody', () => {
+        const onAddGuest = renderWithAdd()
+        fireEvent.click(addChip())
+
+        const field = screen.getByPlaceholderText(/guest name/i)
+        fireEvent.change(field, { target: { value: 'Dan' } })
+        fireEvent.keyDown(field, { key: 'Escape' })
+
+        expect(onAddGuest).not.toHaveBeenCalled()
+        expect(screen.queryByPlaceholderText(/guest name/i)).toBeNull()
+    })
+
+    /*
+     * The strip used to hide itself when there was nobody to choose between,
+     * which is right for a filter and wrong for the only way of adding the
+     * second person. It stays, minus the choice.
+     */
+    it('still shows the plus on a list with only one person', () => {
+        renderWithAdd(vi.fn(), [{ name: 'Alice', id: 'p1' }])
+
+        expect(addChip()).toBeTruthy()
+    })
+
+    it('names that one person without offering a filter that filters nothing', () => {
+        renderWithAdd(vi.fn(), [{ name: 'Alice', id: 'p1' }])
+
+        expect(screen.getByTestId('sole-person').textContent).toContain('Alice')
+        expect(screen.queryByRole('button', { name: /^Alice/ })).toBeNull()
+    })
+})

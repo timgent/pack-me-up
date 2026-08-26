@@ -407,7 +407,7 @@ Are you sure you want to continue?"
                             <div className="space-y-3">
                                 <button
                                     onClick={() => handleSuccessAction('/create-packing-list')}
-                                    className="w-full bg-gradient-primary text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                                    className="w-full bg-gradient-primary-button text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
                                 >
                                     🚀 Create My First Packing List
                                 </button>
