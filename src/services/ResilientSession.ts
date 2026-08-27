@@ -8,7 +8,7 @@ import {
     calculateJwkThumbprint,
     type JWTVerifyGetKey,
 } from 'jose'
-import { logAuthEvent } from './authLog'
+import { logAuthEvent, reportSessionEnded } from './authLog'
 
 /**
  * A SessionCore that treats "I could not reach the token endpoint" and
@@ -57,6 +57,18 @@ const CLOCK_TOLERANCE_SECONDS = 300
 const MAX_ATTEMPTS = 2
 
 const RETRY_BASE_MS = 800
+
+/**
+ * How long to wait before trying again after a refresh that failed transiently.
+ *
+ * Something has to own this. On a phone the renewal timer that was due while the
+ * device slept fires on the way back up, with the radio still down — the refresh
+ * fails, and unless the session asks for another go, nothing does: the app is
+ * still "logged in", so the recovery backoff in SolidPodContext (which only
+ * covers a session that is not active) never engages. The token then lapses in
+ * silence and the grant is left to rot until the provider gives up on it.
+ */
+const TRANSIENT_RETRY_DELAYS_MS = [5_000, 15_000, 45_000, 120_000, 300_000]
 
 const REFRESH_LOCK = 'pmu-solid-token-refresh'
 
@@ -163,23 +175,32 @@ export interface ResilientSessionOptions extends Omit<SessionOptions, 'database'
      * against a local key set instead of reaching the network.
      */
     resolveJwks?: (jwksUri: string) => JWTVerifyGetKey
+    /**
+     * The backoff between retries after a transient failure. Injectable so tests
+     * can watch a session come back without waiting out five real seconds.
+     */
+    transientRetryDelaysMs?: readonly number[]
 }
 
 export class ResilientSession extends SessionCore {
     /** SessionCore keeps its database private, so we hold our own handle. */
     private readonly db: SessionIDB
     private readonly resolveJwks: (jwksUri: string) => JWTVerifyGetKey
+    private readonly transientRetryDelaysMs: readonly number[]
     private renewalTimer: ReturnType<typeof setTimeout> | undefined
+    /** Consecutive transient failures, for pacing the retry timer. */
+    private transientFailures = 0
 
     constructor(
         clientDetails: ConstructorParameters<typeof SessionCore>[0],
         database: SessionIDB,
         sessionOptions: ResilientSessionOptions,
     ) {
-        const { resolveJwks, ...coreOptions } = sessionOptions
+        const { resolveJwks, transientRetryDelaysMs, ...coreOptions } = sessionOptions
         super(clientDetails, { ...coreOptions, database })
         this.db = database
         this.resolveJwks = resolveJwks ?? jwksFor
+        this.transientRetryDelaysMs = transientRetryDelaysMs ?? TRANSIENT_RETRY_DELAYS_MS
     }
 
     /**
@@ -203,6 +224,7 @@ export class ResilientSession extends SessionCore {
             try {
                 const tokens = await withRefreshLock(() => this.refreshWithRetries())
                 await this.setTokenDetails(tokens)
+                this.transientFailures = 0
                 this.scheduleRenewal()
                 logAuthEvent('refresh.succeeded', { expiresIn: this.getExpiresIn() })
                 this.resolveRefresh?.()
@@ -215,8 +237,14 @@ export class ResilientSession extends SessionCore {
                 )
                 this.rejectRefresh?.(error instanceof Error ? error : new Error(String(error)))
                 // Only the provider disowning the grant ends the session. A transient
-                // failure leaves the stored refresh token intact for the next attempt.
-                if (ended) this.dispatchExpirationEvent()
+                // failure leaves the stored refresh token intact for the next attempt,
+                // and books that attempt rather than hoping something else will.
+                if (ended) {
+                    reportSessionEnded(error.reason)
+                    this.dispatchExpirationEvent()
+                } else {
+                    this.scheduleTransientRetry()
+                }
             } finally {
                 this.clearRefreshPromise()
                 if (wasActive !== this.isActive) this.dispatchStateChangeEvent()
@@ -291,6 +319,25 @@ export class ResilientSession extends SessionCore {
             clearTimeout(this.renewalTimer)
             this.renewalTimer = undefined
         }
+    }
+
+    /**
+     * Books another attempt after a transient failure, on a backoff that tops out
+     * at five minutes. It shares the renewal timer: whichever of the two is due
+     * first is the one worth doing, and a success re-arms the normal schedule.
+     */
+    private scheduleTransientRetry(): void {
+        this.cancelRenewal()
+
+        const delay = this.transientRetryDelaysMs[
+            Math.min(this.transientFailures, this.transientRetryDelaysMs.length - 1)
+        ]
+        this.transientFailures += 1
+
+        this.renewalTimer = setTimeout(() => {
+            logAuthEvent('refresh.retry-after-failure', { attempt: this.transientFailures })
+            void this.restore().catch(() => { /* reported by restore() */ })
+        }, delay)
     }
 
     private async refreshWithRetries() {
@@ -392,6 +439,16 @@ export class ResilientSession extends SessionCore {
         } catch (error) {
             // Signature, JWKS fetch or clock problems. Retrying is safe and often works.
             throw new TransientRefreshError(`Could not verify the new access token: ${String(error)}`)
+        }
+
+        // SessionCore answers an access token it cannot read — no `webid`, no `exp`,
+        // not a JWT at all — by calling its own logout(), which clears IndexedDB and
+        // the refresh token with it. Stop such a token here, before setTokenDetails
+        // ever sees it: a provider having a bad minute must not cost the session.
+        // Transient, because the stored refresh token is untouched and the next
+        // exchange may well come back with a usable token.
+        if (!payload.webid || !payload.exp) {
+            throw new TransientRefreshError('The new access token is missing its webid or exp claim.')
         }
 
         // These two cannot come right on a retry: the stored key or registration

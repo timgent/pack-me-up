@@ -30,7 +30,7 @@ When raising a PR that addresses a GitHub issue, always reference the issue in t
 
 Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`'s
 `SessionCore` ships no refresh lifecycle — that is this app's job, and it lives in
-`ResilientSession` (`src/services/ResilientSession.ts`). Two rules it exists to keep:
+`ResilientSession` (`src/services/ResilientSession.ts`). Three rules it exists to keep:
 
 - **Only the provider may end a session.** `invalid_grant`/`invalid_client`, or a DPoP
   key that no longer matches, are terminal. Network errors, 5xx, 429, JWKS fetch
@@ -40,6 +40,12 @@ Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`
 - **Bank a rotated refresh token before doing anything that can throw.** Providers
   treat a re-presented refresh token as a replay and revoke the whole grant, so a
   replacement that is received but not stored is a dead session.
+- **Never let the app be a dynamic client in production.** The native shell is
+  served from `https://localhost`, so it fell through to dynamic client
+  registration — and a registration the provider reclaims answers the next refresh
+  with `invalid_client`, which is terminal. `solidClientIdentity.ts` decides this,
+  and `public/client-id.json` must keep listing the native redirect URI or the
+  mobile app cannot log in at all.
 
 `docs/staying-signed-in.md` has the full trace of the logout bugs these rules came
 from. `SolidPodContext.resilience.test.tsx`, `ResilientSession.test.ts` and e2e suite J

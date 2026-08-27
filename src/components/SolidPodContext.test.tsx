@@ -3,6 +3,7 @@ import { render, screen, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SolidPodProvider, useSolidPod } from './SolidPodContext'
 import { ResilientSession } from '../services/ResilientSession'
+import { HOSTED_CLIENT_ID_URL } from '../services/solidClientIdentity'
 import { ToastProvider } from './ToastContext'
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -53,6 +54,16 @@ vi.mock('../services/ResilientSession', async (importOriginal) => {
 
 vi.mock('@uvdsl/solid-oidc-client-browser', () => ({
     SessionIDB: vi.fn().mockImplementation(function() { return {} }),
+}))
+
+const mockIsNativePlatform = vi.fn(() => false)
+
+vi.mock('@capacitor/core', () => ({
+    Capacitor: { isNativePlatform: () => mockIsNativePlatform() },
+}))
+
+vi.mock('@capacitor/app', () => ({
+    App: { addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }) },
 }))
 
 /** The ResilientSession instance the provider constructed. */
@@ -358,6 +369,30 @@ describe('SolidPodContext', () => {
 
         await waitFor(() => {
             expect(screen.getByTestId('sessionExpired').textContent).toBe('false')
+        })
+    })
+})
+
+describe('SolidPodContext — the client it presents itself as', () => {
+    beforeEach(() => {
+        vi.mocked(ResilientSession).mockClear()
+    })
+
+    afterEach(() => {
+        mockIsNativePlatform.mockReturnValue(false)
+    })
+
+    it('gives the native app the hosted Client ID Document, not a throwaway registration', () => {
+        // The shell is served from https://localhost, which never matched the
+        // hosted document, so it used to register dynamically on every install —
+        // and a dynamic registration the provider reclaims answers the next
+        // refresh with `invalid_client`, which ends the session for good.
+        mockIsNativePlatform.mockReturnValue(true)
+
+        render(<Wrapper><Consumer /></Wrapper>)
+
+        expect(vi.mocked(ResilientSession).mock.calls[0][0]).toEqual({
+            client_id: HOSTED_CLIENT_ID_URL,
         })
     })
 })

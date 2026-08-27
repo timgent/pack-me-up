@@ -1,7 +1,10 @@
 import { createContext, ReactNode, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { type SessionStateChangeDetail } from "@uvdsl/solid-oidc-client-browser/core";
 import { SessionIDB } from "@uvdsl/solid-oidc-client-browser";
+import { Capacitor } from "@capacitor/core";
 import { ResilientSession, SessionEndedError } from "../services/ResilientSession";
+import { solidClientDetails } from "../services/solidClientIdentity";
+import { onAppResumed } from "../services/appResume";
 import { logAuthEvent } from "../services/authLog";
 import { resetPodSessionCaches } from "../services/solidPod";
 import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
@@ -46,21 +49,15 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
   const uvdslSessionRef = useRef<ResilientSession>(null!);
   if (!uvdslSessionRef.current) {
-    const origin = window.location.origin || "http://localhost";
-    // On production, VITE_CLIENT_ID_URL is set so the provider fetches the hosted Client ID
-    // Document (static registration). On preview deploys and localhost it is unset, so we fall
-    // back to dynamic client registration using the current origin's redirect URI.
-    const clientIdUrl = import.meta.env.VITE_CLIENT_ID_URL as string | undefined;
+    // The deployed site and the native app both identify themselves with a hosted
+    // Client ID Document, which cannot lapse. Only an origin with no document of
+    // its own — localhost, a preview deploy — registers dynamically.
     uvdslSessionRef.current = new ResilientSession(
-      clientIdUrl
-        ? { client_id: clientIdUrl }
-        : {
-            // Use SPA root so the redirect_uri in the token exchange matches what's registered.
-            // If we go through pod-auth-callback.html, the library strips params from that URL
-            // and sends the wrong redirect_uri to the token endpoint.
-            redirect_uris: [origin + "/"],
-            client_name: "Pack Me Up",
-          },
+      solidClientDetails({
+        clientIdUrl: import.meta.env.VITE_CLIENT_ID_URL as string | undefined,
+        isNativePlatform: Capacitor.isNativePlatform(),
+        origin: window.location.origin || "http://localhost",
+      }),
       new SessionIDB(),
       {
         onSessionStateChange: (e) => {
@@ -181,8 +178,8 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(recoveryTimerRef.current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Take every chance to get a stalled session back: coming online, or the user
-  // returning to the tab, are both good moments to retry ahead of the backoff.
+  // Take every chance to get a stalled session back: coming online, or the app
+  // returning to the foreground, are both good moments to retry ahead of the backoff.
   useEffect(() => {
     const retryIfRecovering = (trigger: string) => {
       if (!recoveringRef.current || uvdslSession.isActive) return;
@@ -191,34 +188,32 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     };
 
     const onOnline = () => retryIfRecovering("online");
-    const onVisible = () => {
-      if (document.visibilityState === "visible") retryIfRecovering("visible");
-    };
+    const stopWatchingResume = onAppResumed(() => retryIfRecovering("resumed"));
 
     window.addEventListener("online", onOnline);
-    document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("online", onOnline);
-      document.removeEventListener("visibilitychange", onVisible);
+      stopWatchingResume();
     };
   }, [attemptRestore, uvdslSession]);
 
-  // Returning to the tab is when a token is most likely to have lapsed while the
-  // device slept. Renew it before the user's first action needs it.
+  // Coming back to the app is when a token is most likely to have lapsed while
+  // the device slept — and on a phone the renewal timer was frozen along with
+  // the process, so this is the only thing that notices. Renew before the user's
+  // first action needs it.
   useEffect(() => {
     if (!isLoggedIn) return;
 
     const renewIfNeeded = () => {
-      if (document.visibilityState !== "visible") return;
       if (!uvdslSession.needsRenewal()) return;
-      logAuthEvent("refresh.on-visible");
+      logAuthEvent("refresh.on-resume");
       void uvdslSession.restore().catch(() => { /* restore() reports and retries */ });
     };
 
-    document.addEventListener("visibilitychange", renewIfNeeded);
+    const stopWatchingResume = onAppResumed(renewIfNeeded);
     window.addEventListener("online", renewIfNeeded);
     return () => {
-      document.removeEventListener("visibilitychange", renewIfNeeded);
+      stopWatchingResume();
       window.removeEventListener("online", renewIfNeeded);
     };
   }, [isLoggedIn, uvdslSession]);

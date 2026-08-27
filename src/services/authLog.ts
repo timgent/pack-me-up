@@ -1,4 +1,4 @@
-import { addBreadcrumb } from '@sentry/react'
+import { addBreadcrumb, captureMessage } from '@sentry/react'
 
 /**
  * A durable record of everything that happens to the Solid session.
@@ -75,6 +75,26 @@ export function logAuthEvent(
         if (level === 'error') console.error(line, detail ?? '')
         else if (level === 'warn') console.warn(line, detail ?? '')
         else console.log(line, detail ?? '')
+    }
+}
+
+/**
+ * Reports a session that genuinely ended, so it is visible without the device.
+ *
+ * The local log answers "why was I signed out?" only for someone holding the
+ * phone. A session ending is not an error anything throws, so nothing reached
+ * Sentry either, and the mobile app's expiries were invisible. This sends the
+ * one fact that separates a dead grant from a stale client registration — the
+ * reason — and nothing that identifies the user.
+ */
+export function reportSessionEnded(reason: string): void {
+    try {
+        captureMessage(`Solid session ended: ${reason}`, {
+            level: 'error',
+            tags: { auth_session_ended: reason },
+        })
+    } catch {
+        // Sentry not initialised (tests, local dev) — the local log is what matters.
     }
 }
 
