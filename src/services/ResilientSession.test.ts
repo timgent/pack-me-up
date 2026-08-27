@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { generateKeyPair, exportJWK, SignJWT, calculateJwkThumbprint, createLocalJWKSet } from 'jose'
-import { ResilientSession, SessionEndedError } from './ResilientSession'
+import { ResilientSession, SessionEndedError, type ResilientSessionOptions } from './ResilientSession'
 
 /**
  * These cover the exchange that decides whether a user stays logged in.
@@ -35,10 +35,14 @@ let dpopKeys: Awaited<ReturnType<typeof generateKeyPair>>
 let localJwks: ReturnType<typeof createLocalJWKSet>
 
 async function makeAccessToken(
-    opts: { expiresIn?: string | number; signWith?: CryptoKey } = {},
+    opts: { expiresIn?: string | number; signWith?: CryptoKey; omitWebId?: boolean } = {},
 ): Promise<string> {
     const jkt = await calculateJwkThumbprint(await exportJWK(dpopKeys.publicKey))
-    return new SignJWT({ webid: WEB_ID, client_id: CLIENT_ID, cnf: { jkt } })
+    return new SignJWT({
+        ...(opts.omitWebId ? {} : { webid: WEB_ID }),
+        client_id: CLIENT_ID,
+        cnf: { jkt },
+    })
         .setProtectedHeader({ alg: 'ES256', kid: 'test-key' })
         .setIssuer(IDP)
         .setAudience('solid')
@@ -47,7 +51,11 @@ async function makeAccessToken(
         .sign(opts.signWith ?? signingKeys.privateKey)
 }
 
-function makeSession(db: FakeDb, onExpiration?: () => void) {
+function makeSession(
+    db: FakeDb,
+    onExpiration?: () => void,
+    overrides: Partial<ResilientSessionOptions> = {},
+) {
     return new ResilientSession(
         { client_id: CLIENT_ID },
         db as unknown as ConstructorParameters<typeof ResilientSession>[1],
@@ -55,6 +63,7 @@ function makeSession(db: FakeDb, onExpiration?: () => void) {
             onSessionExpiration: onExpiration,
             // Verify against the local test key set rather than a remote JWKS.
             resolveJwks: () => localJwks,
+            ...overrides,
         },
     )
 }
@@ -113,6 +122,7 @@ describe('ResilientSession', () => {
         // The replacement must have survived the failure. Keeping the old value
         // here is what strands a session for good.
         expect(db.items.get('refresh_token')).toBe('refresh-token-v2')
+        session.cancelRenewal()
     }, 30_000)
 
     it('restores the session and stores the rotated token on success', async () => {
@@ -163,6 +173,7 @@ describe('ResilientSession', () => {
         // A struggling server is not a logged-out user.
         expect(onExpiration).not.toHaveBeenCalled()
         expect(db.items.get('refresh_token')).toBe('refresh-token-v1')
+        session.cancelRenewal()
     }, 30_000)
 
     it('retries an unreachable token endpoint and keeps the refresh token', async () => {
@@ -175,6 +186,7 @@ describe('ResilientSession', () => {
         await expect(session.restore()).rejects.not.toBeInstanceOf(SessionEndedError)
         expect(onExpiration).not.toHaveBeenCalled()
         expect(db.items.get('refresh_token')).toBe('refresh-token-v1')
+        session.cancelRenewal()
     }, 30_000)
 
     it('recovers on a later attempt once the network comes back', async () => {
@@ -230,6 +242,69 @@ describe('ResilientSession', () => {
         expect(session.isActive).toBe(true)
         expect(session.getExpiresIn()).toBeGreaterThan(0)
         expect(session.needsRenewal()).toBe(true)
+        session.cancelRenewal()
+    }, 30_000)
+
+    it('comes back on its own after a refresh that failed transiently', async () => {
+        // A phone waking with the radio still down is the common case: the timer
+        // that was due while it slept fires, the refresh fails, and nothing has
+        // asked for a retry. Without one the token quietly lapses and the grant
+        // is left to rot until the provider gives up on it.
+        const fetchMock = vi.fn(async () => { throw new TypeError('Failed to fetch') })
+        vi.stubGlobal('fetch', fetchMock)
+
+        const session = makeSession(db, undefined, { transientRetryDelaysMs: [10] })
+        await expect(session.restore()).rejects.not.toBeInstanceOf(SessionEndedError)
+
+        const callsSoFar = fetchMock.mock.calls.length
+        expect(callsSoFar).toBeGreaterThan(0)
+
+        // Nothing else is watching. The session must come back by itself.
+        await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(callsSoFar))
+        session.cancelRenewal()
+    }, 30_000)
+
+    it('stops trying once the provider has rejected the grant', async () => {
+        const fetchMock = vi.fn(async () => new Response(
+            JSON.stringify({ error: 'invalid_grant' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+        ))
+        vi.stubGlobal('fetch', fetchMock)
+
+        const session = makeSession(db, undefined, { transientRetryDelaysMs: [10] })
+        await expect(session.restore()).rejects.toBeInstanceOf(SessionEndedError)
+
+        const callsSoFar = fetchMock.mock.calls.length
+        // A dead grant is not worth hammering the token endpoint over.
+        await new Promise(resolve => setTimeout(resolve, 200))
+        expect(fetchMock.mock.calls.length).toBe(callsSoFar)
+    }, 30_000)
+
+    it('never erases the stored session over a token it cannot make sense of', async () => {
+        // SessionCore answers an access token with no `webid` claim by calling its
+        // own logout(), which clears IndexedDB — the refresh token with it. The
+        // provider is having a bad minute; that must not cost the session.
+        vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input instanceof Request ? input.url : input)
+            if (url.startsWith(TOKEN_ENDPOINT)) {
+                return new Response(JSON.stringify({
+                    access_token: await makeAccessToken({ omitWebId: true }),
+                    refresh_token: 'refresh-token-v2',
+                    expires_in: 3600,
+                    token_type: 'DPoP',
+                }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+            }
+            throw new Error(`unexpected request to ${url}`)
+        }))
+
+        const onExpiration = vi.fn()
+        const session = makeSession(db, onExpiration)
+
+        await expect(session.restore()).rejects.not.toBeInstanceOf(SessionEndedError)
+
+        expect(db.items.get('refresh_token')).toBe('refresh-token-v2')
+        expect(db.items.size).toBeGreaterThan(1)
+        expect(onExpiration).not.toHaveBeenCalled()
         session.cancelRenewal()
     }, 30_000)
 })

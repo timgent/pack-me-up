@@ -110,6 +110,84 @@ DPoP-bound token only once it is 70% through its lifetime — about 17 hours of 
 CSS refresh token's 24 — but rotates a public client's token on **every** refresh
 when it is not sender-constrained, and deployments tune this freely.
 
+## The phone kept being signed out anyway
+
+Everything above was fixed on the web *and* in the native app — and the Android
+app went on losing its session. What was left was not in the refresh path at all.
+It was who the app said it was.
+
+### 8. The phone was a throwaway client
+
+Solid-OIDC offers two ways to be a client:
+
+- a **Client ID Document** hosted at an https URL, which the provider re-reads on
+  every grant. Nothing about it can lapse.
+- a **dynamic registration**, created at login, which the provider owns and may
+  reclaim. Inrupt's ESS expires them; a Community Solid Server loses them
+  whenever its registration storage is cleared or reset.
+
+The app has a hosted document at `/client-id.json`, and `VITE_CLIENT_ID_URL`
+points the deployed site at it. Everywhere else fell back to dynamic
+registration, and "everywhere else" quietly included both native apps: Capacitor
+serves the shell from `https://localhost`, and the document listed only
+`https://packmeup.tim-gent.com/` as a redirect URI, so the phone could not have
+used it even if the build had been configured to.
+
+When such a registration is reclaimed, the next refresh comes back
+`invalid_client`. That is terminal by definition — the app is no longer a client
+the provider has heard of — so no amount of retrying helps, and the refresh token
+in IndexedDB is still perfectly good when the user is signed out. It looks
+exactly like every bug above, and none of the fixes above touch it. It is also
+why the web app was fine while the phone was not: the web app has never been a
+dynamic client in production.
+
+`public/client-id.json` now lists `https://localhost/` too — Capacitor uses its
+https scheme on both platforms, so one entry covers Android and iOS — and
+`solidClientIdentity.ts` gives the native shell the hosted document. Only an
+origin with no document of its own (localhost, a preview deploy) still registers
+dynamically, where a lost session costs nothing.
+
+Because the client id is stored per session, existing installs keep the dynamic
+client they logged in with. The change takes effect at the next login.
+
+### 9. A transient failure could be nobody's job
+
+`ResilientSession` retries within one `restore()`, and `SolidPodContext` retries
+on a backoff — but only for a session that is *not* active. A phone that wakes
+with the radio still down is the other case: the renewal timer that came due
+while the device slept fires, the refresh fails transiently, and the app is still
+"logged in", so neither backoff engages. Nothing was booked. The token then
+lapsed in silence, and the grant was left to age until the provider gave up on
+it.
+
+`ResilientSession` now books its own retry after a transient failure, backing off
+to five minutes and re-arming the normal schedule as soon as one succeeds.
+
+### 10. Waking up was not always noticed
+
+Coming back to the app is the one moment a stale session must be looked at, and
+`visibilitychange` was the only signal for it. An Android WebView whose activity
+is paused and resumed does not reliably report a visibility change — the timers
+were frozen with the process, so if nothing notices the resume, nothing renews.
+`onAppResumed` (`src/services/appResume.ts`) listens for the App plugin's
+`appStateChange` as well, which is the event that always arrives on a phone.
+
+### 11. Two ways to lose the whole session anyway
+
+`SessionCore._updateSessionDetailsFromToken` answers an access token it cannot
+read — no `webid` claim, no `exp`, not a JWT — by calling its own `logout()`,
+which clears IndexedDB and the refresh token with it. That is bug 4 by another
+route, reachable from a provider having a bad minute rather than from a 401.
+`ResilientSession` now rejects such a token as transient *before* handing it to
+`setTokenDetails`, so nothing but a deliberate sign-out ever clears the database.
+
+Finally, a session ending is not an error anything throws, so nothing reached
+Sentry: on a phone, where the sign-in history cannot be read over someone's
+shoulder, expiries were invisible. `reportSessionEnded` now reports the reason —
+and only the reason, nothing identifying — so `invalid_grant` (a dead grant) can
+be told apart from `invalid_client` (a stale registration) without the device in
+hand.
+
 ## What changed
 
 A `ResilientSession` subclass (`src/services/ResilientSession.ts`) keeps
@@ -139,6 +217,12 @@ A `ResilientSession` subclass (`src/services/ResilientSession.ts`) keeps
   continues in the background and signs the user in when it lands.
 - A failed OAuth callback no longer prevents restoring the session already on the
   device.
+- The native app identifies itself with the hosted Client ID Document, so its
+  client registration cannot be reclaimed underneath it (bug 8).
+- A transient failure always books its own next attempt (bug 9), and a resume is
+  noticed through the App plugin as well as `visibilitychange` (bug 10).
+- An access token the library cannot read is refused before it can trigger the
+  library's `logout()` (bug 11).
 
 ## If it ever happens again
 
@@ -148,8 +232,11 @@ reason the provider gave. "Copy for a bug report" is the whole sequence. Nothing
 in it is sent anywhere on its own.
 
 The event to look for is `refresh.session-ended`. Its `reason` says whether the
-provider rejected the grant (`invalid_grant` — the session genuinely ended) or
-something else. Repeated `refresh.failed-transiently` or `restore.will-retry`
+provider rejected the grant (`invalid_grant` — the session genuinely ended), the
+registration went stale (`invalid_client` — see bug 8) or something else. That
+reason also goes to Sentry as `Solid session ended: <reason>`, tagged
+`auth_session_ended`, which is how a phone's expiry can be read without the
+phone. Repeated `refresh.failed-transiently` or `restore.will-retry`
 without a matching `refresh.succeeded` means the app is trying and failing to
 reach the token endpoint, which is a network or provider-availability story
 rather than an auth one.
