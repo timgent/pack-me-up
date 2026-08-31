@@ -398,12 +398,21 @@ export function CategoryItemGrid({
                                 person keeps their place down the whole card
                                 however many lines the chips take — and the same
                                 side of the name on every row of every card,
-                                filtered or not. */}
+                                filtered or not.
+
+                                A shared row holds the same place open but is not
+                                bound to it: its pill is one control several times
+                                wider than a disc, and one person's 44px is
+                                narrower than the pill on every one-person list.
+                                A minimum keeps it lined up with the chips wherever
+                                there is room and lets it have the rest of the row
+                                where there isn't, instead of running off the
+                                side of the card. */}
                             <div
                                 role="group"
                                 aria-label={row.label}
                                 className="flex shrink-0 flex-wrap gap-3 py-2"
-                                style={{ width: `${chipBlockWidth}px` }}
+                                style={row.communal ? { minWidth: `${chipBlockWidth}px` } : { width: `${chipBlockWidth}px` }}
                             >
                                 {row.communal
                                     ? renderSharedChip(row)

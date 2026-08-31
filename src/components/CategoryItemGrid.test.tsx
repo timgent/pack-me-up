@@ -44,6 +44,37 @@ function renderGrid(visibleColumnKeys?: ReadonlySet<string>) {
     )
 }
 
+/**
+ * A one-person list, where the chip block is at its narrowest and a shared
+ * row's pill is several times wider than the column it sits in.
+ */
+const soloPeople = [{ name: 'Alice', id: 'p1' }]
+const soloItems = [
+    item({ id: 'a1', itemText: 'Sunhat', personName: 'Alice', personId: 'p1' }),
+    item({ id: 's1', itemText: 'Tent', communal: true }),
+]
+const soloColumns = buildGridColumns(soloPeople, soloItems)
+const soloRows = buildCategoryRows(soloItems, soloColumns)
+/** One chip's 32px disc and the 12px after it. */
+const soloChipBlockWidth = 44
+
+function renderSoloGrid(visibleColumnKeys?: ReadonlySet<string>) {
+    return render(
+        <CategoryItemGrid
+            columns={soloColumns}
+            visibleColumnKeys={visibleColumnKeys}
+            rows={soloRows}
+            personIdentity={() => ({ color: PERSON_COLORS[0] })}
+            packedById={{}}
+            hidePacked={false}
+            flourish={null}
+            onToggleItem={vi.fn()}
+            registerCellRef={vi.fn()}
+            onOpenRow={vi.fn()}
+        />
+    )
+}
+
 /** The chip block and the name span of the row carrying `label`. */
 function partsOf(label: string) {
     const row = screen.getByRole('button', { name: `Edit ${label}` }).closest('[data-testid="grid-row"]')!
@@ -98,6 +129,23 @@ describe('where the chips sit', () => {
 
         expect(partsOf('Tent').chips.className).not.toContain('order-first')
         expect(partsOf('Sunhat').chips.className).not.toContain('order-first')
+    })
+
+    it('lets a shared row take the width its pill needs, on a list of one', () => {
+        // The chip block is a person's place held open, and a shared row has no
+        // person in it — pinning its pill to one person's 32px ran the pill off
+        // the side of the card on every phone-width one-person list.
+        renderSoloGrid()
+
+        const shared = partsOf('Tent').chips
+        expect(shared.style.width).toBe('')
+        expect(shared.style.minWidth).toBe(`${soloChipBlockWidth}px`)
+    })
+
+    it('still holds one person in the same place down the card', () => {
+        renderSoloGrid()
+
+        expect(partsOf('Sunhat').chips.style.width).toBe(`${soloChipBlockWidth}px`)
     })
 })
 
