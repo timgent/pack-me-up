@@ -1,5 +1,8 @@
 # Release Notes
 
+## 1.13.0 (versionCode 14) — 2026-08-31
+- Fixed a shared item's pill spilling outside the card on one-person lists
+
 ## 1.12.0 (versionCode 13) — 2026-08-31
 - Fixed Android sign-outs caused by an expired app registration
 - Tidier list header: back and menu buttons replace a row of orange buttons
