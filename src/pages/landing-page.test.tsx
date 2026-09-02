@@ -225,4 +225,22 @@ describe('LandingPage – signed-in greeting', () => {
 
         expect(screen.queryByText(/signed in as/i)).toBeNull()
     })
+
+    // Offline is not signed out (#342): the greeting stays, and says which it is.
+    it('still greets a signed-in user whose Pod is out of reach', async () => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            isReconnecting: true,
+            webId: WEB_ID,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+
+        renderPage()
+
+        expect(await screen.findByText(/signed in as/i)).toBeTruthy()
+        expect(screen.getByText(/offline/i)).toBeTruthy()
+    })
 })

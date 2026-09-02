@@ -7,6 +7,7 @@ import './App.css'
 import { Navigation } from './components/Navigation'
 import { Footer } from './components/Footer'
 import { SessionExpiredBanner } from './components/SessionExpiredBanner'
+import { OfflineBanner } from './components/OfflineBanner'
 import { ToastProvider } from './components/ToastContext'
 import { ThemeProvider } from './components/ThemeContext'
 import { LandingPage } from './pages/landing-page'
@@ -27,9 +28,12 @@ import { YourDataPage } from './pages/your-data'
 import { OpenResourcePage } from './pages/open-resource'
 
 function DefaultRedirect() {
-  const { isLoggedIn, isLoading } = useSolidPod()
+  const { isLoggedIn, isReconnecting, isLoading } = useSolidPod()
   if (isLoading) return null
-  return <Navigate to={isLoggedIn ? '/view-lists' : '/home'} replace />
+  // A signed-in user whose pod is out of reach still opens on their lists —
+  // they are on the device. Sending them to the marketing landing page instead
+  // is half of what made being offline look like being signed out (#342).
+  return <Navigate to={isLoggedIn || isReconnecting ? '/view-lists' : '/home'} replace />
 }
 
 function App() {
@@ -45,6 +49,7 @@ function App() {
               <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
                 <Navigation />
                 <SessionExpiredBanner />
+                <OfflineBanner />
                 <div className="flex-1 container mx-auto px-4 py-8">
                   <Routes>
                     <Route path="/" element={<DefaultRedirect />} />

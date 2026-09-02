@@ -321,7 +321,7 @@ export function CreatePackingList() {
     const [isSuggestionDismissed, setIsSuggestionDismissed] = useState(false)
     const [isDeletionSuggestionDismissed, setIsDeletionSuggestionDismissed] = useState(false)
     const { showToast } = useToast()
-    const { isLoggedIn, login, session } = useSolidPod()
+    const { isLoggedIn, isReconnecting, login, session } = useSolidPod()
     // Their own faces, on the very first screen that names them.
     const personPhoto = usePersonPhotos(questionSet?.people ?? NO_PEOPLE, session)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
@@ -728,7 +728,10 @@ export function CreatePackingList() {
                                 </Link>
                             </div>
 
-                            {!isLoggedIn && (
+                            {/* Not offered to a signed-in user whose pod is
+                                out of reach (#342): they have already done this,
+                                and signing in again is not what fixes no signal. */}
+                            {!isLoggedIn && !isReconnecting && (
                                 <div className="bg-gradient-to-br from-accent-50 dark:from-accent-950/40 to-accent-100 dark:to-accent-900/40 p-6 rounded-xl border-2 border-accent-200 dark:border-accent-800">
                                     <h3 className="text-lg font-bold text-accent-900 dark:text-accent-200 mb-2">🔄 Sync Questions From Another Device</h3>
                                     <p className="text-gray-700 dark:text-gray-300 mb-4">

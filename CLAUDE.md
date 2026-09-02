@@ -13,7 +13,8 @@ Each serial suite that writes to a Solid pod **must use its own dedicated pod us
 
 | Suite | Pod user |
 |-------|----------|
-| E, J, Z | `testuser` |
+| E, J (read-only tests), Z | `testuser` |
+| J5 (writes a list) | `juser` |
 | F | `fuser` |
 | G | `guser` |
 | H | `huser` |
@@ -47,9 +48,18 @@ Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`
   and `public/client-id.json` must keep listing the native redirect URI or the
   mobile app cannot log in at all.
 
+A fourth rule follows from the first: **a session that cannot be reached is not a
+session that has ended.** `isReconnecting` (`SolidPodContext`) is that state, and
+while it holds, the app keeps the account on screen and opens the identity's own
+PouchDB namespace from `rememberedSession.ts` rather than the empty local one —
+otherwise being offline looks exactly like being logged out (#342).
+
 `docs/staying-signed-in.md` has the full trace of the logout bugs these rules came
-from. `SolidPodContext.resilience.test.tsx`, `ResilientSession.test.ts` and e2e suite J
-pin the behaviour; suite J in particular asserts that a 401 does *not* sign the user out.
+from, and `docs/offline.md` covers what the app does with no network.
+`SolidPodContext.resilience.test.tsx`, `SolidPodContext.offline.test.tsx`,
+`ResilientSession.test.ts` and e2e suite J pin the behaviour; suite J in particular
+asserts that a 401 does *not* sign the user out, and that a pod it cannot reach
+leaves the user signed in with their lists on screen.
 
 ## Application Capability description
 

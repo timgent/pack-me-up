@@ -8,10 +8,25 @@ import { ThemeToggle } from './ThemeToggle'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
 
+/**
+ * The one thing the nav owes a signed-in user whose Pod is unreachable: which of
+ * the two states they are in. Their name is on screen either way, so without
+ * this the only difference between "synced" and "not syncing" would be invisible.
+ */
+const OfflineBadge = () => (
+    <span
+        data-testid="nav-offline-badge"
+        className="px-2 py-0.5 rounded-full bg-white/20 text-xs font-semibold whitespace-nowrap"
+        title="You're still signed in. Your Pod is out of reach, so changes will sync when the connection is back."
+    >
+        Offline
+    </span>
+)
+
 export const Navigation = () => {
     const [isOpen, setIsOpen] = useState(false)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const { login, logout, isLoggedIn, webId, session } = useSolidPod()
+    const { login, logout, isLoggedIn, isReconnecting, webId, session } = useSolidPod()
     const { db, loginSyncVersion } = useDatabase()
     const location = useLocation()
     const navigate = useNavigate()
@@ -25,6 +40,12 @@ export const Navigation = () => {
 
     const profile = useSolidProfile(webId, session)
     const displayName = profileDisplayName(profile, webId)
+
+    // Signed in is signed in, whether or not the Pod can be reached right now.
+    // Offering "Sync & Share" to someone whose session is merely offline is what
+    // made a lost connection read as a logout (#342); the badge below says which
+    // of the two it is, so nothing is hidden — it just isn't a sign-in prompt.
+    const showsAsSignedIn = isLoggedIn || isReconnecting
 
     const podMatch = /^\/pod\/([^/]+)/.exec(location.pathname)
     const currentForeignEncoded = podMatch?.[1] ?? null
@@ -97,8 +118,9 @@ export const Navigation = () => {
                         {/* Solid Login/Logout section */}
                         <div className="hidden md:flex items-center gap-4">
                             <ThemeToggle />
-                            {isLoggedIn ? (
+                            {showsAsSignedIn ? (
                                 <div className="flex items-center gap-3">
+                                    {isReconnecting && <OfflineBadge />}
                                     {/*
                                       * The context switcher stays out here rather than
                                       * inside the account menu: whose data you are
@@ -209,7 +231,7 @@ export const Navigation = () => {
                         <ThemeToggle showLabel />
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">
-                            {isLoggedIn ? (
+                            {showsAsSignedIn ? (
                                 <>
                                     {/*
                                       * The same things the desktop account menu holds,
@@ -223,6 +245,11 @@ export const Navigation = () => {
                                         <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Signed in as</p>
                                         <p className="mt-0.5 text-xs text-white/80 break-all" title={webId}>{webId}</p>
                                     </div>
+                                    {isReconnecting && (
+                                        <div className="px-3 pb-2">
+                                            <OfflineBadge />
+                                        </div>
+                                    )}
                                     <Link
                                         to="/backups"
                                         className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"

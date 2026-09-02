@@ -19,15 +19,18 @@ function wasDismissed(): boolean {
 
 /**
  * A subtle, dismissible nudge shown to logged-out users who already have
- * something worth keeping. Renders nothing once the user is logged in or has
- * dismissed it this session.
+ * something worth keeping. Renders nothing once the user is logged in (or
+ * signed in but offline) or has dismissed it this session.
  */
 export function SyncAcrossDevicesPrompt() {
-    const { isLoggedIn, login } = useSolidPod()
+    const { isLoggedIn, isReconnecting, login } = useSolidPod()
     const [isDismissed, setIsDismissed] = useState(wasDismissed)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
 
-    if (isLoggedIn || isDismissed) return null
+    // `isReconnecting` is a signed-in user the app cannot reach the pod for
+    // (#342). Asking them to sign in would be telling them their session is
+    // gone when it is not — and signing in again is not the fix for no signal.
+    if (isLoggedIn || isReconnecting || isDismissed) return null
 
     const handleDismiss = () => {
         try {

@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures'
-import { accountMenu, loginToCss, logoutViaAccountMenu, openAccountMenu } from '../helpers/login'
+import { accountMenu, loginToCss, logoutViaAccountMenu, openAccountMenu, waitForLiveSession } from '../helpers/login'
 
 const CSS_ISSUER = process.env.CSS_ISSUER ?? 'http://localhost:4001'
 const TEST_EMAIL = 'test@example.com'
@@ -54,7 +54,8 @@ test.describe('E – Solid Pod Authentication', () => {
   test('E4: session restored on page reload', async ({ authedPage: page }) => {
     await expect(accountMenu(page)).toBeVisible()
     await page.reload()
-    // Session should be restored from storage
-    await expect(accountMenu(page)).toBeVisible({ timeout: 15_000 })
+    // Restored, not merely remembered: an offline start shows the account too,
+    // so this waits for the session to actually be live again (#342).
+    await waitForLiveSession(page, 15_000)
   })
 })

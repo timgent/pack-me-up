@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures'
-import { accountMenu, loginToCss } from '../helpers/login'
+import { loginToCss, waitForLiveSession } from '../helpers/login'
 import { fillPersonRequiredFields } from '../helpers/wizard'
 import { chooseListAction, openListActions } from '../helpers/packing-list'
 import { CSS_ISSUER, TEST_EMAIL, TEST_PASSWORD } from '../../playwright.config'
@@ -36,7 +36,7 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         try {
             await page.getByRole('button', { name: /use.*local/i }).click({ timeout: 3_000 })
         } catch { /* no modal */ }
-        await accountMenu(page).first().waitFor({ timeout: 15_000 })
+        await waitForLiveSession(page, 15_000)
         console.log('Logged in')
 
         // ── 3. Navigate to the list ──────────────────────────────────────────

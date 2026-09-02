@@ -14,6 +14,7 @@ import {
   FUSER_EMAIL, FUSER_PASSWORD, FUSER_POD_NAME,
   GUSER_EMAIL, GUSER_PASSWORD, GUSER_POD_NAME,
   HUSER_EMAIL, HUSER_PASSWORD, HUSER_POD_NAME,
+  JUSER_EMAIL, JUSER_PASSWORD, JUSER_POD_NAME,
   LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME,
   MUSER_EMAIL, MUSER_PASSWORD, MUSER_POD_NAME,
 } from '../playwright.config'
@@ -70,6 +71,9 @@ export default async function globalSetup() {
 
   await createCssAccount(CSS_PORT, HUSER_EMAIL, HUSER_PASSWORD, HUSER_POD_NAME)
   console.log(`[setup] H-suite account created: ${HUSER_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, JUSER_EMAIL, JUSER_PASSWORD, JUSER_POD_NAME)
+  console.log(`[setup] J-suite account created: ${JUSER_EMAIL}`)
 
   await createCssAccount(CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME)
   console.log(`[setup] L-suite account created: ${LUSER_EMAIL}`)

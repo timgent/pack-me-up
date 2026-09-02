@@ -40,6 +40,22 @@ function signedIn() {
     mockUseSolidPod.mockReturnValue({
         session: null,
         isLoggedIn: true,
+        isReconnecting: false,
+        sessionExpired: false,
+        clearSessionExpired: vi.fn(),
+        webId: WEB_ID,
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+    })
+}
+
+/** Signed in, but the Pod is out of reach — a phone that started with no signal. */
+function reconnecting() {
+    mockUseSolidPod.mockReturnValue({
+        session: null,
+        isLoggedIn: false,
+        isReconnecting: true,
         sessionExpired: false,
         clearSessionExpired: vi.fn(),
         webId: WEB_ID,
@@ -69,6 +85,7 @@ describe('Navigation', () => {
         mockUseSolidPod.mockReturnValue({
             session: null,
             isLoggedIn: false,
+            isReconnecting: false,
             sessionExpired: false,
             clearSessionExpired: vi.fn(),
             webId: undefined,
@@ -227,6 +244,7 @@ describe('Navigation – signed-out auth control', () => {
         mockUseSolidPod.mockReturnValue({
             session: null,
             isLoggedIn: false,
+            isReconnecting: false,
             sessionExpired: false,
             clearSessionExpired: vi.fn(),
             webId: undefined,
@@ -252,5 +270,39 @@ describe('Navigation – signed-out auth control', () => {
         renderNav()
 
         expect(screen.getAllByText(/sync across devices/i).length).toBeGreaterThanOrEqual(2)
+    })
+})
+
+/**
+ * Offline is not signed out (#342). A phone that starts with no signal cannot
+ * make its session live, and the nav used to answer that by offering to sign the
+ * user in — the single loudest "you are logged out" signal in the app, shown to
+ * someone who never left.
+ */
+describe('Navigation – signed in but offline', () => {
+    beforeEach(() => {
+        reconnecting()
+    })
+
+    it('keeps showing the account rather than offering to sign in', async () => {
+        renderNav()
+
+        expect(within(navBar()).queryByRole('button', { name: 'Sync & Share' })).toBeNull()
+        expect(await within(navBar()).findByRole('button', { name: /account menu/i })).toBeTruthy()
+    })
+
+    it('says the Pod is out of reach rather than leaving it unexplained', () => {
+        renderNav()
+
+        expect(within(navBar()).getByText(/offline/i)).toBeTruthy()
+    })
+
+    it('keeps the mobile menu signed in too, with a way out', () => {
+        renderNav()
+
+        const mobile = screen.getByTestId('mobile-menu')
+        expect(within(mobile).queryByRole('button', { name: 'Sync & Share' })).toBeNull()
+        expect(within(mobile).getByText(/offline/i)).toBeTruthy()
+        expect(within(mobile).getByRole('button', { name: 'Logout' })).toBeTruthy()
     })
 })
