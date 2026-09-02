@@ -1,5 +1,8 @@
 # Release Notes
 
+## 1.14.0 (versionCode 15) — 2026-09-02
+- Fixed unwanted sign-outs when the Pod server is temporarily unreachable
+
 ## 1.13.0 (versionCode 14) — 2026-08-31
 - Fixed a shared item's pill spilling outside the card on one-person lists
 
