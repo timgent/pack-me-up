@@ -6,7 +6,7 @@ import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 
 export const LandingPage = () => {
-    const { isLoggedIn, webId, session, login } = useSolidPod()
+    const { isLoggedIn, isReconnecting, webId, session, login } = useSolidPod()
     const profile = useSolidProfile(webId, session)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
     const hasQuestions = useHasQuestions()
@@ -27,7 +27,7 @@ export const LandingPage = () => {
     )
     return (
         <>
-            {isLoggedIn && (
+            {(isLoggedIn || isReconnecting) && (
                 <div className="mb-6 p-4 bg-gradient-to-r from-success-50 dark:from-success-950/40 to-primary-50 dark:to-primary-950/40 border-2 border-success-300 dark:border-success-700 rounded-2xl shadow-soft animate-fade-in">
                     {/*
                       * Their name, not their WebID. The nav stopped printing the
@@ -37,6 +37,13 @@ export const LandingPage = () => {
                       */}
                     <p className="text-success-800 dark:text-success-200 font-semibold">
                         🎉 Signed in as <span className="font-bold">{profileDisplayName(profile, webId)}</span>
+                        {/* Signed in but unreachable is still signed in (#342) —
+                            the greeting stays and says which of the two it is. */}
+                        {isReconnecting && (
+                            <span className="ml-2 font-normal text-success-700 dark:text-success-300">
+                                · offline, changes will sync later
+                            </span>
+                        )}
                     </p>
                 </div>
             )}

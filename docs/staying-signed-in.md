@@ -188,6 +188,21 @@ and only the reason, nothing identifying — so `invalid_grant` (a dead grant) c
 be told apart from `invalid_client` (a stale registration) without the device in
 hand.
 
+### 12. Offline looked exactly like signed out
+
+Everything above is about not *losing* a session. This one is about not being
+able to *show* one. A cold start with no network cannot make a session live —
+the refresh needs the provider to answer — so `isLoggedIn` was false, and the app
+had no third state to render: it offered "Sync & Share" in the nav, opened on the
+landing page, and, because the PouchDB namespace is derived from the pod URL read
+over the network, fell back to the empty `local` database. A signed-in user with
+no signal opened the app to no lists and an invitation to sign in.
+
+The session layer was already doing the right thing underneath. What was missing
+was `isReconnecting` — signed in, stored, unreachable — and a device that
+remembers who it is signed in as between live sessions.
+[offline.md](./offline.md) has that story, and where offline-first goes next.
+
 ## What changed
 
 A `ResilientSession` subclass (`src/services/ResilientSession.ts`) keeps
@@ -223,6 +238,9 @@ A `ResilientSession` subclass (`src/services/ResilientSession.ts`) keeps
   noticed through the App plugin as well as `visibilitychange` (bug 10).
 - An access token the library cannot read is refused before it can trigger the
   library's `logout()` (bug 11).
+- A session that is stored but not live reads as *offline*, not signed out: the
+  account stays on screen, the device's own copy of the data opens, and nothing
+  asks the user to sign in again (bug 12, [offline.md](./offline.md)).
 
 ## If it ever happens again
 

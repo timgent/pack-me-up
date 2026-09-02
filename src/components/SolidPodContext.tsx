@@ -9,12 +9,27 @@ import { logAuthEvent } from "../services/authLog";
 import { resetPodSessionCaches } from "../services/solidPod";
 import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
 import { AppSession } from "../types/AppSession";
+import { forgetSignedIn, rememberSignedIn, rememberedWebId } from "../services/rememberedSession";
 
 interface SolidPodContextValue {
   session: AppSession | null;
+  /** A live session: the pod is reachable and requests to it will be authorised. */
   isLoggedIn: boolean;
+  /**
+   * Signed in, but the session is not live — the provider cannot be reached, so
+   * the stored refresh token has not been exchanged yet. Almost always: no
+   * network. The user has *not* been signed out and nothing has been lost, so
+   * the app keeps their identity and their data on screen and goes on retrying.
+   * Never true once the provider has ended the grant (see `sessionExpired`).
+   */
+  isReconnecting: boolean;
   sessionExpired: boolean;
   clearSessionExpired: () => void;
+  /**
+   * Who the user is signed in as — from the live session, or, while
+   * reconnecting, remembered from the last one. Not proof that a pod request
+   * will succeed: check `isLoggedIn` (or `session`) for that.
+   */
   webId: string | undefined;
   isLoading: boolean;
   login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
@@ -35,17 +50,42 @@ const STARTUP_RESTORE_BUDGET_MS = 4_000;
 
 export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [webId, setWebId] = useState<string | undefined>(undefined);
+  const [liveWebId, setLiveWebId] = useState<string | undefined>(undefined);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const intentionalLogoutRef = useRef(false);
+  // Cleared only when the session is genuinely over, so it survives the reloads
+  // and cold starts an offline device is full of.
+  const [lastWebId, setLastWebId] = useState<string | undefined>(rememberedWebId);
 
   // A session we could not restore yet but have no reason to believe is dead.
   // While this is set, the app keeps quietly trying rather than showing the user
   // a login prompt for what is usually a few seconds of bad network.
+  //
+  // The ref is what the retry logic reads (callbacks made once, at construction,
+  // cannot see React state); the state is the same fact for rendering. Set them
+  // together through `setRecovering`.
   const recoveringRef = useRef(false);
+  // Seeded from what the device remembers: a cold start with a remembered
+  // identity is reconnecting until proven otherwise, so the first paint after
+  // an offline launch shows the user signed in rather than flashing a sign-in
+  // button at them. A device with no stored session corrects this within a tick.
+  const [isReconnecting, setIsReconnecting] = useState(() => rememberedWebId() !== undefined);
   const recoveryAttemptRef = useRef(0);
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const setRecovering = useCallback((recovering: boolean) => {
+    recoveringRef.current = recovering;
+    setIsReconnecting(recovering);
+  }, []);
+
+  // The provider has disowned the grant. Kept in a ref because the session
+  // callbacks are built once and cannot read state: it stops the state-change
+  // event that follows an expiry from booking a retry for a session that is over.
+  const providerEndedRef = useRef(false);
+  // `attemptRestore` is defined below and re-created as its deps change; the
+  // callbacks reach it through this so they always call the current one.
+  const attemptRestoreRef = useRef<((trigger: string) => Promise<boolean>) | undefined>(undefined);
 
   const uvdslSessionRef = useRef<ResilientSession>(null!);
   if (!uvdslSessionRef.current) {
@@ -63,20 +103,39 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         onSessionStateChange: (e) => {
           const { isActive, webId: newWebId } = (e as CustomEvent<SessionStateChangeDetail>).detail;
           setIsLoggedIn(isActive);
-          setWebId(isActive ? newWebId : undefined);
+          setLiveWebId(isActive ? newWebId : undefined);
           if (isActive) {
             setSessionExpired(false);
-            recoveringRef.current = false;
+            providerEndedRef.current = false;
+            setRecovering(false);
             recoveryAttemptRef.current = 0;
+            if (newWebId) {
+              rememberSignedIn(newWebId);
+              setLastWebId(newWebId);
+            }
+            return;
+          }
+          // A live session went inactive without the provider saying anything —
+          // the access token lapsed while the refresh could not get through,
+          // which on a phone is just "it woke up with no signal". Nothing else
+          // covers this: the recovery backoff only watches a session that was
+          // never restored. So claim it here and keep trying.
+          if (!providerEndedRef.current && !intentionalLogoutRef.current) {
+            setRecovering(true);
+            void attemptRestoreRef.current?.("session-inactive");
           }
         },
         // ResilientSession fires this only when the provider has rejected the
         // grant — not for network trouble, which it retries on its own.
         onSessionExpiration: () => {
+          providerEndedRef.current = true;
           if (!intentionalLogoutRef.current) setSessionExpired(true);
-          recoveringRef.current = false;
+          setRecovering(false);
           setIsLoggedIn(false);
-          setWebId(undefined);
+          setLiveWebId(undefined);
+          // The session is actually over, so the device stops claiming an identity.
+          forgetSignedIn();
+          setLastWebId(undefined);
           intentionalLogoutRef.current = false;
         },
       }
@@ -84,6 +143,10 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   }
 
   const uvdslSession = uvdslSessionRef.current;
+
+  // The live session's WebID while there is one; otherwise the remembered one,
+  // but only while we still believe that session is coming back.
+  const webId = liveWebId ?? (isReconnecting ? lastWebId : undefined);
 
   const appSession: AppSession | null = isLoggedIn
     ? { fetch: uvdslSession.authFetch.bind(uvdslSession), info: { isLoggedIn, webId } }
@@ -98,25 +161,32 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     if (uvdslSession.isActive) return true;
     if (!(await uvdslSession.hasStoredSession())) {
       logAuthEvent("restore.no-stored-session", { trigger });
-      recoveringRef.current = false;
+      setRecovering(false);
+      // Nothing to come back to — anything remembered about the identity is
+      // stale (storage evicted, or a sign-out this tab never saw).
+      forgetSignedIn();
+      setLastWebId(undefined);
       return false;
     }
+    // A stored session that is not live is a signed-in user we cannot reach
+    // yet, from this moment rather than only once an attempt has failed.
+    setRecovering(true);
 
     try {
       logAuthEvent("restore.attempt", { trigger, attempt: recoveryAttemptRef.current + 1 });
       await uvdslSession.restore();
-      recoveringRef.current = false;
+      setRecovering(false);
       recoveryAttemptRef.current = 0;
       logAuthEvent("restore.succeeded", { trigger });
       return true;
     } catch (error) {
       if (error instanceof SessionEndedError) {
         logAuthEvent("restore.session-ended", { trigger, reason: error.reason }, "error");
-        recoveringRef.current = false;
+        setRecovering(false);
         return false;
       }
       // Still recoverable. Schedule another go.
-      recoveringRef.current = true;
+      setRecovering(true);
       const attempt = recoveryAttemptRef.current;
       recoveryAttemptRef.current = attempt + 1;
       const delay = RECOVERY_DELAYS_MS[Math.min(attempt, RECOVERY_DELAYS_MS.length - 1)];
@@ -126,7 +196,11 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
       recoveryTimerRef.current = setTimeout(() => { void attemptRestore("backoff"); }, delay);
       return false;
     }
-  }, [uvdslSession]);
+  }, [uvdslSession, setRecovering]);
+
+  // The session callbacks are built once, so they reach the current
+  // `attemptRestore` through here rather than closing over a stale one.
+  attemptRestoreRef.current = attemptRestore;
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -238,7 +312,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     intentionalLogoutRef.current = true;
-    recoveringRef.current = false;
+    setRecovering(false);
     clearTimeout(recoveryTimerRef.current);
     try {
       await uvdslSession.logout();
@@ -249,8 +323,12 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     // Which pod a WebID lives in, and which of its containers exist, are facts
     // about the identity that just went away.
     resetPodSessionCaches();
+    // Nothing about the identity outlives a deliberate sign-out: the next start
+    // must show a signed-out app, not one waiting to reconnect.
+    forgetSignedIn();
+    setLastWebId(undefined);
     setIsLoggedIn(false);
-    setWebId(undefined);
+    setLiveWebId(undefined);
   };
 
   const clearSessionExpired = () => setSessionExpired(false);
@@ -258,6 +336,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const value: SolidPodContextValue = {
     session: appSession,
     isLoggedIn,
+    isReconnecting: isReconnecting && !isLoggedIn,
     sessionExpired,
     clearSessionExpired,
     webId,

@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
 import type { AppSession as Session } from '../types/AppSession'
 import { DatabaseProvider, useDatabase } from './DatabaseContext'
+import { rememberPodNamespace, rememberedPodNamespace } from '../services/rememberedSession'
 
 // --- Mocks ---
 
@@ -86,6 +87,7 @@ describe('DatabaseContext', () => {
     mockDetectPodDataFormat.mockReset()
     mockDetectPodDataFormat.mockResolvedValue('rdf')
     mockMigrateJsonToRdf.mockReset()
+    localStorage.clear()
     mockMigrateJsonToRdf.mockResolvedValue({ questionSetMigrated: false, packingListsMigrated: 0, errors: [] })
     localStorage.clear()
   })
@@ -200,6 +202,83 @@ describe('DatabaseContext', () => {
     const podNamespaceCall = namespaceCalls.find(ns => ns !== 'local')
     expect(podNamespaceCall).toBeDefined()
     expect(podNamespaceCall).toContain('example.com')
+  })
+
+  /**
+   * Offline is not signed out (#342). The pod-scoped PouchDB namespace comes from
+   * the pod URL, which comes from the WebID profile — a network read. With no
+   * network the app used to fall back to the empty `local` database, so a
+   * signed-in user opened their app to no lists at all: the most alarming way
+   * possible to say "you look logged out".
+   */
+  describe('signed in but offline', () => {
+    const WEB_ID = 'https://example.com/profile#me'
+
+    function reconnecting() {
+      mockUseSolidPod.mockReturnValue({
+        session: null,
+        isLoggedIn: false,
+        isReconnecting: true,
+        webId: WEB_ID,
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+    }
+
+    it('opens the identity\'s own database from the remembered namespace', async () => {
+      rememberPodNamespace(WEB_ID, 'example.com')
+      reconnecting()
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      expect(mockGetInstance).toHaveBeenCalledWith('example.com')
+      expect(mockGetInstance).not.toHaveBeenCalledWith('local')
+      // Nothing may be asked of the pod: there is no session to ask with.
+      expect(mockGetPrimaryPodUrl).not.toHaveBeenCalled()
+      expect(mockSyncAllDataFromPod).not.toHaveBeenCalled()
+    })
+
+    it('falls back to the sanitized webId when no namespace was remembered', async () => {
+      reconnecting()
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => screen.getByTestId('child'))
+      const namespaces = mockGetInstance.mock.calls.map(([ns]) => ns)
+      expect(namespaces.some(ns => ns !== 'local' && ns.includes('example.com'))).toBe(true)
+    })
+
+    it('remembers the namespace a live login resolved, for the next offline start', async () => {
+      const mockSession = { info: { isLoggedIn: true, webId: WEB_ID } }
+      mockUseSolidPod.mockReturnValue({
+        session: mockSession as unknown as Session,
+        isLoggedIn: true,
+        isReconnecting: false,
+        webId: WEB_ID,
+        isLoading: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+      })
+      mockGetPrimaryPodUrl.mockResolvedValue('https://example.com/')
+
+      render(
+        <DatabaseProvider>
+          <div data-testid="child" />
+        </DatabaseProvider>
+      )
+
+      await waitFor(() => expect(rememberedPodNamespace(WEB_ID)).toBe('example.com'))
+    })
   })
 
   it('throws when useDatabase is called outside DatabaseProvider', () => {

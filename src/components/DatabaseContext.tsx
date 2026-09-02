@@ -3,6 +3,7 @@ import { PackingAppDatabase, LOCAL_NAMESPACE } from '../services/database'
 import { useSolidPod } from './SolidPodContext'
 import { getPrimaryPodUrl, syncAllDataFromPod } from '../services/solidPod'
 import { detectPodDataFormat, migrateJsonToRdf } from '../services/rdfMigration'
+import { rememberPodNamespace, rememberedPodNamespace } from '../services/rememberedSession'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface DatabaseContextValue {
@@ -30,7 +31,7 @@ const DatabaseContext = createContext<DatabaseContextValue | undefined>(undefine
  * choice to copy their local data to the pod.
  */
 export function DatabaseProvider({ children }: { children: ReactNode }) {
-    const { isLoggedIn, webId, session, isLoading } = useSolidPod()
+    const { isLoggedIn, isReconnecting, webId, session, isLoading } = useSolidPod()
     const [db, setDb] = useState<PackingAppDatabase | null>(null)
     const [namespace, setNamespace] = useState<string | null>(null)
     const [isResolvingPod, setIsResolvingPod] = useState(false)
@@ -51,6 +52,21 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         }
 
         if (!isLoggedIn || !webId) {
+            // Signed in but unable to reach the pod (#342). The namespace is
+            // normally derived from the pod URL, which is read from the WebID
+            // profile — impossible with no network — so without a remembered one
+            // the app would open the empty `local` database and the user's lists
+            // would appear to be gone. This is a read of the device's own copy;
+            // nothing is asked of the pod until a session is live again.
+            if (isReconnecting && webId) {
+                const offlineNamespace =
+                    rememberedPodNamespace(webId) ?? PackingAppDatabase.sanitizePodUrl(webId)
+                setShowMigrationPrompt(false)
+                setNamespace(offlineNamespace)
+                setDb(PackingAppDatabase.getInstance(offlineNamespace))
+                return
+            }
+
             // Not logged in — use the local namespace immediately
             syncedNamespaceRef.current = null
             setShowMigrationPrompt(false)
@@ -74,6 +90,10 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             const resolvedNamespace = podUrl
                 ? PackingAppDatabase.sanitizePodUrl(podUrl)
                 : PackingAppDatabase.sanitizePodUrl(webId)
+
+            // Banked for the next start that has no network: working this out
+            // again needs the pod, and that is exactly what will be missing.
+            rememberPodNamespace(webId, resolvedNamespace)
 
             // Session refreshed with same identity — nothing to do.
             if (syncedNamespaceRef.current === resolvedNamespace) {
@@ -145,7 +165,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true
         }
-    }, [isLoggedIn, webId, session, isLoading])
+    }, [isLoggedIn, isReconnecting, webId, session, isLoading])
 
     if (isLoading || isResolvingPod || !db || !namespace) {
         return null

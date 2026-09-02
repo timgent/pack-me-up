@@ -29,6 +29,11 @@ export const HUSER_POD_NAME = 'huser'
 export const LUSER_EMAIL = 'luser@example.com'
 export const LUSER_PASSWORD = 'test1234'
 export const LUSER_POD_NAME = 'luser'
+// J's one data-writing test needs a pod nobody else touches: E, J and Z share
+// `testuser`, and a suite that writes there breaks the ones that assume it empty.
+export const JUSER_EMAIL = 'juser@example.com'
+export const JUSER_PASSWORD = 'test1234'
+export const JUSER_POD_NAME = 'juser'
 export const MUSER_EMAIL = 'muser@example.com'
 export const MUSER_PASSWORD = 'test1234'
 export const MUSER_POD_NAME = 'muser'

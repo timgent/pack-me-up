@@ -383,7 +383,7 @@ export function ViewPackingList() {
     const handleCheckAll = (items: PackingListItem[]) =>
         items.forEach(item => setValue(`items.${item.id}`, true))
     const isDesktop = useIsDesktop()
-    const { isLoggedIn, session } = useSolidPod()
+    const { isLoggedIn, isReconnecting, session } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
     // Read from the question set on every visit, not copied onto the list when
@@ -1702,6 +1702,10 @@ export function ViewPackingList() {
                                 disabled={isLoggedIn && !ownPodUrl}
                                 onSelect={() => {
                                     if (isLoggedIn) setShareModalOpen(true)
+                                    // Signed in but offline (#342): the sign-in
+                                    // prompt would be a lie, and sharing is the
+                                    // one thing here that genuinely needs the pod.
+                                    else if (isReconnecting) showToast("You're offline — sharing needs a connection to your Pod.", 'error')
                                     else setSignInToSharePromptOpen(true)
                                 }}
                             >

@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * The signed-in sentinel. Logout used to be a button in the nav bar and was
@@ -7,6 +7,19 @@ import type { Locator, Page } from '@playwright/test'
  */
 export function accountMenu(page: Page): Locator {
   return page.getByRole('button', { name: /account menu/i })
+}
+
+/**
+ * The *live* signed-in sentinel: the account, with no offline notice beside it.
+ *
+ * The account menu on its own stopped meaning "the pod is reachable" in #342 — a
+ * session that is stored but not yet live now shows the same account with an
+ * "Offline" badge, which is the whole point of that change. So anything that
+ * needs a working pod waits for this instead, or it races the restore.
+ */
+export async function waitForLiveSession(page: Page, timeout = 30_000): Promise<void> {
+  await accountMenu(page).first().waitFor({ state: 'visible', timeout })
+  await expect(page.getByTestId('offline-banner')).toHaveCount(0, { timeout })
 }
 
 /** Opens the account menu, so its Backups link and Logout button are reachable. */

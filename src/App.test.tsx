@@ -27,6 +27,10 @@ vi.mock('./components/SessionExpiredBanner', () => ({
   SessionExpiredBanner: () => null,
 }))
 
+vi.mock('./components/OfflineBanner', () => ({
+  OfflineBanner: () => null,
+}))
+
 vi.mock('./pages/landing-page', () => ({ LandingPage: () => null }))
 vi.mock('./pages/questions-page', () => ({ QuestionsPage: () => null }))
 vi.mock('./pages/create-packing-list', () => ({ CreatePackingList: () => null }))

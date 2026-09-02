@@ -12,9 +12,10 @@ import { useSolidPod } from './SolidPodContext'
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockLogin = vi.fn()
 
-function mockPod(isLoggedIn: boolean) {
+function mockPod(isLoggedIn: boolean, isReconnecting = false) {
     mockUseSolidPod.mockReturnValue({
         isLoggedIn,
+        isReconnecting,
         session: null,
         sessionExpired: false,
         clearSessionExpired: vi.fn(),
@@ -80,5 +81,16 @@ describe('SyncAcrossDevicesPrompt', () => {
         unmount()
         const { container } = render(<SyncAcrossDevicesPrompt />)
         expect(container.firstChild).toBeNull()
+    })
+    /**
+     * Offline is not signed out (#342): nudging a signed-in user to sign in is
+     * the app telling them their session is gone when it is not.
+     */
+    it('stays quiet for a signed-in user whose Pod is out of reach', () => {
+        mockPod(false, true)
+
+        const { container } = render(<SyncAcrossDevicesPrompt />)
+
+        expect(container.innerHTML).toBe('')
     })
 })
