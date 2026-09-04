@@ -5,23 +5,33 @@ import { useHasQuestions } from '../hooks/useHasQuestions'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import { SolidProviderSelector } from '../components/SolidProviderSelector'
 
+const CTA_CLASSES =
+    'inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary'
+
 export const LandingPage = () => {
     const { isLoggedIn, isReconnecting, webId, session, login } = useSolidPod()
     const profile = useSolidProfile(webId, session)
     const [isProviderSelectorOpen, setIsProviderSelectorOpen] = useState(false)
-    const hasQuestions = useHasQuestions()
-    const primaryCta = hasQuestions ? (
-        <Link
-            to="/view-lists"
-            className="inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+    const { hasQuestions, isLoading: isCheckingQuestions } = useHasQuestions()
+    // Which CTA is right depends on data that arrives from the pod after the
+    // page has painted, so until the check settles the page says neither. It
+    // used to guess "new user", which sent a returning user to the wizard and
+    // left them there until they reloaded (#333). A placeholder of the same
+    // size keeps everything below it still while the answer lands.
+    const primaryCta = isCheckingQuestions ? (
+        <div
+            role="status"
+            aria-live="polite"
+            className={`${CTA_CLASSES} pointer-events-none opacity-60 motion-safe:animate-pulse`}
         >
+            Checking your questions...
+        </div>
+    ) : hasQuestions ? (
+        <Link to="/view-lists" className={CTA_CLASSES}>
             📋 View Packing Lists
         </Link>
     ) : (
-        <Link
-            to="/wizard"
-            className="inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
-        >
+        <Link to="/wizard" className={CTA_CLASSES}>
             ✨ Get Started with the Wizard
         </Link>
     )
