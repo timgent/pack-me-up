@@ -305,6 +305,35 @@ describe('SolidPodContext', () => {
         })
     })
 
+    // #334: "/home" is where you happened to be, not somewhere you asked to
+    // come back to. Hand those to the redirect page, which knows what this
+    // identity's pod holds and so which page to suggest.
+    it('routes a neutral stored return route through the redirect page after OAuth callback', async () => {
+        setWindowLocation('?code=abc123&state=xyz', '')
+        sessionStorage.setItem('authReturnTo', '/home')
+        mockIsActive = true
+        mockWebId = 'https://user.example.org/profile/card#me'
+
+        const replaceSpy = vi.fn()
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { ...originalLocation, search: '?code=abc123&state=xyz', hash: '', replace: replaceSpy },
+        })
+
+        render(
+            <Wrapper>
+                <Consumer />
+            </Wrapper>
+        )
+
+        await waitFor(() => {
+            expect(replaceSpy).toHaveBeenCalledWith('/#/solid-pod-handle-redirect')
+        })
+        // Left behind, it would be restored on the next load and put the user
+        // straight back on the page they signed in from.
+        expect(sessionStorage.getItem('authReturnTo')).toBeNull()
+    })
+
     it('arms a renewal timer for the life of the session, and disarms it on logout', async () => {
         // Keeping the session alive is the session object's job now: it renews on a
         // timer pegged to the token's own expiry, rather than a fixed poll that

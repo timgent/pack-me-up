@@ -8,6 +8,7 @@ import { onAppResumed } from "../services/appResume";
 import { logAuthEvent } from "../services/authLog";
 import { resetPodSessionCaches } from "../services/solidPod";
 import { AUTH_RETURN_TO_KEY } from "../pages/solid-pod-handle-redirect-page";
+import { isNeutralAuthReturnRoute } from "../pages/postLoginDestination";
 import { AppSession } from "../types/AppSession";
 import { forgetSignedIn, rememberSignedIn, rememberedWebId } from "../services/rememberedSession";
 
@@ -228,7 +229,18 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           // redirect_uri registered with the IdP can be the plain SPA root ("/").
           logAuthEvent("login.completed", { webId: uvdslSession.webId });
           uvdslSession.scheduleRenewal();
-          const returnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY) || "/solid-pod-handle-redirect";
+          const storedReturnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY);
+          let returnTo = storedReturnTo ?? "";
+          if (isNeutralAuthReturnRoute(returnTo)) {
+            // Nowhere the user asked to come back to — the home page is where
+            // they happened to be when they signed in, not a destination. Hand
+            // it to the redirect page, which picks between their lists and the
+            // wizard once it knows what this identity's pod holds (#334).
+            // Clearing the key matters: the reload below re-reads it, and a
+            // leftover "/home" would put them straight back where they started.
+            sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+            returnTo = "/solid-pod-handle-redirect";
+          }
           window.location.replace("/#" + returnTo);
           return;
         }
