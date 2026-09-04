@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, Link } from 'react-router-dom'
@@ -161,8 +162,9 @@ export const Wizard = () => {
 
             {hasExistingData && (
                 <div className="mb-6 p-4 bg-warning-50 dark:bg-warning-950/40 border-2 border-warning-300 dark:border-warning-700 rounded-2xl">
-                    <p className="text-warning-900 dark:text-warning-200 font-semibold">
-                        ⚠️ You already have packing list questions set up. Completing this wizard will replace them.
+                    <p className="flex items-start gap-2 text-warning-900 dark:text-warning-200 font-semibold">
+                        <ExclamationTriangleIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+                        <span>You already have packing list questions set up. Completing this wizard will replace them.</span>
                     </p>
                     <p className="text-sm text-warning-800 dark:text-warning-200 mt-1">
                         To keep your existing questions, go to{' '}
@@ -175,7 +177,10 @@ export const Wizard = () => {
                 {/* People Section */}
                 <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-soft border-2 border-primary-200 dark:border-primary-800">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold text-primary-900 dark:text-primary-200">👥 Who's Packing?</h2>
+                        <h2 className="flex items-center gap-2 text-2xl font-bold text-primary-900 dark:text-primary-200">
+                            <UsersIcon aria-hidden="true" className="h-6 w-6 shrink-0" />
+                            Who's Packing?
+                        </h2>
                         <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                             {fields.length} in your group
                         </span>
@@ -341,7 +346,8 @@ export const Wizard = () => {
                         disabled={isLoading}
                         className="px-8 py-4 text-lg"
                     >
-                        {isLoading ? '🔄 Generating...' : '✅ Generate My Packing Questions'}
+                        {isLoading && <ArrowPathIcon aria-hidden="true" className="h-5 w-5 motion-safe:animate-spin" />}
+                        {isLoading ? 'Generating...' : 'Generate My Packing Questions'}
                     </Button>
                 </div>
             </form>
@@ -351,7 +357,12 @@ export const Wizard = () => {
                 isOpen={showConfirmDialog}
                 onClose={() => setShowConfirmDialog(false)}
                 onConfirm={handleConfirmOverride}
-                title="⚠️ Existing Data Found"
+                title={
+                    <span className="flex items-center gap-2">
+                        <ExclamationTriangleIcon aria-hidden="true" className="h-5 w-5 shrink-0 text-warning-600 dark:text-warning-400" />
+                        Existing Data Found
+                    </span>
+                }
                 message="You already have packing list questions set up. Generating a new set will override your current questions.
 
 Are you sure you want to continue?"
@@ -364,7 +375,7 @@ Are you sure you want to continue?"
             <Modal
                 isOpen={showSuccessModal}
                 onClose={handleDismissSuccess}
-                title="🎉 Questions Generated Successfully!"
+                title="Questions Generated Successfully!"
             >
                 <div className="space-y-6">
                     {revealSteps.length > 0 && (
@@ -374,7 +385,7 @@ Are you sure you want to continue?"
                                     key={step.personId}
                                     className="reveal-line flex gap-2 text-gray-700 dark:text-gray-300 break-words"
                                 >
-                                    <span aria-hidden="true">✨</span>
+                                    <CheckCircleIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-success-600 dark:text-success-400" />
                                     <span className="flex-1 min-w-0">{step.text}</span>
                                 </li>
                             ))}
@@ -409,14 +420,14 @@ Are you sure you want to continue?"
                                     onClick={() => handleSuccessAction('/create-packing-list')}
                                     className="w-full bg-gradient-primary-button text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
                                 >
-                                    🚀 Create My First Packing List
+                                    Create My First Packing List
                                 </button>
 
                                 <button
                                     onClick={() => handleSuccessAction('/manage-questions')}
                                     className="w-full text-primary-700 dark:text-primary-300 border-2 border-primary-200 dark:border-primary-800 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
                                 >
-                                    ✏️ Refine My Packing List Questions
+                                    Refine My Packing List Questions
                                 </button>
                             </div>
 

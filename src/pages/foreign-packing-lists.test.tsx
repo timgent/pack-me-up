@@ -136,7 +136,7 @@ describe('ForeignPackingListsPage trip destination and dates', () => {
         await screen.findByText(/Summer Holiday/)
         expect(screen.getByText(/Lisbon, Portugal/)).toBeTruthy()
         expect(screen.getByText(new RegExp(localDateOf(tripStart).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy()
-        expect(screen.queryByText(/📅 Created/)).toBeNull()
+        expect(screen.queryByText(/Created/)).toBeNull()
     })
 
     it('falls back to a labelled creation date when a shared list has no trip dates', async () => {
@@ -148,7 +148,7 @@ describe('ForeignPackingListsPage trip destination and dates', () => {
         renderPage()
 
         await screen.findByText(/Summer Holiday/)
-        expect(screen.getByText(/📅 Created/)).toBeTruthy()
+        expect(screen.getByText(/Created/)).toBeTruthy()
     })
 })
 

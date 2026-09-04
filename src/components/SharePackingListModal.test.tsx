@@ -121,7 +121,7 @@ describe('SharePackingListModal', () => {
             mockGetCollaborators.mockResolvedValue([])
             mockIsPubliclyAccessible.mockResolvedValue(true)
             renderModal()
-            await waitFor(() => expect(screen.getByText('🌐 Anyone with the link')).toBeTruthy())
+            await waitFor(() => expect(screen.getByText('Anyone with the link')).toBeTruthy())
         })
 
         it('shows revoke button for each named collaborator', async () => {

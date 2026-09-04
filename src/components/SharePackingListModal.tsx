@@ -1,3 +1,4 @@
+import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect } from 'react'
 import { AppSession } from '../types/AppSession'
 import {
@@ -156,7 +157,10 @@ export function SharePackingListModal({
                         <ul className="space-y-2">
                             {isPublic && (
                                 <li className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                    <span className="text-sm text-gray-800 dark:text-gray-100">🌐 Anyone with the link</span>
+                                    <span className="inline-flex items-center gap-1.5 text-sm text-gray-800 dark:text-gray-100">
+                                        <GlobeAltIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                        Anyone with the link
+                                    </span>
                                     <button
                                         type="button"
                                         onClick={handleRevokePublic}

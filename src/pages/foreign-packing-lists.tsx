@@ -1,3 +1,4 @@
+import { CalendarIcon, MapPinIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -88,18 +89,18 @@ export function ForeignPackingListsPage() {
             >
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
-                        ✈️ {list.name}
+                        {list.name}
                         {list.destination && !countdown && (
                             <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2 py-0.5 rounded-full">
-                                📍 {list.destination}
+                                <MapPinIcon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5 align-[-0.15em]" />
+                                {list.destination}
                             </span>
                         )}
                         <TripCountdownBadge countdown={countdown} />
                     </h3>
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg self-start sm:self-auto">
-                        {tripDates
-                            ? `📅 ${tripDates}`
-                            : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
+                    <span className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg sm:self-auto">
+                        <CalendarIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                        {tripDates || `Created ${new Date(list.createdAt).toLocaleDateString()}`}
                     </span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -153,10 +154,13 @@ function Header({ onCreate }: { onCreate: () => void }) {
     return (
         <div className="mb-8 flex justify-between items-start gap-4">
             <div className="mb-2">
-                <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">📦 Packing Lists</h1>
+                <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">Packing Lists</h1>
                 <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">Shared packing lists.</p>
             </div>
-            <Button variant="primary" onClick={onCreate}>➕ New List</Button>
+            <Button variant="primary" onClick={onCreate}>
+                <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                New List
+            </Button>
         </div>
     )
 }

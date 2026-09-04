@@ -1,3 +1,5 @@
+import { BriefcaseIcon } from '@heroicons/react/24/outline'
+
 interface LoadingStateProps {
     /** What is being waited for, e.g. "Loading packing lists..." — read out to screen readers. */
     message: string;
@@ -9,12 +11,16 @@ interface LoadingStateProps {
  * The app's one waiting treatment: a suitcase rocking above a skeleton of the
  * content on its way. Sized to sit in the same space the real content will
  * take, so nothing jumps when it arrives.
+ *
+ * The suitcase is an icon rather than an emoji (#335) so it is the colour of the text
+ * beside it in both themes. `loading-suitcase` still does the rocking, and
+ * still stops under `prefers-reduced-motion`.
  */
 export function LoadingState({ message, rows = 3 }: LoadingStateProps) {
     return (
         <div role="status" aria-live="polite">
             <div className="flex flex-col items-center gap-3 py-6">
-                <span aria-hidden="true" className="loading-suitcase text-5xl leading-none">🧳</span>
+                <BriefcaseIcon aria-hidden="true" className="loading-suitcase h-12 w-12 text-primary-500 dark:text-primary-400" />
                 <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">{message}</p>
             </div>
 

@@ -1995,7 +1995,7 @@ export function QuestionsPage() {
                         data-testid="questions-empty-state"
                         className="text-center py-10 px-6 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft"
                     >
-                        <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">Nothing here yet — let's fix that 🧳</p>
+                        <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">Nothing here yet — let's fix that</p>
                         <p className="mx-auto mt-2 max-w-md text-sm text-gray-600 dark:text-gray-400">
                             Answer a few questions about who's travelling and we'll build your questions and packing items for you. Everything stays editable afterwards.
                         </p>

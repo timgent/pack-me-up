@@ -774,7 +774,7 @@ describe('PackingLists trip destination and dates', () => {
 
     it('shows the destination on the list card', async () => {
         renderWithList({ ...tripList, startDate: undefined, endDate: undefined })
-        expect(await screen.findByText(/📍 Lisbon, Portugal/)).toBeTruthy()
+        expect(await screen.findByText('Lisbon, Portugal')).toBeTruthy()
     })
 
     // Two lines both saying Lisbon is one line too many: once the trip has
@@ -782,7 +782,7 @@ describe('PackingLists trip destination and dates', () => {
     it('folds the destination into the countdown once the trip has dates', async () => {
         renderWithList(tripList)
         expect((await screen.findByTestId('trip-countdown')).textContent).toContain('Lisbon, Portugal')
-        expect(screen.queryByText(/📍 Lisbon, Portugal/)).toBeNull()
+        expect(screen.queryByText('Lisbon, Portugal')).toBeNull()
     })
 
     it('shows the trip dates rather than the creation date', async () => {
@@ -791,21 +791,21 @@ describe('PackingLists trip destination and dates', () => {
 
         const expected = `${localDateOf(tripStart)} – ${localDateOf(tripEnd)}`
         expect(screen.getByText(new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toBeTruthy()
-        expect(screen.queryByText(/📅 Created/)).toBeNull()
+        expect(screen.queryByText(/Created/)).toBeNull()
     })
 
     it('labels the date as the creation date when the list has no trip dates', async () => {
         renderWithList({ ...tripList, startDate: undefined, endDate: undefined })
         await screen.findByText(/Summer Holiday/)
 
-        expect(screen.getByText(/📅 Created/).textContent).toContain(new Date('2026-01-01T00:00:00Z').toLocaleDateString())
+        expect(screen.getByText(/Created/).textContent).toContain(new Date('2026-01-01T00:00:00Z').toLocaleDateString())
     })
 
     it('shows no destination badge when the list has none', async () => {
         renderWithList({ ...tripList, destination: undefined })
         await screen.findByText(/Summer Holiday/)
 
-        expect(screen.queryByText(/📍/)).toBeNull()
+        expect(screen.queryByText('Lisbon, Portugal')).toBeNull()
     })
 })
 

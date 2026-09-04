@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { ArrowPathIcon, CalendarIcon, ChevronDownIcon, ChevronRightIcon, LinkIcon, MapPinIcon, UserIcon } from '@heroicons/react/24/outline'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useDebouncedCallback } from 'use-debounce'
 import { PackingList, PackingListItem } from '../create-packing-list/types'
@@ -1698,7 +1699,7 @@ export function ViewPackingList() {
                     {!foreignPodUrl && (
                         <ActionMenu label="List actions">
                             <ActionMenuItem
-                                icon="🔗"
+                                icon={<LinkIcon aria-hidden="true" className="h-5 w-5" />}
                                 disabled={isLoggedIn && !ownPodUrl}
                                 onSelect={() => {
                                     if (isLoggedIn) setShareModalOpen(true)
@@ -1713,7 +1714,7 @@ export function ViewPackingList() {
                             </ActionMenuItem>
                             {hasQuestionSet && (
                                 <ActionMenuItem
-                                    icon="🔄"
+                                    icon={<ArrowPathIcon aria-hidden="true" className="h-5 w-5" />}
                                     onSelect={handleOpenQuestionUpdate}
                                 >
                                     Update from questions
@@ -1730,8 +1731,18 @@ export function ViewPackingList() {
                         {/* Countdown first: how soon the trip is is what the
                             traveller came to know; the dates back it up. */}
                         <TripCountdownBadge countdown={tripCountdown} />
-                        {packingList.destination && !tripCountdown && <span>📍 {packingList.destination}</span>}
-                        {tripDates && <span>📅 {tripDates}</span>}
+                        {packingList.destination && !tripCountdown && (
+                            <span className="inline-flex items-center gap-1">
+                                <MapPinIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                {packingList.destination}
+                            </span>
+                        )}
+                        {tripDates && (
+                            <span className="inline-flex items-center gap-1">
+                                <CalendarIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                {tripDates}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>
@@ -1748,8 +1759,9 @@ export function ViewPackingList() {
             {/* Persistent "viewing someone else's list" indicator */}
             {foreignPodUrl && !foreignPodCtx && (
                 <div className="w-full max-w-screen-2xl mb-2 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-3">
-                    <p className="text-sm text-indigo-800 dark:text-indigo-200 font-medium">
-                        👤 Viewing a list from <span className="font-semibold">{resolveOwnerDisplayName(ownerDisplayName, effectiveOwnerWebId, foreignPodUrl)}</span>
+                    <p className="flex items-center gap-1.5 text-sm text-indigo-800 dark:text-indigo-200 font-medium">
+                        <UserIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                        Viewing a list from <span className="font-semibold">{resolveOwnerDisplayName(ownerDisplayName, effectiveOwnerWebId, foreignPodUrl)}</span>
                     </p>
                 </div>
             )}
@@ -1763,7 +1775,7 @@ export function ViewPackingList() {
                             rather than squeezing everything into wrapped fragments. */}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                             <span className={`text-sm font-medium whitespace-nowrap ${allPacked ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                                {allPacked ? '🎉 All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
+                                {allPacked ? 'All packed!' : `${packedCount} / ${totalCount} packed (${percentComplete}%)`}
                             </span>
                             {/* The bar shrinks to its minimum before the encouragement
                                 gives way, and at 320px the encouragement takes a line of
@@ -1800,7 +1812,9 @@ export function ViewPackingList() {
                                         {/* Same glyph the section headers use for the same
                                             state, so the toolbar and the cards never point
                                             opposite ways at each other. */}
-                                        <span aria-hidden="true" className="text-xs text-gray-400 dark:text-gray-500">{everySectionFolded ? '▶' : '▼'}</span>
+                                        {everySectionFolded
+                                            ? <ChevronRightIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                                            : <ChevronDownIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />}
                                         {/* The word "all" is what tips this row onto a second
                                             line on a phone, and the icon already says it. */}
                                         {everySectionFolded ? (isDesktop ? 'Expand all' : 'Expand') : (isDesktop ? 'Collapse all' : 'Collapse')}
@@ -1887,7 +1901,7 @@ export function ViewPackingList() {
                                             but this shouldn't pass in silence. */}
                                         {solePersonUnpacked === 0 && solePersonTotal > 0 ? (
                                             <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 dark:border-emerald-800 bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                                🎉 {solePerson.name}'s bag is packed!
+                                                {solePerson.name}'s bag is packed!
                                             </span>
                                         ) : solePersonUnpacked > 0 && (
                                             <button
@@ -2057,7 +2071,9 @@ export function ViewPackingList() {
                                             onClick={() => toggleSection(sectionKey)}
                                             className="flex items-center gap-2 flex-1 min-w-0 text-left"
                                         >
-                                            <span className="shrink-0 text-sm text-gray-400 dark:text-gray-500">{isSectionCollapsed ? '▶' : '▼'}</span>
+                                            {isSectionCollapsed
+                                            ? <ChevronRightIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                                            : <ChevronDownIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />}
                                             <span className="text-xl font-semibold text-gray-800 dark:text-gray-100">{title}</span>
                                             {/* Never let a count break across lines — "9 /" above "9" is
                                                 a fraction the eye has to reassemble. */}
@@ -2070,7 +2086,7 @@ export function ViewPackingList() {
                                                 aria-label={`All packed for ${completeLabel}${filterQualifier}`}
                                                 className="animate-pop-in text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-full px-2 py-0.5 shrink-0"
                                             >
-                                                🎉 All packed!
+                                                All packed!
                                             </span>
                                         )}
                                         {/* Used to sit on each folded group inside a card. The
@@ -2119,7 +2135,7 @@ export function ViewPackingList() {
                                     </div>
                                     {isComplete && items.length === 0 && !isGridSection && (
                                         <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                                            Nothing left to pack 🎒
+                                            Nothing left to pack
                                         </p>
                                     )}
                                     {isGridSection && (
@@ -2248,7 +2264,7 @@ export function ViewPackingList() {
                 { label: 'Free', text: 'All major Pod providers are free to sign up' },
                 { label: 'You own your data', text: 'Your lists stay in your personal storage' },
             ]}
-            confirmLabel="🔗 Sign in to share"
+            confirmLabel="Sign in to share"
             dismissLabel="Not now"
             onBeforeLogin={() => { if (id) setPendingSignInAction({ type: 'share', listId: id }) }}
         />

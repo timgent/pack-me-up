@@ -1,3 +1,4 @@
+import { UsersIcon } from '@heroicons/react/24/outline'
 /**
  * "Who needs this?" — everything about one row of the category grid that isn't
  * ticking a box.
@@ -141,7 +142,7 @@ export function ItemRowPanel({
 
                 {row.communal ? (
                     <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-3 py-2">
-                        <span aria-hidden="true">👥</span>
+                        <UsersIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-700 dark:text-blue-300" />
                         <span className="flex-1 text-sm font-medium text-blue-900 dark:text-blue-200">
                             Shared — packed once for the whole group
                         </span>

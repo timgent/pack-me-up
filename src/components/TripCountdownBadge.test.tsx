@@ -68,9 +68,21 @@ describe('the trip countdown badge', () => {
         expect(badge()!.textContent).toContain('2 sleeps until Cornwall · 18 items left')
     })
 
-    it('leaves the emoji out of the accessible name so it is not read aloud', () => {
+    it('leaves the glyph out of the accessible name so it is not read aloud', () => {
         freezeClock()
         renderFor({ startDate: '2026-06-18', destination: 'Cornwall' })
         expect(badge()!.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    })
+
+    // #335: an emoji is a full-colour bitmap that ignores the tone around it,
+    // and `today` is white text on accent. An icon inherits `currentColor`, so
+    // each state's glyph is whatever colour that state chose.
+    it('marks the state with an icon rather than an emoji', () => {
+        freezeClock()
+        renderFor({ startDate: '2026-06-18', destination: 'Cornwall' })
+
+        const glyph = badge()!.querySelector('[aria-hidden="true"]')!
+        expect(glyph.tagName.toLowerCase()).toBe('svg')
+        expect(badge()!.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
     })
 })

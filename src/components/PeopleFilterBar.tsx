@@ -1,3 +1,4 @@
+import { UsersIcon } from '@heroicons/react/24/outline'
 /**
  * Who the user is packing for — the strip above the cards.
  *
@@ -266,7 +267,7 @@ export function PeopleFilterBar({
                             }`}
                         >
                             <span className="relative shrink-0">
-                                <span aria-hidden="true">👥</span>
+                                <UsersIcon aria-hidden="true" className="h-4 w-4" />
                                 {done && <DoneTick />}
                             </span>
                             <span className="hidden whitespace-nowrap sm:inline">Shared</span>

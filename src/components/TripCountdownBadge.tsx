@@ -1,3 +1,4 @@
+import { BriefcaseIcon, HomeIcon, MoonIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { URGENT_SLEEPS } from '../create-packing-list/tripDetails'
 import type { TripCountdown, TripCountdownStatus } from '../create-packing-list/tripDetails'
 
@@ -20,11 +21,16 @@ const TONES: Record<TripCountdownStatus | 'urgent', string> = {
     past: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700',
 }
 
-const ICONS: Record<TripCountdownStatus, string> = {
-    upcoming: '🌙',
-    today: '🎉',
-    'in-progress': '🧳',
-    past: '🏡',
+/**
+ * Icons, not emoji (#335): an emoji is a full-colour bitmap that ignores the
+ * tone it is sitting in, and `today`'s badge is white-on-accent. These inherit
+ * `currentColor`, so each state's glyph is the colour its own tone chose.
+ */
+const ICONS: Record<TripCountdownStatus, typeof MoonIcon> = {
+    upcoming: MoonIcon,
+    today: SparklesIcon,
+    'in-progress': BriefcaseIcon,
+    past: HomeIcon,
 }
 
 /**
@@ -37,6 +43,7 @@ export function TripCountdownBadge({ countdown, className = '' }: TripCountdownB
 
     const urgent = countdown.status === 'upcoming' && (countdown.sleeps ?? Infinity) <= URGENT_SLEEPS
     const tone = TONES[urgent ? 'urgent' : countdown.status]
+    const Icon = ICONS[countdown.status]
 
     return (
         <span
@@ -44,7 +51,7 @@ export function TripCountdownBadge({ countdown, className = '' }: TripCountdownB
             data-countdown-status={countdown.status}
             className={`inline-flex items-center gap-1 text-sm font-semibold border px-2.5 py-1 rounded-full max-w-full ${tone} ${className}`}
         >
-            <span aria-hidden="true">{ICONS[countdown.status]}</span>
+            <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
             {countdown.label}
         </span>
     )

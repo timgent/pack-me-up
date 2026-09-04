@@ -1004,7 +1004,7 @@ describe('packing progress bar and milestones', () => {
         toggleItems(0, 8)
 
         // The section header celebrates too, so the strip is one of several
-        await waitFor(() => expect(screen.getAllByText('🎉 All packed!').length).toBeGreaterThan(0))
+        await waitFor(() => expect(screen.getAllByText('All packed!').length).toBeGreaterThan(0))
         expect(screen.queryByTestId('progress-milestone')).toBeNull()
         expect(screen.getByTestId('packing-progress-fill').style.width).toBe('100%')
     })
@@ -1825,7 +1825,7 @@ describe('ViewPackingList shared (communal) items', () => {
         // No column belongs to it, and it comes first — the shared card's place
         // in person view, kept
         expect(camping.getAllByTestId('grid-row')[0].textContent).toContain('Tent')
-        expect(camping.getByText('👥 Shared')).toBeTruthy()
+        expect(camping.getByText('Shared')).toBeTruthy()
     })
 
     it('counts shared items in the section total', async () => {
@@ -4254,7 +4254,7 @@ describe('ViewPackingList header emphasis', () => {
         // Radix's to keep — and only if the menu is actually one.
         const menu = screen.getByRole('menu')
         await waitFor(() => expect(within(menu).getAllByRole('menuitem').map(i => i.textContent))
-            .toEqual(['🔗Share', '🔄Update from questions']))
+            .toEqual(['Share', 'Update from questions']))
     })
 
     it('adds a guest from the strip the guests are on, not from the header', async () => {

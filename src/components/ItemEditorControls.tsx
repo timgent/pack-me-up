@@ -1,3 +1,4 @@
+import { UsersIcon } from '@heroicons/react/24/outline'
 /**
  * The controls that edit one item's settings, shared by the option editor's
  * dense modal rows and by the inline editor that opens inside a read-only list.
@@ -69,7 +70,7 @@ export const PersonToggles = memo(function PersonToggles({ item, people, layout,
                     aria-pressed={isCommunal}
                     className={`inline-flex items-center justify-center h-5 rounded-full px-1 text-[10px] transition-colors mr-1 ${isCommunal ? 'bg-blue-600 text-white' : PERSON_COLOR_OFF}`}
                 >
-                    👥
+                    <UsersIcon aria-hidden="true" className="h-3.5 w-3.5" />
                 </button>
                 {people.length > 1 && people.map((person, personIdx) => {
                     const selected = item.personSelections?.[personIdx]?.selected ?? false
@@ -100,7 +101,7 @@ export const PersonToggles = memo(function PersonToggles({ item, people, layout,
                 aria-pressed={isCommunal}
                 className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border-2 transition-colors ${isCommunal ? 'bg-blue-600 text-white border-transparent' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'}`}
             >
-                <span className="text-lg font-bold leading-none">👥</span>
+                <UsersIcon aria-hidden="true" className="h-5 w-5" />
                 <span className="text-[10px] font-medium leading-none truncate w-full text-center px-1">
                     Shared
                 </span>

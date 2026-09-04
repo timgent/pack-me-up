@@ -1,3 +1,4 @@
+import { CakeIcon } from '@heroicons/react/24/outline'
 import { useMemo, useState } from 'react'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { AGE_RANGE_OPTIONS } from '../edit-questions/types'
@@ -133,7 +134,10 @@ export function AgePromotionCard({ questionSet, onApply, manualTransitions, onMa
     return (
         <div className="bg-violet-50 dark:bg-violet-950/40 rounded-lg border border-violet-200 dark:border-violet-800 p-4">
             <div className="flex items-start justify-between gap-4">
-                <p className="text-violet-900 dark:text-violet-200 font-medium">🎂 Time flies — {summary}! Want to update their packing items?</p>
+                <p className="flex items-start gap-2 text-violet-900 dark:text-violet-200 font-medium">
+                    <CakeIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+                    <span>Time flies — {summary}! Want to update their packing items?</span>
+                </p>
                 <button
                     type="button"
                     aria-label="Dismiss age update"

@@ -1,3 +1,4 @@
+import { UsersIcon } from '@heroicons/react/24/outline'
 /**
  * One item as a row: the shape every list on the questions page is made of.
  *
@@ -65,7 +66,7 @@ export const ItemRow = memo(function ItemRow({ item, people, index, isOpen, high
                     title="Shared — packed once for the whole group"
                     className="inline-flex items-center justify-center h-5 rounded-full px-1.5 text-[10px] font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 select-none shrink-0"
                 >
-                    👥
+                    <UsersIcon aria-hidden="true" className="h-3.5 w-3.5" />
                 </span>
             )}
             {item.perNight !== undefined && (

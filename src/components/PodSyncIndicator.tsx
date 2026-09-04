@@ -1,3 +1,5 @@
+import { BriefcaseIcon } from '@heroicons/react/24/outline'
+
 interface PodSyncIndicatorProps {
     /**
      * What is being checked, when the page is showing one thing rather than
@@ -24,7 +26,7 @@ export function PodSyncIndicator({ subject }: PodSyncIndicatorProps) {
             aria-live="polite"
             className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400"
         >
-            <span aria-hidden="true" className="loading-suitcase text-base leading-none">🧳</span>
+            <BriefcaseIcon aria-hidden="true" className="loading-suitcase h-4 w-4 shrink-0" />
             Checking your Pod for changes{subject ? ` to ${subject}` : ''}...
         </div>
     )

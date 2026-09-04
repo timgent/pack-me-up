@@ -1,3 +1,4 @@
+import { CheckCircleIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
@@ -283,7 +284,7 @@ export function SharingSettingsPage() {
                 { label: 'Free', text: 'All major Pod providers are free to sign up' },
                 { label: 'You own your data', text: 'Everything stays in your personal storage' },
             ]}
-            confirmLabel="🔗 Sign in and share"
+            confirmLabel="Sign in and share"
             dismissLabel="Not now"
             onBeforeLogin={() => setPendingSignInAction({ type: 'share-full-setup' })}
         />
@@ -360,8 +361,9 @@ export function SharingSettingsPage() {
 
                 {inviteLink && (
                     <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
-                        <p className="text-sm font-semibold text-primary-900 dark:text-primary-200">
-                            ✅ Your full setup is shared{sharedWith ? ' with ' + sharedWith : ''}
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
+                            <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                            Your full setup is shared{sharedWith ? ' with ' + sharedWith : ''}
                         </p>
                         <p className="text-sm text-gray-700 dark:text-gray-300">
                             They now have your question set and all your packing lists. Send them this
@@ -502,13 +504,13 @@ export function SharingSettingsPage() {
                                 return (
                                     <li key={list.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
                                         <div className="flex flex-col flex-1 min-w-0">
-                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">✈️ {list.name}</span>
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{list.name}</span>
                                             <span className="text-xs text-gray-500 dark:text-gray-400">
                                                 {status === 'loading' ? 'Loading sharing info…' :
                                                     status === 'error' ? 'Could not load sharing info' :
                                                     [
-                                                        status.isPublic ? '🌐 Public' : null,
-                                                        individualCollaborators(status).length > 0 ? `👤 ${individualCollaborators(status).length} person${individualCollaborators(status).length > 1 ? 's' : ''}` : null,
+                                                        status.isPublic ? 'Public' : null,
+                                                        individualCollaborators(status).length > 0 ? `Shared with ${individualCollaborators(status).length} person${individualCollaborators(status).length > 1 ? 's' : ''}` : null,
                                                     ].filter(Boolean).join(' · ')}
                                             </span>
                                         </div>

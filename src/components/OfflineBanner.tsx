@@ -1,3 +1,4 @@
+import { SignalSlashIcon } from '@heroicons/react/24/outline'
 import { useSolidPod } from './SolidPodContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
@@ -29,7 +30,7 @@ export function OfflineBanner() {
             className="bg-primary-50 dark:bg-primary-950/40 border-b border-primary-200 dark:border-primary-800 px-4 py-2.5"
         >
             <p className="text-sm text-primary-900 dark:text-primary-200 font-medium">
-                <span aria-hidden="true">📴 </span>
+                <SignalSlashIcon aria-hidden="true" className="mr-1 inline-block h-4 w-4 align-[-0.2em]" />
                 {isOnline
                     ? "Can't reach your Pod — reconnecting."
                     : "You're offline."}
