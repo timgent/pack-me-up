@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom'
  * a 404 on a URL the card still names — so `onError` drops back to the icon
  * rather than leaving a broken image where a face should be.
  */
-export function ProfileBadge({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
+export function ProfileBadge({ name, photoUrl, showName = true }: { name: string; photoUrl?: string | null; showName?: boolean }) {
     // Keyed to the URL, so a person whose photo 404s falls back but still picks
     // up a *later* working one. Same reasoning as PersonAvatar.
     const [failed, setFailed] = useState<string | null>(null)
@@ -41,7 +41,9 @@ export function ProfileBadge({ name, photoUrl }: { name: string; photoUrl?: stri
                     <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
                 </svg>
             )}
-            <span className="text-sm font-medium truncate max-w-[10rem]">{name}</span>
+            {/* The mobile bar has room for a face and not for a name; the
+                control that holds it carries the name for a screen reader. */}
+            {showName && <span className="text-sm font-medium truncate max-w-[10rem]">{name}</span>}
         </>
     )
 }
@@ -125,6 +127,20 @@ export function AccountMenu({ webId, displayName, photoUrl, onLogout }: {
                         className="block px-4 py-3 text-sm font-semibold hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors duration-200"
                     >
                         Backups
+                    </Link>
+                    {/*
+                      * The theme choice moved off the nav bar to /settings (#337).
+                      * This menu is the nearest thing the app has to a settings
+                      * home, so it points at the page rather than holding the
+                      * control — the same page a signed-out user reaches from the
+                      * footer.
+                      */}
+                    <Link
+                        to="/settings"
+                        onClick={() => setIsOpen(false)}
+                        className="block px-4 py-3 text-sm font-semibold border-t border-gray-100 dark:border-gray-800 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors duration-200"
+                    >
+                        Settings
                     </Link>
                     <button
                         type="button"

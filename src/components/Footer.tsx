@@ -33,6 +33,14 @@ export function Footer() {
                 <Link to="/your-data" className={linkStyles}>
                     Delete my data
                 </Link>
+                {/*
+                  * The theme choice lives on /settings, and the footer is the only
+                  * place that is on every page in every auth state — a signed-out
+                  * desktop user has neither an account menu nor a hamburger. See #337.
+                  */}
+                <Link to="/settings" className={linkStyles}>
+                    Settings
+                </Link>
                 <a href={`mailto:${FEEDBACK_EMAIL}`} className={linkStyles}>
                     Feedback
                 </a>

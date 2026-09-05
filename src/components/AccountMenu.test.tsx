@@ -58,6 +58,14 @@ describe('AccountMenu', () => {
         expect(screen.queryByRole('button', { name: 'Logout' })).toBeNull()
     })
 
+    it('links to settings, so the theme choice is one hop from the nav bar it left', () => {
+        const { trigger } = renderMenu()
+
+        fireEvent.click(trigger)
+
+        expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings')
+    })
+
     it('holds the WebID, Backups and Logout once open', () => {
         const { trigger } = renderMenu()
 

@@ -25,6 +25,7 @@ import { SharingSettingsPage } from './pages/sharing-settings'
 import { QuestionsPage } from './pages/questions-page'
 import { PrivacyPolicyPage } from './pages/privacy-policy'
 import { YourDataPage } from './pages/your-data'
+import { SettingsPage } from './pages/settings'
 import { OpenResourcePage } from './pages/open-resource'
 
 function DefaultRedirect() {
@@ -67,6 +68,7 @@ function App() {
                     <Route path="/sharing" element={<SharingSettingsPage />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                     <Route path="/your-data" element={<YourDataPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/pod/:encodedPodUrl" element={<ForeignPodLayout />}>
                       <Route index element={<Navigate to="view-lists" replace />} />
                       <Route path="view-lists" element={<ForeignPackingListsPage />} />

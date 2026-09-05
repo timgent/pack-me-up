@@ -10,7 +10,8 @@ vi.mock('./SolidPodContext', () => ({
 }))
 
 vi.mock('./SolidProviderSelector', () => ({
-    SolidProviderSelector: () => null,
+    SolidProviderSelector: ({ isOpen }: { isOpen: boolean }) =>
+        isOpen ? <div data-testid="provider-selector" /> : null,
 }))
 
 // Only the profile read is faked: podUsernameFromWebId is the real one, so the
@@ -78,7 +79,15 @@ function renderNav() {
 /** The top row — what "the nav bar" means, as opposed to the mobile menu below it. */
 const navBar = () => screen.getByTestId('nav-bar')
 
-const openAccountMenu = () => fireEvent.click(within(navBar()).getByRole('button', { name: /account menu/i }))
+/**
+ * The bar renders both layouts and lets CSS pick one, so a query across the
+ * whole row now finds the desktop and mobile copies of the same thing. These
+ * two say which layout an assertion is about.
+ */
+const desktopBar = () => screen.getByTestId('nav-bar-desktop')
+const mobileBar = () => screen.getByTestId('nav-bar-mobile')
+
+const openAccountMenu = () => fireEvent.click(within(desktopBar()).getByRole('button', { name: /account menu/i }))
 
 describe('Navigation', () => {
     beforeEach(() => {
@@ -199,8 +208,8 @@ describe('Navigation – signed-in account menu', () => {
 
         renderNav()
 
-        await waitFor(() => expect(within(navBar()).getByText('Alice Adams')).toBeTruthy())
-        expect(within(navBar()).getByTestId('profile-photo').getAttribute('src'))
+        await waitFor(() => expect(within(desktopBar()).getByText('Alice Adams')).toBeTruthy())
+        expect(within(desktopBar()).getByTestId('profile-photo').getAttribute('src'))
             .toBe('https://user.solidpod.example/me.png')
     })
 
@@ -208,8 +217,8 @@ describe('Navigation – signed-in account menu', () => {
         renderNav()
 
         await waitFor(() => expect(mockGetSolidProfile).toHaveBeenCalled())
-        expect(within(navBar()).getAllByText('user').length).toBeGreaterThan(0)
-        expect(within(navBar()).getByTestId('profile-icon')).toBeTruthy()
+        expect(within(desktopBar()).getAllByText('user').length).toBeGreaterThan(0)
+        expect(within(desktopBar()).getByTestId('profile-icon')).toBeTruthy()
     })
 
     it('keeps the WebID reachable inside the account menu', () => {
@@ -217,9 +226,9 @@ describe('Navigation – signed-in account menu', () => {
 
         openAccountMenu()
 
-        expect(within(navBar()).getByText(WEB_ID)).toBeTruthy()
-        expect(within(navBar()).getByRole('button', { name: 'Logout' })).toBeTruthy()
-        expect(within(navBar()).getByRole('link', { name: 'Backups' })).toBeTruthy()
+        expect(within(desktopBar()).getByText(WEB_ID)).toBeTruthy()
+        expect(within(desktopBar()).getByRole('button', { name: 'Logout' })).toBeTruthy()
+        expect(within(desktopBar()).getByRole('link', { name: 'Backups' })).toBeTruthy()
     })
 
     it('reads the profile through the shared cached path', async () => {
@@ -288,13 +297,13 @@ describe('Navigation – signed in but offline', () => {
         renderNav()
 
         expect(within(navBar()).queryByRole('button', { name: 'Sync & Share' })).toBeNull()
-        expect(await within(navBar()).findByRole('button', { name: /account menu/i })).toBeTruthy()
+        expect(await within(desktopBar()).findByRole('button', { name: /account menu/i })).toBeTruthy()
     })
 
     it('says the Pod is out of reach rather than leaving it unexplained', () => {
         renderNav()
 
-        expect(within(navBar()).getByText(/offline/i)).toBeTruthy()
+        expect(within(desktopBar()).getByText(/offline/i)).toBeTruthy()
     })
 
     it('keeps the mobile menu signed in too, with a way out', () => {
@@ -304,5 +313,85 @@ describe('Navigation – signed in but offline', () => {
         expect(within(mobile).queryByRole('button', { name: 'Sync & Share' })).toBeNull()
         expect(within(mobile).getByText(/offline/i)).toBeTruthy()
         expect(within(mobile).getByRole('button', { name: 'Logout' })).toBeTruthy()
+    })
+})
+
+/**
+ * #337. The theme control held a permanent slot in both bars — on mobile, one of
+ * only two — while sign-in was a tap deep inside the hamburger. The control now
+ * lives on /settings and the slot went to the thing a user actually came for.
+ */
+describe('Navigation – theme control and the mobile top bar', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            isReconnecting: false,
+            sessionExpired: false,
+            clearSessionExpired: vi.fn(),
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    it('has no theme control anywhere in the nav', () => {
+        renderNav()
+
+        expect(screen.queryByRole('button', { name: /switch to (dark|light) mode/i })).toBeNull()
+        expect(screen.queryByText(/^(dark|light) mode$/i)).toBeNull()
+    })
+
+    it('points at the settings page from the mobile menu instead', () => {
+        renderNav()
+
+        const mobile = screen.getByTestId('mobile-menu')
+        expect(within(mobile).getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings')
+    })
+
+    it('offers sign-in from the mobile bar itself, not only inside the hamburger', () => {
+        renderNav()
+
+        expect(within(mobileBar()).getByRole('button', { name: 'Sign in' })).toBeTruthy()
+    })
+
+    it('starts sign-in straight from that button', () => {
+        renderNav()
+
+        expect(screen.queryByTestId('provider-selector')).toBeNull()
+
+        fireEvent.click(within(mobileBar()).getByRole('button', { name: 'Sign in' }))
+
+        expect(screen.getByTestId('provider-selector')).toBeTruthy()
+    })
+
+    it('shows the profile in the mobile bar once signed in, and no sign-in prompt', async () => {
+        signedIn()
+        renderNav()
+
+        expect(await within(mobileBar()).findByRole('button', { name: /your profile/i })).toBeTruthy()
+        expect(within(mobileBar()).queryByRole('button', { name: 'Sign in' })).toBeNull()
+    })
+
+    // Offline is not signed out (#342): the bar must not fall back to a
+    // sign-in prompt just because the pod is out of reach.
+    it('keeps the profile in the mobile bar while reconnecting', async () => {
+        reconnecting()
+        renderNav()
+
+        expect(await within(mobileBar()).findByRole('button', { name: /your profile/i })).toBeTruthy()
+        expect(within(mobileBar()).queryByRole('button', { name: 'Sign in' })).toBeNull()
+    })
+
+    it('opens the account section from that profile control', async () => {
+        signedIn()
+        renderNav()
+        // The profile read resolves into state; let it land before clicking.
+        await waitFor(() => expect(mockGetSolidProfile).toHaveBeenCalled())
+
+        fireEvent.click(within(mobileBar()).getByRole('button', { name: /your profile/i }))
+
+        expect(screen.getByTestId('mobile-menu').className).toContain('block')
     })
 })
