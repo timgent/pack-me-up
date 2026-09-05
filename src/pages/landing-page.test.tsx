@@ -277,3 +277,86 @@ describe('LandingPage – signed-in greeting', () => {
         expect(screen.getByText(/offline/i)).toBeTruthy()
     })
 })
+
+// #336: three cards, three colour families, a hover-scale on a div nobody can
+// click. The complaint was "a lot going on"; the emoji (#335) were the smaller
+// half of it. Colour marks the one primary action — surfaces stay neutral.
+describe('LandingPage – how it works section', () => {
+    beforeEach(() => {
+        mockUseSolidPod.mockReturnValue({
+            session: null,
+            isLoggedIn: false,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+    })
+
+    const renderSteps = () => {
+        hasQuestions(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        return screen.getAllByRole('listitem')
+    }
+
+    it('renders the three steps as one ordered sequence', () => {
+        const steps = renderSteps()
+        expect(steps).toHaveLength(3)
+        expect(steps[0].closest('ol')).toBeTruthy()
+    })
+
+    it('numbers the steps', () => {
+        const steps = renderSteps()
+        expect(steps.map(step => step.textContent)).toEqual([
+            expect.stringContaining('1'),
+            expect.stringContaining('2'),
+            expect.stringContaining('3'),
+        ])
+    })
+
+    it('gives the three step cards one shared surface treatment', () => {
+        const [first, ...rest] = renderSteps()
+        rest.forEach(step => expect(step.className).toBe(first.className))
+    })
+
+    it('does not tint the step cards by colour family', () => {
+        renderSteps().forEach(step => {
+            expect(step.className).not.toMatch(/(primary|secondary|success|accent)-\d/)
+            expect(step.className).not.toMatch(/bg-gradient/)
+        })
+    })
+
+    // A <li> is not clickable, so growth and glow on hover promise an
+    // affordance that isn't there. They were also bare `hover:` rather than
+    // the `motion-safe:` variant Button.tsx uses, so they ignored
+    // prefers-reduced-motion.
+    it('offers no hover affordance on the non-interactive cards', () => {
+        renderSteps().forEach(step => {
+            expect(step.className).not.toMatch(/hover:scale/)
+            expect(step.className).not.toMatch(/hover:shadow-glow/)
+        })
+    })
+
+    it('reworks dark mode too, rather than leaving the light surface behind', () => {
+        expect(renderSteps()[0].className).toMatch(/dark:bg-/)
+    })
+
+    // "Reserve saturated colour for the primary CTA only — it should be the
+    // single most colourful thing above the fold." In dark mode the headline
+    // was the brightest thing on screen instead.
+    it('keeps the hero headline neutral rather than tinted', () => {
+        hasQuestions(false)
+        render(<MemoryRouter><LandingPage /></MemoryRouter>)
+        const heading = screen.getByRole('heading', { level: 1 })
+        expect(heading.className).not.toMatch(/text-(primary|secondary|success|accent)-[1-5]00/)
+    })
+
+    it('leaves the primary CTA as the only gradient above the fold', () => {
+        const steps = renderSteps()
+        const cta = screen.getByRole('link', { name: /get started with the wizard/i })
+        expect(cta.className).toMatch(/bg-gradient-primary-button/)
+        steps.forEach(step => {
+            expect(step.innerHTML).not.toMatch(/bg-gradient/)
+        })
+    })
+})

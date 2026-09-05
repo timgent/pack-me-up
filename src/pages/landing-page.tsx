@@ -9,6 +9,41 @@ import { SolidProviderSelector } from '../components/SolidProviderSelector'
 const CTA_CLASSES =
     'inline-block bg-gradient-primary-button text-white px-8 py-4 rounded-2xl text-lg font-bold motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary'
 
+/*
+ * One surface for all three steps, so they read as a single sequence rather
+ * than three unrelated features (#336). They used to carry a colour family
+ * each — primary, secondary, success — competing with the CTA's gradient and
+ * the page's own background for the same attention. Colour now marks the one
+ * primary action; everything around it is neutral, and the step number is the
+ * only accent the section gets.
+ *
+ * Shared as a constant because three hand-copied class strings are how they
+ * drifted apart in the first place.
+ */
+const CARD_CLASSES =
+    'flex flex-col gap-3 p-6 rounded-2xl bg-white/70 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 shadow-soft'
+
+const STEPS = [
+    {
+        number: 1,
+        Icon: SparklesIcon,
+        title: 'Set up in a minute',
+        body: "One screen — tell us who you travel with, and we'll generate a starter set of packing questions for your group.",
+    },
+    {
+        number: 2,
+        Icon: PencilSquareIcon,
+        title: 'Fine-tune your questions',
+        body: 'Add, remove, and customise questions and packing items until they perfectly match how you travel.',
+    },
+    {
+        number: 3,
+        Icon: ClipboardDocumentListIcon,
+        title: 'Pack for every trip',
+        body: 'Before each trip, answer your questions to instantly generate a personalised packing list.',
+    },
+]
+
 export const LandingPage = () => {
     const { isLoggedIn, isReconnecting, webId, session, login } = useSolidPod()
     const profile = useSolidProfile(webId, session)
@@ -63,7 +98,10 @@ export const LandingPage = () => {
                 {/* Hero leads with the travel benefit and keeps the primary CTA above the
                     fold — the data-ownership story lives in the trust section further down. */}
                 <div className="text-center mb-10 animate-slide-up">
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-primary-900 dark:text-primary-200 text-balance">
+                    {/* Neutral, not tinted: in dark mode `primary-200` made the headline the
+                        brightest thing on screen, ahead of the CTA it is meant to lead
+                        into (#336). */}
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900 dark:text-gray-100 text-balance">
                         Packing lists that learn how you travel
                     </h1>
                     <p className="text-lg sm:text-xl text-gray-700 dark:text-gray-300 max-w-2xl mx-auto">
@@ -77,31 +115,24 @@ export const LandingPage = () => {
 
                 <div className="mb-12">
                     <h2 className="text-center text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-6">How it works</h2>
-                    <div className="grid md:grid-cols-3 gap-6">
-                        <div className="bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-primary-100 dark:to-primary-900/40 p-6 rounded-2xl shadow-soft hover:shadow-glow-primary transition-all duration-300 hover:scale-105 border-2 border-primary-200 dark:border-primary-800">
-                            <SparklesIcon aria-hidden="true" className="mb-2 h-8 w-8 text-primary-700 dark:text-primary-300" />
-                            <h3 className="text-xl font-bold mb-3 text-primary-900 dark:text-primary-200">1. Set up in a minute</h3>
-                            <p className="text-gray-700 dark:text-gray-300">
-                                One screen — tell us who you travel with, and we'll generate a starter set of packing questions for your group.
-                            </p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-secondary-50 dark:from-secondary-950/40 to-secondary-100 dark:to-secondary-900/40 p-6 rounded-2xl shadow-soft hover:shadow-glow-secondary transition-all duration-300 hover:scale-105 border-2 border-secondary-200 dark:border-secondary-800">
-                            <PencilSquareIcon aria-hidden="true" className="mb-2 h-8 w-8 text-secondary-700 dark:text-secondary-300" />
-                            <h3 className="text-xl font-bold mb-3 text-secondary-900 dark:text-secondary-200">2. Fine-tune your questions</h3>
-                            <p className="text-gray-700 dark:text-gray-300">
-                                Add, remove, and customise questions and packing items until they perfectly match how you travel.
-                            </p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-success-50 dark:from-success-950/40 to-success-100 dark:to-success-900/40 p-6 rounded-2xl shadow-soft hover:shadow-lg transition-all duration-300 hover:scale-105 border-2 border-success-200 dark:border-success-800">
-                            <ClipboardDocumentListIcon aria-hidden="true" className="mb-2 h-8 w-8 text-success-700 dark:text-success-300" />
-                            <h3 className="text-xl font-bold mb-3 text-success-900 dark:text-success-200">3. Pack for every trip</h3>
-                            <p className="text-gray-700 dark:text-gray-300">
-                                Before each trip, answer your questions to instantly generate a personalised packing list.
-                            </p>
-                        </div>
-                    </div>
+                    {/* An ordered list, because that is what it is. No hover
+                        growth or glow: these are not clickable, and promising an
+                        affordance that isn't there was half of what made the
+                        section feel busy. */}
+                    <ol className="grid md:grid-cols-3 gap-6">
+                        {STEPS.map(({ number, Icon, title, body }) => (
+                            <li key={number} className={CARD_CLASSES}>
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200 text-sm font-bold">
+                                        {number}
+                                    </span>
+                                    <Icon aria-hidden="true" className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h3>
+                                <p className="text-gray-700 dark:text-gray-300">{body}</p>
+                            </li>
+                        ))}
+                    </ol>
                 </div>
 
                 <div className="mt-10 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-center text-sm text-gray-500 dark:text-gray-400">
