@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 
@@ -5,10 +6,11 @@ interface ConfirmationDialogProps {
     isOpen: boolean
     onClose: () => void
     onConfirm: () => void
-    title: string
-    message: string
-    confirmText?: string
-    cancelText?: string
+    /** Nodes rather than strings, so an icon can sit beside the words (#335). */
+    title: ReactNode
+    message: ReactNode
+    confirmText?: ReactNode
+    cancelText?: ReactNode
     confirmVariant?: 'primary' | 'secondary' | 'danger' | 'ghost'
 }
 

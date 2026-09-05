@@ -1,3 +1,4 @@
+import { CalendarIcon, GlobeAltIcon, MapPinIcon, PlusIcon, UserIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useNavigate } from 'react-router-dom'
@@ -284,18 +285,19 @@ export function PackingLists() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                     <div className="min-w-0">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 flex-wrap">
-                        ✈️ {list.name}
+                        {list.name}
                         {list.sharedFromPodUrl ? (
                             <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full">
-                                👤 From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
+                                <UserIcon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5 align-[-0.15em]" />
+                                From {resolveOwnerDisplayName(ownerNames[list.id], list.ownerWebId, list.sharedFromPodUrl)}
                             </span>
                         ) : (
                             <>
                                 {sharingStatus[list.id] === 'public' && (
-                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">🌐 Public</span>
+                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-blue-700 dark:text-blue-300 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"><GlobeAltIcon aria-hidden="true" className="h-3.5 w-3.5" />Public</span>
                                 )}
                                 {sharingStatus[list.id] === 'shared' && (
-                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">👤 Shared</span>
+                                    <span className="text-xs font-medium bg-white/60 dark:bg-white/10 text-indigo-700 dark:text-indigo-300 inline-flex items-center gap-1 px-2 py-0.5 rounded-full"><UserIcon aria-hidden="true" className="h-3.5 w-3.5" />Shared</span>
                                 )}
                             </>
                         )}
@@ -303,15 +305,17 @@ export function PackingLists() {
                     {/* On its own line so a long destination never
                         pushes the actions onto a second row */}
                     {list.destination && !countdown && (
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 truncate">📍 {list.destination}</p>
+                        <p className="mt-1 flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                            <MapPinIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{list.destination}</span>
+                        </p>
                     )}
                     <TripCountdownBadge countdown={countdown} className="mt-1" />
                     </div>
                     <div data-testid="list-actions" className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg">
-                            {tripDates
-                                ? `📅 ${tripDates}`
-                                : `📅 Created ${new Date(list.createdAt).toLocaleDateString()}`}
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-lg">
+                            <CalendarIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                            {tripDates || `Created ${new Date(list.createdAt).toLocaleDateString()}`}
                         </span>
                         <ListCardMenu
                             listName={list.name}
@@ -348,10 +352,13 @@ export function PackingLists() {
             <div className="max-w-4xl mx-auto py-8 px-4">
                 <div className="mb-8 flex justify-between items-start">
                     <div className="mb-2">
-                        <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">📦 Packing Lists</h1>
+                        <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">Packing Lists</h1>
                         <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">View all your created packing lists.</p>
                     </div>
-                    <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
+                    <Button variant="primary" onClick={() => navigate('/create-packing-list')}>
+                        <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                        New List
+                    </Button>
                 </div>
                 <LoadingState message="Loading packing lists..." rows={3} />
             </div>
@@ -362,10 +369,13 @@ export function PackingLists() {
         <div className="max-w-4xl mx-auto py-8 px-4">
             <div className="mb-8 flex justify-between items-start">
                 <div className="mb-2">
-                    <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">📦 Packing Lists</h1>
+                    <h1 className="text-4xl font-bold text-primary-900 dark:text-primary-200">Packing Lists</h1>
                     <p className="mt-2 text-lg text-gray-700 dark:text-gray-300 font-medium">View all your created packing lists.</p>
                 </div>
-                <Button variant="primary" onClick={() => navigate('/create-packing-list')}>➕ New List</Button>
+                <Button variant="primary" onClick={() => navigate('/create-packing-list')}>
+                        <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                        New List
+                    </Button>
             </div>
 
             {/* The lists below are the local copy; say so while the pod is still
@@ -378,7 +388,7 @@ export function PackingLists() {
             {packingLists.length === 0 ? (
                 <div className="text-center py-12 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft">
                     <p className="text-lg text-gray-800 dark:text-gray-100 font-semibold">
-                        No packing lists found. Create your first packing list to get started! 🎒
+                        No packing lists found. Create your first packing list to get started!
                     </p>
                 </div>
             ) : (
@@ -392,7 +402,7 @@ export function PackingLists() {
                     {currentLists.length === 0 && (
                         <div className="text-center py-12 bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-accent-50 dark:to-accent-950/40 rounded-2xl border-2 border-primary-200 dark:border-primary-800 shadow-soft">
                             <p className="text-lg text-gray-800 dark:text-gray-100 font-semibold">
-                                No upcoming trips. Your past trips are below — or start a new list! 🎒
+                                No upcoming trips. Your past trips are below — or start a new list!
                             </p>
                         </div>
                     )}

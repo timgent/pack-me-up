@@ -3,7 +3,12 @@ import { ReactNode } from 'react';
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    title: string;
+    /**
+     * A node, not a string, so a header can carry an icon element beside its
+     * words. Callers used to smuggle a warning glyph into the string itself
+     * because this was the only way to get one in — see #335.
+     */
+    title: ReactNode;
     children: ReactNode;
 }
 

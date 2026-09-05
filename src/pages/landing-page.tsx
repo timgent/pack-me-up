@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckBadgeIcon, ClipboardDocumentListIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { Link } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useHasQuestions } from '../hooks/useHasQuestions'
@@ -28,11 +29,11 @@ export const LandingPage = () => {
         </div>
     ) : hasQuestions ? (
         <Link to="/view-lists" className={CTA_CLASSES}>
-            📋 View Packing Lists
+            View Packing Lists
         </Link>
     ) : (
         <Link to="/wizard" className={CTA_CLASSES}>
-            ✨ Get Started with the Wizard
+            Get Started with the Wizard
         </Link>
     )
     return (
@@ -46,7 +47,8 @@ export const LandingPage = () => {
                       * stays in the nav rather than being repeated an inch away.
                       */}
                     <p className="text-success-800 dark:text-success-200 font-semibold">
-                        🎉 Signed in as <span className="font-bold">{profileDisplayName(profile, webId)}</span>
+                        <CheckBadgeIcon aria-hidden="true" className="mr-1 inline-block h-5 w-5 align-[-0.25em]" />
+                        Signed in as <span className="font-bold">{profileDisplayName(profile, webId)}</span>
                         {/* Signed in but unreachable is still signed in (#342) —
                             the greeting stays and says which of the two it is. */}
                         {isReconnecting && (
@@ -77,7 +79,7 @@ export const LandingPage = () => {
                     <h2 className="text-center text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-6">How it works</h2>
                     <div className="grid md:grid-cols-3 gap-6">
                         <div className="bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-primary-100 dark:to-primary-900/40 p-6 rounded-2xl shadow-soft hover:shadow-glow-primary transition-all duration-300 hover:scale-105 border-2 border-primary-200 dark:border-primary-800">
-                            <div className="text-3xl mb-2">✨</div>
+                            <SparklesIcon aria-hidden="true" className="mb-2 h-8 w-8 text-primary-700 dark:text-primary-300" />
                             <h3 className="text-xl font-bold mb-3 text-primary-900 dark:text-primary-200">1. Set up in a minute</h3>
                             <p className="text-gray-700 dark:text-gray-300">
                                 One screen — tell us who you travel with, and we'll generate a starter set of packing questions for your group.
@@ -85,7 +87,7 @@ export const LandingPage = () => {
                         </div>
 
                         <div className="bg-gradient-to-br from-secondary-50 dark:from-secondary-950/40 to-secondary-100 dark:to-secondary-900/40 p-6 rounded-2xl shadow-soft hover:shadow-glow-secondary transition-all duration-300 hover:scale-105 border-2 border-secondary-200 dark:border-secondary-800">
-                            <div className="text-3xl mb-2">✏️</div>
+                            <PencilSquareIcon aria-hidden="true" className="mb-2 h-8 w-8 text-secondary-700 dark:text-secondary-300" />
                             <h3 className="text-xl font-bold mb-3 text-secondary-900 dark:text-secondary-200">2. Fine-tune your questions</h3>
                             <p className="text-gray-700 dark:text-gray-300">
                                 Add, remove, and customise questions and packing items until they perfectly match how you travel.
@@ -93,7 +95,7 @@ export const LandingPage = () => {
                         </div>
 
                         <div className="bg-gradient-to-br from-success-50 dark:from-success-950/40 to-success-100 dark:to-success-900/40 p-6 rounded-2xl shadow-soft hover:shadow-lg transition-all duration-300 hover:scale-105 border-2 border-success-200 dark:border-success-800">
-                            <div className="text-3xl mb-2">📋</div>
+                            <ClipboardDocumentListIcon aria-hidden="true" className="mb-2 h-8 w-8 text-success-700 dark:text-success-300" />
                             <h3 className="text-xl font-bold mb-3 text-success-900 dark:text-success-200">3. Pack for every trip</h3>
                             <p className="text-gray-700 dark:text-gray-300">
                                 Before each trip, answer your questions to instantly generate a personalised packing list.

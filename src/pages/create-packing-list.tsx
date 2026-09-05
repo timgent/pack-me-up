@@ -1,3 +1,4 @@
+import { ArrowPathIcon, ClipboardDocumentListIcon, PencilSquareIcon, SparklesIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -192,7 +193,8 @@ function SuggestionCard({ suggestions, questionSet, onSaveToQuestionSet, onSkip,
                                                     onChange={(e) => setCommunalFlags(prev => ({ ...prev, [item.id]: e.target.checked }))}
                                                     className="h-4 w-4 text-blue-600 dark:text-blue-400 rounded focus:ring-2 focus:ring-blue-500"
                                                 />
-                                                👥 Shared
+                                                <UsersIcon aria-hidden="true" className="h-4 w-4" />
+                                                Shared
                                             </label>
                                             <div className="flex gap-2">
                                                 <Button
@@ -708,7 +710,7 @@ export function CreatePackingList() {
 
                     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-soft border-2 border-primary-200 dark:border-primary-800 p-8">
                         <div className="text-center mb-6">
-                            <div className="text-6xl mb-4">📋</div>
+                            <ClipboardDocumentListIcon aria-hidden="true" className="mx-auto mb-4 h-14 w-14 text-primary-600 dark:text-primary-400" />
                             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">No Questions Found</h2>
                             <p className="text-gray-600 dark:text-gray-400">
                                 Before you can create a packing list, you need to set up your packing list questions.
@@ -717,7 +719,10 @@ export function CreatePackingList() {
 
                         <div className="space-y-4 max-w-2xl mx-auto">
                             <div className="bg-gradient-to-br from-primary-50 dark:from-primary-950/40 to-primary-100 dark:to-primary-900/40 p-6 rounded-xl border-2 border-primary-200 dark:border-primary-800">
-                                <h3 className="text-lg font-bold text-primary-900 dark:text-primary-200 mb-2">✨ Quick Start with Wizard</h3>
+                                <h3 className="flex items-center gap-2 text-lg font-bold text-primary-900 dark:text-primary-200 mb-2">
+                                    <SparklesIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                                    Quick Start with Wizard
+                                </h3>
                                 <p className="text-gray-700 dark:text-gray-300 mb-4">
                                     Answer a few simple questions and we'll generate a personalized question set for you.
                                 </p>
@@ -733,7 +738,10 @@ export function CreatePackingList() {
                                 and signing in again is not what fixes no signal. */}
                             {!isLoggedIn && !isReconnecting && (
                                 <div className="bg-gradient-to-br from-accent-50 dark:from-accent-950/40 to-accent-100 dark:to-accent-900/40 p-6 rounded-xl border-2 border-accent-200 dark:border-accent-800">
-                                    <h3 className="text-lg font-bold text-accent-900 dark:text-accent-200 mb-2">🔄 Sync Questions From Another Device</h3>
+                                    <h3 className="flex items-center gap-2 text-lg font-bold text-accent-900 dark:text-accent-200 mb-2">
+                                        <ArrowPathIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                                        Sync Questions From Another Device
+                                    </h3>
                                     <p className="text-gray-700 dark:text-gray-300 mb-4">
                                         If you've already created questions on another device, sign in to sync them here. Signing in uses your Solid Pod.
                                     </p>
@@ -747,7 +755,10 @@ export function CreatePackingList() {
                             )}
 
                             <div className="bg-gradient-to-br from-secondary-50 dark:from-secondary-950/40 to-secondary-100 dark:to-secondary-900/40 p-6 rounded-xl border-2 border-secondary-200 dark:border-secondary-800">
-                                <h3 className="text-lg font-bold text-secondary-900 dark:text-secondary-200 mb-2">✏️ Create Manually</h3>
+                                <h3 className="flex items-center gap-2 text-lg font-bold text-secondary-900 dark:text-secondary-200 mb-2">
+                                    <PencilSquareIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                                    Create Manually
+                                </h3>
                                 <p className="text-gray-700 dark:text-gray-300 mb-4">
                                     Prefer full control? Create your packing list questions from scratch.
                                 </p>

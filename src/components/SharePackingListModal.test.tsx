@@ -121,7 +121,11 @@ describe('SharePackingListModal', () => {
             mockGetCollaborators.mockResolvedValue([])
             mockIsPubliclyAccessible.mockResolvedValue(true)
             renderModal()
-            await waitFor(() => expect(screen.getByText('🌐 Anyone with the link')).toBeTruthy())
+            // Scoped to the row: "Anyone with the link" is also the share-mode
+            // toggle's label, so a bare text match is two elements.
+            await waitFor(() => expect(
+                screen.getAllByRole('listitem').find(li => li.textContent?.includes('Anyone with the link'))
+            ).toBeTruthy())
         })
 
         it('shows revoke button for each named collaborator', async () => {

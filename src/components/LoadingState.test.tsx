@@ -15,11 +15,14 @@ describe('LoadingState', () => {
     })
 
     it('shows a packing-themed suitcase that screen readers skip', () => {
-        render(<LoadingState message="Loading backups..." />)
+        const { container } = render(<LoadingState message="Loading backups..." />)
 
-        const suitcase = screen.getByText('🧳')
-        expect(suitcase.getAttribute('aria-hidden')).toBe('true')
-        expect(suitcase.className).toContain('loading-suitcase')
+        // An icon rather than 🧳 since #335, so it takes the theme's colour —
+        // but it is still the rocking suitcase, and still skipped by readers.
+        const suitcase = container.querySelector('.loading-suitcase')
+        expect(suitcase).toBeTruthy()
+        expect(suitcase!.tagName.toLowerCase()).toBe('svg')
+        expect(suitcase!.getAttribute('aria-hidden')).toBe('true')
     })
 
     it('renders a skeleton of the content to come', () => {

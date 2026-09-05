@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { DevicePhoneMobileIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useSolidPod } from './SolidPodContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
 
@@ -48,7 +48,10 @@ export function SyncAcrossDevicesPrompt() {
                 className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 px-4 py-3"
             >
                 <p className="flex-1 min-w-50 text-sm text-gray-700 dark:text-gray-300">
-                    <span className="font-bold text-primary-900 dark:text-primary-200">📱 Sync across devices</span>
+                    <span className="font-bold text-primary-900 dark:text-primary-200">
+                        <DevicePhoneMobileIcon aria-hidden="true" className="mr-1 inline-block h-4 w-4 align-[-0.2em]" />
+                        Sync across devices
+                    </span>
                     {' — '}
                     sign in to pick these lists up on your phone or laptop, and keep them safe if you clear your browser.
                 </p>

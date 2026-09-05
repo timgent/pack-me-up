@@ -1,3 +1,4 @@
+import { ChevronDownIcon, ChevronRightIcon, UsersIcon } from '@heroicons/react/24/outline'
 /**
  * A category's items as a grid: the item down the side, the people across it,
  * a checkbox where they meet.
@@ -206,7 +207,7 @@ export function CategoryItemGrid({
     const visibleRows = foldShared ? visible.filter(row => !row.communal) : visible
 
     if (visibleRows.length === 0 && sharedRows.length === 0) {
-        return <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Nothing left to pack 🎒</p>
+        return <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Nothing left to pack</p>
     }
 
     // One width for every row in the card, so the chips land in the same places
@@ -372,7 +373,10 @@ export function CategoryItemGrid({
                     aria-label={`${row.label} for the whole group`}
                     className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                 />
-                <span className="whitespace-nowrap">👥 Shared</span>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                    <UsersIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                    Shared
+                </span>
                 {renderFlourish(item)}
             </label>
         )
@@ -439,8 +443,10 @@ export function CategoryItemGrid({
                         onClick={() => setSharedOpen(open => !open)}
                         className="flex w-full items-center gap-1.5 rounded-md px-1 py-2 text-left text-xs font-semibold text-blue-800 dark:text-blue-200 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
                     >
-                        <span aria-hidden="true" className="text-gray-400 dark:text-gray-500">{sharedOpen ? '▼' : '▶'}</span>
-                        <span aria-hidden="true">👥</span>
+                        {sharedOpen
+                            ? <ChevronDownIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                            : <ChevronRightIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />}
+                        <UsersIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
                         Shared ({sharedRows.length})
                     </button>
                     {sharedOpen && (

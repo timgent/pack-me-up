@@ -71,19 +71,22 @@ test.describe('Z – Offline list → login → share (regression for 404 fix)',
         expect(linkValue).toContain('pod=')
         console.log('Shareable link:', linkValue)
 
-        // ── 7. Close + reopen → Current access shows 🌐 row ────────────────
+        // ── 7. Close + reopen → Current access shows the public row ───────
         // Use onClose button (×) rather than Escape to ensure overlay is gone
         const closeBtn = page.getByRole('button', { name: /close/i }).or(page.locator('button[aria-label="Close"]'))
         await closeBtn.click({ timeout: 3_000 }).catch(() => page.keyboard.press('Escape'))
         // Wait for modal to be fully gone before clicking Share again
         await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 })
         await chooseListAction(page, /^share$/i)
-        await expect(page.getByText('🌐 Anyone with the link')).toBeVisible({ timeout: 8_000 })
+        // Scoped to the Current-access row: "Anyone with the link" is also the
+        // label of the share-mode toggle above it, which never goes away.
+        const publicAccessRow = page.getByRole('listitem').filter({ hasText: 'Anyone with the link' })
+        await expect(publicAccessRow).toBeVisible({ timeout: 8_000 })
         console.log('"Anyone with the link" row visible ✓')
 
         // ── 8. Probe: revoke ────────────────────────────────────────────────
         await page.getByRole('button', { name: /revoke public access/i }).click()
-        await expect(page.getByText('🌐 Anyone with the link')).not.toBeVisible({ timeout: 8_000 })
+        await expect(publicAccessRow).not.toBeVisible({ timeout: 8_000 })
         console.log('Public row gone after revoke ✓')
 
         // 404s on pack-me resources are expected: pod polling before first sync + ACL probing during grant

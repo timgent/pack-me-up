@@ -1,3 +1,4 @@
+import { SparklesIcon } from '@heroicons/react/24/outline'
 import { useMemo, useState } from 'react'
 import { PackingListQuestionSet } from '../edit-questions/types'
 import { WIZARD_TEMPLATE_VERSION } from '../edit-questions/example-data'
@@ -79,8 +80,9 @@ export function TemplateUpdatesCard({ questionSet, onApply }: TemplateUpdatesCar
     return (
         <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 p-4">
             <div className="flex items-start justify-between gap-4">
-                <p className="text-emerald-900 dark:text-emerald-200 font-medium">
-                    ✨ We've added to the starter suggestions since you set up — {count} new suggestion{count === 1 ? '' : 's'} available.
+                <p className="flex items-start gap-2 text-emerald-900 dark:text-emerald-200 font-medium">
+                    <SparklesIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+                    <span>We've added to the starter suggestions since you set up — {count} new suggestion{count === 1 ? '' : 's'} available.</span>
                 </p>
                 <button
                     type="button"

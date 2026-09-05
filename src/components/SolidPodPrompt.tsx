@@ -45,7 +45,7 @@ export function SolidPodPrompt({
   message,
   benefitsTitle = 'What signing in unlocks:',
   benefits = DEFAULT_BENEFITS,
-  confirmLabel = '🔒 Sync & Share',
+  confirmLabel = 'Sync & Share',
   dismissLabel = 'Maybe Later',
   onBeforeLogin,
 }: SolidPodPromptProps) {
