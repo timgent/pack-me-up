@@ -25,6 +25,12 @@ describe('Footer', () => {
         expect(screen.getByRole('link', { name: 'Delete my data' }).getAttribute('href')).toBe('/your-data')
     })
 
+    it('links to settings, the one place a signed-out user can reach the theme choice', () => {
+        renderFooter()
+
+        expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings')
+    })
+
     it('offers a way to get in touch', () => {
         renderFooter()
 

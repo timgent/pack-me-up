@@ -4,7 +4,6 @@ import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import { SolidProviderSelector } from './SolidProviderSelector'
 import { AccountMenu, ProfileBadge } from './AccountMenu'
-import { ThemeToggle } from './ThemeToggle'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
 
@@ -116,8 +115,7 @@ export const Navigation = () => {
                             </div>
                         </div>
                         {/* Solid Login/Logout section */}
-                        <div className="hidden md:flex items-center gap-4">
-                            <ThemeToggle />
+                        <div data-testid="nav-bar-desktop" className="hidden md:flex items-center gap-4">
                             {showsAsSignedIn ? (
                                 <div className="flex items-center gap-3">
                                     {isReconnecting && <OfflineBadge />}
@@ -171,8 +169,33 @@ export const Navigation = () => {
                             )}
                         </div>
                         {/* Mobile menu button */}
-                        <div className="md:hidden flex items-center gap-1">
-                            <ThemeToggle />
+                        <div data-testid="nav-bar-mobile" className="md:hidden flex items-center gap-1">
+                            {/*
+                              * The slot the theme toggle used to hold (#337). On the
+                              * smallest screen this bar has room for two controls, and
+                              * spending one of them on light-vs-dark while sign-in sat a
+                              * tap deep inside the hamburger had the priority backwards.
+                              * The theme choice now lives on /settings; who you are, or
+                              * the way to become someone, lives here.
+                              */}
+                            {showsAsSignedIn ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpen(true)}
+                                    className="flex items-center p-1.5 rounded-lg hover:bg-white/20 transition-all duration-200"
+                                >
+                                    <span className="sr-only">Your profile, {displayName}</span>
+                                    <ProfileBadge name={displayName} photoUrl={profile.photo} showName={false} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleSolidLogin}
+                                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-white/90 text-primary-700 hover:bg-white transition-all duration-200 shadow-soft"
+                                    title="Sign in to sync your lists across devices and share them - your data stays in your own Solid Pod"
+                                >
+                                    Sign in
+                                </button>
+                            )}
                             <button
                                 onClick={() => setIsOpen(!isOpen)}
                                 className="inline-flex items-center justify-center p-2.5 rounded-lg text-white hover:bg-white/20 focus:outline-none transition-all duration-200"
@@ -228,7 +251,15 @@ export const Navigation = () => {
                         >
                             Sharing
                         </Link>
-                        <ThemeToggle showLabel />
+                        {/* Signed in or out: the theme choice and anything else
+                            app-wide lives on /settings now. */}
+                        <Link
+                            to="/settings"
+                            className="block px-3 py-3 rounded-xl text-base font-semibold hover:bg-white/20 transition-all duration-200"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Settings
+                        </Link>
                         {/* Mobile Solid Login/Logout */}
                         <div className="border-t border-white/20 pt-2 mt-2">
                             {showsAsSignedIn ? (
