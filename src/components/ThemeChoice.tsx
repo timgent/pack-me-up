@@ -46,13 +46,24 @@ export function ThemeChoice() {
     return (
         <fieldset>
             <legend className="sr-only">Theme</legend>
-            <div className="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800">
+            {/*
+              * A three-column grid rather than a wrapping flex row: at 390px the
+              * flex version dropped "System" onto a second line on its own, which
+              * reads as a different kind of option than the other two.
+              */}
+            <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 sm:inline-grid sm:w-auto">
                 {OPTIONS.map(({ value, label, Icon }) => {
                     const isSelected = current === value
                     return (
                         <label
                             key={value}
-                            className={`flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200 ${
+                            /*
+                             * The radio itself is sr-only, so the focus ring has to
+                             * be drawn by the label around it or keyboard users get
+                             * no indicator at all. Same `has-[:focus-visible]:`
+                             * treatment the item chips use in CategoryItemGrid.
+                             */
+                            className={`flex items-center justify-center gap-1.5 min-h-[44px] px-2 sm:px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-600 dark:has-[:focus-visible]:ring-primary-400 ${
                                 isSelected
                                     ? 'bg-white dark:bg-gray-900 text-primary-800 dark:text-primary-200 shadow-soft'
                                     : 'text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-gray-900/60'
@@ -66,7 +77,7 @@ export function ThemeChoice() {
                                 onChange={() => choose(value)}
                                 className="sr-only"
                             />
-                            <Icon className="h-5 w-5" aria-hidden="true" />
+                            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                             {label}
                         </label>
                     )
