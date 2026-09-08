@@ -155,21 +155,15 @@ export const Wizard = () => {
                 <p className="text-lg text-gray-700 dark:text-gray-300">
                     Tell us who you travel with — we'll generate a starter set of packing questions tailored to your group.
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 italic">
-                    Do this once to get started. Afterwards, fine-tune your questions and packing items from 'My Questions &amp; Items' to match exactly what you need.
-                </p>
             </div>
 
             {hasExistingData && (
-                <div className="mb-6 p-4 bg-warning-50 dark:bg-warning-950/40 border-2 border-warning-300 dark:border-warning-700 rounded-2xl">
-                    <p className="flex items-start gap-2 text-warning-900 dark:text-warning-200 font-semibold">
-                        <ExclamationTriangleIcon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
-                        <span>You already have packing list questions set up. Completing this wizard will replace them.</span>
-                    </p>
-                    <p className="text-sm text-warning-800 dark:text-warning-200 mt-1">
-                        To keep your existing questions, go to{' '}
+                <div className="mb-6 p-3 bg-warning-50 dark:bg-warning-950/40 border border-warning-300 dark:border-warning-700 rounded-xl flex items-center gap-2 text-sm text-warning-900 dark:text-warning-200">
+                    <ExclamationTriangleIcon aria-hidden="true" className="h-5 w-5 shrink-0" />
+                    <span>
+                        You already have packing list questions set up — completing this wizard will replace them. To keep them, go to{' '}
                         <Link to="/manage-questions" className="underline font-semibold">Edit Questions</Link> instead.
-                    </p>
+                    </span>
                 </div>
             )}
 
@@ -181,9 +175,11 @@ export const Wizard = () => {
                             <UsersIcon aria-hidden="true" className="h-6 w-6 shrink-0" />
                             Who's Packing?
                         </h2>
-                        <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                            {fields.length} in your group
-                        </span>
+                        {fields.length > 1 && (
+                            <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                                {fields.length} in your group
+                            </span>
+                        )}
                     </div>
 
                     {isPrefilled && (
