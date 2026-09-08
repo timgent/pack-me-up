@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { Wizard } from './wizard'
@@ -83,6 +83,24 @@ describe('Wizard', () => {
         expect(screen.queryByText(/you already have packing list questions set up/i)).toBeNull()
     })
 
+    it('hides the group counter with a single person, and shows it from two', async () => {
+        const db = makeDb({ getQuestionSet: vi.fn().mockRejectedValue({ name: 'not_found' }) })
+        mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
+
+        render(
+            <MemoryRouter>
+                <Wizard />
+            </MemoryRouter>
+        )
+
+        await waitFor(() => screen.getByRole('button', { name: /generate my packing questions/i }))
+        expect(screen.queryByText(/in your group/i)).toBeNull()
+
+        fireEvent.click(screen.getByRole('button', { name: /add another person/i }))
+
+        expect(await screen.findByText('2 in your group')).toBeTruthy()
+    })
+
     describe('re-running the wizard', () => {
         const existingSet = {
             people: [
@@ -158,6 +176,7 @@ describe('Wizard', () => {
                 expect(nameInputs.map(input => input.value)).toEqual(['Me'])
             })
             expect(screen.queryByText(/filled in the people from your current setup/i)).toBeNull()
+            expect(screen.queryByText(/in your group/i)).toBeNull()
         })
     })
 
@@ -301,7 +320,7 @@ describe('Wizard', () => {
         )
     })
 
-    it('shows the one-time setup note', async () => {
+    it('shows a single intro paragraph under the heading, with no separate one-time setup note', async () => {
         const db = makeDb()
         mockUseDatabase.mockReturnValue({ db: db as unknown as PackingAppDatabase })
 
@@ -312,8 +331,9 @@ describe('Wizard', () => {
         )
 
         await waitFor(() =>
-            expect(screen.getByText(/do this once to get started/i)).toBeTruthy()
+            expect(screen.getByText(/tell us who you travel with/i)).toBeTruthy()
         )
+        expect(screen.queryByText(/do this once to get started/i)).toBeNull()
     })
 
     it('does not render the activities section', async () => {
