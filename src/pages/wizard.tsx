@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, UsersIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, SparklesIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, Link } from 'react-router-dom'
@@ -371,7 +371,17 @@ Are you sure you want to continue?"
             <Modal
                 isOpen={showSuccessModal}
                 onClose={handleDismissSuccess}
-                title="Questions Generated Successfully!"
+                title={
+                    <span className="flex flex-col items-center gap-3">
+                        <span
+                            data-testid="wizard-success-badge"
+                            className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40"
+                        >
+                            <SparklesIcon aria-hidden="true" className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+                        </span>
+                        <span>Questions Generated Successfully!</span>
+                    </span>
+                }
             >
                 <div className="space-y-6">
                     {revealSteps.length > 0 && (
@@ -399,39 +409,32 @@ Are you sure you want to continue?"
                         </div>
                     )}
 
-                    {isRevealComplete && (
-                        <>
-                            {summary && (
-                                <p className="text-center font-bold text-primary-900 dark:text-primary-200 break-words">
-                                    {summary.text}
-                                </p>
-                            )}
-
-                            <p className="text-gray-700 dark:text-gray-300 text-center">
-                                Your starter questions are ready! Head to 'My Questions &amp; Items' to add, remove, or tweak them to match how you travel — then create your first list.
-                            </p>
-
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => handleSuccessAction('/create-packing-list')}
-                                    className="w-full bg-gradient-primary-button text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
-                                >
-                                    Create My First Packing List
-                                </button>
-
-                                <button
-                                    onClick={() => handleSuccessAction('/manage-questions')}
-                                    className="w-full text-primary-700 dark:text-primary-300 border-2 border-primary-200 dark:border-primary-800 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
-                                >
-                                    Refine My Packing List Questions
-                                </button>
-                            </div>
-
-                            <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
-                                You can always access these options from the navigation menu above
-                            </p>
-                        </>
+                    {isRevealComplete && summary && (
+                        <p className="text-center font-bold text-primary-900 dark:text-primary-200 break-words">
+                            {summary.text}
+                        </p>
                     )}
+
+                    {/*
+                      * The CTAs render from the moment the modal opens (#339) —
+                      * nothing about the celebration requires withholding the
+                      * exit, so the reveal plays above rather than gating it.
+                      */}
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => handleSuccessAction('/create-packing-list')}
+                            className="w-full bg-gradient-primary-button text-white px-4 sm:px-6 py-4 rounded-xl font-bold text-base sm:text-lg break-words motion-safe:hover:scale-105 transition-all duration-200 shadow-soft hover:shadow-glow-primary"
+                        >
+                            Create My First Packing List
+                        </button>
+
+                        <button
+                            onClick={() => handleSuccessAction('/manage-questions')}
+                            className="w-full text-primary-700 dark:text-primary-300 border-2 border-primary-200 dark:border-primary-800 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 px-4 sm:px-6 py-3 rounded-xl font-semibold text-sm sm:text-base break-words transition-all duration-200"
+                        >
+                            Refine My Packing List Questions
+                        </button>
+                    </div>
                 </div>
             </Modal>
         </div>
