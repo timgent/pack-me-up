@@ -273,6 +273,23 @@ describe('Wizard', () => {
             expect(await screen.findByText('Questions page')).toBeTruthy()
             expect(screen.queryByText(/questions generated successfully/i)).toBeNull()
         })
+
+        it('badges the celebration above the title instead of naming it in copy', async () => {
+            renderAfterGeneration()
+
+            await waitFor(() => expect(screen.getByTestId('wizard-success-badge')).toBeTruthy())
+            expect(screen.getByText(/questions generated successfully/i)).toBeTruthy()
+        })
+
+        it('does not restate what the buttons and nav already say', async () => {
+            renderAfterGeneration()
+
+            await waitFor(() =>
+                expect(screen.getByRole('button', { name: /create my first packing list/i })).toBeTruthy()
+            )
+            expect(screen.queryByText(/your starter questions are ready/i)).toBeNull()
+            expect(screen.queryByText(/you can always access these options/i)).toBeNull()
+        })
     })
 
     it('acts on a success modal CTA without asking a logged-out user to sign in', async () => {
@@ -548,15 +565,13 @@ describe('Wizard', () => {
             )
         })
 
-        it('only offers the CTAs once the reveal has finished', async () => {
+        it('offers the CTAs immediately, without waiting for the reveal to finish', async () => {
             renderAfterGeneration()
 
-            expect(screen.queryByRole('button', { name: /create my first packing list/i })).toBeNull()
-
-            await waitFor(
-                () => expect(screen.getByRole('button', { name: /create my first packing list/i })).toBeTruthy(),
-                { timeout: 4000 }
-            )
+            expect(await screen.findByRole('button', { name: /create my first packing list/i })).toBeTruthy()
+            expect(await screen.findByRole('button', { name: /refine my packing list questions/i })).toBeTruthy()
+            // Still mid-reveal: the last person hasn't appeared yet
+            expect(screen.queryByText(/thinking about Rex/i)).toBeNull()
         })
 
         it('lets the user skip straight to the summary', async () => {
