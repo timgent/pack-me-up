@@ -32,6 +32,7 @@ export function SignInHistory() {
     const [version, setVersion] = useState(0)
 
     // Re-read on each render pass we ask for; the log is written outside React.
+    // Most recent first, matching the copied bug report.
     const entries = [...getAuthLog()].reverse()
     void version
 

@@ -103,9 +103,10 @@ export function getAuthLog(): readonly AuthEvent[] {
     return load()
 }
 
-/** The log as pasteable text, for a bug report. */
+/** The log as pasteable text, for a bug report. Most recent event first. */
 export function formatAuthLog(): string {
-    return load()
+    return [...load()]
+        .reverse()
         .map(e => {
             const detail = e.detail ? ` ${JSON.stringify(e.detail)}` : ''
             return `${new Date(e.at).toISOString()} [${e.level}] ${e.event}${detail}`
