@@ -161,6 +161,25 @@ describe('ResilientSession', () => {
         expect(onExpiration).toHaveBeenCalledTimes(1)
     }, 30_000)
 
+    it('records why the session ended, before telling the UI about it', async () => {
+        // dispatchExpirationEvent() carries no payload, so the reason has to be
+        // readable off the session itself by the time the callback fires — that
+        // is what lets the UI say "your identity provider ended this" instead of
+        // a generic, possibly misleading "something went wrong".
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(
+            JSON.stringify({ error: 'invalid_grant' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+        )))
+
+        let reasonWhenNotified: string | undefined
+        const session = makeSession(db, () => { reasonWhenNotified = session.lastEndedReason })
+
+        await expect(session.restore()).rejects.toBeInstanceOf(SessionEndedError)
+
+        expect(session.lastEndedReason).toBe('invalid_grant')
+        expect(reasonWhenNotified).toBe('invalid_grant')
+    }, 30_000)
+
     it('retries a 503 rather than treating it as the end of the session', async () => {
         const fetchMock = vi.fn(async () => new Response('upstream unavailable', { status: 503 }))
         vi.stubGlobal('fetch', fetchMock)

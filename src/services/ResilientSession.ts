@@ -190,6 +190,13 @@ export class ResilientSession extends SessionCore {
     private renewalTimer: ReturnType<typeof setTimeout> | undefined
     /** Consecutive transient failures, for pacing the retry timer. */
     private transientFailures = 0
+    /**
+     * The `SessionEndedError.reason` from the failure that last ended this
+     * session, so the UI can say *why* — the identity provider revoked the
+     * grant, as opposed to a bug in this app. Set just before
+     * `dispatchExpirationEvent()`, which carries no payload of its own.
+     */
+    lastEndedReason: string | undefined
 
     constructor(
         clientDetails: ConstructorParameters<typeof SessionCore>[0],
@@ -240,6 +247,7 @@ export class ResilientSession extends SessionCore {
                 // failure leaves the stored refresh token intact for the next attempt,
                 // and books that attempt rather than hoping something else will.
                 if (ended) {
+                    this.lastEndedReason = error.reason
                     reportSessionEnded(error.reason)
                     this.dispatchExpirationEvent()
                 } else {

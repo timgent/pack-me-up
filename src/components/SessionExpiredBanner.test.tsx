@@ -67,6 +67,33 @@ describe('SessionExpiredBanner', () => {
         expect(clearSessionExpired).toHaveBeenCalledOnce()
     })
 
+    it('explains that the identity provider ended the session when the reason says so', () => {
+        mockUseSolidPod.mockReturnValue({
+            ...defaultMock,
+            sessionExpired: true,
+            isLoggedIn: false,
+            sessionExpiredReason: 'invalid_grant',
+        })
+
+        render(<SessionExpiredBanner />)
+
+        expect(screen.getByText(/your identity provider ended this session/i)).toBeDefined()
+    })
+
+    it('falls back to the generic message when there is no provider-side reason', () => {
+        mockUseSolidPod.mockReturnValue({
+            ...defaultMock,
+            sessionExpired: true,
+            isLoggedIn: false,
+            sessionExpiredReason: undefined,
+        })
+
+        render(<SessionExpiredBanner />)
+
+        expect(screen.getByText(/your session has expired/i)).toBeDefined()
+        expect(screen.queryByText(/your identity provider ended this session/i)).toBeNull()
+    })
+
     it('opens the provider selector when "Log in again" is clicked', () => {
         mockUseSolidPod.mockReturnValue({ ...defaultMock, sessionExpired: true, isLoggedIn: false })
 
