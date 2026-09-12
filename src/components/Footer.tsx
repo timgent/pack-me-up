@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { ApplicationCapabilityRdfa } from './ApplicationCapabilityRdfa'
+import { ANDROID_TEST_PATH, isRecruitingTesters } from '../config/androidTest'
 
 export const FEEDBACK_EMAIL = 'tim.packmeup@gmail.com'
 
@@ -44,6 +46,18 @@ export function Footer() {
                 <a href={`mailto:${FEEDBACK_EMAIL}`} className={linkStyles}>
                     Feedback
                 </a>
+                {/*
+                  * The recruitment banner is dismissible for good, so without this
+                  * there is no way back to the page once someone closes it. Gated on
+                  * the same two conditions as the banner: only while a tester group is
+                  * configured, and never inside the native app, whose reader already
+                  * has the thing it asks them to install.
+                  */}
+                {isRecruitingTesters() && !Capacitor.isNativePlatform() && (
+                    <Link to={ANDROID_TEST_PATH} className={linkStyles}>
+                        Help test on Android
+                    </Link>
+                )}
             </nav>
             {/* Invisible: the app's Application Capability description as RDFa,
                 so the triples travel with the HTML too. See
