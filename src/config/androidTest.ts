@@ -41,7 +41,7 @@ export const PLAY_OPT_IN_URL = `https://play.google.com/apps/testing/${PLAY_PACK
  * default to the literal type `''`, and every "are we recruiting" branch
  * below becomes statically dead code.
  */
-export const TESTER_GROUP_URL: string = ''
+export const TESTER_GROUP_URL: string = 'https://groups.google.com/g/pack-me-up-android-testers'
 
 /**
  * Whether to show the recruitment call at all. Takes the URL as an argument
