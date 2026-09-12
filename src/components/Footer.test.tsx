@@ -1,7 +1,22 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
+
+const { mockIsRecruiting, mockIsNativePlatform } = vi.hoisted(() => ({
+    mockIsRecruiting: vi.fn(),
+    mockIsNativePlatform: vi.fn(),
+}))
+
+vi.mock('@capacitor/core', () => ({
+    Capacitor: { isNativePlatform: () => mockIsNativePlatform() },
+}))
+
+vi.mock('../config/androidTest', async () => {
+    const actual = await vi.importActual<typeof import('../config/androidTest')>('../config/androidTest')
+    return { ...actual, isRecruitingTesters: () => mockIsRecruiting() }
+})
+
 import { Footer, FEEDBACK_EMAIL } from './Footer'
 
 function renderFooter() {
@@ -9,6 +24,10 @@ function renderFooter() {
 }
 
 describe('Footer', () => {
+    beforeEach(() => {
+        mockIsRecruiting.mockReset().mockReturnValue(false)
+        mockIsNativePlatform.mockReset().mockReturnValue(false)
+    })
     afterEach(() => {
         cleanup()
     })
@@ -64,5 +83,35 @@ describe('Footer', () => {
         renderFooter()
 
         expect(screen.queryByRole('link', { name: /^your data$/i })).toBeNull()
+    })
+})
+
+describe('Footer tester recruitment link', () => {
+    beforeEach(() => {
+        mockIsRecruiting.mockReset().mockReturnValue(true)
+        mockIsNativePlatform.mockReset().mockReturnValue(false)
+    })
+    afterEach(() => cleanup())
+
+    it('offers the way back to the test page, since the banner dismisses for good', () => {
+        renderFooter()
+
+        expect(screen.getByRole('link', { name: 'Help test on Android' }).getAttribute('href')).toBe('/android-test')
+    })
+
+    it('says nothing while no tester group is configured', () => {
+        mockIsRecruiting.mockReturnValue(false)
+
+        renderFooter()
+
+        expect(screen.queryByRole('link', { name: 'Help test on Android' })).toBeNull()
+    })
+
+    it('says nothing in the native app, whose reader already has it', () => {
+        mockIsNativePlatform.mockReturnValue(true)
+
+        renderFooter()
+
+        expect(screen.queryByRole('link', { name: 'Help test on Android' })).toBeNull()
     })
 })

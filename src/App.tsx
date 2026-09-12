@@ -8,6 +8,7 @@ import { Navigation } from './components/Navigation'
 import { Footer } from './components/Footer'
 import { SessionExpiredBanner } from './components/SessionExpiredBanner'
 import { OfflineBanner } from './components/OfflineBanner'
+import { AndroidTestBanner } from './components/AndroidTestBanner'
 import { ToastProvider } from './components/ToastContext'
 import { ThemeProvider } from './components/ThemeContext'
 import { LandingPage } from './pages/landing-page'
@@ -27,6 +28,7 @@ import { PrivacyPolicyPage } from './pages/privacy-policy'
 import { YourDataPage } from './pages/your-data'
 import { SettingsPage } from './pages/settings'
 import { OpenResourcePage } from './pages/open-resource'
+import { AndroidTestPage } from './pages/android-test'
 
 function DefaultRedirect() {
   const { isLoggedIn, isReconnecting, isLoading } = useSolidPod()
@@ -51,6 +53,7 @@ function App() {
                 <Navigation />
                 <SessionExpiredBanner />
                 <OfflineBanner />
+                <AndroidTestBanner />
                 <div className="flex-1 container mx-auto px-4 py-8">
                   <Routes>
                     <Route path="/" element={<DefaultRedirect />} />
@@ -69,6 +72,9 @@ function App() {
                     <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                     <Route path="/your-data" element={<YourDataPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    {/* Stable home for the Play closed-test call — see
+                        src/config/androidTest.ts for why nothing links straight to Play. */}
+                    <Route path="/android-test" element={<AndroidTestPage />} />
                     <Route path="/pod/:encodedPodUrl" element={<ForeignPodLayout />}>
                       <Route index element={<Navigate to="view-lists" replace />} />
                       <Route path="view-lists" element={<ForeignPackingListsPage />} />
