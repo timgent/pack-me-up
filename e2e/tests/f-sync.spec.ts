@@ -147,11 +147,19 @@ test.describe('F – Solid Pod Sync', () => {
     // This opens the stale-_rev window: local DB save completes in <50 ms (advances _rev),
     // pod PUT completes in ~1500 ms (component state _rev still stale),
     // 800 ms debounce fires between them → second save sees stale _rev.
+    // The reload below can cancel a request whose PUT is still sitting in the
+    // artificial delay (a debounce this test doesn't wait out individually) —
+    // the browser then resolves that route on its own, and this handler's own
+    // continue() is redundant. It has nothing left to affect at that point, so
+    // swallow it rather than let it surface as an unhandled rejection in
+    // whichever test happens to be running once the delay elapses.
     await page.route('**/pack-me-up/packing-lists/**', async (route) => {
       if (route.request().method() === 'PUT') {
         await new Promise(resolve => setTimeout(resolve, 1500))
       }
-      await route.continue()
+      try {
+        await route.continue()
+      } catch { /* already resolved by navigation or unroute — nothing to do */ }
     })
 
     try {

@@ -25,6 +25,12 @@ interface SolidPodContextValue {
    */
   isReconnecting: boolean;
   sessionExpired: boolean;
+  /**
+   * The `SessionEndedError.reason` behind the current `sessionExpired`, when
+   * known — e.g. `invalid_grant`. Lets the UI say the identity provider ended
+   * the session rather than leaving the impression this app broke.
+   */
+  sessionExpiredReason?: string;
   clearSessionExpired: () => void;
   /**
    * Who the user is signed in as — from the live session, or, while
@@ -53,6 +59,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [liveWebId, setLiveWebId] = useState<string | undefined>(undefined);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionExpiredReason, setSessionExpiredReason] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const intentionalLogoutRef = useRef(false);
   // Cleared only when the session is genuinely over, so it survives the reloads
@@ -107,6 +114,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           setLiveWebId(isActive ? newWebId : undefined);
           if (isActive) {
             setSessionExpired(false);
+            setSessionExpiredReason(undefined);
             providerEndedRef.current = false;
             setRecovering(false);
             recoveryAttemptRef.current = 0;
@@ -130,7 +138,10 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
         // grant — not for network trouble, which it retries on its own.
         onSessionExpiration: () => {
           providerEndedRef.current = true;
-          if (!intentionalLogoutRef.current) setSessionExpired(true);
+          if (!intentionalLogoutRef.current) {
+            setSessionExpired(true);
+            setSessionExpiredReason(uvdslSessionRef.current?.lastEndedReason);
+          }
           setRecovering(false);
           setIsLoggedIn(false);
           setLiveWebId(undefined);
@@ -343,13 +354,17 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     setLiveWebId(undefined);
   };
 
-  const clearSessionExpired = () => setSessionExpired(false);
+  const clearSessionExpired = () => {
+    setSessionExpired(false);
+    setSessionExpiredReason(undefined);
+  };
 
   const value: SolidPodContextValue = {
     session: appSession,
     isLoggedIn,
     isReconnecting: isReconnecting && !isLoggedIn,
     sessionExpired,
+    sessionExpiredReason,
     clearSessionExpired,
     webId,
     isLoading,

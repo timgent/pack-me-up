@@ -9,8 +9,11 @@ const TEST_POD_NAME = 'testuser'
 const isTokenRequest = (url: URL) =>
   url.port === new URL(CSS_ISSUER).port && url.pathname.endsWith('/token')
 
+// The banner's wording differs by SessionEndedError.reason (SessionExpiredBanner.tsx):
+// a provider-side reason like invalid_grant gets its own explanation, everything
+// else falls back to "Your session has expired." Match the sentence both share.
 const expiredBanner = (page: import('@playwright/test').Page) =>
-  page.getByText(/session has expired/i).first()
+  page.getByText(/your data is saved locally/i).first()
 
 test.describe('J – Session Expiry', () => {
   /**

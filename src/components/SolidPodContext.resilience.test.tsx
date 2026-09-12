@@ -27,6 +27,7 @@ let mockLogout = vi.fn()
 
 let mockHasStoredSession = vi.fn()
 let mockNeedsRenewal = vi.fn()
+let mockLastEndedReason: string | undefined
 
 vi.mock('../services/ResilientSession', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../services/ResilientSession')>()
@@ -41,6 +42,7 @@ vi.mock('../services/ResilientSession', async (importOriginal) => {
             return {
                 get isActive() { return mockIsActive },
                 get webId() { return mockWebId },
+                get lastEndedReason() { return mockLastEndedReason },
                 handleRedirectFromLogin: vi.fn().mockResolvedValue(undefined),
                 restore: (...args: unknown[]) => mockRestore(...args),
                 login: vi.fn().mockResolvedValue(undefined),
@@ -64,11 +66,12 @@ vi.mock('@uvdsl/solid-oidc-client-browser', () => ({
 const WEB_ID = 'https://user.example.org/profile/card#me'
 
 function Consumer() {
-    const { isLoggedIn, sessionExpired } = useSolidPod()
+    const { isLoggedIn, sessionExpired, sessionExpiredReason } = useSolidPod()
     return (
         <div>
             <span data-testid="isLoggedIn">{String(isLoggedIn)}</span>
             <span data-testid="sessionExpired">{String(sessionExpired)}</span>
+            <span data-testid="sessionExpiredReason">{String(sessionExpiredReason)}</span>
         </div>
     )
 }
@@ -111,6 +114,7 @@ describe('SolidPodContext — staying logged in', () => {
         // A stored refresh token exists unless a test says otherwise.
         mockHasStoredSession = vi.fn().mockResolvedValue(true)
         mockNeedsRenewal = vi.fn().mockReturnValue(false)
+        mockLastEndedReason = undefined
         sessionStorage.clear()
     })
 
@@ -161,6 +165,24 @@ describe('SolidPodContext — staying logged in', () => {
             expect(screen.getByTestId('isLoggedIn').textContent).toBe('false')
             expect(screen.getByTestId('sessionExpired').textContent).toBe('true')
         })
+    }, 15_000)
+
+    it('carries the provider\'s rejection reason alongside the expiry, for the UI to explain it', async () => {
+        // dispatchExpirationEvent() itself carries no payload — the reason has to
+        // come off the session (ResilientSession.lastEndedReason) at the moment
+        // the callback fires, or the banner has no way to say why.
+        renderApp()
+        await act(async () => { activateSession() })
+        await waitFor(() => expect(screen.getByTestId('isLoggedIn').textContent).toBe('true'))
+
+        await act(async () => {
+            mockIsActive = false
+            mockWebId = undefined
+            mockLastEndedReason = 'invalid_grant'
+            capturedCallbacks.onSessionExpiration?.()
+        })
+
+        await waitFor(() => expect(screen.getByTestId('sessionExpiredReason').textContent).toBe('invalid_grant'))
     }, 15_000)
 
     it('never erases the stored refresh token when the pod answers 401', async () => {
