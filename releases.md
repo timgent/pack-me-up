@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.15.0 (versionCode 16) — 2026-09-12
+- Clearer message when a login session was ended by the sign-in provider
+- Sign-in history now lists your most recent sign-ins first
+- Refreshed home page and wizard screens, with icons replacing emoji throughout
+- Theme choice moved to Settings, and made easier to reach on mobile
+
 ## 1.14.0 (versionCode 15) — 2026-09-02
 - Fixed unwanted sign-outs when the Pod server is temporarily unreachable
 
