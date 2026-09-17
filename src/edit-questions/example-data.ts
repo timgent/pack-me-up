@@ -550,9 +550,25 @@ export function createExampleData(people: Person[], selectedActivityIds: string[
                             section(C.clothes,
                                 item("Bra", people, getFemaleTeenagersAndAdults),
                                 item("Underwear", people, getToddlersAndOlder, { perNight: 1, maxQuantity: 10 }),
+                                // Potty training runs right through the Toddler
+                                // bracket ("1-3 - potty & pull-ups"), and an
+                                // accident soaks pants and bottoms together. The
+                                // general rates assume clothes come back clean —
+                                // which is how a toddler ended up with two pairs
+                                // of trousers for a four-night trip.
+                                //
+                                // These carry the same text as the general copies
+                                // on purpose: `deduplicateItems` collapses the
+                                // pair for anyone in both and keeps the larger
+                                // quantity, so a toddler gets one row with a
+                                // bigger number rather than a second, confusing
+                                // row. The caps assume a wash mid-trip.
+                                item("Underwear", people, getToddlers, { perNight: 3, maxQuantity: 15 }),
                                 item("Socks", people, undefined, { perNight: 1, maxQuantity: 10 }),
                                 item("T-shirt/Top", people, undefined, { perNight: 1, maxQuantity: 10 }),
                                 item("Trousers/Shorts", people, undefined, { perNight: 1, perNights: 3, maxQuantity: 5 }),
+                                // Potty-training rate — see the note on Underwear above.
+                                item("Trousers/Shorts", people, getToddlers, { perNight: 2, maxQuantity: 10 }),
                                 item("Jumper", people, undefined, { perNight: 1, perNights: 4, maxQuantity: 2 }),
                                 communalItem("Laundry bag", people),
                                 communalItem("Travel detergent", people),

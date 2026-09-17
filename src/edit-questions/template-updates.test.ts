@@ -35,6 +35,33 @@ describe('buildTemplateUpdateSuggestions', () => {
         })
     })
 
+    // The template deliberately carries two rates under one text where they
+    // reach different people — Baby and Toddler "Spare clothes", the general
+    // and potty-training "Trousers/Shorts". A user missing the text is offered
+    // both, and the review card keys its checkboxes (and its React rows) on
+    // `key`, so the pair must not share one.
+    it('gives each copy of a repeated item text its own key', () => {
+        const toddler: Person = { id: 't1', name: 'Tod', ageRange: 'Toddler' }
+        const baby: Person = { id: 'b1', name: 'Bea', ageRange: 'Baby' }
+        const set = baseSet([adult, toddler, baby])
+        const overnightYes = findQuestion(set, TEMPLATE_QUESTION_IDS.overnight).options.find(o => o.text === 'Yes')!
+        overnightYes.items = overnightYes.items.filter(i => i.text !== 'Trousers/Shorts')
+        set.alwaysNeededItems = set.alwaysNeededItems.filter(i => i.text !== 'Spare clothes')
+
+        const suggestions = buildTemplateUpdateSuggestions(set)
+        expect(suggestions.filter(s => s.label === 'Trousers/Shorts')).toHaveLength(2)
+        expect(suggestions.filter(s => s.label === 'Spare clothes')).toHaveLength(2)
+        const keys = suggestions.map(s => s.key)
+        expect(new Set(keys).size, 'suggestion keys must be unique').toBe(keys.length)
+
+        // Both rates come back, so the toddler keeps their own.
+        const updated = applyTemplateUpdates(set, suggestions)
+        const restored = findQuestion(updated, TEMPLATE_QUESTION_IDS.overnight)
+            .options.find(o => o.text === 'Yes')!.items
+            .filter(i => i.text === 'Trousers/Shorts')
+        expect(restored).toHaveLength(2)
+    })
+
     it('suggests a missing always-needed item', () => {
         const set = baseSet()
         set.alwaysNeededItems = set.alwaysNeededItems.filter(i => i.text !== 'Snacks')

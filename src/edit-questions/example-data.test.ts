@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { createExampleData, ACTIVITY_OPTION_IDS, TEMPLATE_QUESTION_IDS, TRANSPORT_OPTION_IDS, ACCOMMODATION_OPTION_IDS, WIZARD_TEMPLATE_VERSION } from './example-data'
 import { CATEGORIES } from './item-sections'
-import { Person } from './types'
+import { Item, Person } from './types'
+import { generateQuestionBasedItems } from '../create-packing-list/generatePackingListItems'
+import { deduplicateItems } from '../create-packing-list/deduplicate'
 
 const people: Person[] = [{ id: 'person-1', name: 'Alice', ageRange: 'Adult' }]
 const femaleAdult: Person = { id: 'f1', name: 'Alice', ageRange: 'Adult', gender: 'female' }
@@ -752,6 +754,78 @@ describe('createExampleData - quantity rates', () => {
         expect(nappies.perNight).toBeGreaterThan(0)
         expect(nappies.maxQuantity).toBeUndefined()
         expect(result.alwaysNeededItems.find(i => i.text === 'Formula/Baby food')!.perNight).toBeGreaterThan(0)
+    })
+})
+
+describe('createExampleData - potty-training toddlers', () => {
+    const adult: Person = { id: 'a1', name: 'Alice', ageRange: 'Adult' }
+    const toddler: Person = { id: 't1', name: 'Tod', ageRange: 'Toddler' }
+    const child: Person = { id: 'c1', name: 'Cal', ageRange: 'Child' }
+    const family = [adult, toddler, child]
+
+    function clothesItems(people: Person[]) {
+        const overnight = createExampleData(people).questions
+            .find(q => q.id === TEMPLATE_QUESTION_IDS.overnight)!
+        return overnight.options.find(o => o.text === 'Yes')!.items
+    }
+
+    const packsFor = (item: Item, personId: string) =>
+        item.personSelections.some(ps => ps.personId === personId && ps.selected)
+
+    /** Pairs per night the template suggests for one person, largest rate wins. */
+    function ratePerNight(items: Item[], text: string, personId: string): number {
+        const rates = items
+            .filter(i => i.text === text && packsFor(i, personId))
+            .map(i => (i.perNight ?? 0) / (i.perNights ?? 1))
+        expect(rates.length, `nothing packs "${text}" for ${personId}`).toBeGreaterThan(0)
+        return Math.max(...rates)
+    }
+
+    it('packs more than one pair of trousers/shorts a day for a toddler', () => {
+        const items = clothesItems(family)
+        expect(ratePerNight(items, 'Trousers/Shorts', toddler.id)).toBeGreaterThan(1)
+    })
+
+    it('packs more than one pair of underwear a day for a toddler', () => {
+        const items = clothesItems(family)
+        expect(ratePerNight(items, 'Underwear', toddler.id)).toBeGreaterThan(1)
+    })
+
+    it('leaves everyone else on the ordinary rate', () => {
+        const items = clothesItems(family)
+        for (const person of [adult, child]) {
+            expect(ratePerNight(items, 'Trousers/Shorts', person.id),
+                `${person.name} should keep the ordinary trousers rate`).toBeLessThanOrEqual(1)
+            expect(ratePerNight(items, 'Underwear', person.id),
+                `${person.name} should keep the ordinary underwear rate`).toBeLessThanOrEqual(1)
+        }
+    })
+
+    // The toddler copy shares its text with the general one, so `deduplicateItems`
+    // collapses the pair and keeps the larger quantity. This is the number the
+    // user actually sees.
+    it('shows the toddler the bigger number on the generated list', () => {
+        const nights = 4
+        const result = createExampleData(family)
+        const overnight = result.questions.find(q => q.id === TEMPLATE_QUESTION_IDS.overnight)!
+        const yes = overnight.options.find(o => o.text === 'Yes')!
+        const generated = deduplicateItems(generateQuestionBasedItems(
+            result.questions,
+            [{ questionId: overnight.id, selectedOptionIds: [yes.id] }],
+            family,
+            family.map(p => p.id),
+            nights,
+        ))
+
+        const rowFor = (text: string, personId: string) => {
+            const rows = generated.filter(i => i.itemText === text && i.personId === personId)
+            expect(rows, `one row expected for "${text}"`).toHaveLength(1)
+            return rows[0]
+        }
+
+        expect(rowFor('Trousers/Shorts', toddler.id).quantity).toBeGreaterThan(nights)
+        expect(rowFor('Underwear', toddler.id).quantity).toBeGreaterThan(nights)
+        expect(rowFor('Trousers/Shorts', adult.id).quantity).toBeLessThanOrEqual(nights)
     })
 })
 
