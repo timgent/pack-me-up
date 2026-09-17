@@ -152,6 +152,19 @@ export function buildTemplateUpdateSuggestions(qs: PackingListQuestionSet): Temp
 
     const suggestions: TemplateUpdateSuggestion[] = []
 
+    // Two template items can share a text in one place: the Baby and Toddler
+    // rates for "Spare clothes", the general and potty-training rates for
+    // "Trousers/Shorts". They are separate additions reaching different people,
+    // so each needs its own checkbox — a shared key would tie them together in
+    // the review card and collide as a React key.
+    const usedKeys = new Set<string>()
+    const uniqueKey = (key: string): string => {
+        let candidate = key
+        for (let n = 2; usedKeys.has(candidate); n++) candidate = `${key}#${n}`
+        usedKeys.add(candidate)
+        return candidate
+    }
+
     // Every item text anywhere in the user's set (including deleted questions'
     // items), used to tell a genuinely new question from a renamed one.
     const allUserItemTexts = new Set<string>()
@@ -209,7 +222,7 @@ export function buildTemplateUpdateSuggestions(qs: PackingListQuestionSet): Temp
                 if (!isRelevant(ti) || existing.has(normalize(ti.text))) continue
                 suggestions.push({
                     kind: 'addItem',
-                    key: `addItem:${locationKey(location)}:${normalize(ti.text)}`,
+                    key: uniqueKey(`addItem:${locationKey(location)}:${normalize(ti.text)}`),
                     label: ti.text,
                     contextLabel: `${uq.text} — ${uo.text}`,
                     location,
@@ -225,7 +238,7 @@ export function buildTemplateUpdateSuggestions(qs: PackingListQuestionSet): Temp
         const location: ItemLocation = { kind: 'always' }
         suggestions.push({
             kind: 'addItem',
-            key: `addItem:always:${normalize(ti.text)}`,
+            key: uniqueKey(`addItem:always:${normalize(ti.text)}`),
             label: ti.text,
             contextLabel: 'Always needed',
             location,
