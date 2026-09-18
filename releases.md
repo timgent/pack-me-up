@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.16.0 (versionCode 17) — 2026-09-18
+- Your own sharing address is now easy to find, with copy, share-sheet and QR code
+- Shared addresses are checked and confirmed before access is granted, so shares no longer silently fail
+- A shared link that won't open now tells you what to do next, not just that it failed
+- More generous clothing suggestions for potty-training toddlers on multi-night trips
+
 ## 1.15.0 (versionCode 16) — 2026-09-12
 - Clearer message when a login session was ended by the sign-in provider
 - Sign-in history now lists your most recent sign-ins first
