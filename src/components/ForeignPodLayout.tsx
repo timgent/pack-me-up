@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useParams, Navigate, useSearchParams } from 'react-router-dom'
 import { ForeignPodContext } from './ForeignPodContext'
+import { SharedAccessHelp } from './SharedAccessHelp'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import {
@@ -19,7 +20,7 @@ export function ForeignPodLayout() {
     const foreignPodUrl = decodeURIComponent(encodedPodUrl ?? '')
     const [searchParams] = useSearchParams()
     const ownerWebIdFromUrl = searchParams.get('owner') ?? undefined
-    const { isLoggedIn, session } = useSolidPod()
+    const { isLoggedIn, session, webId } = useSolidPod()
     const { db } = useDatabase()
     const [accessState, setAccessState] = useState<'pending' | 'ok' | 'denied'>('pending')
     const [ownerName, setOwnerName] = useState<string | null>(null)
@@ -95,20 +96,15 @@ export function ForeignPodLayout() {
 
     if (!foreignPodUrl) return <Navigate to="/view-lists" replace />
 
+    // Both of these used to be sentences with nothing to do next — see
+    // SharedAccessHelp, which is where following a shared link now lands when
+    // the link cannot be opened.
     if (!isLoggedIn) {
-        return (
-            <div className="max-w-4xl mx-auto py-8 px-4">
-                <p className="text-gray-700 dark:text-gray-300">Please log in to view shared content.</p>
-            </div>
-        )
+        return <SharedAccessHelp what="lists" isLoggedIn={false} webId={null} />
     }
 
     if (accessState === 'denied') {
-        return (
-            <div className="max-w-4xl mx-auto py-8 px-4">
-                <p className="text-red-700 dark:text-red-300">Access denied to this pod. The owner may have revoked access.</p>
-            </div>
-        )
+        return <SharedAccessHelp what="lists" isLoggedIn webId={webId} />
     }
 
     if (accessState === 'pending') {

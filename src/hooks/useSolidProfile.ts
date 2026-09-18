@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getSolidProfile, podUsernameFromWebId, type SolidProfile } from '../services/solidPod'
 import type { AppSession } from '../types/AppSession'
 
-const UNREAD: SolidProfile = { name: null, photo: null }
+const UNREAD: SolidProfile = { name: null, photo: null, resolved: false }
 
 /**
  * One WebID's profile card — their name, and their photo.

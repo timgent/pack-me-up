@@ -85,7 +85,7 @@ test.describe('M – Full pod collaboration', () => {
 
     test('M2: Owner grants full access to collaborator and gets invite link', async () => {
         await pageA.goto('/#/sharing')
-        await pageA.getByLabel(/their webid/i).fill(collabWebId)
+        await pageA.getByLabel(/their sharing address/i).fill(collabWebId)
         await pageA.getByRole('button', { name: /share my setup/i }).click()
 
         await expect(pageA.getByLabel(/invite link/i)).toBeVisible({ timeout: 15_000 })
@@ -176,7 +176,7 @@ test.describe('M – Full pod collaboration', () => {
         }
     })
 
-    test('M9: Owner revokes access; collab sees access denied', async ({ browser }) => {
+    test('M9: Owner revokes access; collab is told what to do about it', async ({ browser }) => {
         // Owner revokes
         await pageA.goto('/#/sharing')
         const revokeCollab = pageA.getByRole('button', { name: `Revoke access for ${collabWebId}` })
@@ -192,7 +192,15 @@ test.describe('M – Full pod collaboration', () => {
             await pageC.goto('/')
             await loginToCss(pageC, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
             await pageC.goto(inviteLink)
-            await expect(pageC.getByText(/access denied/i)).toBeVisible({ timeout: 20_000 })
+            // Not "Access denied": the screen names the account they are
+            // actually signed in as and hands them that address to send back,
+            // because a mismatched address is the likelier cause and the one
+            // they can fix themselves.
+            await expect(pageC.getByRole('heading', { name: /can't open this yet/i })).toBeVisible({ timeout: 20_000 })
+            // By test id: the WebID is also in the (hidden) mobile nav, so a
+            // text match picks up a node nobody can see.
+            await expect(pageC.getByTestId('sharing-address')).toHaveText(collabWebId)
+            await expect(pageC.getByRole('button', { name: /copy my address/i })).toBeVisible()
         } finally {
             await ctxC.close()
         }

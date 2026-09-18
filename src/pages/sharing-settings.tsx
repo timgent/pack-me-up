@@ -26,6 +26,10 @@ import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
+import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
+import { WebIdField } from '../components/WebIdField'
+import { YourSharingAddress } from '../components/YourSharingAddress'
+import { useWebIdLookup } from '../hooks/useWebIdLookup'
 import {
     clearPendingSignInAction,
     getPendingSignInAction,
@@ -71,6 +75,7 @@ export function SharingSettingsPage() {
 
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
+    const collaboratorLookup = useWebIdLookup(collaboratorWebId, session)
     const [isGranting, setIsGranting] = useState(false)
     const [inviteLink, setInviteLink] = useState<string | null>(null)
     const [sharedWith, setSharedWith] = useState<string | null>(null)
@@ -182,17 +187,18 @@ export function SharingSettingsPage() {
     }, [isLoggedIn, ownPodUrl, session, db])
 
     const handleGrantAccess = async () => {
-        if (!session || !ownPodUrl || !collaboratorWebId.trim()) return
+        const theirWebId = collaboratorLookup.webId
+        if (!session || !ownPodUrl || !theirWebId) return
         setIsGranting(true)
         setInviteLink(null)
         setSharedWith(null)
         try {
-            await grantFullCollaboratorAccess(session, ownPodUrl, collaboratorWebId.trim())
+            await grantFullCollaboratorAccess(session, ownPodUrl, theirWebId)
             const ownerWebId = session?.info.webId
             const ownerParam = ownerWebId ? `?owner=${encodeURIComponent(ownerWebId)}` : ''
             const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists${ownerParam}`
             setInviteLink(link)
-            setSharedWith(collaboratorWebId.trim())
+            setSharedWith(theirWebId)
             setCollaboratorWebId('')
             await loadCollaborators()
             showToast(successToast('setupShared'), 'success')
@@ -332,32 +338,31 @@ export function SharingSettingsPage() {
                 <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200">Sharing</h1>
             </div>
 
+            {/* First, because it is the first thing either person needs and the
+                app used to offer it nowhere: sharing starts with an address
+                only the *other* side can produce. */}
+            {session?.info.webId && <YourSharingAddress webId={session.info.webId} />}
+
             {/* Section 1: Share the whole setup — questions + every list */}
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                 <FullSetupIntro />
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                        ref={webIdInputRef}
-                        type="text"
-                        value={collaboratorWebId}
-                        onChange={e => setCollaboratorWebId(e.target.value)}
-                        placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
-                        aria-label="Their WebID"
-                        className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    <button
-                        onClick={handleGrantAccess}
-                        disabled={isGranting || !collaboratorWebId.trim()}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                    >
-                        {isGranting ? 'Sharing…' : 'Share my setup'}
-                    </button>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    A WebID is the address of someone's Solid Pod — ask them to copy theirs from their
-                    own sharing page.
-                </p>
+                <WebIdField
+                    label="Their sharing address (WebID)"
+                    placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
+                    value={collaboratorWebId}
+                    onChange={setCollaboratorWebId}
+                    lookup={collaboratorLookup}
+                    disabled={isGranting}
+                    inputRef={webIdInputRef}
+                />
+                <button
+                    onClick={handleGrantAccess}
+                    disabled={isGranting || !collaboratorLookup.webId}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                    {isGranting ? 'Sharing…' : 'Share my setup'}
+                </button>
 
                 {inviteLink && (
                     <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
@@ -390,7 +395,7 @@ export function SharingSettingsPage() {
                     <ul className="space-y-2 mt-2">
                         {collaborators.map(webId => (
                             <li key={webId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={webId}>{webId}</span>
+                                <CollaboratorIdentity webId={webId} session={session} />
                                 <button
                                     onClick={() => handleRevoke(webId)}
                                     disabled={revokingWebId === webId}

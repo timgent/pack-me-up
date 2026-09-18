@@ -34,6 +34,11 @@ export const SUCCESS_TOAST_VARIANTS = {
         'Copied! Paste it wherever suits',
         'Invite link is on your clipboard',
     ],
+    addressCopied: [
+        'Your address is on the clipboard',
+        'Copied — paste it to whoever asked',
+        "Address copied. Send it to them and you're set",
+    ],
     setupShared: [
         'Your full setup is shared 🎉',
         'Shared — they can see your setup now',

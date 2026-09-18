@@ -1629,6 +1629,86 @@ describe('ViewPackingList when an own-pod list is not in local storage yet', () 
     })
 })
 
+// A link to somebody else's list that does not open is the receiving end of the
+// sharing handshake failing, and "Packing list not found" is no help there:
+// the reader did not lose a list, they were sent one and cannot see it.
+
+describe('ViewPackingList when a shared list will not open', () => {
+    function renderSharedList() {
+        const getPackingList = vi.fn().mockRejectedValue({ name: 'not_found', message: 'Packing list not found' })
+        mockUseDatabase.mockReturnValue({
+            db: { ...makeDb(), getPackingList } as unknown as PackingAppDatabase,
+            loginSyncInProgress: false,
+        })
+        const result = render(
+            <MemoryRouter initialEntries={['/view-list/test-list-1?pod=https%3A%2F%2Falice.example.org%2F']}>
+                <Routes>
+                    <Route path="/view-list/:id" element={<ViewPackingList />} />
+                </Routes>
+            </MemoryRouter>
+        )
+        return result
+    }
+
+    /**
+     * A foreign list holds the spinner until the pod poll answers, because the
+     * local miss says nothing about a list that was never ours. Refusal is that
+     * answer arriving.
+     */
+    async function podRefusesTheList() {
+        await waitFor(() => expect(mockUsePodSync).toHaveBeenCalled())
+        const { onSyncError } = mockUsePodSync.mock.calls[mockUsePodSync.mock.calls.length - 1][0]
+        act(() => onSyncError('403 Forbidden'))
+    }
+
+    beforeEach(() => {
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+        mockUsePodSync.mockReturnValue({ saveToPod: vi.fn() })
+        mockUseSyncCoordinator.mockReturnValue({
+            syncingFromPod: false,
+            handleSyncSuccess: vi.fn(),
+            handleSyncError: vi.fn(),
+            saveWithSyncPrevention: vi.fn(),
+        })
+    })
+
+    afterEach(() => { vi.restoreAllMocks() })
+
+    it('offers a signed-out visitor the way in, not a missing-list message', async () => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: false,
+            session: null,
+            webId: undefined,
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+
+        renderSharedList()
+        await podRefusesTheList()
+
+        expect(await screen.findByRole('button', { name: /sign in to open/i })).toBeTruthy()
+        expect(screen.queryByText('Packing list not found')).toBeNull()
+    })
+
+    it('tells a signed-in visitor which address to send back', async () => {
+        mockUseSolidPod.mockReturnValue({
+            isLoggedIn: true,
+            session: { info: { isLoggedIn: true, webId: 'https://bob.example.org/profile/card#me' }, fetch: vi.fn() },
+            webId: 'https://bob.example.org/profile/card#me',
+            isLoading: false,
+            login: vi.fn(),
+            logout: vi.fn(),
+        })
+
+        renderSharedList()
+        await podRefusesTheList()
+
+        expect(await screen.findByRole('button', { name: /copy my address/i })).toBeTruthy()
+        expect(screen.getAllByText('https://bob.example.org/profile/card#me').length).toBeGreaterThan(0)
+    })
+})
+
 // Opening a list the device already holds must not wait on the pod. The login
 // sync walks the whole pod — every list, the question set, the tombstones — and
 // on a slow connection that is seconds of staring at a skeleton for data the

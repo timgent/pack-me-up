@@ -15,6 +15,10 @@ vi.mock('../services/solidPod', () => ({
         const base = `${window.location.origin}/#/view-lists/${listId}?pod=${encodeURIComponent(podUrl)}`
         return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
     }),
+    // The modal names the people it lists, and confirms an address before
+    // granting to it — both of which read profile cards.
+    getSolidProfile: vi.fn().mockResolvedValue({ name: null, photo: null, resolved: false }),
+    friendlyWebIdName: vi.fn((webId: string) => new URL(webId).hostname),
 }))
 
 import {
@@ -115,6 +119,16 @@ describe('SharePackingListModal', () => {
             await waitFor(() =>
                 expect(screen.getByText('https://bob.solidcommunity.net/profile/card#me')).toBeTruthy()
             )
+        })
+
+        it('names a collaborator rather than only spelling out their address', async () => {
+            mockGetCollaborators.mockResolvedValue(['https://bob.solidcommunity.net/profile/card#me'])
+            mockIsPubliclyAccessible.mockResolvedValue(false)
+            renderModal()
+
+            // Checking that the person you shared with is the person you meant
+            // is the one job this list has.
+            await waitFor(() => expect(screen.getByText('bob.solidcommunity.net')).toBeTruthy())
         })
 
         it('shows public row when publicly accessible', async () => {

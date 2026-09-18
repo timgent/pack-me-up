@@ -19,6 +19,7 @@ import { POD_CONTAINERS, getPrimaryPodUrl, saveRdfToPod, resolveOwnerDisplayName
 import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
+import { SharedAccessHelp } from '../components/SharedAccessHelp'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { UpdateFromQuestionsModal } from '../components/UpdateFromQuestionsModal'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -384,7 +385,7 @@ export function ViewPackingList() {
     const handleCheckAll = (items: PackingListItem[]) =>
         items.forEach(item => setValue(`items.${item.id}`, true))
     const isDesktop = useIsDesktop()
-    const { isLoggedIn, isReconnecting, session } = useSolidPod()
+    const { isLoggedIn, isReconnecting, session, webId } = useSolidPod()
     const { showToast } = useToast()
     const { db } = useDatabase()
     // Read from the question set on every visit, not copied onto the list when
@@ -1435,6 +1436,14 @@ export function ViewPackingList() {
     }
 
     if (!packingList) {
+        // A list on somebody else's pod that never arrived is a different
+        // problem from one of ours that isn't here: they followed a link
+        // somebody sent them, and "not found" tells them nothing they can act
+        // on. Almost always it is a sign-in they have not done, or a grant that
+        // went to a different address than the one they are using.
+        if (foreignPodUrl) {
+            return <SharedAccessHelp what="list" isLoggedIn={isLoggedIn} webId={webId} />
+        }
         return <div className="max-w-4xl mx-auto py-8 px-4">Packing list not found</div>
     }
 

@@ -61,6 +61,37 @@ from, and `docs/offline.md` covers what the app does with no network.
 asserts that a 401 does *not* sign the user out, and that a pod it cannot reach
 leaves the user signed in with their lists on screen.
 
+## Sharing
+
+Every share — one list or the whole setup — is gated on a WebID that only the
+*other* person can produce, and that exchange is where sharing actually failed
+(#354 follow-up). Three rules keep it working:
+
+- **Never take a typed address on trust.** `normaliseWebIdInput`
+  (`src/services/webIdInput.ts`) turns what people actually type — a Pod root, a
+  profile card missing its `#me`, a bare host — into a WebID or into `null`, and
+  `useWebIdLookup` then reads the profile card so the field can name who is
+  there before anything is granted. A raw string handed to `grantCollaboratorAccess`
+  is recorded by WAC without complaint, reported as a success, and reaches
+  nobody. Both share fields go through `WebIdField`; a third place asks for a
+  WebID (`PersonIdentityPicker`, for avatars) and does not yet.
+- **An unreadable profile never blocks a share.** A card can be unreachable
+  because the address is wrong, or because the server is down, the card is
+  private, or none was ever published. `WebIdLookupStatus` keeps those apart:
+  `invalid` has nothing to grant to, `unknown` warns and lets it through.
+- **The receiving end always has a next step.** A shared link that will not open
+  renders `SharedAccessHelp`, never a bare sentence: signed out it offers the way
+  in, signed in it names the account they are signed in as and hands them that
+  address to send back — because a mismatched address, not a revoked grant, is
+  the usual cause. It covers both entry points, `ForeignPodLayout` (a whole
+  setup) and `view-packing-list` with a `?pod=` (one list).
+
+`YourSharingAddress` is the other half: the signed-in person's own WebID with
+copy, share sheet and QR, at the top of `/sharing` and inside the access panels.
+Before it, the app displayed the user's WebID only as unselectable text in the
+account menu — so the first step of every share was one the app did not support.
+E2E suites L and M cover both paths end to end.
+
 ## Application Capability description
 
 The app publishes a machine-readable description of itself at `/` — what it can
