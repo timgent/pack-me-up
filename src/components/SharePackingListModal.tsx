@@ -12,7 +12,9 @@ import {
 } from '../services/solidPod'
 import { Modal } from './Modal'
 import { Button } from './Button'
-import { Input } from './Input'
+import { CollaboratorIdentity } from './CollaboratorIdentity'
+import { WebIdField } from './WebIdField'
+import { useWebIdLookup } from '../hooks/useWebIdLookup'
 
 type ShareMode = 'person' | 'public'
 
@@ -40,6 +42,10 @@ export function SharePackingListModal({
     const [isGranting, setIsGranting] = useState(false)
     const [generatedLink, setGeneratedLink] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+
+    // What we will actually grant to, and who is behind it — see WebIdField
+    // for why an address is never taken on trust any more.
+    const collaboratorLookup = useWebIdLookup(collaboratorWebId, session)
 
     const [currentCollaborators, setCurrentCollaborators] = useState<string[]>([])
     const [isPublic, setIsPublic] = useState(false)
@@ -73,13 +79,14 @@ export function SharePackingListModal({
     }, [isOpen])
 
     const handleShare = async () => {
-        if (!collaboratorWebId.trim()) return
+        const webId = collaboratorLookup.webId
+        if (!webId) return
 
         setIsGranting(true)
         setError(null)
         try {
             if (saveListToPod) await saveListToPod()
-            await grantCollaboratorAccess(session, fileUrl, collaboratorWebId.trim())
+            await grantCollaboratorAccess(session, fileUrl, webId)
             setGeneratedLink(buildLink())
             setCollaboratorWebId('')
             await loadCurrentAccess()
@@ -174,7 +181,7 @@ export function SharePackingListModal({
                             )}
                             {currentCollaborators.map(webId => (
                                 <li key={webId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                    <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={webId}>{webId}</span>
+                                    <CollaboratorIdentity webId={webId} session={session} />
                                     <button
                                         type="button"
                                         onClick={() => handleRevokeCollaborator(webId)}
@@ -223,18 +230,17 @@ export function SharePackingListModal({
                     </div>
 
                     {shareMode === 'person' && (
-                        <div>
-                            <Input
-                                label="Collaborator's WebID"
-                                placeholder="https://friend.solidcommunity.net/profile/card#me"
-                                value={collaboratorWebId}
-                                onChange={e => {
-                                    setCollaboratorWebId(e.target.value)
-                                    setError(null)
-                                }}
-                                disabled={isGranting}
-                            />
-                        </div>
+                        <WebIdField
+                            label="Their sharing address (WebID)"
+                            placeholder="https://friend.solidcommunity.net/profile/card#me"
+                            value={collaboratorWebId}
+                            onChange={value => {
+                                setCollaboratorWebId(value)
+                                setError(null)
+                            }}
+                            lookup={collaboratorLookup}
+                            disabled={isGranting}
+                        />
                     )}
 
                     {shareMode === 'public' && !generatedLink && (
@@ -252,7 +258,7 @@ export function SharePackingListModal({
                             type="button"
                             variant="primary"
                             onClick={handleShare}
-                            disabled={isGranting || !collaboratorWebId.trim()}
+                            disabled={isGranting || !collaboratorLookup.webId}
                         >
                             {isGranting ? 'Sharing...' : 'Share'}
                         </Button>
@@ -271,6 +277,9 @@ export function SharePackingListModal({
 
                     {generatedLink && (
                         <div className="space-y-2 mt-3">
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                Access is granted. Send them this link so they can open the list:
+                            </p>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Shareable link
                                 <input

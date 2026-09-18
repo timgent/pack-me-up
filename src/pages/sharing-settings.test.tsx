@@ -19,6 +19,10 @@ vi.mock('../services/solidPod', () => ({
     isRetryablePodUrlFailure: () => false,
     PodUrlUnavailableError: class PodUrlUnavailableError extends Error {},
     getPodOwnerName: vi.fn(() => Promise.resolve(null)),
+    // The page names the people it lists, and confirms an address before
+    // granting to it — both of which read profile cards.
+    getSolidProfile: vi.fn(() => Promise.resolve({ name: null, photo: null, resolved: false })),
+    friendlyWebIdName: vi.fn((webId: string) => new URL(webId).hostname),
     friendlyPodName: vi.fn((url: string) => url),
     resolveOwnerDisplayName: vi.fn((foafName: string | null | undefined, ownerWebId: string | null | undefined, podUrl: string) => foafName ?? ownerWebId ?? podUrl),
     buildSharedListPath: vi.fn((listId: string, podUrl: string, ownerWebId?: string) => {
@@ -35,7 +39,7 @@ vi.mock('../services/solidPod', () => ({
 
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
-import { saveRdfToPod, getFullCollaborators, getCollaborators } from '../services/solidPod'
+import { saveRdfToPod, getFullCollaborators, getCollaborators, grantFullCollaboratorAccess } from '../services/solidPod'
 import { useToast } from '../components/ToastContext'
 import { SUCCESS_TOAST_VARIANTS } from '../utils/successToastCopy'
 import { getPendingSignInAction, setPendingSignInAction } from '../utils/pendingSignInAction'
@@ -174,6 +178,30 @@ describe('SharingSettingsPage — share your full setup', () => {
         expect(await screen.findByText(/your full setup is shared/i)).toBeTruthy()
         fireEvent.click(screen.getByRole('button', { name: /copy link/i }))
         await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/view-lists')))
+    })
+
+    it('hands them their own address, which is the step neither side could take', async () => {
+        renderPage()
+
+        // Sharing starts with an address only the *other* person can produce,
+        // and until this the app showed theirs nowhere they could copy it.
+        expect(await screen.findByText('https://me.example.com/profile#me')).toBeTruthy()
+        expect(screen.getByRole('button', { name: /copy my address/i })).toBeTruthy()
+    })
+
+    it('shares with the WebID behind a Pod root, rather than the Pod root itself', async () => {
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'alice.solidcommunity.net' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        await waitFor(() => expect(vi.mocked(grantFullCollaboratorAccess)).toHaveBeenCalledWith(
+            expect.anything(),
+            'https://pod.example.com/',
+            'https://alice.solidcommunity.net/profile/card#me',
+        ))
     })
 
     it('offers a benefit-framed sign-in instead of a bare log-in notice when logged out', async () => {

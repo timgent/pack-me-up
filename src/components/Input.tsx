@@ -2,6 +2,12 @@ import React from 'react'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
+    /**
+     * Forwarded to the input itself. React 19 passes `ref` through as an
+     * ordinary prop, so the spread below carries it — it just is not part of
+     * `InputHTMLAttributes`, which is why it is named here.
+     */
+    ref?: React.Ref<HTMLInputElement>;
 }
 
 export function Input({ label, ...props }: InputProps) {

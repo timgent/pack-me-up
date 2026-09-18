@@ -185,9 +185,20 @@ export interface SolidProfile {
     name: string | null
     /** Absolute URL of the profile photo, if the card names one. */
     photo: string | null
+    /**
+     * Whether a card was actually found at this WebID — as opposed to found and
+     * empty, which is what a card with no `foaf:name` and no photo looks like.
+     *
+     * The distinction only matters in one place, and it matters a lot there:
+     * the fields that ask for someone else's address, which use this to tell
+     * "nobody is at this address" (a typo, and the grant will reach no one)
+     * apart from "somebody is, they just haven't published a name". Anything
+     * that only wants a name or a photo can keep ignoring it.
+     */
+    resolved: boolean
 }
 
-const EMPTY_PROFILE: SolidProfile = { name: null, photo: null }
+const EMPTY_PROFILE: SolidProfile = { name: null, photo: null, resolved: false }
 
 /**
  * Profile cards already fetched, or in flight, keyed by WebID and by whether
@@ -251,6 +262,7 @@ export async function getSolidProfile(session: Session | null | undefined, webId
             return {
                 name: getStringNoLocale(card, `${FOAF}name`) ?? null,
                 photo: photo ?? null,
+                resolved: true,
             }
         } catch {
             return EMPTY_PROFILE

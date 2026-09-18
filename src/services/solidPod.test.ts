@@ -1595,10 +1595,35 @@ describe('getPodOwnerName', () => {
     it('does not re-request a card that failed, however often it is asked for', async () => {
         mockGetSolidDataset.mockRejectedValue(new Error('Not found'))
 
-        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null })
-        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null })
+        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null, resolved: false })
+        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null, resolved: false })
 
         expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
+    })
+
+    // `resolved` is what lets the share fields tell "there is nobody at this
+    // address" apart from "there is somebody, and they have not published a
+    // name". Both look like an empty profile, and only one of them is a
+    // reason to warn the person about to grant access.
+    it('reports a card that answered as resolved, named or not', async () => {
+        const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+        const nameless = buildThing({ url: WEB_ID }).build()
+        mockGetSolidDataset.mockResolvedValueOnce(setThing(createSolidDataset(), nameless) as unknown as SolidDataset & WithServerResourceInfo)
+
+        expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: null, photo: null, resolved: true })
+    })
+
+    it('reports a card that could not be read as unresolved', async () => {
+        mockGetSolidDataset.mockRejectedValueOnce(new Error('Not found'))
+
+        expect((await getSolidProfile(mockSession, WEB_ID)).resolved).toBe(false)
+    })
+
+    it('reports a document with no thing for the WebID as unresolved', async () => {
+        const { createSolidDataset } = await import('@inrupt/solid-client')
+        mockGetSolidDataset.mockResolvedValueOnce(createSolidDataset() as unknown as SolidDataset & WithServerResourceInfo)
+
+        expect((await getSolidProfile(mockSession, WEB_ID)).resolved).toBe(false)
     })
 
     it('uses an explicit WebID instead of deriving from the pod URL', async () => {

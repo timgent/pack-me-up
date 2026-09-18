@@ -26,7 +26,7 @@ describe('useSolidProfile', () => {
 
         const { result } = renderHook(() => useSolidProfile('https://alice.example/profile/card#me', session))
 
-        expect(result.current).toEqual({ name: null, photo: null })
+        expect(result.current).toEqual({ name: null, photo: null, resolved: false })
     })
 
     it('reports the name and photo the card names', async () => {
@@ -60,7 +60,7 @@ describe('useSolidProfile', () => {
         const { result } = renderHook(() => useSolidProfile('https://gone.example/profile/card#me', session))
 
         await waitFor(() => expect(mockGetSolidProfile).toHaveBeenCalled())
-        expect(result.current).toEqual({ name: null, photo: null })
+        expect(result.current).toEqual({ name: null, photo: null, resolved: false })
     })
 
     it('does not write state for a profile that lands after unmount', async () => {
