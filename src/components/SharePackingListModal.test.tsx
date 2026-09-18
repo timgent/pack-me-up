@@ -4,6 +4,10 @@ import React from 'react'
 import { SharePackingListModal } from './SharePackingListModal'
 import type { AppSession } from '../types/AppSession'
 
+// The link panel confirms a copy with a toast now (see ShareActions), so the
+// modal sits inside the toast context in the app.
+vi.mock('./ToastContext', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
+
 vi.mock('../services/solidPod', () => ({
     grantCollaboratorAccess: vi.fn(),
     grantPublicAccess: vi.fn(),

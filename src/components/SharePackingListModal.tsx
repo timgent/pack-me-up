@@ -13,7 +13,10 @@ import {
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { CollaboratorIdentity } from './CollaboratorIdentity'
+import { PeopleSuggestions } from './PeopleSuggestions'
+import { ShareableLink } from './ShareableLink'
 import { WebIdField } from './WebIdField'
+import type { KnownPerson } from '../hooks/useKnownPeople'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
 
 type ShareMode = 'person' | 'public'
@@ -25,7 +28,17 @@ interface SharePackingListModalProps {
     fileUrl: string
     listId: string
     sharerPodUrl: string
+    /** Named in the share-sheet message, so "what is this link?" is answered. */
+    listName?: string
     saveListToPod?: () => Promise<void>
+    /**
+     * Addresses this device already holds, offered as one tap each.
+     *
+     * Passed in rather than read here: this component talks to the Pod, and
+     * the local database is the caller's business (see the Data Access rules
+     * in CLAUDE.md).
+     */
+    knownPeople?: readonly KnownPerson[]
 }
 
 export function SharePackingListModal({
@@ -35,7 +48,9 @@ export function SharePackingListModal({
     fileUrl,
     listId,
     sharerPodUrl,
+    listName,
     saveListToPod,
+    knownPeople = [],
 }: SharePackingListModalProps) {
     const [shareMode, setShareMode] = useState<ShareMode>('person')
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
@@ -136,12 +151,6 @@ export function SharePackingListModal({
         }
     }
 
-    const handleCopy = () => {
-        if (generatedLink) {
-            navigator.clipboard.writeText(generatedLink)
-        }
-    }
-
     const handleModeChange = (mode: ShareMode) => {
         setShareMode(mode)
         setError(null)
@@ -230,6 +239,17 @@ export function SharePackingListModal({
                     </div>
 
                     {shareMode === 'person' && (
+                        <PeopleSuggestions
+                            people={knownPeople}
+                            alreadyShared={currentCollaborators}
+                            onPick={webId => {
+                                setCollaboratorWebId(webId)
+                                setError(null)
+                            }}
+                        />
+                    )}
+
+                    {shareMode === 'person' && (
                         <WebIdField
                             label="Their sharing address (WebID)"
                             placeholder="https://friend.solidcommunity.net/profile/card#me"
@@ -280,19 +300,7 @@ export function SharePackingListModal({
                             <p className="text-sm text-gray-700 dark:text-gray-300">
                                 Access is granted. Send them this link so they can open the list:
                             </p>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Shareable link
-                                <input
-                                    aria-label="Shareable link"
-                                    type="text"
-                                    readOnly
-                                    value={generatedLink}
-                                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800"
-                                />
-                            </label>
-                            <Button type="button" variant="secondary" onClick={handleCopy}>
-                                Copy link
-                            </Button>
+                            <ShareableLink link={generatedLink} label="Shareable link" subject={listName} />
                         </div>
                     )}
                 </div>

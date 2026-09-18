@@ -17,8 +17,10 @@ import {
     POD_CONTAINERS,
     getCollaborators,
     isPubliclyAccessible,
+    friendlyWebIdName,
 } from '../services/solidPod'
 import { useOwnerDisplayNames } from '../hooks/useOwnerDisplayName'
+import { useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext, SharedListContext } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
@@ -27,8 +29,11 @@ import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
 import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
+import { PeopleSuggestions } from '../components/PeopleSuggestions'
+import { ShareableLink } from '../components/ShareableLink'
 import { WebIdField } from '../components/WebIdField'
 import { YourSharingAddress } from '../components/YourSharingAddress'
+import { useKnownPeople } from '../hooks/useKnownPeople'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
 import {
     clearPendingSignInAction,
@@ -76,9 +81,13 @@ export function SharingSettingsPage() {
     const [ownPodUrl, setOwnPodUrl] = useState<string | null>(null)
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
     const collaboratorLookup = useWebIdLookup(collaboratorWebId, session)
+    const knownPeople = useKnownPeople()
     const [isGranting, setIsGranting] = useState(false)
     const [inviteLink, setInviteLink] = useState<string | null>(null)
     const [sharedWith, setSharedWith] = useState<string | null>(null)
+    // Their card is already cached from the field's own check a moment ago, so
+    // naming them in the confirmation costs nothing.
+    const sharedWithProfile = useSolidProfile(sharedWith ?? undefined, session)
     const [signInPromptOpen, setSignInPromptOpen] = useState(false)
     const webIdInputRef = useRef<HTMLInputElement>(null)
     const [collaborators, setCollaborators] = useState<string[]>([])
@@ -99,7 +108,7 @@ export function SharingSettingsPage() {
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
     const [sharingStatusByListId, setSharingStatusByListId] = useState<Record<string, ListSharingStatus>>({})
-    const [managingList, setManagingList] = useState<{ fileUrl: string; listId: string } | null>(null)
+    const [managingList, setManagingList] = useState<{ fileUrl: string; listId: string; name: string } | null>(null)
 
     useEffect(() => {
         if (!isLoggedIn || !session) return
@@ -211,20 +220,6 @@ export function SharingSettingsPage() {
         }
     }
 
-    const handleCopyInviteLink = async () => {
-        if (!inviteLink) return
-        try {
-            await navigator.clipboard.writeText(inviteLink)
-            showToast(successToast('inviteLinkCopied'), 'success')
-        } catch (err) {
-            // Clipboard access can be refused (permissions, insecure origin) —
-            // the link is on screen and selectable, so say so rather than fail
-            // silently.
-            const details = reportError(err, 'SharingSettingsPage: failed to copy invite link')
-            showToast('Could not copy — select the link and copy it manually.', 'error', details)
-        }
-    }
-
     const handleRemoveSharedContext = async (podUrl: string) => {
         setRemovingPodUrl(podUrl)
         try {
@@ -248,6 +243,14 @@ export function SharingSettingsPage() {
         try {
             await revokeFullCollaboratorAccess(session, ownPodUrl, webId)
             await loadCollaborators()
+            // The "shared with X" confirmation is component state, and this page
+            // is not remounted by hash navigation — so revoking X left a banner
+            // on screen saying they still had everything. Nothing else clears
+            // it, so it has to be cleared here.
+            if (sharedWith === webId) {
+                setInviteLink(null)
+                setSharedWith(null)
+            }
             showToast('Access revoked', 'success')
         } catch (err) {
             const details = reportError(err, 'SharingSettingsPage: failed to revoke access')
@@ -347,6 +350,12 @@ export function SharingSettingsPage() {
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                 <FullSetupIntro />
+                <PeopleSuggestions
+                    people={knownPeople}
+                    alreadyShared={collaborators}
+                    onPick={setCollaboratorWebId}
+                    label="Share with someone you already know"
+                />
                 <WebIdField
                     label="Their sharing address (WebID)"
                     placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
@@ -368,23 +377,14 @@ export function SharingSettingsPage() {
                     <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
                         <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
                             <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                            Your full setup is shared{sharedWith ? ' with ' + sharedWith : ''}
+                            Your full setup is shared
+                            {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
                         </p>
                         <p className="text-sm text-gray-700 dark:text-gray-300">
                             They now have your question set and all your packing lists. Send them this
                             link so they can open it:
                         </p>
-                        <input
-                            type="text"
-                            readOnly
-                            value={inviteLink}
-                            aria-label="Invite link"
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none"
-                            onClick={e => (e.target as HTMLInputElement).select()}
-                        />
-                        <Button type="button" variant="secondary" onClick={handleCopyInviteLink}>
-                            Copy link
-                        </Button>
+                        <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
                     </div>
                 )}
 
@@ -524,6 +524,7 @@ export function SharingSettingsPage() {
                                                 onClick={() => setManagingList({
                                                     fileUrl: `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
                                                     listId: list.id,
+                                                    name: list.name,
                                                 })}
                                                 className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                             >
@@ -545,7 +546,9 @@ export function SharingSettingsPage() {
                     session={session}
                     fileUrl={managingList.fileUrl}
                     listId={managingList.listId}
+                    listName={managingList.name}
                     sharerPodUrl={ownPodUrl}
+                    knownPeople={knownPeople}
                 />
             )}
         </div>

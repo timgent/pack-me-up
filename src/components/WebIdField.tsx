@@ -1,5 +1,5 @@
 import { CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
-import React from 'react'
+import React, { type ReactNode } from 'react'
 import type { WebIdLookup } from '../hooks/useWebIdLookup'
 import { friendlyWebIdName } from '../services/solidPod'
 import { Input } from './Input'
@@ -32,6 +32,14 @@ export function WebIdField({
     disabled,
     placeholder = 'e.g. https://alice.solidcommunity.net/profile/card#me',
     inputRef,
+    inputAriaLabel,
+    onBlur,
+    emptyHint = (
+        <>
+            Ask them to open Pack Me Up, go to their <strong>Sharing page</strong>, and
+            tap “Copy my address”.
+        </>
+    ),
 }: {
     label: string
     value: string
@@ -40,6 +48,16 @@ export function WebIdField({
     disabled?: boolean
     placeholder?: string
     inputRef?: React.Ref<HTMLInputElement>
+    /**
+     * A fuller accessible name, where the visible label cannot say who this is
+     * about — one field per person in a list of them. Keep the visible label
+     * inside it, so what is read matches what is seen.
+     */
+    inputAriaLabel?: string
+    /** Somewhere to normalise the value, for callers that store what is typed. */
+    onBlur?: () => void
+    /** What an empty field suggests. The default points at the sharing flow. */
+    emptyHint?: ReactNode
 }) {
     const { webId, status, profile } = lookup
     // Worth saying out loud only when we changed something. Told "we'll use
@@ -55,6 +73,8 @@ export function WebIdField({
                 onChange={e => onChange(e.target.value)}
                 disabled={disabled}
                 ref={inputRef}
+                aria-label={inputAriaLabel}
+                onBlur={onBlur}
                 type="text"
                 inputMode="url"
                 autoComplete="off"
@@ -66,10 +86,7 @@ export function WebIdField({
                 result of typing an address rather than only sighted users. */}
             <div role="status" aria-live="polite" className="min-h-[1.25rem]">
                 {status === 'empty' && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Ask them to open Pack Me Up, go to their <strong>Sharing page</strong>, and
-                        tap “Copy my address”.
-                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{emptyHint}</p>
                 )}
 
                 {status === 'invalid' && (

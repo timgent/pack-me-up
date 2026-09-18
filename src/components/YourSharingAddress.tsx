@@ -1,10 +1,5 @@
-import { ClipboardDocumentIcon, QrCodeIcon, ShareIcon } from '@heroicons/react/24/outline'
-import { useState } from 'react'
-import { reportError } from '../errorReporting'
 import { successToast } from '../utils/successToastCopy'
-import { Button } from './Button'
-import { QrCode } from './QrCode'
-import { useToast } from './ToastContext'
+import { ShareActions } from './ShareActions'
 
 /**
  * The signed-in person's own WebID, in a form they can actually hand to
@@ -33,42 +28,6 @@ export function YourSharingAddress({
     description?: string
     className?: string
 }) {
-    const { showToast } = useToast()
-    const [showQr, setShowQr] = useState(false)
-
-    // Feature-detected per render rather than at module load: the native shell
-    // and the browser build run the same code, and only one of them has it.
-    const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(webId)
-            showToast(successToast('addressCopied'), 'success')
-        } catch (err) {
-            // Clipboard access gets refused often enough to plan for (insecure
-            // origin, permissions, an embedded webview). The address is on
-            // screen and selectable, so say that rather than fail silently.
-            const details = reportError(err, 'YourSharingAddress: failed to copy address')
-            showToast('Could not copy — select the address and copy it manually.', 'error', details)
-        }
-    }
-
-    const handleShare = async () => {
-        try {
-            await navigator.share?.({
-                title: 'My Pack Me Up sharing address',
-                text: `Here's my Pack Me Up sharing address, so you can share packing lists with me: ${webId}`,
-            })
-        } catch (err) {
-            // Dismissing the sheet rejects with AbortError. That is a person
-            // changing their mind, not a fault, and toasting at them for it
-            // would be rude.
-            if (err instanceof Error && err.name === 'AbortError') return
-            const details = reportError(err, 'YourSharingAddress: failed to open the share sheet')
-            showToast('Could not open the share sheet — copy the address instead.', 'error', details)
-        }
-    }
-
     return (
         <div className={`rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-3 ${className}`}>
             <div className="space-y-1">
@@ -85,35 +44,17 @@ export function YourSharingAddress({
                 {webId}
             </p>
 
-            <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="primary" onClick={handleCopy}>
-                    <ClipboardDocumentIcon aria-hidden="true" className="h-4 w-4" />
-                    Copy my address
-                </Button>
-                {canShare && (
-                    <Button type="button" variant="secondary" onClick={handleShare}>
-                        <ShareIcon aria-hidden="true" className="h-4 w-4" />
-                        Send my address
-                    </Button>
-                )}
-                <Button type="button" variant="subtle" onClick={() => setShowQr(open => !open)} aria-expanded={showQr}>
-                    <QrCodeIcon aria-hidden="true" className="h-4 w-4" />
-                    {showQr ? 'Hide QR code' : 'Show QR code'}
-                </Button>
-            </div>
-
-            {showQr && (
-                <div className="space-y-1">
-                    <QrCode
-                        value={webId}
-                        label="Your sharing address as a QR code"
-                        className="h-44 w-44 rounded-lg border border-gray-300 dark:border-gray-600 p-2"
-                    />
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                        They can point a camera at this instead of typing it.
-                    </p>
-                </div>
-            )}
+            <ShareActions
+                value={webId}
+                copyLabel="Copy my address"
+                copiedMessage={() => successToast('addressCopied')}
+                shareLabel="Send my address"
+                shareTitle="My Pack Me Up sharing address"
+                shareText={`Here's my Pack Me Up sharing address, so you can share packing lists with me: ${webId}`}
+                qrLabel="Your sharing address as a QR code"
+                qrHint="They can point a camera at this instead of typing it."
+                errorContext="YourSharingAddress"
+            />
         </div>
     )
 }
