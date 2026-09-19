@@ -13,6 +13,7 @@ import {
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { CollaboratorIdentity } from './CollaboratorIdentity'
+import { CreateInviteLink } from './CreateInviteLink'
 import { PeopleSuggestions } from './PeopleSuggestions'
 import { ShareableLink } from './ShareableLink'
 import { WebIdField } from './WebIdField'
@@ -237,6 +238,22 @@ export function SharePackingListModal({
                             Anyone with the link
                         </button>
                     </div>
+
+                    {shareMode === 'person' && (
+                        <div className="space-y-3 mb-4">
+                            <CreateInviteLink
+                                session={session}
+                                podUrl={sharerPodUrl}
+                                kind="list"
+                                listId={listId}
+                                label={listName}
+                                subject={listName ?? 'a packing list'}
+                            />
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                                Or share with an address you already have
+                            </p>
+                        </div>
+                    )}
 
                     {shareMode === 'person' && (
                         <PeopleSuggestions

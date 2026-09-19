@@ -17,6 +17,8 @@ import {
   JUSER_EMAIL, JUSER_PASSWORD, JUSER_POD_NAME,
   LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME,
   MUSER_EMAIL, MUSER_PASSWORD, MUSER_POD_NAME,
+  NUSER_EMAIL, NUSER_PASSWORD, NUSER_POD_NAME,
+  NINVITEE_EMAIL, NINVITEE_PASSWORD, NINVITEE_POD_NAME,
 } from '../playwright.config'
 import v1QuestionSet from './fixtures/v1-question-set.json' with { type: 'json' }
 import v1PackingList from './fixtures/v1-packing-list.json' with { type: 'json' }
@@ -77,6 +79,12 @@ export default async function globalSetup() {
 
   await createCssAccount(CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME)
   console.log(`[setup] L-suite account created: ${LUSER_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, NUSER_EMAIL, NUSER_PASSWORD, NUSER_POD_NAME)
+  console.log(`[setup] N-suite inviter account created: ${NUSER_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, NINVITEE_EMAIL, NINVITEE_PASSWORD, NINVITEE_POD_NAME)
+  console.log(`[setup] N-suite invitee account created: ${NINVITEE_EMAIL}`)
 
   await createCssAccount(CSS_PORT, MUSER_EMAIL, MUSER_PASSWORD, MUSER_POD_NAME)
   console.log(`[setup] M-suite account created: ${MUSER_EMAIL}`)
