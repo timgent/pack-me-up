@@ -29,6 +29,14 @@ vi.mock('../services/solidPod', () => ({
         const base = `/view-lists/${listId}?pod=${encodeURIComponent(podUrl)}`
         return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
     }),
+    // Mirrors the real builder, whose whole point is that the origin is the
+    // app's public one and never `window.location.origin` (#357). The sentinel
+    // origin below is what proves the page delegates instead of composing the
+    // URL itself, as it used to.
+    buildSharedSetupUrl: vi.fn((podUrl: string, ownerWebId?: string) => {
+        const base = `https://public.example.com/#/pod/${encodeURIComponent(podUrl)}/view-lists`
+        return ownerWebId ? `${base}?owner=${encodeURIComponent(ownerWebId)}` : base
+    }),
     saveRdfToPod: vi.fn(() => Promise.resolve()),
     POD_CONTAINERS: {
         SHARED_WITH_ME: 'pack-me-up/shared-with-me.ttl',
@@ -188,6 +196,10 @@ describe('SharingSettingsPage — share your full setup', () => {
         expect(await screen.findByText(/your full setup is shared/i)).toBeTruthy()
         fireEvent.click(screen.getByRole('button', { name: /copy link/i }))
         await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/view-lists')))
+        // The link has to open on somebody else's device, so it carries the
+        // app's public origin rather than whatever this one is served from.
+        expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/public\.example\.com\/#\/pod\//))
+        expect(writeText).not.toHaveBeenCalledWith(expect.stringContaining(window.location.origin))
     })
 
     it('offers an invite link before asking for an address at all', async () => {
