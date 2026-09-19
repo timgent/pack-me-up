@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import type { AppSession } from '../types/AppSession'
 import type { StoredInvite } from '../services/invites'
+import { PUBLIC_APP_ORIGIN } from '../services/publicAppOrigin'
 
 const mockCreateInvite = vi.fn()
 vi.mock('../services/invites', async importOriginal => {
@@ -66,6 +67,30 @@ describe('CreateInviteLink', () => {
         expect((field as HTMLInputElement).value).toContain(`/#/invite/${created.token}`)
         // The delay is stated up front rather than discovered later.
         expect(screen.getByText(/next time you open Pack Me Up/i)).toBeTruthy()
+    })
+
+    it('builds the link on the app’s public origin, not the device’s', async () => {
+        // In the native shell `window.location.origin` is `https://localhost`,
+        // and an invite link is by definition opened on somebody else's device
+        // (#357). The guard over the builders themselves is in
+        // `services/shareLinks.test.ts`; this is the call site.
+        const originalLocation = window.location
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { ...originalLocation, origin: 'https://localhost' },
+        })
+        try {
+            renderIt()
+
+            fireEvent.click(screen.getByRole('button', { name: /create invite link/i }))
+
+            const field = await screen.findByRole('textbox', { name: /invite link/i })
+            const link = (field as HTMLInputElement).value
+            expect(link).not.toContain('localhost')
+            expect(link.startsWith(`${PUBLIC_APP_ORIGIN}/#/invite/`)).toBe(true)
+        } finally {
+            Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+        }
     })
 
     it('tells them the other way still works when the Pod refuses', async () => {

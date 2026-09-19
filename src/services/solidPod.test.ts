@@ -29,12 +29,8 @@ import {
     isRetryablePodUrlFailure,
     PodUrlUnavailableError,
     POD_ERROR_MESSAGES,
-    buildSharedListPath,
-    buildSharedListUrl,
     buildSharedSetupPath,
-    buildSharedSetupUrl,
 } from './solidPod'
-import { PUBLIC_APP_ORIGIN } from './publicAppOrigin'
 import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
 import type { PackingListQuestionSet } from '../edit-questions/types'
@@ -1930,60 +1926,6 @@ describe('podUsernameFromWebId', () => {
 
     it('returns null for an invalid URL', () => {
         expect(podUsernameFromWebId('not-a-url')).toBeNull()
-    })
-})
-
-/**
- * A share link is built on one device and opened on another. Inside the
- * Capacitor shell the runtime origin is `https://localhost`, so for as long as
- * these builders read it, every link the native app produced pointed at the
- * phone that produced it (#357).
- *
- * This is the guard the fix is for: the bug is a one-line mistake, easy to
- * reintroduce in the next sharing surface, and nothing else catches it. Any new
- * builder of a link that leaves the device belongs in the list below.
- */
-describe('share links never carry the runtime origin of a native shell', () => {
-    const originalLocation = window.location
-    const LIST_ID = 'list-1'
-    const POD_URL = 'https://pod.example.com/'
-    const OWNER_WEB_ID = 'https://pod.example.com/profile/card#me'
-
-    const stubOrigin = (origin: string) => {
-        Object.defineProperty(window, 'location', {
-            configurable: true,
-            value: { ...originalLocation, origin },
-        })
-    }
-
-    /** Every builder of a URL that is handed to somebody else. */
-    const linkBuilders: Array<[string, () => string]> = [
-        ['buildSharedListUrl', () => buildSharedListUrl(LIST_ID, POD_URL, OWNER_WEB_ID)],
-        ['buildSharedSetupUrl', () => buildSharedSetupUrl(POD_URL, OWNER_WEB_ID)],
-    ]
-
-    afterEach(() => {
-        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
-    })
-
-    it.each(linkBuilders)('%s sends the public origin, not https://localhost', (_name, build) => {
-        stubOrigin('https://localhost')
-        const link = build()
-        expect(link).not.toContain('localhost')
-        expect(link.startsWith(`${PUBLIC_APP_ORIGIN}/#/`)).toBe(true)
-    })
-
-    it.each(linkBuilders)('%s keeps a real web origin, so a preview deploy links to itself', (_name, build) => {
-        stubOrigin('https://preview.example.com')
-        expect(build().startsWith('https://preview.example.com/#/')).toBe(true)
-    })
-
-    it('still carries the pod and owner the recipient needs', () => {
-        stubOrigin('https://localhost')
-        expect(buildSharedListUrl(LIST_ID, POD_URL, OWNER_WEB_ID))
-            .toBe(`${PUBLIC_APP_ORIGIN}/#${buildSharedListPath(LIST_ID, POD_URL, OWNER_WEB_ID)}`)
-        expect(buildSharedSetupUrl(POD_URL, OWNER_WEB_ID))
-            .toBe(`${PUBLIC_APP_ORIGIN}/#${buildSharedSetupPath(POD_URL, OWNER_WEB_ID)}`)
     })
 })
 
