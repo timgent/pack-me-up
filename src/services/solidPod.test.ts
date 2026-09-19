@@ -29,6 +29,7 @@ import {
     isRetryablePodUrlFailure,
     PodUrlUnavailableError,
     POD_ERROR_MESSAGES,
+    buildSharedSetupPath,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
@@ -1925,5 +1926,18 @@ describe('podUsernameFromWebId', () => {
 
     it('returns null for an invalid URL', () => {
         expect(podUsernameFromWebId('not-a-url')).toBeNull()
+    })
+})
+
+describe('buildSharedSetupPath', () => {
+    it('points at the whole-setup route for the sharer’s pod', () => {
+        expect(buildSharedSetupPath('https://pod.example.com/'))
+            .toBe(`/pod/${encodeURIComponent('https://pod.example.com/')}/view-lists`)
+    })
+
+    it('names the owner when one is known, so the recipient sees whose setup it is', () => {
+        expect(buildSharedSetupPath('https://pod.example.com/', 'https://pod.example.com/profile/card#me'))
+            .toBe(`/pod/${encodeURIComponent('https://pod.example.com/')}/view-lists`
+                + `?owner=${encodeURIComponent('https://pod.example.com/profile/card#me')}`)
     })
 })

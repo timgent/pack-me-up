@@ -2,6 +2,7 @@ import { LinkIcon } from '@heroicons/react/24/outline'
 import { useState } from 'react'
 import { reportError } from '../errorReporting'
 import { buildInviteLink, createInvite, type StoredInvite } from '../services/invites'
+import { shareOrigin } from '../services/publicAppOrigin'
 import type { InviteKind } from '../services/rdfSerialization'
 import type { AppSession } from '../types/AppSession'
 import { Button } from './Button'
@@ -64,7 +65,10 @@ export function CreateInviteLink({ session, podUrl, kind, listId, label, subject
                     time you open Pack Me Up — you don't need their address at all.
                 </p>
                 <ShareableLink
-                    link={buildInviteLink(window.location.origin, podUrl, session.info.webId, invite)}
+                    // `shareOrigin()`, never this device's: inside the native
+                    // shell the runtime origin is `https://localhost`, and this
+                    // link's whole job is to be opened somewhere else (#357).
+                    link={buildInviteLink(shareOrigin(), podUrl, session.info.webId, invite)}
                     label="Invite link"
                     subject={subject}
                 />

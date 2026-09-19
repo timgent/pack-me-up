@@ -14,6 +14,7 @@ import {
     getPodOwnerName,
     resolveOwnerDisplayName,
     buildSharedListPath,
+    buildSharedSetupUrl,
     POD_CONTAINERS,
     getCollaborators,
     isPubliclyAccessible,
@@ -241,8 +242,9 @@ export function SharingSettingsPage() {
         try {
             await grantFullCollaboratorAccess(session, ownPodUrl, theirWebId)
             const ownerWebId = session?.info.webId
-            const ownerParam = ownerWebId ? `?owner=${encodeURIComponent(ownerWebId)}` : ''
-            const link = `${window.location.origin}/#/pod/${encodeURIComponent(ownPodUrl)}/view-lists${ownerParam}`
+            // Built on the app's public origin, not this device's: inside the
+            // native shell the runtime origin is `https://localhost` (#357).
+            const link = buildSharedSetupUrl(ownPodUrl, ownerWebId ?? undefined)
             setInviteLink(link)
             setSharedWith(theirWebId)
             setCollaboratorWebId('')

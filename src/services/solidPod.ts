@@ -12,6 +12,7 @@ import { mergePackingLists } from '../utils/mergePackingLists'
 import { profile } from '../utils/profiling'
 import { yieldToEventLoop } from '../utils/yieldToEventLoop'
 import { responseToDataset } from './rdfDataset'
+import { shareOrigin } from './publicAppOrigin'
 
 /**
  * Pod container paths under the user's Pod root
@@ -171,8 +172,26 @@ export function buildSharedListPath(listId: string, podUrl: string, ownerWebId?:
     return ownerWebId ? `${base}&owner=${encodeURIComponent(ownerWebId)}` : base
 }
 
+/**
+ * The in-app route for somebody else's whole setup — the other half of a share,
+ * granted by `grantFullCollaboratorAccess`.
+ */
+export function buildSharedSetupPath(podUrl: string, ownerWebId?: string): string {
+    const base = `/pod/${encodeURIComponent(podUrl)}/view-lists`
+    return ownerWebId ? `${base}?owner=${encodeURIComponent(ownerWebId)}` : base
+}
+
+/**
+ * The two links a share produces. Both are built here, on `shareOrigin()`
+ * rather than `window.location.origin`, because both are opened on somebody
+ * else's device — see `publicAppOrigin.ts` and #357.
+ */
 export function buildSharedListUrl(listId: string, podUrl: string, ownerWebId?: string): string {
-    return `${window.location.origin}/#${buildSharedListPath(listId, podUrl, ownerWebId)}`
+    return `${shareOrigin()}/#${buildSharedListPath(listId, podUrl, ownerWebId)}`
+}
+
+export function buildSharedSetupUrl(podUrl: string, ownerWebId?: string): string {
+    return `${shareOrigin()}/#${buildSharedSetupPath(podUrl, ownerWebId)}`
 }
 
 export function deriveWebIdFromPodUrl(podUrl: string): string {

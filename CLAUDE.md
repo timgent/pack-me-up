@@ -97,6 +97,21 @@ Every share — one list or the whole setup — is gated on a WebID that only th
   already has access. It is a local read behind an `enabled` flag, so a packing
   list page does not pay for three documents until a share dialog opens.
 
+- **A link that leaves the device never carries `window.location.origin`.** In
+  the Capacitor shell that origin is `https://localhost`, so every link the
+  native app produced was copyable, shareable and useless, and sharing read as
+  local-only when the WAC grants behind it had worked all along (#357). The
+  origin comes from `shareOrigin()` (`src/services/publicAppOrigin.ts`), derived
+  from `HOSTED_CLIENT_ID_URL` so the deployment host is written down once and
+  overridable with `VITE_PUBLIC_ORIGIN`. A web origin is kept as it is, so a
+  preview deploy links to itself, and `window.location.origin` stays right for
+  in-app navigation. The mistake is one line and each new sharing surface is a
+  fresh chance to make it — the setup link repeated it after the list link, and
+  `CreateInviteLink` repeated it again — so a new builder goes in the
+  `linkBuilders` list in `services/shareLinks.test.ts`, and a builder that takes
+  its origin as an argument (`buildInviteLink`) also needs a test at its call
+  site that what gets passed is `shareOrigin()`.
+
 ### Invite links
 
 `CreateInviteLink` is the path that needs nothing from the other person, and it
