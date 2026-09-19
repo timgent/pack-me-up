@@ -159,11 +159,11 @@ describe('acceptInvite', () => {
 
         expect(mockFetch).toHaveBeenCalledWith(url, expect.objectContaining({
             method: 'PATCH',
-            headers: expect.objectContaining({ 'Content-Type': 'text/n3' }),
+            headers: expect.objectContaining({ 'Content-Type': 'application/sparql-update' }),
         }))
         const body = mockFetch.mock.calls[0][1].body as string
-        expect(body).toContain('solid:inserts')
-        expect(body).not.toContain('solid:deletes')
+        expect(body).toContain('INSERT DATA')
+        expect(body).not.toContain('DELETE')
         expect(body).toContain('https://bob.example.org/profile/card#me')
     })
 
