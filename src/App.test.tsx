@@ -17,6 +17,8 @@ vi.mock('./components/DatabaseContext', () => ({
 
 vi.mock('./components/ToastContext', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  // `InviteRedemption` toasts when somebody accepts an invite.
+  useToast: () => ({ showToast: vi.fn() }),
 }))
 
 vi.mock('./components/Navigation', () => ({

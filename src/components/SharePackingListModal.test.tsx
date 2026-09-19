@@ -22,6 +22,8 @@ vi.mock('../services/solidPod', () => ({
     // The modal names the people it lists, and confirms an address before
     // granting to it — both of which read profile cards.
     getSolidProfile: vi.fn().mockResolvedValue({ name: null, photo: null, resolved: false }),
+    // Reached through CreateInviteLink -> services/invites.
+    POD_CONTAINERS: { ROOT: 'pack-me-up/', PACKING_LISTS: 'pack-me-up/packing-lists/' },
     friendlyWebIdName: vi.fn((webId: string) => new URL(webId).hostname),
 }))
 

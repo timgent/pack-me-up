@@ -29,11 +29,13 @@ import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
 import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
+import { CreateInviteLink } from '../components/CreateInviteLink'
 import { PeopleSuggestions } from '../components/PeopleSuggestions'
 import { ShareableLink } from '../components/ShareableLink'
 import { WebIdField } from '../components/WebIdField'
 import { YourSharingAddress } from '../components/YourSharingAddress'
 import { useKnownPeople } from '../hooks/useKnownPeople'
+import { deleteInvite, listInvites, type StoredInvite } from '../services/invites'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
 import {
     clearPendingSignInAction,
@@ -82,6 +84,8 @@ export function SharingSettingsPage() {
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
     const collaboratorLookup = useWebIdLookup(collaboratorWebId, session)
     const knownPeople = useKnownPeople()
+    const [pendingInvites, setPendingInvites] = useState<StoredInvite[]>([])
+    const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
     const [isGranting, setIsGranting] = useState(false)
     const [inviteLink, setInviteLink] = useState<string | null>(null)
     const [sharedWith, setSharedWith] = useState<string | null>(null)
@@ -143,6 +147,30 @@ export function SharingSettingsPage() {
     useEffect(() => {
         if (ownPodUrl) loadCollaborators()
     }, [ownPodUrl, loadCollaborators])
+
+    const loadInvites = useCallback(async () => {
+        if (!session || !ownPodUrl) return
+        // Never fatal: an unreadable invites container only means no links to
+        // show, and the rest of this page is unaffected by it.
+        setPendingInvites(await listInvites(session, ownPodUrl).catch(() => []))
+    }, [session, ownPodUrl])
+
+    useEffect(() => { loadInvites() }, [loadInvites])
+
+    const handleRevokeInvite = async (invite: StoredInvite) => {
+        if (!session) return
+        setRevokingInvite(invite.url)
+        try {
+            await deleteInvite(session, invite.url)
+            setPendingInvites(current => current.filter(i => i.url !== invite.url))
+            showToast('Invite link revoked — it stops working straight away', 'success')
+        } catch (err) {
+            const details = reportError(err, 'SharingSettingsPage: failed to revoke invite')
+            showToast('Failed to revoke that invite link. Please try again.', 'error', details)
+        } finally {
+            setRevokingInvite(null)
+        }
+    }
 
     useEffect(() => {
         if (sharedWithMe) setSharedContexts(sharedWithMe.contexts)
@@ -350,6 +378,20 @@ export function SharingSettingsPage() {
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                 <FullSetupIntro />
+                {session && ownPodUrl && (
+                    <CreateInviteLink
+                        session={session}
+                        podUrl={ownPodUrl}
+                        kind="full-setup"
+                        subject="my questions and packing lists"
+                        onCreated={invite => setPendingInvites(current => [...current, invite])}
+                    />
+                )}
+
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    Or share with an address you already have
+                </p>
+
                 <PeopleSuggestions
                     people={knownPeople}
                     alreadyShared={collaborators}
@@ -411,6 +453,43 @@ export function SharingSettingsPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">You haven't shared your full setup with anyone yet.</p>
                 )}
             </section>
+
+            {/* Invite links that have been handed out and not yet used up. */}
+            {pendingInvites.length > 0 && (
+                <section className="space-y-3">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Invite links you've sent</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Anyone holding one of these links can accept it. They disappear from here
+                        once used. Revoking one stops it working straight away.
+                    </p>
+                    <ul className="space-y-2">
+                        {pendingInvites.map(invite => (
+                            <li key={invite.url} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                <div className="flex flex-col flex-1 min-w-0">
+                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                        {invite.kind === 'full-setup'
+                                            ? 'Your full setup'
+                                            : invite.label ?? 'One packing list'}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {invite.acceptedBy.length > 0
+                                            ? 'Accepted — access is granted next time this app opens'
+                                            : `Sent ${new Date(invite.createdAt).toLocaleDateString()}, not accepted yet`}
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => handleRevokeInvite(invite)}
+                                    disabled={revokingInvite === invite.url}
+                                    aria-label={`Revoke invite link for ${invite.kind === 'full-setup' ? 'your full setup' : invite.label ?? 'a packing list'}`}
+                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
+                                >
+                                    {revokingInvite === invite.url ? 'Revoking…' : 'Revoke'}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
 
             {/* Section 2: Pods shared with me */}
             <section className="space-y-4">

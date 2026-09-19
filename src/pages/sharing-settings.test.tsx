@@ -37,6 +37,12 @@ vi.mock('../services/solidPod', () => ({
     },
 }))
 
+vi.mock('../services/invites', async importOriginal => {
+    const actual = await importOriginal<typeof import('../services/invites')>()
+    return { ...actual, listInvites: vi.fn(() => Promise.resolve([])), deleteInvite: vi.fn(() => Promise.resolve()) }
+})
+
+import { listInvites, deleteInvite } from '../services/invites'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { saveRdfToPod, getFullCollaborators, getCollaborators, grantFullCollaboratorAccess } from '../services/solidPod'
@@ -182,6 +188,71 @@ describe('SharingSettingsPage — share your full setup', () => {
         expect(await screen.findByText(/your full setup is shared/i)).toBeTruthy()
         fireEvent.click(screen.getByRole('button', { name: /copy link/i }))
         await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/view-lists')))
+    })
+
+    it('offers an invite link before asking for an address at all', async () => {
+        renderPage()
+
+        // The address field is the path that needs something only the other
+        // person has; the link is the path that needs nothing.
+        expect(await screen.findByRole('button', { name: /create invite link/i })).toBeTruthy()
+        expect(screen.getByText(/or share with an address you already have/i)).toBeTruthy()
+    })
+
+    it('lists an invite link that has been sent but not used', async () => {
+        vi.mocked(listInvites).mockResolvedValue([{
+            token: 'tok-aaaaaaaaaaaaaaaaaaaa',
+            kind: 'full-setup',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            acceptedBy: [],
+            url: 'https://pod.example.com/pack-me-up/invites/tok-aaaaaaaaaaaaaaaaaaaa',
+        }])
+        renderPage()
+
+        expect(await screen.findByRole('heading', { name: /invite links you've sent/i })).toBeTruthy()
+        expect(screen.getByText(/not accepted yet/i)).toBeTruthy()
+    })
+
+    it('says when an invite is accepted but not yet acted on', async () => {
+        // The one real cost of having no server: it is stated rather than
+        // left to be discovered.
+        vi.mocked(listInvites).mockResolvedValue([{
+            token: 'tok-bbbbbbbbbbbbbbbbbbbb',
+            kind: 'list',
+            listId: 'l1',
+            label: 'Ski trip',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            acceptedBy: ['https://bob.example.com/profile/card#me'],
+            url: 'https://pod.example.com/pack-me-up/invites/tok-bbbbbbbbbbbbbbbbbbbb',
+        }])
+        renderPage()
+
+        expect(await screen.findByText(/access is granted next time this app opens/i)).toBeTruthy()
+        expect(screen.getByText('Ski trip')).toBeTruthy()
+    })
+
+    it('revokes an invite link and drops it from the list', async () => {
+        vi.mocked(listInvites).mockResolvedValue([{
+            token: 'tok-cccccccccccccccccccc',
+            kind: 'full-setup',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            acceptedBy: [],
+            url: 'https://pod.example.com/pack-me-up/invites/tok-cccccccccccccccccccc',
+        }])
+        vi.mocked(deleteInvite).mockResolvedValue(undefined)
+        renderPage()
+
+        fireEvent.click(await screen.findByRole('button', { name: /revoke invite link/i }))
+
+        await waitFor(() => expect(deleteInvite).toHaveBeenCalled())
+        await waitFor(() => expect(screen.queryByRole('heading', { name: /invite links you've sent/i })).toBeNull())
+    })
+
+    it('shows no invite section when there is nothing outstanding', async () => {
+        renderPage()
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        expect(screen.queryByRole('heading', { name: /invite links you've sent/i })).toBeNull()
     })
 
     it('hands them their own address, which is the step neither side could take', async () => {
