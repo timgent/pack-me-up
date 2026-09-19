@@ -34,6 +34,7 @@ import { PeopleSuggestions } from '../components/PeopleSuggestions'
 import { ShareableLink } from '../components/ShareableLink'
 import { WebIdField } from '../components/WebIdField'
 import { YourSharingAddress } from '../components/YourSharingAddress'
+import { useInviteRedemptionVersion } from '../components/InviteRedemptionContext'
 import { useKnownPeople } from '../hooks/useKnownPeople'
 import { deleteInvite, listInvites, type StoredInvite } from '../services/invites'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
@@ -84,6 +85,9 @@ export function SharingSettingsPage() {
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
     const collaboratorLookup = useWebIdLookup(collaboratorWebId, session)
     const knownPeople = useKnownPeople()
+    // Redemption grants access moments after this page has loaded, so both
+    // lists below have to re-read when it does.
+    const redemptionVersion = useInviteRedemptionVersion()
     const [pendingInvites, setPendingInvites] = useState<StoredInvite[]>([])
     const [revokingInvite, setRevokingInvite] = useState<string | null>(null)
     const [isGranting, setIsGranting] = useState(false)
@@ -142,7 +146,10 @@ export function SharingSettingsPage() {
         } finally {
             setIsLoadingCollaborators(false)
         }
-    }, [session, ownPodUrl])
+    // `redemptionVersion` is a change signal rather than an input: redeeming
+    // an invite grants access, which is exactly what this reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session, ownPodUrl, redemptionVersion])
 
     useEffect(() => {
         if (ownPodUrl) loadCollaborators()
@@ -153,7 +160,9 @@ export function SharingSettingsPage() {
         // Never fatal: an unreadable invites container only means no links to
         // show, and the rest of this page is unaffected by it.
         setPendingInvites(await listInvites(session, ownPodUrl).catch(() => []))
-    }, [session, ownPodUrl])
+    // Redeeming an invite deletes it, so this list changes with it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session, ownPodUrl, redemptionVersion])
 
     useEffect(() => { loadInvites() }, [loadInvites])
 

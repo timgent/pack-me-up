@@ -34,6 +34,15 @@ export const LUSER_POD_NAME = 'luser'
 export const JUSER_EMAIL = 'juser@example.com'
 export const JUSER_PASSWORD = 'test1234'
 export const JUSER_POD_NAME = 'juser'
+// N exercises invite links, which need two Pods that no other suite touches:
+// the invitee's WebID is written into the inviter's Pod and then granted access
+// to everything in it.
+export const NUSER_EMAIL = 'nuser@example.com'
+export const NUSER_PASSWORD = 'test1234'
+export const NUSER_POD_NAME = 'nuser'
+export const NINVITEE_EMAIL = 'ninvitee@example.com'
+export const NINVITEE_PASSWORD = 'test1234'
+export const NINVITEE_POD_NAME = 'ninvitee'
 export const MUSER_EMAIL = 'muser@example.com'
 export const MUSER_PASSWORD = 'test1234'
 export const MUSER_POD_NAME = 'muser'

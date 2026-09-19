@@ -22,6 +22,8 @@ Each serial suite that writes to a Solid pod **must use its own dedicated pod us
 | L (User A) | `luser` |
 | M (User A) | `muser` |
 | L/M (User B) | `collabuser` |
+| N (inviter) | `nuser` |
+| N (invitee) | `ninvitee` |
 
 ## Pull Requests
 
@@ -94,6 +96,41 @@ Every share — one list or the whole setup — is gated on a WebID that only th
   with. `PeopleSuggestions` offers what is left as chips, minus anyone who
   already has access. It is a local read behind an `enabled` flag, so a packing
   list page does not pay for three documents until a share dialog opens.
+
+### Invite links
+
+`CreateInviteLink` is the path that needs nothing from the other person, and it
+sits above the address field on both share surfaces because having nothing is
+where everybody starts. Four rules:
+
+- **The URL is the secret.** One resource per invite at
+  `pack-me-up/invites/{token}`, granted public Append and nothing else
+  (`services/invites.ts`). That one choice is why accepting needs no prior
+  permission, why an invite link is not a peephole (nobody holding it can
+  *read*, so two invitees never learn of each other), why revoking is a DELETE
+  — and why it works on ACP Pods, since `setPublicAccess` is the one
+  access-control call solid-client implements for both. `inviteUrlFor` is where
+  a token becomes a path segment, so it refuses anything not shaped like one.
+- **What arrives is never trusted; what was sent is.** The appended WebID was
+  written by a stranger. What gets granted is decided by the *invite* — the
+  inviter's own record of what she offered — so a WebID on a list invite can
+  only ever reach that list. `datasetToInvite` reads an unknown kind as the
+  narrower one for the same reason.
+- **Nothing happens until the inviter's app runs.** There is no server, so an
+  acceptance waits on the Pod for `useInviteRedemption`. Both ends say so in
+  words. A grant that fails keeps its invite so the next run retries; deleting
+  there would lose the acceptance with no way for either side to tell.
+- **Redemption is app-wide, and pages re-read when it fires.** It is mounted in
+  `App.tsx`, not on the Sharing page — the sender is waiting to hear it worked,
+  not planning a visit to settings. `InviteRedemptionContext` is the signal that
+  access changed underneath a page that has already loaded.
+
+Two known properties, both deliberate: a full-setup collaborator can read the
+invites container, because "your full setup" includes it — no escalation, since
+they already have everything an invite could grant, but they can see who is
+being invited; and `verifyForeignPodAccess` reads the packing-lists container,
+so somebody who shares a setup containing no lists at all is told they have no
+access. E2E suite N covers the round trip on two Pods.
 
 Both halves of a share get the same three ways out — clipboard, system share
 sheet, QR — through `ShareActions`: `YourSharingAddress` for the address that

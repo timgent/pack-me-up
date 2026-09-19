@@ -25,6 +25,7 @@ import { ForeignPackingListsPage } from './pages/foreign-packing-lists'
 import { SharingSettingsPage } from './pages/sharing-settings'
 import { AcceptInvitePage } from './pages/accept-invite'
 import { useInviteRedemption } from './hooks/useInviteRedemption'
+import { InviteRedemptionContext } from './components/InviteRedemptionContext'
 import { QuestionsPage } from './pages/questions-page'
 import { PrivacyPolicyPage } from './pages/privacy-policy'
 import { YourDataPage } from './pages/your-data'
@@ -48,9 +49,10 @@ function DefaultRedirect() {
  * the invite has no reason to visit that page again — they are waiting to hear
  * that it worked, not to go looking. Renders nothing; it only acts.
  */
-function InviteRedemption() {
-  useInviteRedemption()
-  return null
+function InviteRedemption({ children }: { children: React.ReactNode }) {
+  const { redeemed } = useInviteRedemption()
+  // Pages that show who has access re-read when this moves.
+  return <InviteRedemptionContext.Provider value={redeemed.length}>{children}</InviteRedemptionContext.Provider>
 }
 
 function App() {
@@ -60,12 +62,12 @@ function App() {
         <SolidPodProvider>
           <DatabaseProvider>
             <HashRouter>
+              <InviteRedemption>
               <Analytics />
               {/* Column layout keeps the footer at the bottom of short pages rather
                   than floating it under the content. */}
               <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-50 via-white to-accent-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
                 <Navigation />
-                <InviteRedemption />
                 <SessionExpiredBanner />
                 <OfflineBanner />
                 <AndroidTestBanner />
@@ -103,6 +105,7 @@ function App() {
                 </div>
                 <Footer />
               </div>
+              </InviteRedemption>
             </HashRouter>
           </DatabaseProvider>
         </SolidPodProvider>
