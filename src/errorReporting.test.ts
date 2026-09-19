@@ -97,4 +97,39 @@ describe('reportError with values that are not Errors', () => {
         const captured = captureException.mock.calls[0][0] as Error & { cause?: unknown }
         expect(captured.cause).toEqual({ name: 'conflict', message: 'Document update conflict', status: 409 })
     })
+
+    it('attaches a numeric status from a thrown object as Sentry extra context', () => {
+        reportError({ name: 'conflict', message: 'Document update conflict', status: 409 })
+
+        const [, options] = captureException.mock.calls[0]
+        expect(options).toEqual({ extra: { status: 409 } })
+    })
+})
+
+describe('reportError with a status carried on a real Error', () => {
+    beforeEach(() => {
+        captureException.mockClear()
+        vi.spyOn(console, 'error').mockImplementation(() => {})
+    })
+
+    it('attaches a numeric status property as Sentry extra context', () => {
+        class WithStatus extends Error {
+            constructor(message: string, readonly status: number) {
+                super(message)
+            }
+        }
+        const error = new WithStatus('This invite link is not accepting replies.', 403)
+
+        reportError(error)
+
+        expect(captureException).toHaveBeenCalledWith(error, { extra: { status: 403 } })
+    })
+
+    it('sends no extra context when the error has no numeric status', () => {
+        const error = new Error('boom')
+
+        reportError(error)
+
+        expect(captureException).toHaveBeenCalledWith(error)
+    })
 })

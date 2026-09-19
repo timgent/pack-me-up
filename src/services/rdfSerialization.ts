@@ -934,11 +934,19 @@ export function datasetToInvite(dataset: SolidDataset, datasetUrl: string): Invi
 }
 
 /**
- * The N3 patch that accepting an invite sends.
+ * The SPARQL Update patch that accepting an invite sends.
  *
  * Inserts only, because Append is the only permission the sender has — and
  * that is deliberate: it means accepting can never damage or read the
  * inviter's Pod, only add one triple to one resource.
+ *
+ * SPARQL Update (`application/sparql-update`) rather than N3-Patch
+ * (`text/n3`): Inrupt's ESS does not accept an N3-Patch on an ACP-protected
+ * resource under a plain `acl:Append` grant — it refuses the identical
+ * insert with 403, and only stops refusing once the grant also includes
+ * `acl:Write`, which defeats the point of an append-only invite (see
+ * docs/invite-links-on-acp-pods.md). The same insert as SPARQL Update
+ * succeeds under Append alone, on both ESS and Community Solid Server.
  */
 export function inviteAcceptancePatch(datasetUrl: string, webId: string): string {
     // The WebID is written into a document body as an IRI. It comes from the
@@ -949,7 +957,5 @@ export function inviteAcceptancePatch(datasetUrl: string, webId: string): string
     if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Not a WebID that can be written')
     if (/[<>"{}|\\^`\s]/.test(webId)) throw new Error('Not a WebID that can be written')
 
-    return `@prefix solid: <http://www.w3.org/ns/solid/terms#>.
-<#accept> a solid:InsertDeletePatch;
-  solid:inserts { <${inviteSubject(datasetUrl)}> <${PMU.acceptedBy}> <${webId}>. }.`
+    return `INSERT DATA { <${inviteSubject(datasetUrl)}> <${PMU.acceptedBy}> <${webId}>. }`
 }

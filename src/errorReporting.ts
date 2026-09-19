@@ -2,8 +2,26 @@ import * as Sentry from '@sentry/capacitor'
 
 export function reportError(error: unknown, context?: string): string {
     console.error(context ?? 'Unhandled error', error)
-    Sentry.captureException(toReportableError(error))
+    const reportable = toReportableError(error)
+    const extra = statusExtra(reportable)
+    Sentry.captureException(reportable, ...(extra ? [extra] : []))
     return formatErrorDetails(error, context)
+}
+
+/**
+ * `captureException` only serialises an Error's name, message and stack, so a
+ * `status` the app attached to an error (e.g. `InviteAcceptError`) is
+ * otherwise invisible in Sentry. Surface it as `extra` so an issue like the
+ * ACP invite failure can say whether it was a 401 or a 403 without needing
+ * live Pod access to find out — see docs/invite-links-on-acp-pods.md.
+ */
+function statusExtra(error: Error & { cause?: unknown }): { extra: { status: number } } | undefined {
+    const own = (error as { status?: unknown }).status
+    if (typeof own === 'number') return { extra: { status: own } }
+
+    const cause = error.cause
+    const wrapped = typeof cause === 'object' && cause !== null ? (cause as { status?: unknown }).status : undefined
+    return typeof wrapped === 'number' ? { extra: { status: wrapped } } : undefined
 }
 
 /**
