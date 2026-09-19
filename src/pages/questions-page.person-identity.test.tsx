@@ -134,6 +134,38 @@ describe('PeopleModal appearance picker', () => {
         expect(onSave).toHaveBeenLastCalledWith([{ id: 'p1', name: 'Alice', webId: undefined }])
     })
 
+    it('stores the WebID behind a Pod root once they leave the field', () => {
+        // What is stored here is what `useKnownPeople` matches on, so a Pod
+        // root saved verbatim is the same person filed under a second name.
+        const { onSave } = renderModal([{ id: 'p1', name: 'Alice' }])
+        fireEvent.click(avatarButtonFor('Alice'))
+        const field = screen.getByLabelText('Solid WebID for Alice')
+
+        fireEvent.change(field, { target: { value: 'alice.solidcommunity.net' } })
+        fireEvent.blur(field)
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onSave).toHaveBeenCalledWith([
+            { id: 'p1', name: 'Alice', webId: 'https://alice.solidcommunity.net/profile/card#me' },
+        ])
+    })
+
+    it('leaves an address it cannot make sense of exactly as typed', () => {
+        // Rewriting nonsense into a plausible-looking WebID would only hide the
+        // mistake; the field says so instead.
+        const { onSave } = renderModal([{ id: 'p1', name: 'Alice' }])
+        fireEvent.click(avatarButtonFor('Alice'))
+        const field = screen.getByLabelText('Solid WebID for Alice')
+
+        fireEvent.change(field, { target: { value: 'not an address' } })
+        fireEvent.blur(field)
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+        expect(onSave).toHaveBeenCalledWith([
+            { id: 'p1', name: 'Alice', webId: 'not an address' },
+        ])
+    })
+
     it('names an unnamed person by position so the picker is still findable', () => {
         renderModal([{ id: 'p1', name: '' }])
         expect(screen.getByRole('button', { name: 'Change appearance for Person 1' })).toBeTruthy()

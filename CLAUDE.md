@@ -73,8 +73,10 @@ Every share — one list or the whole setup — is gated on a WebID that only th
   `useWebIdLookup` then reads the profile card so the field can name who is
   there before anything is granted. A raw string handed to `grantCollaboratorAccess`
   is recorded by WAC without complaint, reported as a success, and reaches
-  nobody. Both share fields go through `WebIdField`; a third place asks for a
-  WebID (`PersonIdentityPicker`, for avatars) and does not yet.
+  nobody. Every field that asks for a WebID goes through `WebIdField` — both
+  share fields, and `PersonIdentityPicker`, which asks for one to put a
+  person's own photo on their avatar and normalises it on blur, because what
+  it stores is what `useKnownPeople` later matches on.
 - **An unreadable profile never blocks a share.** A card can be unreachable
   because the address is wrong, or because the server is down, the card is
   private, or none was ever published. `WebIdLookupStatus` keeps those apart:
@@ -85,11 +87,19 @@ Every share — one list or the whole setup — is gated on a WebID that only th
   address to send back — because a mismatched address, not a revoked grant, is
   the usual cause. It covers both entry points, `ForeignPodLayout` (a whole
   setup) and `view-packing-list` with a `?pod=` (one list).
+- **Never ask for an address the device already holds.** `useKnownPeople` reads
+  the three places one is already stored — the question set's people,
+  `shared-with-me`, `shared-lists-with-me` — normalises them so one person is
+  one entry, and drops the signed-in user, who is not somebody you can share
+  with. `PeopleSuggestions` offers what is left as chips, minus anyone who
+  already has access. It is a local read behind an `enabled` flag, so a packing
+  list page does not pay for three documents until a share dialog opens.
 
-`YourSharingAddress` is the other half: the signed-in person's own WebID with
-copy, share sheet and QR, at the top of `/sharing` and inside the access panels.
-Before it, the app displayed the user's WebID only as unselectable text in the
-account menu — so the first step of every share was one the app did not support.
+Both halves of a share get the same three ways out — clipboard, system share
+sheet, QR — through `ShareActions`: `YourSharingAddress` for the address that
+starts it, `ShareableLink` for the link that has to travel afterwards. Before
+them, the user's own WebID appeared only as unselectable text in the account
+menu, and a freshly granted link got a read-only input and a Copy button.
 E2E suites L and M cover both paths end to end.
 
 ## Application Capability description

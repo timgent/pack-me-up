@@ -20,6 +20,7 @@ import { useOwnerDisplayName } from '../hooks/useOwnerDisplayName'
 import { packingListToDataset, datasetToPackingList } from '../services/rdfSerialization'
 import { SharePackingListModal } from '../components/SharePackingListModal'
 import { SharedAccessHelp } from '../components/SharedAccessHelp'
+import { useKnownPeople } from '../hooks/useKnownPeople'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { UpdateFromQuestionsModal } from '../components/UpdateFromQuestionsModal'
 import { useForeignPod } from '../components/ForeignPodContext'
@@ -386,6 +387,7 @@ export function ViewPackingList() {
         items.forEach(item => setValue(`items.${item.id}`, true))
     const isDesktop = useIsDesktop()
     const { isLoggedIn, isReconnecting, session, webId } = useSolidPod()
+    const knownPeople = useKnownPeople(shareModalOpen)
     const { showToast } = useToast()
     const { db } = useDatabase()
     // Read from the question set on every visit, not copied onto the list when
@@ -2284,7 +2286,9 @@ export function ViewPackingList() {
                 session={session}
                 fileUrl={`${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`}
                 listId={id}
+                listName={packingList?.name}
                 sharerPodUrl={ownPodUrl}
+                knownPeople={knownPeople}
                 saveListToPod={packingList ? async () => {
                     await saveRdfToPod({
                         session,

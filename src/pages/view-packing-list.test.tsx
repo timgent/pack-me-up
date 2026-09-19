@@ -103,6 +103,9 @@ function makeDb() {
         savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
         getSharedListsWithMe: vi.fn().mockResolvedValue({ lists: [], lastModified: '' }),
         saveSharedListsWithMe: vi.fn().mockResolvedValue({ rev: '1' }),
+        // Read by `useKnownPeople`, which fills the share dialog's suggestions.
+        getQuestionSet: vi.fn().mockResolvedValue({ questions: [], people: [] }),
+        getSharedWithMe: vi.fn().mockResolvedValue({ contexts: [], lastModified: '' }),
     }
 }
 
@@ -162,6 +165,8 @@ const multiCategoryPackingList = {
 
 function makeDbMultiCategory() {
     return {
+        getQuestionSet: vi.fn().mockResolvedValue({ questions: [], people: [] }),
+        getSharedWithMe: vi.fn().mockResolvedValue({ contexts: [], lastModified: '' }),
         getPackingList: vi.fn().mockResolvedValue(multiCategoryPackingList),
         savePackingList: vi.fn().mockResolvedValue({ rev: '2' }),
     }

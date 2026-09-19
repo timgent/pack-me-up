@@ -1382,6 +1382,7 @@ export function PeopleModal({ people, onSave, onClose, session }: {
                                         selectedColor={identity.color}
                                         selectedEmoji={identity.emoji}
                                         webId={person.webId ?? ''}
+                                        session={session}
                                         onSelectColor={id => updateColor(i, id)}
                                         onSelectEmoji={emoji => updateEmoji(i, emoji)}
                                         onChangeWebId={webId => updateWebId(i, webId)}

@@ -57,6 +57,8 @@ function renderPage(dbOverrides: Partial<PackingAppDatabase> = {}) {
         getSharedListsWithMe: vi.fn(() => Promise.resolve({ lists: [], lastModified: '' })),
         saveSharedListsWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
         getAllPackingLists: vi.fn(() => Promise.resolve([])),
+        // Read by `useKnownPeople`, behind the suggestion chips.
+        getQuestionSet: vi.fn(() => Promise.resolve({ questions: [], people: [] })),
         ...dbOverrides,
     }
     mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
@@ -125,6 +127,8 @@ function renderLoggedOut(login = vi.fn()) {
         getSharedListsWithMe: vi.fn(() => Promise.resolve({ lists: [], lastModified: '' })),
         saveSharedListsWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
         getAllPackingLists: vi.fn(() => Promise.resolve([])),
+        // Read by `useKnownPeople`, behind the suggestion chips.
+        getQuestionSet: vi.fn(() => Promise.resolve({ questions: [], people: [] })),
     }
     mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
     mockUseSolidPod.mockReturnValue({ session: null, isLoggedIn: false, login } as unknown as ReturnType<typeof useSolidPod>)
@@ -189,6 +193,63 @@ describe('SharingSettingsPage — share your full setup', () => {
         expect(screen.getByRole('button', { name: /copy my address/i })).toBeTruthy()
     })
 
+    it('offers someone you already know instead of asking for their address again', async () => {
+        renderPage({
+            getQuestionSet: vi.fn(() => Promise.resolve({
+                questions: [],
+                people: [{ id: '1', name: 'Bob', webId: 'https://bob.example.com/profile/card#me' }],
+            })),
+        } as unknown as Partial<PackingAppDatabase>)
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Bob' }))
+
+        await waitFor(() => expect((screen.getByLabelText(/webid/i) as HTMLInputElement).value)
+            .toBe('https://bob.example.com/profile/card#me'))
+    })
+
+    it('confirms the share by naming the person, not reciting their address', async () => {
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'https://alice.example.com/profile/card#me' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        // The list below has said "alice.example.com" rather than the whole
+        // WebID since names arrived; the confirmation above it should agree.
+        const banner = await screen.findByText(/your full setup is shared with/i)
+        expect(banner.textContent).toContain('alice.example.com')
+        expect(banner.textContent).not.toContain('/profile/card#me')
+    })
+
+    it('never offers to share with the person doing the sharing', async () => {
+        // The wizard's first person is you — named "Me" — so a question set
+        // with your own address on it made the app suggest sharing with
+        // yourself.
+        renderPage({
+            getQuestionSet: vi.fn(() => Promise.resolve({
+                questions: [],
+                people: [{ id: '1', name: 'Me', webId: 'https://me.example.com/profile#me' }],
+            })),
+        } as unknown as Partial<PackingAppDatabase>)
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Me' })).toBeNull())
+    })
+
+    it('does not offer someone who already has the full setup', async () => {
+        vi.mocked(getFullCollaborators).mockResolvedValue(['https://bob.example.com/profile/card#me'])
+        renderPage({
+            getQuestionSet: vi.fn(() => Promise.resolve({
+                questions: [],
+                people: [{ id: '1', name: 'Bob', webId: 'https://bob.example.com/profile/card#me' }],
+            })),
+        } as unknown as Partial<PackingAppDatabase>)
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Bob' })).toBeNull())
+    })
+
     it('shares with the WebID behind a Pod root, rather than the Pod root itself', async () => {
         renderPage()
 
@@ -202,6 +263,23 @@ describe('SharingSettingsPage — share your full setup', () => {
             'https://pod.example.com/',
             'https://alice.solidcommunity.net/profile/card#me',
         ))
+    })
+
+    it('stops claiming the setup is shared with someone once they are revoked', async () => {
+        const BOB = 'https://bob.example.com/profile/card#me'
+        vi.mocked(getFullCollaborators).mockResolvedValue([BOB])
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), { target: { value: BOB } })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+        expect(await screen.findByText(/your full setup is shared/i)).toBeTruthy()
+
+        vi.mocked(getFullCollaborators).mockResolvedValue([])
+        fireEvent.click(screen.getByRole('button', { name: `Revoke access for ${BOB}` }))
+
+        // The banner outlived the thing it described: this page is not
+        // remounted by hash navigation, so its state has to be corrected here.
+        await waitFor(() => expect(screen.queryByText(/your full setup is shared/i)).toBeNull())
     })
 
     it('offers a benefit-framed sign-in instead of a bare log-in notice when logged out', async () => {
