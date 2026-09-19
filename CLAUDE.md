@@ -73,8 +73,10 @@ Every share — one list or the whole setup — is gated on a WebID that only th
   `useWebIdLookup` then reads the profile card so the field can name who is
   there before anything is granted. A raw string handed to `grantCollaboratorAccess`
   is recorded by WAC without complaint, reported as a success, and reaches
-  nobody. Both share fields go through `WebIdField`; a third place asks for a
-  WebID (`PersonIdentityPicker`, for avatars) and does not yet.
+  nobody. Every field that asks for a WebID goes through `WebIdField` — both
+  share fields, and `PersonIdentityPicker`, which asks for one to put a
+  person's own photo on their avatar and normalises it on blur, because what
+  it stores is what `useKnownPeople` later matches on.
 - **An unreadable profile never blocks a share.** A card can be unreachable
   because the address is wrong, or because the server is down, the card is
   private, or none was ever published. `WebIdLookupStatus` keeps those apart:
