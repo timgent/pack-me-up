@@ -153,15 +153,16 @@ export async function listInvites(session: AppSession, podUrl: string): Promise<
 /**
  * Accepts an invite by appending your WebID to it.
  *
- * Raw `fetch` rather than solid-client: this is an N3 patch that only inserts,
- * which is the one shape Append permits, and solid-client's save helpers want
- * to read the resource first — which is exactly what the person accepting is
- * not allowed to do.
+ * Raw `fetch` rather than solid-client: this is a SPARQL Update patch that
+ * only inserts, which is the one shape Append permits, and solid-client's
+ * save helpers want to read the resource first — which is exactly what the
+ * person accepting is not allowed to do. See `inviteAcceptancePatch` for why
+ * SPARQL Update rather than N3-Patch.
  */
 export async function acceptInvite(session: AppSession, inviteUrl: string, webId: string): Promise<void> {
     const response = await session.fetch(inviteUrl, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'text/n3' },
+        headers: { 'Content-Type': 'application/sparql-update' },
         body: inviteAcceptancePatch(inviteUrl, webId),
     })
 

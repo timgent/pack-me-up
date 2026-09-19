@@ -870,7 +870,7 @@ describe('inviteAcceptancePatch', () => {
     it('inserts the accepting WebID against the invite', () => {
         const patch = inviteAcceptancePatch(URL, 'https://bob.example.org/profile/card#me')
 
-        expect(patch).toContain('solid:inserts')
+        expect(patch).toContain('INSERT DATA')
         expect(patch).toContain('<https://bob.example.org/profile/card#me>')
         expect(patch).toContain(`${URL}#invite`)
     })
@@ -878,7 +878,7 @@ describe('inviteAcceptancePatch', () => {
     it('only ever inserts, because appending is all the permission there is', () => {
         const patch = inviteAcceptancePatch(URL, 'https://bob.example.org/profile/card#me')
 
-        expect(patch).not.toContain('solid:deletes')
+        expect(patch).not.toContain('DELETE')
     })
 
     it('refuses a WebID that would break out of the patch', () => {

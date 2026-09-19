@@ -122,10 +122,15 @@ where everybody starts. Four rules:
   `pack-me-up/invites/{token}`, granted public Append and nothing else
   (`services/invites.ts`). That one choice is why accepting needs no prior
   permission, why an invite link is not a peephole (nobody holding it can
-  *read*, so two invitees never learn of each other), why revoking is a DELETE
-  — and why it works on ACP Pods, since `setPublicAccess` is the one
-  access-control call solid-client implements for both. `inviteUrlFor` is where
-  a token becomes a path segment, so it refuses anything not shaped like one.
+  *read*, so two invitees never learn of each other), and why revoking is a
+  DELETE. `inviteUrlFor` is where a token becomes a path segment, so it refuses
+  anything not shaped like one. **This does not currently work when the inviter
+  is on an ACP Pod** (Inrupt ESS): accepting fails with 401/403, and
+  `createInvite`'s grant check cannot catch it, because on ACP
+  `setPublicAccess` verifies by re-parsing the ACR the client itself just wrote
+  rather than asking the server. E2E suite N only covers WAC, so it stays green.
+  `docs/invite-links-on-acp-pods.md` has the evidence and the one experiment
+  still needed.
 - **What arrives is never trusted; what was sent is.** The appended WebID was
   written by a stranger. What gets granted is decided by the *invite* — the
   inviter's own record of what she offered — so a WebID on a list invite can
