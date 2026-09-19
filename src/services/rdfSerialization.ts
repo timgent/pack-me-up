@@ -13,6 +13,7 @@ import {
 } from '@inrupt/solid-client'
 import type { SolidDataset, Thing } from '@inrupt/solid-client'
 import { PMU, RDF, DCTERMS } from './rdfVocab'
+import { isInviteToken } from './inviteToken'
 import type { PackingList, PackingListItem } from '../create-packing-list/types'
 import type {
     PackingListQuestionSet,
@@ -839,4 +840,116 @@ function thingToQuestionItem(dataset: SolidDataset, url: string): Item | null {
         ...(lastModified !== undefined ? { lastModified } : {}),
         ...(deletedAt !== undefined ? { deletedAt } : {}),
     }
+}
+
+// ── Invites ───────────────────────────────────────────────────────────────────
+//
+// Sharing normally needs the other person's address before anything can
+// happen, and getting one is the step that stalls people. An invite link turns
+// that around: the inviter sends a link, the other person opens it and accepts,
+// and their WebID travels back on its own.
+//
+// One resource per invite, at a URL containing 128 bits of randomness. That URL
+// *is* the secret, which is what lets the resource be granted public Append and
+// nothing else:
+//
+// - anyone holding the link can add their WebID, so accepting needs no
+//   permission the inviter granted them first;
+// - nobody holding it can read, so an invite link is not a peephole into the
+//   inviter's Pod, and two people invited separately never learn about each
+//   other;
+// - revoking is deleting the resource;
+// - and it goes through `setPublicAccess`, the one access-control call
+//   solid-client implements for both WAC and ACP — the same call this app
+//   already makes to share a list publicly. Invite links therefore work on
+//   exactly the Pods where public sharing already works.
+
+/** Whether an invite hands over the whole setup or one packing list. */
+export type InviteKind = 'full-setup' | 'list'
+
+export interface Invite {
+    /** The secret from the link, which is also the resource's filename. */
+    token: string
+    kind: InviteKind
+    /** Which list, when `kind` is 'list'. */
+    listId?: string
+    /**
+     * What the invite is called, copied when it was made. A copy rather than a
+     * lookup because whoever opens the link cannot read the thing it names —
+     * so nothing else could tell them what they are being offered.
+     */
+    label?: string
+    createdAt: string
+    /** WebIDs appended by whoever opened the link. Untrusted until matched. */
+    acceptedBy: string[]
+}
+
+/** Where the invite's own triples live inside its resource. */
+const inviteSubject = (datasetUrl: string) => `${datasetUrl}#invite`
+
+export function inviteToDataset(invite: Invite, datasetUrl: string): SolidDataset {
+    let builder = buildThing({ url: inviteSubject(datasetUrl) })
+        .addUrl(RDF.type, PMU.Invite)
+        .addStringNoLocale(PMU.inviteToken, invite.token)
+        .addStringNoLocale(PMU.inviteKind, invite.kind)
+        .addDatetime(PMU.inviteCreatedAt, new Date(invite.createdAt))
+
+    if (invite.listId) builder = builder.addStringNoLocale(PMU.inviteListId, invite.listId)
+    if (invite.label) builder = builder.addStringNoLocale(PMU.inviteLabel, invite.label)
+    for (const webId of invite.acceptedBy) builder = builder.addUrl(PMU.acceptedBy, webId)
+
+    return setThing(createSolidDataset(), builder.build())
+}
+
+/**
+ * Reads an invite, or returns null.
+ *
+ * Null is a normal answer, not a failure: this reads whatever is sitting in the
+ * invites container, and the appended half of any invite was written by
+ * somebody else. A token that is not shaped like ours is junk — and even a
+ * well-formed one means nothing until it matches the link that was sent.
+ */
+export function datasetToInvite(dataset: SolidDataset, datasetUrl: string): Invite | null {
+    const thing = getThing(dataset, inviteSubject(datasetUrl))
+    if (!thing) return null
+
+    const token = getStringNoLocale(thing, PMU.inviteToken)
+    if (!isInviteToken(token)) return null
+
+    // Anything we do not recognise is read as the narrower kind. An unknown
+    // value must never fall through to handing over the whole setup.
+    const kind: InviteKind = getStringNoLocale(thing, PMU.inviteKind) === 'full-setup' ? 'full-setup' : 'list'
+    const listId = getStringNoLocale(thing, PMU.inviteListId) ?? undefined
+    const label = getStringNoLocale(thing, PMU.inviteLabel) ?? undefined
+
+    const invite: Invite = {
+        token: token!,
+        kind,
+        createdAt: getDatetime(thing, PMU.inviteCreatedAt)?.toISOString() ?? new Date().toISOString(),
+        acceptedBy: getUrlAll(thing, PMU.acceptedBy),
+    }
+    if (listId) invite.listId = listId
+    if (label) invite.label = label
+    return invite
+}
+
+/**
+ * The N3 patch that accepting an invite sends.
+ *
+ * Inserts only, because Append is the only permission the sender has — and
+ * that is deliberate: it means accepting can never damage or read the
+ * inviter's Pod, only add one triple to one resource.
+ */
+export function inviteAcceptancePatch(datasetUrl: string, webId: string): string {
+    // The WebID is written into a document body as an IRI. It comes from the
+    // signed-in session rather than a form, but a value that cannot be written
+    // safely is worth refusing outright rather than escaping into something
+    // that looks fine and is not.
+    const url = new URL(webId)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Not a WebID that can be written')
+    if (/[<>"{}|\\^`\s]/.test(webId)) throw new Error('Not a WebID that can be written')
+
+    return `@prefix solid: <http://www.w3.org/ns/solid/terms#>.
+<#accept> a solid:InsertDeletePatch;
+  solid:inserts { <${inviteSubject(datasetUrl)}> <${PMU.acceptedBy}> <${webId}>. }.`
 }

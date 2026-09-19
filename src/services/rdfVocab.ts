@@ -150,6 +150,17 @@ export const PMU = {
     sharedListUrl: `${PMU_NS}sharedListUrl`,
     sharedListLabel: `${PMU_NS}sharedListLabel`,
 
+    // Invites. One resource per invite, living at an unguessable URL that is
+    // itself the secret in the link. The inviter writes it; whoever opens the
+    // link appends their WebID to it and can read nothing.
+    Invite: `${PMU_NS}Invite`,
+    inviteToken: `${PMU_NS}inviteToken`,
+    inviteKind: `${PMU_NS}inviteKind`,
+    inviteListId: `${PMU_NS}inviteListId`,
+    inviteLabel: `${PMU_NS}inviteLabel`,
+    inviteCreatedAt: `${PMU_NS}inviteCreatedAt`,
+    acceptedBy: `${PMU_NS}acceptedBy`,
+
     // Shared
     name: 'https://schema.org/name',
 } as const

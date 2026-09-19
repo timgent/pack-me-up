@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createSolidDataset } from '@inrupt/solid-client'
 import type { SolidDataset } from '@inrupt/solid-client'
 import {
     packingListToDataset,
@@ -9,10 +10,13 @@ import {
     datasetToSharedListsWithMe,
     deletedPackingListsToDataset,
     datasetToDeletedPackingLists,
+    inviteToDataset,
+    datasetToInvite,
+    inviteAcceptancePatch,
 } from './rdfSerialization'
 import type { PackingList, PackingListItem } from '../create-packing-list/types'
 import type { PackingListQuestionSet, Person, Question, Option } from '../edit-questions/types'
-import type { SharedListsWithMe, DeletedPackingLists } from './rdfSerialization'
+import type { SharedListsWithMe, DeletedPackingLists, Invite, InviteKind } from './rdfSerialization'
 import {
     fullyPopulatedPackingList,
     fullyPopulatedQuestionSet,
@@ -785,5 +789,103 @@ describe('item order round-trip', () => {
         const list = makePackingList({ items: [makeItem({ id: 'item-1' })] })
         const result = roundTripList(list)
         expect(result.items[0].order).toBeUndefined()
+    })
+})
+
+
+// ── Invites ───────────────────────────────────────────────────────────────────
+//
+// One resource per invite, written by the inviter and appended to by whoever
+// opens the link. The two halves never trust each other the same amount: the
+// inviter's half is her own data, the appended WebIDs are whatever a stranger
+// managed to write.
+
+describe('inviteToDataset / datasetToInvite', () => {
+    const URL = 'https://alice.example.org/pack-me-up/invites/tok-aaaaaaaaaaaaaaaaaaaa'
+
+    const whole: Invite = {
+        token: 'tok-aaaaaaaaaaaaaaaaaaaa',
+        kind: 'full-setup',
+        createdAt: '2026-01-02T03:04:05.000Z',
+        acceptedBy: [],
+    }
+
+    it('round-trips a whole-setup invite nobody has accepted', () => {
+        expect(datasetToInvite(inviteToDataset(whole, URL), URL)).toEqual(whole)
+    })
+
+    it('round-trips a single-list invite, with the name it was made under', () => {
+        // The label is a copy taken at the time: the person opening the link
+        // cannot read the list it names, so nothing else could tell them what
+        // they are being offered.
+        const listInvite: Invite = {
+            token: 'tok-bbbbbbbbbbbbbbbbbbbb',
+            kind: 'list',
+            listId: 'list-1',
+            label: 'Ski trip',
+            createdAt: '2026-01-02T03:04:05.000Z',
+            acceptedBy: [],
+        }
+
+        expect(datasetToInvite(inviteToDataset(listInvite, URL), URL)).toEqual(listInvite)
+    })
+
+    it('reads back everyone who has accepted', () => {
+        const accepted: Invite = {
+            ...whole,
+            acceptedBy: [
+                'https://bob.example.org/profile/card#me',
+                'https://carol.example.org/profile/card#me',
+            ],
+        }
+
+        const back = datasetToInvite(inviteToDataset(accepted, URL), URL)
+
+        expect(back?.acceptedBy).toEqual(accepted.acceptedBy)
+    })
+
+    it('returns null for a document that is not an invite', () => {
+        // Reading the invites container turns up whatever is in it.
+        expect(datasetToInvite(createSolidDataset(), URL)).toBeNull()
+    })
+
+    it('returns null when the token is not shaped like one of ours', () => {
+        const dodgy = inviteToDataset({ ...whole, token: 'nope' }, URL)
+
+        expect(datasetToInvite(dodgy, URL)).toBeNull()
+    })
+
+    it('treats an unknown kind as the narrower one', () => {
+        // A kind we do not recognise must not fall through to handing over
+        // everything.
+        const ds = inviteToDataset({ ...whole, kind: 'something-else' as InviteKind }, URL)
+
+        expect(datasetToInvite(ds, URL)?.kind).toBe('list')
+    })
+})
+
+describe('inviteAcceptancePatch', () => {
+    const URL = 'https://alice.example.org/pack-me-up/invites/tok-cccccccccccccccccccc'
+
+    it('inserts the accepting WebID against the invite', () => {
+        const patch = inviteAcceptancePatch(URL, 'https://bob.example.org/profile/card#me')
+
+        expect(patch).toContain('solid:inserts')
+        expect(patch).toContain('<https://bob.example.org/profile/card#me>')
+        expect(patch).toContain(`${URL}#invite`)
+    })
+
+    it('only ever inserts, because appending is all the permission there is', () => {
+        const patch = inviteAcceptancePatch(URL, 'https://bob.example.org/profile/card#me')
+
+        expect(patch).not.toContain('solid:deletes')
+    })
+
+    it('refuses a WebID that would break out of the patch', () => {
+        // The WebID goes into a document body as an IRI. It arrives from the
+        // signed-in session rather than a form, but a value that cannot be
+        // written safely is worth refusing rather than escaping.
+        expect(() => inviteAcceptancePatch(URL, 'https://bob.example.org/x> . <#evil> <p> <o')).toThrow()
+        expect(() => inviteAcceptancePatch(URL, 'not a url')).toThrow()
     })
 })
