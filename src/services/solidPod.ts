@@ -609,6 +609,20 @@ export async function verifyForeignPodAccess(
         return true
     } catch (err: unknown) {
         const status = getStatusCode(err)
+        if (status === 403 || status === 401) return false
+        if (status !== 404) throw err
+    }
+
+    // No packing-lists container isn't the same as no access: an owner who has
+    // never created a list has nothing to 404 on but a real access grant. The
+    // app root always exists once a Pod has run the wizard, so a 404 there (as
+    // opposed to a 401/403) means the URL itself is wrong rather than merely
+    // list-less.
+    try {
+        await getSolidDataset(`${foreignPodUrl}${POD_CONTAINERS.ROOT}`, { fetch: session.fetch })
+        return true
+    } catch (err: unknown) {
+        const status = getStatusCode(err)
         if (status === 403 || status === 401 || status === 404) return false
         throw err
     }
