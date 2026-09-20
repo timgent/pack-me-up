@@ -33,6 +33,13 @@ vi.mock('./components/OfflineBanner', () => ({
   OfflineBanner: () => null,
 }))
 
+// Registers `virtual:pwa-register`, a module only the real Vite PWA plugin
+// resolves — not loaded under vitest.config.ts, so it's mocked here the same
+// way pwaUpdate.test.ts and usePwaUpdate.test.ts mock it directly.
+vi.mock('./services/pwaUpdate', () => ({
+  registerPwaServiceWorker: vi.fn(() => undefined),
+}))
+
 vi.mock('./pages/landing-page', () => ({ LandingPage: () => null }))
 vi.mock('./pages/questions-page', () => ({ QuestionsPage: () => null }))
 vi.mock('./pages/create-packing-list', () => ({ CreatePackingList: () => null }))

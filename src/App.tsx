@@ -8,7 +8,9 @@ import { Navigation } from './components/Navigation'
 import { Footer } from './components/Footer'
 import { SessionExpiredBanner } from './components/SessionExpiredBanner'
 import { OfflineBanner } from './components/OfflineBanner'
+import { UpdateAvailableBanner } from './components/UpdateAvailableBanner'
 import { AndroidTestBanner } from './components/AndroidTestBanner'
+import { usePwaUpdate } from './hooks/usePwaUpdate'
 import { ToastProvider } from './components/ToastContext'
 import { ThemeProvider } from './components/ThemeContext'
 import { LandingPage } from './pages/landing-page'
@@ -56,6 +58,7 @@ function InviteRedemption({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { needsRefresh, reload } = usePwaUpdate()
   return (
     <ThemeProvider>
       <ToastProvider>
@@ -70,6 +73,7 @@ function App() {
                 <Navigation />
                 <SessionExpiredBanner />
                 <OfflineBanner />
+                {needsRefresh && <UpdateAvailableBanner onReload={reload} />}
                 <AndroidTestBanner />
                 <div className="flex-1 container mx-auto px-4 py-8">
                   <Routes>

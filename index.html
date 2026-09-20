@@ -9,6 +9,14 @@
        shells get one colour rather than a pair that would have to be kept in
        step with the theme. -->
   <meta name="theme-color" content="#042f2e" />
+  <!-- iOS ignores the web manifest for "Add to Home Screen" — these are the
+       tags Safari actually reads. vite-plugin-pwa (vite.config.ts) injects the
+       <link rel="manifest"> tag and the manifest's own icons for every other
+       installer. -->
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Pack Me Up" />
   <title>Pack Me Up</title>
   <!--
     Applies the theme before the first paint, so the page never flashes light

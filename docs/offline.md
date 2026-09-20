@@ -105,16 +105,31 @@ that gap, roughly in the order the value arrives:
 2. **Per-resource sync state, shown.** "Saved on this device" and "saved to your
    pod" are different facts and the UI mostly conflates them. A list that has
    local edits nobody else can see yet should say so.
-3. **An app shell that survives a cold start.** Everything above assumes the app
-   loaded. On the web, opening it with no connection still gets a browser error
-   page — a service worker (or the native shell, which already ships its assets)
-   is what makes the whole app openable offline, not just usable once open.
-4. **Offline-aware affordances everywhere.** Sharing, backups and pod deletion
+3. **Offline-aware affordances everywhere.** Sharing, backups and pod deletion
    genuinely need the network. They should say that in place, once, rather than
    each page finding its own way to fail.
-5. **Conflict handling with a face.** Merging by `lastModified` silently picks a
+4. **Conflict handling with a face.** Merging by `lastModified` silently picks a
    winner per field. Two devices editing the same list offline is exactly the
    case where a person, not a timestamp, should decide.
+
+## The app shell now survives a cold start
+
+The web app is installable and precaches its own build output (JS/CSS/HTML,
+icons — `vite.config.ts`, `src/services/pwaUpdate.ts`). Opening it with no
+connection, even on a first-ever cold start of a *previously visited* tab, gets
+the real app rather than a browser error page — the piece the numbered list
+above used to carry as item 3.
+
+Two things this deliberately does not do:
+
+- **It never touches pod requests.** Those are cross-origin, and the service
+  worker's `generateSW` config carries no `runtimeCaching` rules, so nothing
+  here overlaps with `ResilientSession` or `saveWithSyncPrevention`.
+- **It never reloads a tab out from under someone.** `registerType: 'prompt'`
+  means a shipped update only flags itself (`UpdateAvailableBanner`); the user
+  decides when to reload, the same reasoning as not calling the OIDC library's
+  `logout()` on a recoverable failure — an action with a big blast radius
+  waits for a clear signal rather than firing automatically.
 
 ## Where the behaviour is pinned
 
@@ -126,3 +141,6 @@ that gap, roughly in the order the value arrives:
   `SyncAcrossDevicesPrompt.test.tsx` — what the user sees.
 - e2e suite J (`J4`, `J5`) — with every request to the pod refused, the app
   still shows the account, the banner, and the lists that were made online.
+- `pwaUpdate.test.ts`, `usePwaUpdate.test.ts`, `UpdateAvailableBanner.test.tsx` —
+  the service worker is skipped on the Capacitor shell, and an update waits
+  for the banner rather than reloading on its own.
