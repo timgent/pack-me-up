@@ -30,6 +30,7 @@ import {
     PodUrlUnavailableError,
     POD_ERROR_MESSAGES,
     buildSharedSetupPath,
+    verifyForeignPodAccess,
 } from './solidPod'
 import { AuthenticationError } from './solidPod'
 import { PackingAppDatabase } from './database'
@@ -1504,6 +1505,84 @@ describe('getCollaborators', () => {
         mockGetAgentAccessAll.mockRejectedValue(err)
 
         await expect(getCollaborators(mockSession, FILE_URL)).rejects.toThrow('Network failure')
+    })
+})
+
+// ─── verifyForeignPodAccess ──────────────────────────────────────────────────
+
+describe('verifyForeignPodAccess', () => {
+    const FOREIGN_POD_URL = 'https://alice.solidcommunity.net/'
+    const LISTS_URL = `${FOREIGN_POD_URL}${POD_CONTAINERS.PACKING_LISTS}`
+    const ROOT_URL = `${FOREIGN_POD_URL}${POD_CONTAINERS.ROOT}`
+
+    it('returns true when the packing-lists container is readable', async () => {
+        mockGetSolidDataset.mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo)
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(true)
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(LISTS_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+
+    it('returns false when the packing-lists container is 401', async () => {
+        mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 401 })
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(false)
+    })
+
+    it('returns false when the packing-lists container is 403', async () => {
+        mockGetSolidDataset.mockRejectedValueOnce({ statusCode: 403 })
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(false)
+    })
+
+    it('returns true when the packing-lists container 404s but the pod root is readable (shared, no lists yet)', async () => {
+        mockGetSolidDataset
+            .mockRejectedValueOnce({ statusCode: 404 }) // no packing-lists container
+            .mockResolvedValueOnce({} as unknown as SolidDataset & WithServerResourceInfo) // pod root exists
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(true)
+        expect(mockGetSolidDataset).toHaveBeenNthCalledWith(2, ROOT_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+    })
+
+    it('returns false when both the packing-lists container and the pod root 404 (wrong pod URL)', async () => {
+        mockGetSolidDataset.mockRejectedValue({ statusCode: 404 })
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(false)
+    })
+
+    it('returns false when the packing-lists container 404s and the pod root is denied', async () => {
+        mockGetSolidDataset
+            .mockRejectedValueOnce({ statusCode: 404 })
+            .mockRejectedValueOnce({ statusCode: 403 })
+
+        const result = await verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)
+
+        expect(result).toBe(false)
+    })
+
+    it('re-throws unexpected errors from the packing-lists check', async () => {
+        const unexpectedError = { statusCode: 500, message: 'Server Error' }
+        mockGetSolidDataset.mockRejectedValueOnce(unexpectedError)
+
+        await expect(verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)).rejects.toEqual(unexpectedError)
+    })
+
+    it('re-throws unexpected errors from the pod root fallback check', async () => {
+        const unexpectedError = { statusCode: 500, message: 'Server Error' }
+        mockGetSolidDataset
+            .mockRejectedValueOnce({ statusCode: 404 })
+            .mockRejectedValueOnce(unexpectedError)
+
+        await expect(verifyForeignPodAccess(mockSession, FOREIGN_POD_URL)).rejects.toEqual(unexpectedError)
     })
 })
 
