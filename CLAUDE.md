@@ -114,9 +114,12 @@ Every share — one list or the whole setup — is gated on a WebID that only th
 
 ### Invite links
 
-`CreateInviteLink` is the path that needs nothing from the other person, and it
-sits above the address field on both share surfaces because having nothing is
-where everybody starts. Four rules:
+`CreateInviteLink` is the path that needs nothing from the other person, so it
+leads on both share surfaces, because having nothing is where everybody starts.
+Typing an address sits below it in `ShareByAddress`, closed until asked for:
+it is still the one way to share with no wait, but laid out beside the link it
+was a second way to do the same thing, read by everybody. The known-people chips
+stay in view above it, and picking one opens it. Four rules:
 
 - **The URL is the secret.** One resource per invite at
   `pack-me-up/invites/{token}`, granted public Append and nothing else
@@ -124,13 +127,10 @@ where everybody starts. Four rules:
   permission, why an invite link is not a peephole (nobody holding it can
   *read*, so two invitees never learn of each other), and why revoking is a
   DELETE. `inviteUrlFor` is where a token becomes a path segment, so it refuses
-  anything not shaped like one. **This does not currently work when the inviter
-  is on an ACP Pod** (Inrupt ESS): accepting fails with 401/403, and
-  `createInvite`'s grant check cannot catch it, because on ACP
-  `setPublicAccess` verifies by re-parsing the ACR the client itself just wrote
-  rather than asking the server. E2E suite N only covers WAC, so it stays green.
-  `docs/invite-links-on-acp-pods.md` has the evidence and the one experiment
-  still needed.
+  anything not shaped like one. Accepting is a SPARQL Update PATCH, not an
+  N3 Patch: Inrupt's ACP Pods refused the N3 Patch under a public Append grant,
+  and E2E suite N only runs on WAC, so it could not tell.
+  `docs/invite-links-on-acp-pods.md` has the investigation.
 - **What arrives is never trusted; what was sent is.** The appended WebID was
   written by a stranger. What gets granted is decided by the *invite* — the
   inviter's own record of what she offered — so a WebID on a list invite can
@@ -140,10 +140,24 @@ where everybody starts. Four rules:
   acceptance waits on the Pod for `useInviteRedemption`. Both ends say so in
   words. A grant that fails keeps its invite so the next run retries; deleting
   there would lose the acceptance with no way for either side to tell.
+- **The invitee keeps a record from the moment they accept.** Accepting writes
+  only to the inviter's Pod, so `AcceptInvitePage` also records the share in the
+  invitee's own `shared-with-me` / `shared-lists-with-me` (`acceptedInvites.ts`)
+  — otherwise their Sharing page has nothing to show for it, before access
+  arrives or after. Whether a share opens is worked out live
+  (`sharedAccess.ts`); what a refusal *means* is stored. An entry made by
+  accepting carries `awaitingAccess` until it first opens (`withAccessConfirmed`,
+  called wherever a share is seen to open), so a refusal while it is set reads
+  "Waiting for … to open Pack Me Up", and one after reads as revoked — never an
+  endless wait. Entries without the flag all came from opening a share, so they
+  had access, which is why no migration was needed.
 - **Redemption is app-wide, and pages re-read when it fires.** It is mounted in
   `App.tsx`, not on the Sharing page — the sender is waiting to hear it worked,
   not planning a visit to settings. `InviteRedemptionContext` is the signal that
-  access changed underneath a page that has already loaded.
+  access changed underneath a page that has already loaded. On its own it runs
+  once per sign-in; while an invite is outstanding the Sharing page also polls
+  `redeemNow` (and offers "Check now"), so an acceptance across the table shows
+  up in seconds rather than at the next reload. E2E N4 pins that.
 
 Two known properties, both deliberate: a full-setup collaborator can read the
 invites container, because "your full setup" includes it — no escalation, since

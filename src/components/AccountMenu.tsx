@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 /**
@@ -62,11 +62,13 @@ export function ProfileBadge({ name, photoUrl, showName = true }: { name: string
  * "click the button that says Alice" and "press the Account menu button" are
  * the same instruction (WCAG 2.5.3).
  */
-export function AccountMenu({ webId, displayName, photoUrl, onLogout }: {
+export function AccountMenu({ webId, displayName, photoUrl, onLogout, viewing }: {
     webId: string
     displayName: string
     photoUrl?: string | null
     onLogout: () => void
+    /** Whose data is on screen and how to switch (`ViewingSwitcher`); given a way to close the menu. */
+    viewing?: (close: () => void) => ReactNode
 }) {
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -121,6 +123,11 @@ export function AccountMenu({ webId, displayName, photoUrl, onLogout }: {
                         {/* Reachable, but no longer the thing the nav bar shouts */}
                         <p className="mt-1 text-xs text-gray-700 dark:text-gray-300 break-all" title={webId}>{webId}</p>
                     </div>
+                    {viewing && (
+                        <div className="px-2 py-2 border-b border-gray-100 dark:border-gray-800">
+                            {viewing(() => setIsOpen(false))}
+                        </div>
+                    )}
                     <Link
                         to="/backups"
                         onClick={() => setIsOpen(false)}

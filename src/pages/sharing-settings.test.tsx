@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -50,7 +50,13 @@ vi.mock('../services/invites', async importOriginal => {
     return { ...actual, listInvites: vi.fn(() => Promise.resolve([])), deleteInvite: vi.fn(() => Promise.resolve()) }
 })
 
+// Whether a share can be opened yet is a Pod read; every entry is open unless
+// a test says otherwise.
+vi.mock('../services/sharedAccess', () => ({ checkSharedAccess: vi.fn(() => Promise.resolve('open')) }))
+
 import { listInvites, deleteInvite } from '../services/invites'
+import { InviteRedemptionContext } from '../components/InviteRedemptionContext'
+import { checkSharedAccess } from '../services/sharedAccess'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { saveRdfToPod, getFullCollaborators, getCollaborators, grantFullCollaboratorAccess } from '../services/solidPod'
@@ -159,13 +165,13 @@ describe('SharingSettingsPage — share your full setup', () => {
         renderPage()
 
         expect(await screen.findByRole('heading', { name: /share your full setup/i })).toBeTruthy()
-        expect(screen.getByText(/let someone else use your questions and lists/i)).toBeTruthy()
+        expect(screen.getByText(/let someone else use your questions/i)).toBeTruthy()
     })
 
     it('spells out that the question set and every list go together', async () => {
         renderPage()
 
-        expect(await screen.findByText(/your question set and every packing list/i)).toBeTruthy()
+        expect(await screen.findByText(/your questions and every packing list/i)).toBeTruthy()
     })
 
     it('keeps the copy relationship-agnostic', async () => {
@@ -173,8 +179,6 @@ describe('SharingSettingsPage — share your full setup', () => {
 
         await screen.findByRole('heading', { name: /share your full setup/i })
         expect(container.textContent).not.toMatch(/partner/i)
-        // Breadth is shown by example rather than assumed
-        expect(container.textContent).toMatch(/families/i)
     })
 
     it('points single-list sharing somewhere else so the two are not confused', async () => {
@@ -208,7 +212,28 @@ describe('SharingSettingsPage — share your full setup', () => {
         // The address field is the path that needs something only the other
         // person has; the link is the path that needs nothing.
         expect(await screen.findByRole('button', { name: /create invite link/i })).toBeTruthy()
-        expect(screen.getByText(/or share with an address you already have/i)).toBeTruthy()
+        // Still there for whoever wants it, but closed: laid out beside the
+        // link it was a second way of doing the same thing, read by everybody.
+        const disclosure = screen.getByText(/use a sharing address instead/i).closest('details')
+        expect(disclosure?.open).toBe(false)
+        expect(disclosure?.contains(screen.getByLabelText(/webid/i))).toBe(true)
+    })
+
+    it('keeps the pitch to a sentence', async () => {
+        renderPage()
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        expect(screen.queryByText(/scout troops/i)).toBeNull()
+        expect(screen.getByText(/just one list\?/i)).toBeTruthy()
+    })
+
+    it('only lists who has the full setup when somebody does', async () => {
+        renderPage()
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        await waitFor(() => expect(vi.mocked(getFullCollaborators)).toHaveBeenCalled())
+        expect(screen.queryByText(/people with your full setup/i)).toBeNull()
+        expect(screen.queryByText(/haven't shared your full setup/i)).toBeNull()
     })
 
     it('lists an invite link that has been sent but not used', async () => {
@@ -274,6 +299,10 @@ describe('SharingSettingsPage — share your full setup', () => {
         // and until this the app showed theirs nowhere they could copy it.
         expect(await screen.findByText('https://me.example.com/profile#me')).toBeTruthy()
         expect(screen.getByRole('button', { name: /copy my address/i })).toBeTruthy()
+        // With the address path, not heading the page: only somebody sharing
+        // by address needs it.
+        expect(screen.getByText(/use a sharing address instead/i).closest('details')
+            ?.contains(screen.getByText('https://me.example.com/profile#me'))).toBe(true)
     })
 
     it('offers someone you already know instead of asking for their address again', async () => {
@@ -288,6 +317,8 @@ describe('SharingSettingsPage — share your full setup', () => {
 
         await waitFor(() => expect((screen.getByLabelText(/webid/i) as HTMLInputElement).value)
             .toBe('https://bob.example.com/profile/card#me'))
+        // Opened, so the pick and the Share button are on screen.
+        expect(screen.getByText(/use a sharing address instead/i).closest('details')?.open).toBe(true)
     })
 
     it('confirms the share by naming the person, not reciting their address', async () => {
@@ -303,6 +334,24 @@ describe('SharingSettingsPage — share your full setup', () => {
         const banner = await screen.findByText(/your full setup is shared with/i)
         expect(banner.textContent).toContain('alice.example.com')
         expect(banner.textContent).not.toContain('/profile/card#me')
+    })
+
+    // It answers the Share button, so it belongs straight under it — not
+    // below "Your own address", which is about the other direction.
+    it('confirms the share right under the Share button, above your own address', async () => {
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'https://alice.example.com/profile/card#me' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        const banner = await screen.findByText(/your full setup is shared with/i)
+        const button = screen.getByRole('button', { name: /share my setup/i })
+        const yourAddress = screen.getByText(/your own address/i)
+        const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        expect(follows(button, banner)).toBe(true)
+        expect(follows(banner, yourAddress)).toBe(true)
     })
 
     it('never offers to share with the person doing the sharing', async () => {
@@ -389,7 +438,8 @@ describe('SharingSettingsPage — share your full setup', () => {
         setPendingSignInAction({ type: 'share-full-setup' })
         renderPage()
 
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/webid/i)))
+        // The invite link, now the way to share, rather than the address field.
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: /create invite link/i })))
         // Consumed, so a later visit does not steal focus again
         expect(getPendingSignInAction()).toBeNull()
     })
@@ -428,8 +478,10 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
             ] as unknown as PackingList[])),
         })
 
-        expect(await screen.findByText(/haven't shared any individual lists yet/i)).toBeTruthy()
-        expect(screen.queryByText(/Alps hut trip/)).toBeNull()
+        await waitFor(() => expect(vi.mocked(getCollaborators)).toHaveBeenCalled())
+        // Nothing individually shared, so no section saying so.
+        await waitFor(() => expect(screen.queryByText(/Alps hut trip/)).toBeNull())
+        expect(screen.queryByRole('heading', { name: /individual lists i've shared/i })).toBeNull()
     })
 
     it('still lists a genuinely individually shared list', async () => {
@@ -442,5 +494,231 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
         })
 
         expect(await screen.findByText(/Alps hut trip/)).toBeTruthy()
+    })
+})
+
+// ── Shares accepted but not yet granted, and shares taken away ───────────────
+
+// Accepting an invite records the share on the invitee's side straight away,
+// but access only arrives when the sender's app next runs. Until then the
+// entry has to say so, rather than vanish or offer an Open that is refused.
+// Once it has opened, being refused means something else: access revoked.
+describe('SharingSettingsPage — shares waiting on the sender, and shares revoked', () => {
+    const mockCheck = vi.mocked(checkSharedAccess)
+    const ALICE_POD = 'https://alice.example.org/'
+    const ALICE = 'https://alice.example.org/profile/card#me'
+    const LIST_URL = `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl`
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCheck.mockResolvedValue('open')
+    })
+
+    const withSetup = (awaitingAccess?: boolean, saveSharedWithMe = vi.fn(() => Promise.resolve({ rev: '1' }))) => ({
+        getSharedWithMe: vi.fn(() => Promise.resolve({
+            contexts: [{ podUrl: ALICE_POD, webId: ALICE, label: 'Alice Smith', addedAt: '', ...(awaitingAccess ? { awaitingAccess } : {}) }],
+            lastModified: '',
+        })),
+        saveSharedWithMe,
+    })
+    const withList = (awaitingAccess?: boolean, saveSharedListsWithMe = vi.fn(() => Promise.resolve({ rev: '1' }))) => ({
+        getSharedListsWithMe: vi.fn(() => Promise.resolve({
+            lists: [{ listId: 'list-123', listUrl: LIST_URL, podUrl: ALICE_POD, ownerWebId: ALICE, label: 'Ski trip', addedAt: '', ...(awaitingAccess ? { awaitingAccess } : {}) }],
+            lastModified: '',
+        })),
+        saveSharedListsWithMe,
+    })
+
+    it('checks each shared setup and list for access', async () => {
+        renderPage({ ...withSetup(), ...withList() })
+
+        await waitFor(() => {
+            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'setup', podUrl: ALICE_POD })
+            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'list', listUrl: LIST_URL })
+        })
+    })
+
+    it('says a setup never yet opened is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withSetup(true))
+
+        expect(await screen.findByText(/waiting for Alice Smith to open Pack Me Up/i)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+        // Changing their mind is still possible.
+        expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
+    })
+
+    it('says a list never yet opened is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withList(true))
+
+        expect(await screen.findByText(/waiting for .* to open Pack Me Up/i)).toBeTruthy()
+        expect(screen.getByText('Ski trip')).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+    })
+
+    // A share that has opened before and is now refused was taken away —
+    // telling them to wait for the sender would have them wait for ever.
+    it('says a setup that has opened before has been revoked', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withSetup())
+
+        expect(await screen.findByText(/Alice Smith has stopped sharing this with you/i)).toBeTruthy()
+        expect(screen.queryByText(/waiting for/i)).toBeNull()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+        expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
+    })
+
+    it('says a list that has opened before has been revoked', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withList())
+
+        expect(await screen.findByText(/has stopped sharing this with you/i)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+    })
+
+    it('offers to open a share once access has arrived', async () => {
+        renderPage(withSetup())
+
+        await waitFor(() => expect(mockCheck).toHaveBeenCalled())
+        expect(await screen.findByRole('button', { name: /^open$/i })).toBeTruthy()
+        expect(screen.queryByText(/waiting for|stopped sharing/i)).toBeNull()
+    })
+
+    // Otherwise a later revocation would still read as a wait.
+    it('remembers that a waiting setup has now opened', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withSetup(true, save))
+
+        await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+            contexts: [expect.not.objectContaining({ awaitingAccess: true })],
+        })))
+    })
+
+    it('remembers that a waiting list has now opened', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withList(true, save))
+
+        await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+            lists: [expect.not.objectContaining({ awaitingAccess: true })],
+        })))
+    })
+
+    it('writes nothing for a share that was never waiting', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withSetup(undefined, save))
+
+        await screen.findByRole('button', { name: /^open$/i })
+        expect(save).not.toHaveBeenCalled()
+    })
+})
+
+// ── Shared with me, as one section ────────────────────────────────────────────
+
+describe('SharingSettingsPage — shared with me', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    // Whole setups and single lists were two sections with two empty states;
+    // to the person receiving them they are one question — what do I have?
+    it('lists setups and single lists together, each saying what it is', async () => {
+        renderPage({
+            getSharedWithMe: vi.fn(() => Promise.resolve({
+                contexts: [{ podUrl: 'https://alice.example.org/', label: 'Alice Smith', addedAt: '' }],
+                lastModified: '',
+            })),
+            getSharedListsWithMe: vi.fn(() => Promise.resolve({
+                lists: [{ listId: 'l1', listUrl: 'https://bob.example.org/pack-me-up/packing-lists/l1.ttl', podUrl: 'https://bob.example.org/', label: 'Ski trip', addedAt: '' }],
+                lastModified: '',
+            })),
+        })
+
+        await screen.findByText('Ski trip')
+        const section = (await screen.findByRole('heading', { name: /^shared with me$/i })).closest('section')!
+        expect(section.textContent).toMatch(/Alice Smith/)
+        expect(section.textContent).toMatch(/Full setup/)
+        expect(section.textContent).toMatch(/Ski trip/)
+        expect(screen.queryByRole('heading', { name: /individual lists shared with me/i })).toBeNull()
+    })
+
+    it('says so once when nothing has been shared', async () => {
+        renderPage()
+
+        expect(await screen.findByText(/nothing has been shared with you yet/i)).toBeTruthy()
+        expect(screen.queryByText(/no shared pods yet/i)).toBeNull()
+        expect(screen.queryByText(/no individual lists yet/i)).toBeNull()
+    })
+})
+
+// ── Waiting on an invite, in the same room ────────────────────────────────────
+
+// An invite is only granted when this app checks the Pod, which used to be
+// once per sign-in — so an invitee accepting across the table stayed invisible
+// until the inviter reloaded. While an invite is out, the page keeps asking.
+describe('SharingSettingsPage — noticing an acceptance without a reload', () => {
+    const POLL_MS = 5_000
+    const outstanding = {
+        token: 'tok-dddddddddddddddddddd',
+        kind: 'full-setup' as const,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        acceptedBy: [],
+        url: 'https://pod.example.com/pack-me-up/invites/tok-dddddddddddddddddddd',
+    }
+
+    function renderWithRedemption(redeemNow: () => Promise<number>) {
+        const db: Partial<PackingAppDatabase> = {
+            getSharedWithMe: vi.fn(() => Promise.resolve({ contexts: [], lastModified: '' })),
+            saveSharedWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+            getSharedListsWithMe: vi.fn(() => Promise.resolve({ lists: [], lastModified: '' })),
+            saveSharedListsWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+            getAllPackingLists: vi.fn(() => Promise.resolve([])),
+            getQuestionSet: vi.fn(() => Promise.resolve({ questions: [], people: [] })),
+        }
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseSolidPod.mockReturnValue({ session: mockSession, isLoggedIn: true } as ReturnType<typeof useSolidPod>)
+        return render(
+            <InviteRedemptionContext.Provider value={{ version: 0, redeemNow }}>
+                <MemoryRouter><SharingSettingsPage /></MemoryRouter>
+            </InviteRedemptionContext.Provider>,
+        )
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.useFakeTimers({ shouldAdvanceTime: true })
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('keeps checking for an acceptance while an invite is out', async () => {
+        vi.mocked(listInvites).mockResolvedValue([outstanding])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+        await screen.findByRole('heading', { name: /invite links you've sent/i })
+
+        await vi.advanceTimersByTimeAsync(POLL_MS)
+        await vi.advanceTimersByTimeAsync(POLL_MS)
+
+        expect(redeemNow.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('does not check when no invite is out', async () => {
+        vi.mocked(listInvites).mockResolvedValue([])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+        await screen.findByRole('heading', { name: /share your full setup/i })
+
+        await vi.advanceTimersByTimeAsync(POLL_MS * 3)
+
+        expect(redeemNow).not.toHaveBeenCalled()
+    })
+
+    it('checks straight away when asked, and says so when nobody has accepted yet', async () => {
+        vi.mocked(listInvites).mockResolvedValue([outstanding])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+
+        fireEvent.click(await screen.findByRole('button', { name: /check now/i }))
+
+        await waitFor(() => expect(redeemNow).toHaveBeenCalled())
+        expect(await screen.findByText(/nobody has accepted yet/i)).toBeTruthy()
     })
 })

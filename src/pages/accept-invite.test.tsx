@@ -16,6 +16,17 @@ const mockSolidPod = vi.fn()
 vi.mock('../components/SolidPodContext', () => ({ useSolidPod: () => mockSolidPod() }))
 vi.mock('../errorReporting', () => ({ reportError: vi.fn() }))
 
+const mockSharedWithMe = vi.fn()
+const mockSaveSharedWithMe = vi.fn()
+vi.mock('../hooks/useSharedWithMeSync', () => ({
+    useSharedWithMeSync: () => ({ sharedWithMe: mockSharedWithMe(), saveSharedWithMe: mockSaveSharedWithMe }),
+}))
+const mockSharedListsWithMe = vi.fn()
+const mockSaveSharedListsWithMe = vi.fn()
+vi.mock('../hooks/useSharedListsSync', () => ({
+    useSharedListsSync: () => ({ sharedListsWithMe: mockSharedListsWithMe(), saveSharedListsWithMe: mockSaveSharedListsWithMe }),
+}))
+
 const { AcceptInvitePage } = await import('./accept-invite')
 
 const TOKEN = 'tok-aaaaaaaaaaaaaaaaaaaa'
@@ -42,6 +53,10 @@ function renderPage({ token = TOKEN, params = '', signedIn = true } = {}) {
 beforeEach(() => {
     vi.clearAllMocks()
     mockAcceptInvite.mockResolvedValue(undefined)
+    mockSharedWithMe.mockReturnValue({ contexts: [], lastModified: '2026-01-01T00:00:00.000Z' })
+    mockSharedListsWithMe.mockReturnValue({ lists: [], lastModified: '2026-01-01T00:00:00.000Z' })
+    mockSaveSharedWithMe.mockImplementation(async data => data)
+    mockSaveSharedListsWithMe.mockImplementation(async data => data)
     mockProfile.mockReturnValue({ name: 'Alice Smith', photo: null, resolved: true })
 })
 
@@ -113,6 +128,87 @@ describe('AcceptInvitePage', () => {
         expect(await screen.findByText(/no longer exists/i)).toBeTruthy()
         // Still on the accept screen, not the success one.
         expect(screen.queryByRole('heading', { name: /^accepted$/i })).toBeNull()
+    })
+
+    // Accepting only writes to the sender's Pod. Without a record on this
+    // side, the invitee's Sharing page had nothing to show for it — before
+    // access arrived or after.
+    describe('keeping a record on the invitee\'s side', () => {
+        it('records an accepted setup as shared with me', async () => {
+            renderPage()
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            await waitFor(() => expect(mockSaveSharedWithMe).toHaveBeenCalledWith({
+                contexts: [expect.objectContaining({ podUrl: POD, webId: OWNER, label: 'Alice Smith' })],
+                lastModified: expect.any(String),
+            }))
+            expect(mockSaveSharedListsWithMe).not.toHaveBeenCalled()
+        })
+
+        it('records an accepted list as a list shared with me', async () => {
+            renderPage({
+                params: `?pod=${encodeURIComponent(POD)}&owner=${encodeURIComponent(OWNER)}&kind=list&list=list-123&label=${encodeURIComponent('Ski trip')}`,
+            })
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            await waitFor(() => expect(mockSaveSharedListsWithMe).toHaveBeenCalledWith({
+                lists: [expect.objectContaining({ listId: 'list-123', podUrl: POD, ownerWebId: OWNER, label: 'Ski trip' })],
+                lastModified: expect.any(String),
+            }))
+            expect(mockSaveSharedWithMe).not.toHaveBeenCalled()
+        })
+
+        it('does not follow a list id that is not shaped like one', async () => {
+            renderPage({
+                params: `?pod=${encodeURIComponent(POD)}&owner=${encodeURIComponent(OWNER)}&kind=list&list=${encodeURIComponent('../../private')}`,
+            })
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            expect(await screen.findByRole('heading', { name: /accepted/i })).toBeTruthy()
+            expect(mockSaveSharedListsWithMe).not.toHaveBeenCalled()
+        })
+
+        it('records nothing when accepting failed', async () => {
+            mockAcceptInvite.mockRejectedValue(new Error('This invite link no longer exists.'))
+            renderPage()
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            await screen.findByText(/no longer exists/i)
+            expect(mockSaveSharedWithMe).not.toHaveBeenCalled()
+        })
+
+        // The acceptance is on their Pod whatever happens here, so saying it
+        // failed would be untrue — and accepting again would fail for real.
+        it('still reports accepted when the record could not be saved', async () => {
+            mockSaveSharedWithMe.mockRejectedValue(new Error('offline'))
+            renderPage()
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            expect(await screen.findByRole('heading', { name: /accepted/i })).toBeTruthy()
+        })
+
+        // Saving over a record that has not loaded yet would replace every
+        // other share with this one.
+        it('waits for the existing record before letting them accept', () => {
+            mockSharedWithMe.mockReturnValue(null)
+            renderPage()
+
+            expect((screen.getByRole('button', { name: /accept invite|loading/i }) as HTMLButtonElement).disabled).toBe(true)
+        })
+
+        it('points them at where it will appear', async () => {
+            renderPage()
+
+            fireEvent.click(screen.getByRole('button', { name: /accept invite/i }))
+
+            const link = await screen.findByRole('link', { name: /sharing/i })
+            expect(link.getAttribute('href')).toBe('/sharing')
+        })
     })
 
     it('offers sign-in rather than an accept button when signed out', () => {

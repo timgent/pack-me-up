@@ -28,6 +28,11 @@ test.describe.configure({ mode: 'serial' })
 test.describe('N – Invite links', () => {
     let ctxA: import('@playwright/test').BrowserContext
     let pageA: import('@playwright/test').Page
+    // The invitee's own browser, kept from accepting through to opening: the
+    // path under test is theirs, and it has to get there without being handed
+    // a URL.
+    let ctxB: import('@playwright/test').BrowserContext
+    let pageB: import('@playwright/test').Page
     let inviteLink: string
 
     const inviteeWebId = `http://localhost:${CSS_PORT}/${NINVITEE_POD_NAME}/profile/card#me`
@@ -62,7 +67,10 @@ test.describe('N – Invite links', () => {
         await pageA.waitForURL(/#\/view-lists\//, { timeout: 15_000 })
     })
 
-    test.afterAll(async () => { await ctxA?.close() })
+    test.afterAll(async () => {
+        await ctxA?.close()
+        await ctxB?.close()
+    })
 
     test('N1: inviter creates an invite link without typing any address', async () => {
         await pageA.goto('/#/sharing')
@@ -85,30 +93,35 @@ test.describe('N – Invite links', () => {
     })
 
     test('N3: the invitee opens the link and accepts, without typing an address either', async ({ browser }) => {
-        const ctxB = await browser.newContext()
-        const pageB = await ctxB.newPage()
-        try {
-            await pageB.goto('/')
-            await loginToCss(pageB, CSS_ISSUER, NINVITEE_EMAIL, NINVITEE_PASSWORD)
-            await pageB.goto(inviteLink)
+        ctxB = await browser.newContext()
+        pageB = await ctxB.newPage()
+        await pageB.goto('/')
+        await loginToCss(pageB, CSS_ISSUER, NINVITEE_EMAIL, NINVITEE_PASSWORD)
+        await pageB.goto(inviteLink)
 
-            await expect(pageB.getByRole('heading', { name: /wants to share/i })).toBeVisible({ timeout: 20_000 })
-            await pageB.getByRole('button', { name: /accept invite/i }).click()
+        await expect(pageB.getByRole('heading', { name: /wants to share/i })).toBeVisible({ timeout: 20_000 })
+        await pageB.getByRole('button', { name: /accept invite/i }).click()
 
-            await expect(pageB.getByRole('heading', { name: /accepted/i })).toBeVisible({ timeout: 20_000 })
-            // The delay is stated rather than hidden: there is no server to
-            // grant while the inviter is away.
-            await expect(pageB.getByText(/next time they open Pack Me Up/i)).toBeVisible()
-        } finally {
-            await ctxB.close()
-        }
+        await expect(pageB.getByRole('heading', { name: /accepted/i })).toBeVisible({ timeout: 20_000 })
+        // The delay is stated rather than hidden: there is no server to
+        // grant while the inviter is away.
+        await expect(pageB.getByText(/next time they open Pack Me Up/i)).toBeVisible()
     })
 
-    test('N4: the inviter opens the app and the invitee is granted access', async () => {
-        // A fresh load is the moment redemption runs — the same thing that
-        // happens when they next pick up their phone.
-        await pageA.goto('/#/sharing')
-        await pageA.reload()
+    test('N3b: the invitee sees the share waiting on the inviter, straight away', async () => {
+        // Accepting used to write only to the inviter's Pod, so the invitee's
+        // Sharing page had nothing to show for it, before access or after.
+        await pageB.getByRole('link', { name: /go to sharing/i }).click()
+        await pageB.waitForURL(/#\/sharing/, { timeout: 10_000 })
+
+        await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeVisible({ timeout: 20_000 })
+    })
+
+    test('N4: the inviter, still on the Sharing page, sees the invitee granted access without reloading', async () => {
+        // Same room: pageA has sat on the Sharing page since N2, before the
+        // acceptance, so the check at sign-in has already run and found
+        // nothing. Only the page's own polling can pick this up.
+        await expect(pageA).toHaveURL(/#\/sharing/)
 
         await expect(pageA.getByRole('heading', { name: /people with your full setup/i }).or(
             pageA.getByText(/people with your full setup/i),
@@ -142,19 +155,34 @@ test.describe('N – Invite links', () => {
         }
     })
 
-    test('N6: the invitee can open what was shared with them', async ({ browser }) => {
-        const ctxD = await browser.newContext()
-        const pageD = await ctxD.newPage()
-        try {
-            await pageD.goto('/')
-            await loginToCss(pageD, CSS_ISSUER, NINVITEE_EMAIL, NINVITEE_PASSWORD)
-            await pageD.goto(`/#/pod/${encodeURIComponent(inviterPodUrl)}/view-lists`)
+    test('N6: the invitee finds what was shared with them on their Sharing page, and opens it', async () => {
+        // From their own Sharing page, not a URL the test assembled: nothing
+        // hands a real invitee the inviter's Pod address.
+        await pageB.goto('/#/sharing')
+        await pageB.reload()
 
-            // Access denied would render SharedAccessHelp instead.
-            await expect(pageD.getByText(/can't open this yet/i)).toBeHidden({ timeout: 20_000 })
-            await expect(pageD.getByText(/Viewing/i)).toBeVisible({ timeout: 20_000 })
-        } finally {
-            await ctxD.close()
-        }
+        await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeHidden({ timeout: 20_000 })
+        const shared = pageB.locator('section', { has: pageB.getByRole('heading', { name: /^shared with me$/i }) })
+        await shared.getByRole('button', { name: /^open$/i }).click()
+
+        await pageB.waitForURL(/#\/pod\//, { timeout: 10_000 })
+        // Access denied would render SharedAccessHelp instead.
+        await expect(pageB.getByText(/can't open this yet/i)).toBeHidden({ timeout: 20_000 })
+        await expect(pageB.getByText(/Viewing/i)).toBeVisible({ timeout: 20_000 })
+    })
+
+    test('N7: once the inviter revokes, the invitee is told it was revoked, not to keep waiting', async () => {
+        await pageA.goto('/#/sharing')
+        const revoke = pageA.getByRole('button', { name: `Revoke access for ${inviteeWebId}` })
+        await expect(revoke).toBeVisible({ timeout: 20_000 })
+        await revoke.click()
+        await expect(revoke).not.toBeVisible({ timeout: 10_000 })
+
+        await pageB.goto('/#/sharing')
+        await pageB.reload()
+        // It opened in N6, so a refusal now is access taken away. Before this
+        // it read "Waiting for … to open Pack Me Up", which never ends.
+        await expect(pageB.getByText(/has stopped sharing this with you/i)).toBeVisible({ timeout: 20_000 })
+        await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeHidden()
     })
 })

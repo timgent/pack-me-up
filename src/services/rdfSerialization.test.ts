@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { sharedWithMeToDataset, datasetToSharedWithMe } from './rdfSerialization'
 import { createSolidDataset } from '@inrupt/solid-client'
 import type { SolidDataset } from '@inrupt/solid-client'
 import {
@@ -578,6 +579,30 @@ function makeSharedListsWithMe(overrides: Partial<SharedListsWithMe> = {}): Shar
 function roundTripSlwm(data: SharedListsWithMe): SharedListsWithMe {
     return datasetToSharedListsWithMe(sharedListsWithMeToDataset(data, SLW_DATASET_URL), SLW_DATASET_URL)
 }
+
+// Whether a share has ever been open to us is what tells "waiting for them"
+// apart from "they stopped sharing" — and it has to survive a trip through the
+// Pod, or another device would call a revoked share merely pending.
+describe('awaitingAccess on shared-with-me entries', () => {
+    const SWM_URL = 'https://pod.example.com/pack-me-up/shared-with-me.ttl'
+
+    it('round-trips on a shared setup', () => {
+        const data = { contexts: [{ podUrl: 'https://a.example/', addedAt: '2026-01-01T00:00:00.000Z', awaitingAccess: true }], lastModified: '2026-01-01T00:00:00.000Z' }
+        expect(datasetToSharedWithMe(sharedWithMeToDataset(data, SWM_URL), SWM_URL).contexts[0].awaitingAccess).toBe(true)
+    })
+
+    it('round-trips on a shared list', () => {
+        const data = makeSharedListsWithMe({
+            lists: [{ listId: 'l', listUrl: 'https://x.example/l.ttl', podUrl: 'https://x.example/', addedAt: '2026-01-01T00:00:00.000Z', awaitingAccess: true }],
+        })
+        expect(roundTripSlwm(data).lists[0].awaitingAccess).toBe(true)
+    })
+
+    it('is absent, not false, on an entry that has had access', () => {
+        const data = { contexts: [{ podUrl: 'https://a.example/', addedAt: '2026-01-01T00:00:00.000Z' }], lastModified: '2026-01-01T00:00:00.000Z' }
+        expect(datasetToSharedWithMe(sharedWithMeToDataset(data, SWM_URL), SWM_URL).contexts[0]).not.toHaveProperty('awaitingAccess')
+    })
+})
 
 describe('sharedListsWithMeToDataset / datasetToSharedListsWithMe', () => {
     it('round-trips an empty list', () => {

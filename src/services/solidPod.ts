@@ -221,8 +221,8 @@ const EMPTY_PROFILE: SolidProfile = { name: null, photo: null, resolved: false }
 
 /**
  * Profile cards already fetched, or in flight, keyed by WebID and by whether
- * the request carried a session — an anonymous miss on a card that turns out to
- * be private must not stand in for the answer a logged-in read would give.
+ * there was a session to retry with — an anonymous miss on a card that turns out
+ * to be private must not stand in for the answer a logged-in read would give.
  *
  * A profile card is about as static as anything on the web, and the app asks
  * for the same handful of them from every component that draws a person: the
@@ -259,6 +259,27 @@ const VCARD = 'http://www.w3.org/2006/vcard/ns#'
  * is what older pods have, and `foaf:depiction` is what some hand-written
  * cards use. First one present wins.
  */
+/**
+ * Fetches a profile card as a stranger first, and as the signed-in user only
+ * when the card turns strangers away.
+ *
+ * A WebID profile document is public by definition, so credentials add nothing
+ * to the ordinary read — and they can take something away. Some identity
+ * servers answer a token they cannot use with a 401 instead of ignoring it:
+ * id.inrupt.com does, so every Inrupt WebID typed into a share field read as
+ * "we couldn't find anyone at that address", while a Community Solid Server
+ * card, which ignores the token, looked fine. Only a card that refuses the
+ * anonymous read is worth asking for again as ourselves.
+ */
+async function readProfileCard(session: Session | null | undefined, profileCardUrl: string) {
+    try {
+        return await getSolidDataset(profileCardUrl)
+    } catch (error) {
+        if (!session || !isAuthenticationError(error)) throw error
+        return getSolidDataset(profileCardUrl, { fetch: session.fetch })
+    }
+}
+
 export async function getSolidProfile(session: Session | null | undefined, webId: string): Promise<SolidProfile> {
     const key = `${webId}|${session ? 'auth' : 'anon'}`
     const cached = profileCache.get(key)
@@ -267,11 +288,7 @@ export async function getSolidProfile(session: Session | null | undefined, webId
     const profileCardUrl = webId.replace(/#.*$/, '')
     const pending = (async (): Promise<SolidProfile> => {
         try {
-            // Unauthenticated when there is no session: a WebID profile card is
-            // public by convention, and the person typing a family member's
-            // WebID into the People editor has no reason to have signed into a
-            // pod of their own first.
-            const dataset = await getSolidDataset(profileCardUrl, session ? { fetch: session.fetch } : undefined)
+            const dataset = await readProfileCard(session, profileCardUrl)
             const card = getThing(dataset, webId)
             if (!card) return EMPTY_PROFILE
             const photo =

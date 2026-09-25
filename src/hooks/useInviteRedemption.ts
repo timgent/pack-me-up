@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useToast } from '../components/ToastContext'
 import { reportError } from '../errorReporting'
@@ -30,30 +30,41 @@ export interface RedeemedInvite {
  * WebID on a list invite can only ever reach that list, whatever else is
  * written beside it.
  */
-export function useInviteRedemption(): { redeemed: RedeemedInvite[] } {
+export function useInviteRedemption(): { redeemed: RedeemedInvite[]; redeemNow: () => Promise<number> } {
     const { session, isLoggedIn } = useSolidPod()
     const { showToast } = useToast()
+    // Every redemption this app run, appended: pages re-read when its length
+    // moves, so a second redemption has to move it again.
     const [redeemed, setRedeemed] = useState<RedeemedInvite[]>([])
-    // Once per sign-in: an acceptance left on the Pod is picked up next time,
-    // and re-reading the container on every render would be pointless traffic.
+    // Once per sign-in on its own: an acceptance left on the Pod is picked up
+    // next time, and re-reading the container on every render would be
+    // pointless traffic. Anything more frequent is asked for (`redeemNow`).
     const doneFor = useRef<string | null>(null)
+    // One check at a time. A poll that lands while one is still running
+    // shares its answer rather than granting the same acceptance twice.
+    const running = useRef<Promise<number> | null>(null)
+    const mounted = useRef(true)
+    useEffect(() => () => { mounted.current = false }, [])
+
+    const signedIn = isLoggedIn ? session : null
+    const sessionRef = useRef(signedIn)
+    sessionRef.current = signedIn
 
     const webId = session?.info.webId
 
-    useEffect(() => {
-        if (!isLoggedIn || !session || !webId) return
-        if (doneFor.current === webId) return
-        doneFor.current = webId
+    /** Grants every accepted invite on the Pod; resolves to how many. Throws if the Pod cannot be read. */
+    const check = useCallback((): Promise<number> => {
+        const current = sessionRef.current
+        if (!current?.info.webId) return Promise.resolve(0)
+        if (running.current) return running.current
 
-        let cancelled = false
+        running.current = (async () => {
+            const podUrl = await getPrimaryPodUrl(current)
+            if (!podUrl) return 0
 
-        async function redeemAll() {
-            const podUrl = await getPrimaryPodUrl(session!)
-            if (!podUrl || cancelled) return
-
-            const invites = await listInvites(session!, podUrl)
+            const invites = await listInvites(current, podUrl)
             const waiting = invites.filter(invite => invite.acceptedBy.length > 0)
-            if (waiting.length === 0 || cancelled) return
+            if (waiting.length === 0) return 0
 
             const done: RedeemedInvite[] = []
             for (const invite of waiting) {
@@ -65,24 +76,24 @@ export function useInviteRedemption(): { redeemed: RedeemedInvite[] } {
                 try {
                     for (const accepter of invite.acceptedBy) {
                         if (invite.kind === 'full-setup') {
-                            await grantFullCollaboratorAccess(session!, podUrl, accepter)
+                            await grantFullCollaboratorAccess(current, podUrl, accepter)
                         } else {
                             const listUrl = `${podUrl}${POD_CONTAINERS.PACKING_LISTS}${invite.listId}.ttl`
-                            await grantCollaboratorAccess(session!, listUrl, accepter)
+                            await grantCollaboratorAccess(current, listUrl, accepter)
                         }
                     }
                     // Only once every grant landed. Deleting after a failure
                     // would lose the acceptance for good: the person who
                     // accepted has no way to tell, and no way to do it again.
-                    await deleteInvite(session!, invite.url)
+                    await deleteInvite(current, invite.url)
                     done.push({ invite, webIds: invite.acceptedBy })
                 } catch (err) {
                     reportError(err, 'useInviteRedemption: failed to grant access for an accepted invite')
                 }
             }
 
-            if (cancelled || done.length === 0) return
-            setRedeemed(done)
+            if (!mounted.current || done.length === 0) return done.length
+            setRedeemed(prev => [...prev, ...done])
 
             const names = done.flatMap(entry => entry.webIds).length
             showToast(
@@ -91,17 +102,31 @@ export function useInviteRedemption(): { redeemed: RedeemedInvite[] } {
                     : `${names} people accepted your invites — they have access now`,
                 'success',
             )
-        }
+            return done.length
+        })().finally(() => { running.current = null })
 
-        redeemAll().catch(err => {
+        return running.current
+    }, [showToast])
+
+    useEffect(() => {
+        if (!isLoggedIn || !session || !webId) return
+        if (doneFor.current === webId) return
+        doneFor.current = webId
+
+        check().catch(err => {
             // An unreachable Pod is normal rather than exceptional, and there
             // is nothing for the user to do about it: the acceptance is still
             // sitting on the Pod for next time. Recorded, not announced.
             reportError(err, 'useInviteRedemption: could not check for accepted invites')
         })
+    }, [isLoggedIn, session, webId, check])
 
-        return () => { cancelled = true }
-    }, [isLoggedIn, session, webId, showToast])
+    /**
+     * Checks now, for a page waiting on somebody to accept. Never throws: a
+     * poll that cannot reach the Pod has nothing to report, and reporting it
+     * every few seconds would bury real errors.
+     */
+    const redeemNow = useCallback(() => check().catch(() => 0), [check])
 
-    return { redeemed }
+    return { redeemed, redeemNow }
 }

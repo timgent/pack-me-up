@@ -85,6 +85,8 @@ test.describe('M – Full pod collaboration', () => {
 
     test('M2: Owner grants full access to collaborator and gets invite link', async () => {
         await pageA.goto('/#/sharing')
+        // The address path sits behind the invite link, closed until asked for.
+        await pageA.getByText(/use a sharing address instead/i).click()
         await pageA.getByLabel(/their sharing address/i).fill(collabWebId)
         await pageA.getByRole('button', { name: /share my setup/i }).click()
 
@@ -142,7 +144,7 @@ test.describe('M – Full pod collaboration', () => {
         }).toPass({ intervals: [1_000, 2_000, 3_000, 5_000], timeout: 15_000 })
     })
 
-    test('M7: Context switcher appears after visiting shared pod', async ({ browser }) => {
+    test('M7: the account menu offers the shared setup, marked as the one on screen', async ({ browser }) => {
         // A fresh login is required: loginSyncVersion only increments on login, which triggers
         // the Navigation component to re-read shared-with-me.ttl and populate the switcher.
         const ctxC = await browser.newContext()
@@ -152,13 +154,21 @@ test.describe('M – Full pod collaboration', () => {
             await loginToCss(pageC, CSS_ISSUER, COLLAB_EMAIL, COLLAB_PASSWORD)
             await pageC.goto(inviteLink)
             await expect(pageC.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
-            await expect(pageC.getByRole('combobox', { name: /switch context/i })).toBeVisible({ timeout: 30_000 })
+            // In the account menu now, not the header: there at every width.
+            const desktop = pageC.getByTestId('nav-bar-desktop')
+            await expect(async () => {
+                // Start each try closed: the list loads after sign-in sync.
+                await pageC.keyboard.press('Escape')
+                await desktop.getByRole('button', { name: /account menu/i }).click()
+                await expect(desktop.getByRole('group', { name: /viewing/i })).toBeVisible({ timeout: 2_000 })
+            }).toPass({ timeout: 30_000 })
+            await expect(desktop.getByRole('group', { name: /viewing/i }).getByRole('button', { name: /muser/i })).toHaveAttribute('aria-current', 'true')
         } finally {
             await ctxC.close()
         }
     })
 
-    test('M8: Collab switches back to own context via context switcher', async ({ browser }) => {
+    test('M8: Collab switches back to their own data from the account menu', async ({ browser }) => {
         // Fresh login for the same reason as M7 — loginSyncVersion must trigger shared-with-me.ttl re-read.
         const ctxC = await browser.newContext()
         const pageC = await ctxC.newPage()
@@ -168,12 +178,29 @@ test.describe('M – Full pod collaboration', () => {
             await pageC.goto(inviteLink)
             await expect(pageC.getByText(/viewing.*data/i)).toBeVisible({ timeout: 20_000 })
 
-            await pageC.getByRole('combobox', { name: /switch context/i }).selectOption('__own__')
+            const desktop = pageC.getByTestId('nav-bar-desktop')
+            await desktop.getByRole('button', { name: /account menu/i }).click()
+            await desktop.getByRole('group', { name: /viewing/i }).getByRole('button', { name: /your data/i }).click()
             await pageC.waitForURL(/#\/view-lists/, { timeout: 10_000 })
             await expect(pageC.getByText(/viewing.*data/i)).not.toBeVisible()
         } finally {
             await ctxC.close()
         }
+    })
+
+    test('M8b: Collab goes back to their own lists from the full-width banner', async () => {
+        await pageB.goto(inviteLink)
+        const banner = pageB.getByTestId('foreign-pod-banner')
+        await expect(banner).toBeVisible({ timeout: 20_000 })
+
+        // Edge to edge, like the app's other banners — not inset in the page.
+        const box = await banner.boundingBox()
+        expect(box?.x).toBe(0)
+        expect(box?.width).toBe(pageB.viewportSize()?.width)
+
+        await banner.getByRole('link', { name: /back to my lists/i }).click()
+        await pageB.waitForURL(/#\/view-lists$/, { timeout: 10_000 })
+        await expect(pageB.getByText(/viewing.*data/i)).not.toBeVisible()
     })
 
     test('M9: Owner revokes access; collab is told what to do about it', async ({ browser }) => {

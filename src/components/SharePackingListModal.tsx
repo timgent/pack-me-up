@@ -16,6 +16,7 @@ import { CollaboratorIdentity } from './CollaboratorIdentity'
 import { CreateInviteLink } from './CreateInviteLink'
 import { PeopleSuggestions } from './PeopleSuggestions'
 import { ShareableLink } from './ShareableLink'
+import { ShareByAddress } from './ShareByAddress'
 import { WebIdField } from './WebIdField'
 import type { KnownPerson } from '../hooks/useKnownPeople'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
@@ -55,6 +56,7 @@ export function SharePackingListModal({
 }: SharePackingListModalProps) {
     const [shareMode, setShareMode] = useState<ShareMode>('person')
     const [collaboratorWebId, setCollaboratorWebId] = useState('')
+    const [addressOpen, setAddressOpen] = useState(false)
     const [isGranting, setIsGranting] = useState(false)
     const [generatedLink, setGeneratedLink] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -249,35 +251,37 @@ export function SharePackingListModal({
                                 label={listName}
                                 subject={listName ?? 'a packing list'}
                             />
-                            <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                                Or share with an address you already have
-                            </p>
+                            <PeopleSuggestions
+                                people={knownPeople}
+                                alreadyShared={currentCollaborators}
+                                onPick={webId => {
+                                    setCollaboratorWebId(webId)
+                                    setError(null)
+                                    setAddressOpen(true)
+                                }}
+                            />
+                            <ShareByAddress open={addressOpen} onOpenChange={setAddressOpen}>
+                                <WebIdField
+                                    label="Their sharing address (WebID)"
+                                    placeholder="https://friend.solidcommunity.net/profile/card#me"
+                                    value={collaboratorWebId}
+                                    onChange={value => {
+                                        setCollaboratorWebId(value)
+                                        setError(null)
+                                    }}
+                                    lookup={collaboratorLookup}
+                                    disabled={isGranting}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    onClick={handleShare}
+                                    disabled={isGranting || !collaboratorLookup.webId}
+                                >
+                                    {isGranting ? 'Sharing...' : 'Share'}
+                                </Button>
+                            </ShareByAddress>
                         </div>
-                    )}
-
-                    {shareMode === 'person' && (
-                        <PeopleSuggestions
-                            people={knownPeople}
-                            alreadyShared={currentCollaborators}
-                            onPick={webId => {
-                                setCollaboratorWebId(webId)
-                                setError(null)
-                            }}
-                        />
-                    )}
-
-                    {shareMode === 'person' && (
-                        <WebIdField
-                            label="Their sharing address (WebID)"
-                            placeholder="https://friend.solidcommunity.net/profile/card#me"
-                            value={collaboratorWebId}
-                            onChange={value => {
-                                setCollaboratorWebId(value)
-                                setError(null)
-                            }}
-                            lookup={collaboratorLookup}
-                            disabled={isGranting}
-                        />
                     )}
 
                     {shareMode === 'public' && !generatedLink && (
@@ -288,17 +292,6 @@ export function SharePackingListModal({
 
                     {error && (
                         <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
-                    )}
-
-                    {shareMode === 'person' && (
-                        <Button
-                            type="button"
-                            variant="primary"
-                            onClick={handleShare}
-                            disabled={isGranting || !collaboratorLookup.webId}
-                        >
-                            {isGranting ? 'Sharing...' : 'Share'}
-                        </Button>
                     )}
 
                     {shareMode === 'public' && !generatedLink && (

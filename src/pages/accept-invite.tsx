@@ -1,12 +1,15 @@
 import { CheckCircleIcon } from '@heroicons/react/24/outline'
 import { useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useSolidProfile } from '../hooks/useSolidProfile'
+import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
+import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { reportError } from '../errorReporting'
 import { acceptInvite, inviteUrlFor } from '../services/invites'
+import { invitedListId, withAcceptedInvite, type AcceptedInvite } from '../services/acceptedInvites'
 import { isInviteToken } from '../services/inviteToken'
 import { friendlyWebIdName } from '../services/solidPod'
 
@@ -22,6 +25,11 @@ import { friendlyWebIdName } from '../services/solidPod'
  *
  * The one thing that is checked here is the sender's name, which is read from
  * their public profile card rather than taken from the link.
+ *
+ * Accepting also leaves a record on this side, in the invitee's own
+ * shared-with-me documents. Accepting otherwise writes only to the sender's
+ * Pod, so the invitee's Sharing page had nothing to show for it — before
+ * access arrived, or after. The Sharing page works out which it is.
  */
 export function AcceptInvitePage() {
     const { token } = useParams<{ token: string }>()
@@ -32,6 +40,13 @@ export function AcceptInvitePage() {
     const ownerWebId = searchParams.get('owner') ?? ''
     const kind = searchParams.get('kind') === 'list' ? 'list' : 'full-setup'
     const label = searchParams.get('label')
+    const listId = invitedListId(searchParams.get('list'))
+
+    const { sharedWithMe, saveSharedWithMe } = useSharedWithMeSync()
+    const { sharedListsWithMe, saveSharedListsWithMe } = useSharedListsSync()
+    // Both documents are rewritten whole, so saving before they have loaded
+    // would replace every other share with this one.
+    const recordsLoaded = sharedWithMe !== null && sharedListsWithMe !== null
 
     const [signInPromptOpen, setSignInPromptOpen] = useState(false)
     const [state, setState] = useState<'ready' | 'accepting' | 'accepted'>('ready')
@@ -54,12 +69,32 @@ export function AcceptInvitePage() {
         setError(null)
         try {
             await acceptInvite(session, inviteUrlFor(podUrl, token), session.info.webId)
+            await recordAcceptance()
             setState('accepted')
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Could not accept this invite.'
             reportError(err, 'AcceptInvitePage: failed to accept invite')
             setError(message)
             setState('ready')
+        }
+    }
+
+    /**
+     * Never fails the acceptance: that is already on their Pod, so saying it
+     * failed would be untrue, and accepting again would fail for real. At
+     * worst the invitee finds the share the old way, by opening its link.
+     */
+    const recordAcceptance = async () => {
+        if (!sharedWithMe || !sharedListsWithMe) return
+        const accepted: AcceptedInvite = kind === 'list'
+            ? { kind, podUrl, ownerWebId, ownerName: ownerProfile.name, ...(listId ? { listId } : {}), ...(label ? { label } : {}) }
+            : { kind, podUrl, ownerWebId, ownerName: ownerProfile.name }
+        const updates = withAcceptedInvite(accepted, sharedWithMe, sharedListsWithMe, new Date().toISOString())
+        try {
+            if (updates.sharedWithMe) await saveSharedWithMe(updates.sharedWithMe)
+            if (updates.sharedListsWithMe) await saveSharedListsWithMe(updates.sharedListsWithMe)
+        } catch (err) {
+            reportError(err, 'AcceptInvitePage: accepted, but could not record it on this side')
         }
     }
 
@@ -90,10 +125,16 @@ export function AcceptInvitePage() {
                         server to do this while they are away, and somebody waiting on
                         a screen that implies otherwise is worse off than somebody
                         told the truth. */}
-                    Nothing happens on their Pod until their app runs, so it may not appear
-                    straight away. You don't need to do anything else — it'll show up under
-                    “Shared with me”.
+                    Nothing happens on their Pod until their app runs, so you won't be able to
+                    open it straight away. You don't need to do anything else — it's waiting
+                    for you on your Sharing page, and opens from there once they have.
                 </p>
+                <Link
+                    to="/sharing"
+                    className="inline-block px-4 py-2 text-sm font-semibold rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                >
+                    Go to Sharing
+                </Link>
             </div>
         )
     }
@@ -115,7 +156,7 @@ export function AcceptInvitePage() {
                         <span className="font-mono text-xs break-all">{session.info.webId}</span>.
                     </p>
                     {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-                    <Button type="button" variant="primary" onClick={handleAccept} disabled={state === 'accepting'}>
+                    <Button type="button" variant="primary" onClick={handleAccept} disabled={state === 'accepting' || !recordsLoaded}>
                         {state === 'accepting' ? 'Accepting…' : 'Accept invite'}
                     </Button>
                 </>

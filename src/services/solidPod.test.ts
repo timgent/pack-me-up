@@ -1609,7 +1609,7 @@ describe('getPodOwnerName', () => {
         const result = await getPodOwnerName(mockSession, POD)
 
         expect(result).toBe('Alice Smith')
-        expect(mockGetSolidDataset).toHaveBeenCalledWith(PROFILE_CARD_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(PROFILE_CARD_URL)
     })
 
     it('returns null when profile card fetch fails', async () => {
@@ -1718,7 +1718,56 @@ describe('getPodOwnerName', () => {
         const result = await getPodOwnerName(mockSession, POD, EXPLICIT_WEB_ID)
 
         expect(result).toBe('Alice')
-        expect(mockGetSolidDataset).toHaveBeenCalledWith(EXPLICIT_WEB_ID, expect.objectContaining({ fetch: mockSession.fetch }))
+        expect(mockGetSolidDataset).toHaveBeenCalledWith(EXPLICIT_WEB_ID)
+    })
+
+    // A WebID profile document is public by definition, and some identity
+    // servers answer a token they cannot use with a 401 rather than ignoring
+    // it — id.inrupt.com does, so reading an Inrupt WebID as the signed-in
+    // user told every sharer "we couldn't find anyone at that address".
+    describe('reading the card without credentials first', () => {
+        const INRUPT_WEB_ID = 'https://id.inrupt.com/alice'
+
+        async function cardFor(webId: string, name: string) {
+            const { buildThing, setThing, createSolidDataset } = await import('@inrupt/solid-client')
+            const thing = buildThing({ url: webId }).addStringNoLocale('http://xmlns.com/foaf/0.1/name', name).build()
+            return setThing(createSolidDataset(), thing) as unknown as SolidDataset & WithServerResourceInfo
+        }
+
+        it('does not send the signed-in session to read a public card', async () => {
+            mockGetSolidDataset.mockImplementation(async (_url, options) => {
+                if (options?.fetch) throw { statusCode: 401 }
+                return cardFor(INRUPT_WEB_ID, 'Alice')
+            })
+
+            expect(await getSolidProfile(mockSession, INRUPT_WEB_ID)).toEqual({ name: 'Alice', photo: null, resolved: true })
+            expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
+            expect(mockGetSolidDataset).toHaveBeenCalledWith(INRUPT_WEB_ID)
+        })
+
+        it('asks again as the signed-in user when the card refuses strangers', async () => {
+            mockGetSolidDataset.mockImplementation(async (_url, options) => {
+                if (!options?.fetch) throw { statusCode: 401 }
+                return cardFor(WEB_ID, 'Alice Smith')
+            })
+
+            expect(await getSolidProfile(mockSession, WEB_ID)).toEqual({ name: 'Alice Smith', photo: null, resolved: true })
+            expect(mockGetSolidDataset).toHaveBeenLastCalledWith(PROFILE_CARD_URL, expect.objectContaining({ fetch: mockSession.fetch }))
+        })
+
+        it('does not ask again when the card is missing rather than private', async () => {
+            mockGetSolidDataset.mockRejectedValue({ statusCode: 404 })
+
+            expect((await getSolidProfile(mockSession, WEB_ID)).resolved).toBe(false)
+            expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
+        })
+
+        it('has nobody to ask again as when there is no session', async () => {
+            mockGetSolidDataset.mockRejectedValue({ statusCode: 401 })
+
+            expect((await getSolidProfile(null, WEB_ID)).resolved).toBe(false)
+            expect(mockGetSolidDataset).toHaveBeenCalledTimes(1)
+        })
     })
 })
 

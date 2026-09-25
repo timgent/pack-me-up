@@ -1,5 +1,5 @@
-import { CheckCircleIcon } from '@heroicons/react/24/outline'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
@@ -27,6 +27,8 @@ import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
+import { useSharedAccess } from '../hooks/useSharedAccess'
+import { withAccessConfirmed } from '../services/acceptedInvites'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
 import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
@@ -35,7 +37,8 @@ import { PeopleSuggestions } from '../components/PeopleSuggestions'
 import { ShareableLink } from '../components/ShareableLink'
 import { WebIdField } from '../components/WebIdField'
 import { YourSharingAddress } from '../components/YourSharingAddress'
-import { useInviteRedemptionVersion } from '../components/InviteRedemptionContext'
+import { ShareByAddress } from '../components/ShareByAddress'
+import { useInviteRedemptionVersion, useRedeemInvitesNow } from '../components/InviteRedemptionContext'
 import { useKnownPeople } from '../hooks/useKnownPeople'
 import { deleteInvite, listInvites, type StoredInvite } from '../services/invites'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
@@ -45,32 +48,51 @@ import {
     setPendingSignInAction,
 } from '../utils/pendingSignInAction'
 
+/** How often an open Sharing page looks for an accepted invite. */
+const INVITE_POLL_MS = 5_000
+
 type ListSharingStatus = { collaborators: string[]; isPublic: boolean } | 'loading' | 'error'
 
 /**
  * The whole-set share has always worked; it was just buried under a label
  * ("People who can access my data") that described plumbing rather than the
- * thing anyone wants. The copy below is deliberately relationship-agnostic —
- * the examples carry the breadth so nobody has to be someone's "partner" to
- * see themselves in it.
+ * thing anyone wants. Two sentences: what they get, and where to go for less.
+ * Relationship-agnostic, so nobody has to be someone's "partner" to see
+ * themselves in it.
  */
-const FULL_SETUP_TAGLINE = 'Let someone else use your questions and lists.'
-
 function FullSetupIntro() {
     return (
-        <div className="space-y-2">
-            <p className="text-sm text-gray-700 dark:text-gray-300">{FULL_SETUP_TAGLINE}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-                They get your question set and every packing list you have — including the ones you
-                make later — and can view and edit them. Handy for anyone who packs with the same
-                people over and over: couples, families, sports clubs, scout troops, climbing
-                buddies.
+        <div className="space-y-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+                Let someone else use your questions and every packing list — including ones you
+                make later. They can view and edit them.
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-                Sharing just one list? Open that list and choose <strong>Share</strong> — that sends
-                a single list, not your whole setup.
+                Just one list? Open it and choose <strong>Share</strong>.
             </p>
         </div>
+    )
+}
+
+/**
+ * Why a share that is refused cannot be opened — and there are two reasons,
+ * which call for opposite things from the reader.
+ *
+ * Never yet opened (`awaitingAccess`): an accepted invite whose sender's app
+ * has not run since. Nothing can grant on their behalf while they are away, so
+ * this is a wait, said as one. Opened before: they have stopped sharing it,
+ * and waiting would be waiting for ever — so it says so, and Remove is the
+ * way to tidy it away.
+ */
+function ShareUnavailable({ ownerName, awaitingAccess }: { ownerName: string; awaitingAccess?: boolean }) {
+    return awaitingAccess ? (
+        <span className="text-xs text-amber-700 dark:text-amber-300">
+            Waiting for {ownerName} to open Pack Me Up — you can open this once they have
+        </span>
+    ) : (
+        <span className="text-xs text-red-700 dark:text-red-300">
+            {ownerName} has stopped sharing this with you — ask them to share it again, or remove it
+        </span>
     )
 }
 
@@ -98,9 +120,9 @@ export function SharingSettingsPage() {
     // naming them in the confirmation costs nothing.
     const sharedWithProfile = useSolidProfile(sharedWith ?? undefined, session)
     const [signInPromptOpen, setSignInPromptOpen] = useState(false)
-    const webIdInputRef = useRef<HTMLInputElement>(null)
+    const fullSetupRef = useRef<HTMLElement>(null)
+    const [addressOpen, setAddressOpen] = useState(false)
     const [collaborators, setCollaborators] = useState<string[]>([])
-    const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false)
     const [revokingWebId, setRevokingWebId] = useState<string | null>(null)
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
     const [podNames, setPodNames] = useState<Record<string, string>>({})
@@ -114,6 +136,39 @@ export function SharingSettingsPage() {
         session
     )
 
+    // An accepted invite is recorded before the sender's app has granted
+    // anything, so each share says whether it can be opened yet.
+    const accessTargets = useMemo(() => [
+        ...sharedContexts.map(ctx => ({ key: `setup:${ctx.podUrl}`, target: { kind: 'setup' as const, podUrl: ctx.podUrl } })),
+        ...sharedLists.map(ctx => ({ key: `list:${ctx.listUrl}`, target: { kind: 'list' as const, listUrl: ctx.listUrl } })),
+    ], [sharedContexts, sharedLists])
+    const shareAccess = useSharedAccess(accessTargets, session)
+
+    // A share that was waiting and has now opened stops waiting, so that a
+    // later refusal reads as what it is: access taken away.
+    useEffect(() => {
+        const now = new Date().toISOString()
+        if (sharedWithMe) {
+            for (const ctx of sharedWithMe.contexts) {
+                if (!ctx.awaitingAccess || shareAccess[`setup:${ctx.podUrl}`] !== 'open') continue
+                const updated = withAccessConfirmed(sharedWithMe, { kind: 'setup', podUrl: ctx.podUrl }, now)
+                if (updated) saveSharedWithMe(updated).catch(err => reportError(err, 'SharingSettingsPage: failed to record that a share opened'))
+                break
+            }
+        }
+        if (sharedListsWithMeData) {
+            for (const ctx of sharedListsWithMeData.lists) {
+                if (!ctx.awaitingAccess || shareAccess[`list:${ctx.listUrl}`] !== 'open') continue
+                const updated = withAccessConfirmed(sharedListsWithMeData, { kind: 'list', listUrl: ctx.listUrl }, now)
+                if (updated) saveSharedListsWithMe(updated).catch(err => reportError(err, 'SharingSettingsPage: failed to record that a share opened'))
+                break
+            }
+        }
+    // Re-runs when an answer arrives or a save lands; each pass clears one
+    // entry, and the saved document drives the next.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shareAccess, sharedWithMe, sharedListsWithMeData])
+
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
     const [sharingStatusByListId, setSharingStatusByListId] = useState<Record<string, ListSharingStatus>>({})
@@ -125,27 +180,25 @@ export function SharingSettingsPage() {
     }, [isLoggedIn, session])
 
     // Someone who signed in from the "share your full setup" prompt lands back
-    // here — put the cursor where they were going rather than making them find
-    // the field again.
+    // here — put them on the invite link, which is where they were going. It
+    // renders once the Pod URL is known, so this waits for that.
     useEffect(() => {
-        if (!isLoggedIn) return
+        if (!isLoggedIn || !ownPodUrl) return
         const pending = getPendingSignInAction()
         if (pending?.type !== 'share-full-setup') return
         clearPendingSignInAction()
-        webIdInputRef.current?.focus()
-        webIdInputRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
-    }, [isLoggedIn])
+        const button = fullSetupRef.current?.querySelector('button')
+        button?.focus()
+        button?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    }, [isLoggedIn, ownPodUrl])
 
     const loadCollaborators = useCallback(async () => {
         if (!session || !ownPodUrl) return
-        setIsLoadingCollaborators(true)
         try {
             const list = await getFullCollaborators(session, ownPodUrl)
             setCollaborators(list)
         } catch (err) {
             reportError(err, 'SharingSettingsPage: failed to load collaborators')
-        } finally {
-            setIsLoadingCollaborators(false)
         }
     // `redemptionVersion` is a change signal rather than an input: redeeming
     // an invite grants access, which is exactly what this reads.
@@ -166,6 +219,30 @@ export function SharingSettingsPage() {
     }, [session, ownPodUrl, redemptionVersion])
 
     useEffect(() => { loadInvites() }, [loadInvites])
+
+    // Granting only happens when this app checks the Pod — once per sign-in
+    // on its own, so somebody accepting across the table stayed invisible
+    // until a reload. While an invite is out and this page is on screen, keep
+    // asking; a grant bumps the redemption version, which re-reads the lists
+    // above and, once nothing is outstanding, stops this.
+    const redeemNow = useRedeemInvitesNow()
+    const hasOutstandingInvite = pendingInvites.length > 0
+    useEffect(() => {
+        if (!hasOutstandingInvite) return
+        const id = setInterval(() => {
+            if (document.visibilityState === 'visible') redeemNow()
+        }, INVITE_POLL_MS)
+        return () => clearInterval(id)
+    }, [hasOutstandingInvite, redeemNow])
+
+    const [inviteCheck, setInviteCheck] = useState<'checking' | 'none' | null>(null)
+    const handleCheckInvites = async () => {
+        setInviteCheck('checking')
+        const granted = await redeemNow()
+        // A grant announces itself with a toast and drops off the list; only
+        // "nothing yet" needs saying here.
+        setInviteCheck(granted > 0 ? null : 'none')
+    }
 
     const handleRevokeInvite = async (invite: StoredInvite) => {
         if (!session) return
@@ -380,13 +457,8 @@ export function SharingSettingsPage() {
                 <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200">Sharing</h1>
             </div>
 
-            {/* First, because it is the first thing either person needs and the
-                app used to offer it nowhere: sharing starts with an address
-                only the *other* side can produce. */}
-            {session?.info.webId && <YourSharingAddress webId={session.info.webId} />}
-
             {/* Section 1: Share the whole setup — questions + every list */}
-            <section className="space-y-4">
+            <section ref={fullSetupRef} className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
                 <FullSetupIntro />
                 {session && ownPodUrl && (
@@ -399,52 +471,62 @@ export function SharingSettingsPage() {
                     />
                 )}
 
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                    Or share with an address you already have
-                </p>
-
+                {/* One tap for people the device already knows — kept in view,
+                    unlike the typed address, because it asks nothing of anyone. */}
                 <PeopleSuggestions
                     people={knownPeople}
                     alreadyShared={collaborators}
-                    onPick={setCollaboratorWebId}
-                    label="Share with someone you already know"
+                    onPick={webId => {
+                        setCollaboratorWebId(webId)
+                        setAddressOpen(true)
+                    }}
+                    label="Or share straight away with"
                 />
-                <WebIdField
-                    label="Their sharing address (WebID)"
-                    placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
-                    value={collaboratorWebId}
-                    onChange={setCollaboratorWebId}
-                    lookup={collaboratorLookup}
-                    disabled={isGranting}
-                    inputRef={webIdInputRef}
-                />
-                <button
-                    onClick={handleGrantAccess}
-                    disabled={isGranting || !collaboratorLookup.webId}
-                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                >
-                    {isGranting ? 'Sharing…' : 'Share my setup'}
-                </button>
+                <ShareByAddress open={addressOpen} onOpenChange={setAddressOpen}>
+                    <WebIdField
+                        label="Their sharing address (WebID)"
+                        placeholder="e.g. https://alice.solidcommunity.net/profile/card#me"
+                        value={collaboratorWebId}
+                        onChange={setCollaboratorWebId}
+                        lookup={collaboratorLookup}
+                        disabled={isGranting}
+                    />
+                    <button
+                        onClick={handleGrantAccess}
+                        disabled={isGranting || !collaboratorLookup.webId}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                    >
+                        {isGranting ? 'Sharing…' : 'Share my setup'}
+                    </button>
+                    {inviteLink && (
+                        <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
+                            <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
+                                <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                Your full setup is shared
+                                {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                They now have your question set and all your packing lists. Send them this
+                                link so they can open it:
+                            </p>
+                            <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
+                        </div>
+                    )}
+                    {/* Theirs is what this path needs; yours is what the same path
+                        needs when it runs the other way. */}
+                    {session?.info.webId && (
+                        <YourSharingAddress
+                            webId={session.info.webId}
+                            title="Your own address"
+                            description="If someone wants to share with you this way, send them this."
+                        />
+                    )}
+                </ShareByAddress>
 
-                {inviteLink && (
-                    <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
-                        <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
-                            <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                            Your full setup is shared
-                            {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
-                        </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                            They now have your question set and all your packing lists. Send them this
-                            link so they can open it:
-                        </p>
-                        <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
-                    </div>
-                )}
 
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 pt-2">People with your full setup</h3>
-                {isLoadingCollaborators ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
-                ) : collaborators.length > 0 ? (
+                {collaborators.length > 0 && (
+                    <>
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 pt-2">People with your full setup</h3>
                     <ul className="space-y-2 mt-2">
                         {collaborators.map(webId => (
                             <li key={webId} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
@@ -460,19 +542,30 @@ export function SharingSettingsPage() {
                             </li>
                         ))}
                     </ul>
-                ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">You haven't shared your full setup with anyone yet.</p>
+                    </>
                 )}
             </section>
 
             {/* Invite links that have been handed out and not yet used up. */}
             {pendingInvites.length > 0 && (
                 <section className="space-y-3">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Invite links you've sent</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Anyone holding one of these links can accept it. They disappear from here
-                        once used. Revoking one stops it working straight away.
-                    </p>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Invite links you've sent</h2>
+                        <button
+                            type="button"
+                            onClick={handleCheckInvites}
+                            disabled={inviteCheck === 'checking'}
+                            className="inline-flex shrink-0 items-center gap-1 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 disabled:opacity-50 transition-colors"
+                        >
+                            <ArrowPathIcon aria-hidden="true" className={`h-3.5 w-3.5 ${inviteCheck === 'checking' ? 'animate-spin' : ''}`} />
+                            {inviteCheck === 'checking' ? 'Checking…' : 'Check now'}
+                        </button>
+                    </div>
+                    {inviteCheck === 'none' && (
+                        <p role="status" className="text-sm text-gray-500 dark:text-gray-400">
+                            Nobody has accepted yet. This page keeps checking while it's open.
+                        </p>
+                    )}
                     <ul className="space-y-2">
                         {pendingInvites.map(invite => (
                             <li key={invite.url} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
@@ -502,131 +595,122 @@ export function SharingSettingsPage() {
                 </section>
             )}
 
-            {/* Section 2: Pods shared with me */}
+            {/* Section 2: everything shared with me — whole setups and single
+                lists together, because to the person receiving them it is one
+                question: what do I have? */}
             <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Data shared with me</h2>
-                {sharedContexts.length === 0 ? (
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Shared with me</h2>
+                {sharedContexts.length === 0 && sharedLists.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No shared pods yet. Visit an invite link to add one.
+                        Nothing has been shared with you yet.
                     </p>
                 ) : (
                     <ul className="space-y-2">
-                        {sharedContexts.map(ctx => (
-                            <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)}
-                                </span>
-                                <button
-                                    onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
-                                >
-                                    Open
-                                </button>
-                                <button
-                                    onClick={() => handleRemoveSharedContext(ctx.podUrl)}
-                                    disabled={removingPodUrl === ctx.podUrl}
-                                    aria-label={`Remove shared pod`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
-                                >
-                                    {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
-                                </button>
-                            </li>
-                        ))}
+                        {sharedContexts.map(ctx => {
+                            const ownerName = ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)
+                            const refused = shareAccess[`setup:${ctx.podUrl}`] === 'refused'
+                            return (
+                                <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate" title={ctx.podUrl}>
+                                            {ownerName}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">Full setup</span>
+                                        {refused && <ShareUnavailable ownerName={ownerName} awaitingAccess={ctx.awaitingAccess} />}
+                                    </div>
+                                    {!refused && <button
+                                        onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
+                                    >
+                                        Open
+                                    </button>}
+                                    <button
+                                        onClick={() => handleRemoveSharedContext(ctx.podUrl)}
+                                        disabled={removingPodUrl === ctx.podUrl}
+                                        aria-label={`Remove shared pod`}
+                                        className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
+                                    >
+                                        {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
+                                    </button>
+                                </li>
+                            )
+                        })}
+                        {sharedLists.map(ctx => {
+                            const ownerName = resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)
+                            const refused = shareAccess[`list:${ctx.listUrl}`] === 'refused'
+                            return (
+                                <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                            {ctx.label ?? ctx.listId}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
+                                            {ownerName}
+                                        </span>
+                                        {refused && <ShareUnavailable ownerName={ownerName} awaitingAccess={ctx.awaitingAccess} />}
+                                    </div>
+                                    {!refused && <button
+                                        onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
+                                    >
+                                        Open
+                                    </button>}
+                                    <button
+                                        onClick={() => handleRemoveSharedList(ctx.listId)}
+                                        disabled={removingListId === ctx.listId}
+                                        aria-label={`Remove shared list ${ctx.label ?? ctx.listId}`}
+                                        className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
+                                    >
+                                        {removingListId === ctx.listId ? 'Removing…' : 'Remove'}
+                                    </button>
+                                </li>
+                            )
+                        })}
                     </ul>
                 )}
             </section>
 
-            {/* Section 3: Individual lists shared with me */}
-            <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Individual lists shared with me</h2>
-                {sharedLists.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No individual lists yet. When someone shares a list link with you and you save it, it will appear here.
-                    </p>
-                ) : (
-                    <ul className="space-y-2">
-                        {sharedLists.map(ctx => (
-                            <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                <div className="flex flex-col flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                                        {ctx.label ?? ctx.listId}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
-                                        {resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)}
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
-                                >
-                                    Open
-                                </button>
-                                <button
-                                    onClick={() => handleRemoveSharedList(ctx.listId)}
-                                    disabled={removingListId === ctx.listId}
-                                    aria-label={`Remove shared list ${ctx.label ?? ctx.listId}`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
-                                >
-                                    {removingListId === ctx.listId ? 'Removing…' : 'Remove'}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
-
-            {/* Section 4: Individual lists I've shared */}
+            {/* Section 4: Individual lists I've shared — only once some are
+                known to be. Full-setup people are left out: they already have
+                every list. Nothing shows while checking, since otherwise every
+                list flashes up as "loading" and then vanishes. */}
+            {sharedOwnLists.length > 0 && (
             <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Individual lists I've shared</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Lists you've shared on their own — with specific people or publicly. People who have
-                    your full setup are not listed here; they already have every list.
-                </p>
-                {ownLists.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No packing lists yet.</p>
-                ) : sharedOwnLists.length === 0 && Object.values(sharingStatusByListId).every(s => s !== 'loading') ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">You haven't shared any individual lists yet.</p>
-                ) : (
-                    <ul className="space-y-2">
-                        {ownLists
-                            .filter(list => {
-                                const status = sharingStatusByListId[list.id]
-                                if (status === 'loading') return true
-                                return isIndividuallyShared(status)
-                            })
-                            .map(list => {
-                                const status = sharingStatusByListId[list.id]
-                                return (
-                                    <li key={list.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                        <div className="flex flex-col flex-1 min-w-0">
-                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{list.name}</span>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                {status === 'loading' ? 'Loading sharing info…' :
-                                                    status === 'error' ? 'Could not load sharing info' :
-                                                    [
-                                                        status.isPublic ? 'Public' : null,
-                                                        individualCollaborators(status).length > 0 ? `Shared with ${individualCollaborators(status).length} person${individualCollaborators(status).length > 1 ? 's' : ''}` : null,
-                                                    ].filter(Boolean).join(' · ')}
-                                            </span>
-                                        </div>
-                                        {ownPodUrl && session && (
-                                            <button
-                                                onClick={() => setManagingList({
-                                                    fileUrl: `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
-                                                    listId: list.id,
-                                                    name: list.name,
-                                                })}
-                                                className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
-                                            >
-                                                Manage sharing
-                                            </button>
-                                        )}
-                                    </li>
-                                )
-                            })}
-                    </ul>
-                )}
+                <ul className="space-y-2">
+                    {sharedOwnLists.map(list => {
+                            const status = sharingStatusByListId[list.id]
+                            if (typeof status !== 'object') return null
+                            const people = individualCollaborators(status).length
+                            return (
+                                <li key={list.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{list.name}</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {[
+                                                status.isPublic ? 'Public' : null,
+                                                people > 0 ? `Shared with ${people} ${people === 1 ? 'person' : 'people'}` : null,
+                                            ].filter(Boolean).join(' · ')}
+                                        </span>
+                                    </div>
+                                    {ownPodUrl && session && (
+                                        <button
+                                            onClick={() => setManagingList({
+                                                fileUrl: `${ownPodUrl}${POD_CONTAINERS.PACKING_LISTS}${list.id}.ttl`,
+                                                listId: list.id,
+                                                name: list.name,
+                                            })}
+                                            className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
+                                        >
+                                            Manage sharing
+                                        </button>
+                                    )}
+                                </li>
+                            )
+                        })}
+                </ul>
             </section>
+            )}
 
             {/* Manage sharing modal for section 4 */}
             {managingList && session && ownPodUrl && (

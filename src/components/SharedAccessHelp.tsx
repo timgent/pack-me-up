@@ -15,8 +15,8 @@ import { YourSharingAddress } from './YourSharingAddress'
  * they are signed in as. That is a two-message fix once somebody says so.
  *
  * So: signed out, this offers the way in. Signed in, it says which account they
- * are signed in as — the thing the sharer needs to hear — and hands them that
- * address to send back.
+ * are signed in as, suggests a new invite link — which lands on whoever
+ * accepts it — and hands them that address to send back as the fallback.
  */
 export function SharedAccessHelp({ what, isLoggedIn, webId }: {
     /** Whether the link was to one list or to somebody's whole setup. */
@@ -50,10 +50,17 @@ export function SharedAccessHelp({ what, isLoggedIn, webId }: {
                         it's an easy one to get wrong. Less often, they've removed access since
                         sending the link.
                     </p>
+                    {/* An invite lands on whichever account accepts it, so it
+                        fixes a mixed-up address without anyone finding the
+                        right one — hence first. */}
+                    <p className="text-gray-700 dark:text-gray-300">
+                        The easiest fix: ask them for a <strong>new invite link</strong> and accept
+                        it here.
+                    </p>
                     <YourSharingAddress
                         webId={webId}
-                        title="Send them this address"
-                        description="This is the address you're signed in as. Send it to them and ask them to share again — it will land on the account you're actually using."
+                        title="Or send them your address"
+                        description="This is the address you're signed in as. If they share with it, it lands on the account you're actually using."
                     />
                 </>
             ) : (

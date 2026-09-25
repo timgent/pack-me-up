@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Outlet, useParams, Navigate, useSearchParams } from 'react-router-dom'
 import { ForeignPodContext } from './ForeignPodContext'
 import { SharedAccessHelp } from './SharedAccessHelp'
+import { ForeignPodBanner } from './ForeignPodBanner'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import {
@@ -56,14 +57,19 @@ export function ForeignPodLayout() {
                 const name = await getPodOwnerName(session!, foreignPodUrl, webId)
                 setOwnerName(name)
 
-                const needsUpdate = !existing || (webId && !existing.webId) || (name && !existing.label)
+                // An entry recorded by accepting an invite is waiting until it
+                // first opens — which is now. Clearing it is what lets a later
+                // refusal read as revoked rather than as still waiting.
+                const needsUpdate = !existing || (webId && !existing.webId) || (name && !existing.label) || existing.awaitingAccess
                 if (!needsUpdate) return
 
                 const updated: SharedWithMeList = {
                     contexts: existing
-                        ? list.contexts.map(c => c.podUrl === foreignPodUrl
-                            ? { ...c, ...(webId ? { webId } : {}), ...(name ? { label: name } : {}) }
-                            : c)
+                        ? list.contexts.map(c => {
+                            if (c.podUrl !== foreignPodUrl) return c
+                            const { awaitingAccess: _opened, ...rest } = c
+                            return { ...rest, ...(webId ? { webId } : {}), ...(name ? { label: name } : {}) }
+                        })
                         : [...list.contexts, {
                             podUrl: foreignPodUrl,
                             addedAt: new Date().toISOString(),
@@ -117,9 +123,10 @@ export function ForeignPodLayout() {
 
     return (
         <ForeignPodContext.Provider value={{ foreignPodUrl }}>
-            <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 px-4 py-2 text-sm text-blue-800 dark:text-blue-200 -mx-4 -mt-8 mb-6">
-                Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? (resolvedWebId ? friendlyPodName(resolvedWebId) : null) ?? friendlyPodName(foreignPodUrl)}</span>'s data
-            </div>
+            <ForeignPodBanner
+                podUrl={foreignPodUrl}
+                ownerName={ownerName ?? (resolvedWebId ? friendlyPodName(resolvedWebId) : null) ?? friendlyPodName(foreignPodUrl)}
+            />
             <Outlet />
         </ForeignPodContext.Provider>
     )

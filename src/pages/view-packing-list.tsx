@@ -24,6 +24,7 @@ import { useKnownPeople } from '../hooks/useKnownPeople'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { UpdateFromQuestionsModal } from '../components/UpdateFromQuestionsModal'
 import { useForeignPod } from '../components/ForeignPodContext'
+import { withAccessConfirmed } from '../services/acceptedInvites'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { mergePackingLists } from '../utils/mergePackingLists'
 import { applyQuestionSetChanges, computeQuestionSetChanges, type QuestionSetChange } from '../create-packing-list/updateFromQuestions'
@@ -432,8 +433,17 @@ export function ViewPackingList() {
 
     useEffect(() => {
         if (!packingList || !foreignPodUrl || !id || !sharedListsWithMe) return
-        if (sharedListsWithMe.lists.some(l => l.listId === id)) return
         const fileUrl = `${foreignPodUrl}${POD_CONTAINERS.PACKING_LISTS}${id}.ttl`
+        const existing = sharedListsWithMe.lists.find(l => l.listId === id)
+        if (existing) {
+            // Recorded by accepting an invite, and now open: no longer waiting,
+            // so a later refusal reads as revoked.
+            const confirmed = existing.awaitingAccess
+                ? withAccessConfirmed(sharedListsWithMe, { kind: 'list', listUrl: existing.listUrl }, new Date().toISOString())
+                : null
+            if (confirmed) saveSharedListsWithMe(confirmed)
+            return
+        }
         saveSharedListsWithMe({
             lists: [...sharedListsWithMe.lists, {
                 listId: id,

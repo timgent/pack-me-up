@@ -97,6 +97,26 @@ describe('SharePackingListModal', () => {
             await waitFor(() => expect(screen.getByPlaceholderText(/profile\/card#me/i)).toBeTruthy())
         })
 
+        // The invite link leads; the address field is there, closed, for
+        // whoever wants it — same as the Sharing page.
+        it('keeps the address field in a closed disclosure below the invite link', async () => {
+            renderModal()
+            const input = await screen.findByPlaceholderText(/profile\/card#me/i)
+            const disclosure = screen.getByText(/use a sharing address instead/i).closest('details')
+            expect(disclosure?.open).toBe(false)
+            expect(disclosure?.contains(input)).toBe(true)
+            expect(screen.queryByText(/or share with an address you already have/i)).toBeNull()
+        })
+
+        it('opens the address field when someone you know is picked', async () => {
+            renderModal({ knownPeople: [{ webId: 'https://bob.example.com/profile/card#me', name: 'Bob' }] })
+
+            fireEvent.click(await screen.findByRole('button', { name: 'Bob' }))
+
+            expect(screen.getByText(/use a sharing address instead/i).closest('details')?.open).toBe(true)
+            expect((screen.getByPlaceholderText(/profile\/card#me/i) as HTMLInputElement).value).toBe('https://bob.example.com/profile/card#me')
+        })
+
         it('renders a Share button', async () => {
             renderModal()
             await waitFor(() => expect(screen.getByRole('button', { name: /^share$/i })).toBeTruthy())
