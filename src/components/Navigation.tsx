@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect } from 'react'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
@@ -135,27 +136,34 @@ export const Navigation = () => {
                                       * control across the bar — and it is capped too.
                                       */}
                                     {sharedContexts.length > 0 && (
-                                        <select
-                                            value={currentForeignEncoded ?? '__own__'}
-                                            onChange={e => {
-                                                const val = e.target.value
-                                                if (val === '__own__') navigate('/view-lists')
-                                                else navigate(`/pod/${val}/view-lists`)
-                                            }}
-                                            className="hidden lg:block max-w-[12rem] truncate text-sm font-medium bg-white/20 text-white rounded-lg px-2 py-1 border-0 focus:ring-0 cursor-pointer"
-                                            aria-label="Switch context"
-                                        >
-                                            <option value="__own__" className="text-gray-900 dark:text-gray-100">Your data</option>
-                                            {sharedContexts.map(ctx => (
-                                                <option
-                                                    key={ctx.podUrl}
-                                                    value={encodeURIComponent(ctx.podUrl)}
-                                                    className="text-gray-900 dark:text-gray-100"
-                                                >
-                                                    {ctx.label ?? resolveOwnerDisplayName(null, ctx.webId, ctx.podUrl)}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        // The browser's own arrow sits hard against the
+                                        // edge, and padding does not move it everywhere
+                                        // (Chrome on macOS pins it) — so it is hidden and
+                                        // drawn here instead, with room around it.
+                                        <div className="relative hidden lg:block">
+                                            <select
+                                                value={currentForeignEncoded ?? '__own__'}
+                                                onChange={e => {
+                                                    const val = e.target.value
+                                                    if (val === '__own__') navigate('/view-lists')
+                                                    else navigate(`/pod/${val}/view-lists`)
+                                                }}
+                                                className="appearance-none max-w-[12rem] truncate text-sm font-medium bg-white/20 text-white rounded-lg pl-3 pr-8 py-1 border-0 focus:ring-0 cursor-pointer"
+                                                aria-label="Switch context"
+                                            >
+                                                <option value="__own__" className="text-gray-900 dark:text-gray-100">Your data</option>
+                                                {sharedContexts.map(ctx => (
+                                                    <option
+                                                        key={ctx.podUrl}
+                                                        value={encodeURIComponent(ctx.podUrl)}
+                                                        className="text-gray-900 dark:text-gray-100"
+                                                    >
+                                                        {ctx.label ?? resolveOwnerDisplayName(null, ctx.webId, ctx.podUrl)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDownIcon aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
+                                        </div>
                                     )}
                                     <AccountMenu
                                         webId={webId ?? ''}
