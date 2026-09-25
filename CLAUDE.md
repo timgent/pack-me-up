@@ -154,7 +154,10 @@ stay in view above it, and picking one opens it. Four rules:
 - **Redemption is app-wide, and pages re-read when it fires.** It is mounted in
   `App.tsx`, not on the Sharing page — the sender is waiting to hear it worked,
   not planning a visit to settings. `InviteRedemptionContext` is the signal that
-  access changed underneath a page that has already loaded.
+  access changed underneath a page that has already loaded. On its own it runs
+  once per sign-in; while an invite is outstanding the Sharing page also polls
+  `redeemNow` (and offers "Check now"), so an acceptance across the table shows
+  up in seconds rather than at the next reload. E2E N4 pins that.
 
 Two known properties, both deliberate: a full-setup collaborator can read the
 invites container, because "your full setup" includes it — no escalation, since
