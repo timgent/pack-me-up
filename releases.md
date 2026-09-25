@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.17.0 (versionCode 18) — 2026-09-25
+- New: invite links — share access with a link, no need to exchange addresses
+- Share and invite links now always open to the right place
+- Fixed shared setups sometimes wrongly telling recipients they had no access
+- Pack Me Up can now be installed as an app on your device (PWA)
+
 ## 1.16.0 (versionCode 17) — 2026-09-18
 - Your own sharing address is now easy to find, with copy, share-sheet and QR code
 - Shared addresses are checked and confirmed before access is granted, so shares no longer silently fail
