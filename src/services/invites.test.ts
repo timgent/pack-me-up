@@ -218,6 +218,21 @@ describe('buildInviteLink', () => {
         expect(params.get('label')).toBe('Ski trip')
     })
 
+    // The invitee's device has to find the list once access arrives, and it
+    // can read nothing on the sharer's Pod until then — so the link is the
+    // only place the list's id can come from.
+    it('carries the list a list invite is for', () => {
+        const link = buildInviteLink('https://pack-me-up.app', POD, OWNER, {
+            token: 'tok-hhhhhhhhhhhhhhhhhhhh',
+            kind: 'list',
+            listId: 'list-123',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            acceptedBy: [],
+        })
+
+        expect(new URLSearchParams(link.split('?')[1]).get('list')).toBe('list-123')
+    })
+
     it('leaves out a label there is none of', () => {
         const link = buildInviteLink('https://pack-me-up.app', POD, OWNER, {
             token: 'tok-gggggggggggggggggggg',

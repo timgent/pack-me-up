@@ -1,5 +1,5 @@
 import { CheckCircleIcon } from '@heroicons/react/24/outline'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
 import { useDatabase } from '../components/DatabaseContext'
@@ -27,6 +27,7 @@ import { SharePackingListModal } from '../components/SharePackingListModal'
 import type { PackingList } from '../create-packing-list/types'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
+import { useSharedAccess } from '../hooks/useSharedAccess'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
 import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
@@ -74,6 +75,19 @@ function FullSetupIntro() {
     )
 }
 
+/**
+ * A share accepted by invite, whose sender's app has not run since. Nothing
+ * can grant on their behalf while they are away, so this is a wait, and it
+ * is said as one — not an error, and not an Open that leads to a refusal.
+ */
+function WaitingOnSender({ ownerName }: { ownerName: string }) {
+    return (
+        <span className="text-xs text-amber-700 dark:text-amber-300">
+            Waiting for {ownerName} to open Pack Me Up — you can open this once they have
+        </span>
+    )
+}
+
 export function SharingSettingsPage() {
     const { session, isLoggedIn } = useSolidPod()
     const { db } = useDatabase()
@@ -113,6 +127,14 @@ export function SharingSettingsPage() {
         sharedLists.map(ctx => ({ id: ctx.listId, podUrl: ctx.podUrl, ownerWebId: ctx.ownerWebId ?? null })),
         session
     )
+
+    // An accepted invite is recorded before the sender's app has granted
+    // anything, so each share says whether it can be opened yet.
+    const accessTargets = useMemo(() => [
+        ...sharedContexts.map(ctx => ({ key: `setup:${ctx.podUrl}`, target: { kind: 'setup' as const, podUrl: ctx.podUrl } })),
+        ...sharedLists.map(ctx => ({ key: `list:${ctx.listUrl}`, target: { kind: 'list' as const, listUrl: ctx.listUrl } })),
+    ], [sharedContexts, sharedLists])
+    const shareAccess = useSharedAccess(accessTargets, session)
 
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
@@ -511,27 +533,34 @@ export function SharingSettingsPage() {
                     </p>
                 ) : (
                     <ul className="space-y-2">
-                        {sharedContexts.map(ctx => (
-                            <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                <span className="text-sm text-gray-800 dark:text-gray-100 truncate flex-1" title={ctx.podUrl}>
-                                    {ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)}
-                                </span>
-                                <button
-                                    onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
-                                >
-                                    Open
-                                </button>
-                                <button
-                                    onClick={() => handleRemoveSharedContext(ctx.podUrl)}
-                                    disabled={removingPodUrl === ctx.podUrl}
-                                    aria-label={`Remove shared pod`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
-                                >
-                                    {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
-                                </button>
-                            </li>
-                        ))}
+                        {sharedContexts.map(ctx => {
+                            const ownerName = ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)
+                            const waiting = shareAccess[`setup:${ctx.podUrl}`] === 'waiting'
+                            return (
+                                <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm text-gray-800 dark:text-gray-100 truncate" title={ctx.podUrl}>
+                                            {ownerName}
+                                        </span>
+                                        {waiting && <WaitingOnSender ownerName={ownerName} />}
+                                    </div>
+                                    {!waiting && <button
+                                        onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
+                                    >
+                                        Open
+                                    </button>}
+                                    <button
+                                        onClick={() => handleRemoveSharedContext(ctx.podUrl)}
+                                        disabled={removingPodUrl === ctx.podUrl}
+                                        aria-label={`Remove shared pod`}
+                                        className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
+                                    >
+                                        {removingPodUrl === ctx.podUrl ? 'Removing…' : 'Remove'}
+                                    </button>
+                                </li>
+                            )
+                        })}
                     </ul>
                 )}
             </section>
@@ -541,36 +570,41 @@ export function SharingSettingsPage() {
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Individual lists shared with me</h2>
                 {sharedLists.length === 0 ? (
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No individual lists yet. When someone shares a list link with you and you save it, it will appear here.
+                        No individual lists yet. When someone shares a list with you, it will appear here.
                     </p>
                 ) : (
                     <ul className="space-y-2">
-                        {sharedLists.map(ctx => (
-                            <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
-                                <div className="flex flex-col flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                                        {ctx.label ?? ctx.listId}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
-                                        {resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)}
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
-                                    className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
-                                >
-                                    Open
-                                </button>
-                                <button
-                                    onClick={() => handleRemoveSharedList(ctx.listId)}
-                                    disabled={removingListId === ctx.listId}
-                                    aria-label={`Remove shared list ${ctx.label ?? ctx.listId}`}
-                                    className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
-                                >
-                                    {removingListId === ctx.listId ? 'Removing…' : 'Remove'}
-                                </button>
-                            </li>
-                        ))}
+                        {sharedLists.map(ctx => {
+                            const ownerName = resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)
+                            const waiting = shareAccess[`list:${ctx.listUrl}`] === 'waiting'
+                            return (
+                                <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                                            {ctx.label ?? ctx.listId}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
+                                            {ownerName}
+                                        </span>
+                                        {waiting && <WaitingOnSender ownerName={ownerName} />}
+                                    </div>
+                                    {!waiting && <button
+                                        onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
+                                        className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
+                                    >
+                                        Open
+                                    </button>}
+                                    <button
+                                        onClick={() => handleRemoveSharedList(ctx.listId)}
+                                        disabled={removingListId === ctx.listId}
+                                        aria-label={`Remove shared list ${ctx.label ?? ctx.listId}`}
+                                        className="ml-2 px-3 py-1 text-xs font-semibold rounded-md bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 disabled:opacity-50 transition-colors"
+                                    >
+                                        {removingListId === ctx.listId ? 'Removing…' : 'Remove'}
+                                    </button>
+                                </li>
+                            )
+                        })}
                     </ul>
                 )}
             </section>

@@ -140,6 +140,13 @@ where everybody starts. Four rules:
   acceptance waits on the Pod for `useInviteRedemption`. Both ends say so in
   words. A grant that fails keeps its invite so the next run retries; deleting
   there would lose the acceptance with no way for either side to tell.
+- **The invitee keeps a record from the moment they accept.** Accepting writes
+  only to the inviter's Pod, so `AcceptInvitePage` also records the share in the
+  invitee's own `shared-with-me` / `shared-lists-with-me` (`acceptedInvites.ts`)
+  — otherwise their Sharing page has nothing to show for it, before access
+  arrives or after. Whether access has arrived is worked out live
+  (`sharedAccess.ts`), not stored: a refused read shows "Waiting for … to open
+  Pack Me Up" in place of Open, and turns into an ordinary entry by itself.
 - **Redemption is app-wide, and pages re-read when it fires.** It is mounted in
   `App.tsx`, not on the Sharing page — the sender is waiting to hear it worked,
   not planning a visit to settings. `InviteRedemptionContext` is the signal that

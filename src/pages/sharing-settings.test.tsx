@@ -50,7 +50,12 @@ vi.mock('../services/invites', async importOriginal => {
     return { ...actual, listInvites: vi.fn(() => Promise.resolve([])), deleteInvite: vi.fn(() => Promise.resolve()) }
 })
 
+// Whether a share can be opened yet is a Pod read; every entry is open unless
+// a test says otherwise.
+vi.mock('../services/sharedAccess', () => ({ checkSharedAccess: vi.fn(() => Promise.resolve('open')) }))
+
 import { listInvites, deleteInvite } from '../services/invites'
+import { checkSharedAccess } from '../services/sharedAccess'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
 import { saveRdfToPod, getFullCollaborators, getCollaborators, grantFullCollaboratorAccess } from '../services/solidPod'
@@ -442,5 +447,70 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
         })
 
         expect(await screen.findByText(/Alps hut trip/)).toBeTruthy()
+    })
+})
+
+// ── Shares accepted but not yet granted ───────────────────────────────────────
+
+// Accepting an invite records the share on the invitee's side straight away,
+// but access only arrives when the sender's app next runs. Until then the
+// entry has to say so, rather than vanish or offer an Open that is refused.
+describe('SharingSettingsPage — shares still waiting on the sender', () => {
+    const mockCheck = vi.mocked(checkSharedAccess)
+    const ALICE_POD = 'https://alice.example.org/'
+    const ALICE = 'https://alice.example.org/profile/card#me'
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockCheck.mockResolvedValue('open')
+    })
+
+    const withSetup = () => ({
+        getSharedWithMe: vi.fn(() => Promise.resolve({
+            contexts: [{ podUrl: ALICE_POD, webId: ALICE, label: 'Alice Smith', addedAt: '' }],
+            lastModified: '',
+        })),
+    })
+    const withList = () => ({
+        getSharedListsWithMe: vi.fn(() => Promise.resolve({
+            lists: [{ listId: 'list-123', listUrl: `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl`, podUrl: ALICE_POD, ownerWebId: ALICE, label: 'Ski trip', addedAt: '' }],
+            lastModified: '',
+        })),
+    })
+
+    it('checks each shared setup and list for access', async () => {
+        renderPage({ ...withSetup(), ...withList() })
+
+        await waitFor(() => {
+            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'setup', podUrl: ALICE_POD })
+            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'list', listUrl: `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl` })
+        })
+    })
+
+    it('says a setup is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('waiting')
+        renderPage(withSetup())
+
+        expect(await screen.findByText(/waiting for Alice Smith to open Pack Me Up/i)).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+        // Changing their mind is still possible.
+        expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
+    })
+
+    it('says a list is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('waiting')
+        renderPage(withList())
+
+        expect(await screen.findByText(/waiting for .* to open Pack Me Up/i)).toBeTruthy()
+        expect(screen.getByText('Ski trip')).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+    })
+
+    it('offers to open a share once access has arrived', async () => {
+        renderPage(withSetup())
+
+        await waitFor(() => expect(mockCheck).toHaveBeenCalled())
+        expect(await screen.findByRole('button', { name: /^open$/i })).toBeTruthy()
+        expect(screen.queryByText(/waiting for/i)).toBeNull()
     })
 })

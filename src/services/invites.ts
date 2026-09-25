@@ -191,8 +191,11 @@ export async function deleteInvite(session: AppSession, inviteUrl: string): Prom
  * It carries what the invite *is* as well as where it lives, because the
  * person opening it cannot read the resource — so without this the page would
  * have nothing to show them but a URL. None of it is trusted: it decides the
- * wording on one screen, while what is actually granted is decided later by
- * the inviter's own client from her own copy of the invite.
+ * wording on one screen, and where the invitee's app looks for the share once
+ * access arrives (`acceptedInvites.ts`), while what is actually granted is
+ * decided later by the inviter's own client from her own copy of the invite.
+ * A list invite carries the list's id for that reason — nothing else could
+ * tell the invitee's device which list to open.
  */
 export function buildInviteLink(origin: string, podUrl: string, ownerWebId: string, invite: Invite): string {
     const params = new URLSearchParams({
@@ -200,6 +203,7 @@ export function buildInviteLink(origin: string, podUrl: string, ownerWebId: stri
         owner: ownerWebId,
         kind: invite.kind,
     })
+    if (invite.listId) params.set('list', invite.listId)
     if (invite.label) params.set('label', invite.label)
     return `${origin}/#/invite/${invite.token}?${params.toString()}`
 }
