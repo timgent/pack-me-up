@@ -6,6 +6,7 @@ import { SolidProviderSelector } from './SolidProviderSelector'
 import { AccountMenu, ProfileBadge } from './AccountMenu'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
+import { resolveOwnerDisplayName } from '../services/solidPod'
 
 /**
  * The one thing the nav owes a signed-in user whose Pod is unreachable: which of
@@ -121,9 +122,17 @@ export const Navigation = () => {
                                     {isReconnecting && <OfflineBadge />}
                                     {/*
                                       * The context switcher stays out here rather than
-                                      * inside the account menu: whose data you are
-                                      * looking at has to be answerable at a glance,
-                                      * without opening anything.
+                                      * inside the account menu, so moving between
+                                      * setups is one step. Wide screens only: between
+                                      * md and lg it crowded the nav links into each
+                                      * other, and there `ForeignPodBanner` already says
+                                      * whose data this is and offers the way back.
+                                      *
+                                      * A select is as wide as its widest option, so
+                                      * options are named for people, never Pod
+                                      * addresses — an Inrupt one is a UUID on a storage
+                                      * host, which named nobody and stretched the
+                                      * control across the bar — and it is capped too.
                                       */}
                                     {sharedContexts.length > 0 && (
                                         <select
@@ -133,7 +142,7 @@ export const Navigation = () => {
                                                 if (val === '__own__') navigate('/view-lists')
                                                 else navigate(`/pod/${val}/view-lists`)
                                             }}
-                                            className="text-sm font-medium bg-white/20 text-white rounded-lg px-2 py-1 border-0 focus:ring-0 cursor-pointer"
+                                            className="hidden lg:block max-w-[12rem] truncate text-sm font-medium bg-white/20 text-white rounded-lg px-2 py-1 border-0 focus:ring-0 cursor-pointer"
                                             aria-label="Switch context"
                                         >
                                             <option value="__own__" className="text-gray-900 dark:text-gray-100">Your data</option>
@@ -143,7 +152,7 @@ export const Navigation = () => {
                                                     value={encodeURIComponent(ctx.podUrl)}
                                                     className="text-gray-900 dark:text-gray-100"
                                                 >
-                                                    {ctx.label ?? ctx.podUrl}
+                                                    {ctx.label ?? resolveOwnerDisplayName(null, ctx.webId, ctx.podUrl)}
                                                 </option>
                                             ))}
                                         </select>

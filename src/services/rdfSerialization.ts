@@ -594,6 +594,13 @@ export interface SharedContext {
     webId?: string
     label?: string
     addedAt: string
+    /**
+     * Set when an accepted invite recorded this before any access existed, and
+     * cleared the first time it opens (`withAccessConfirmed`). A refusal while
+     * it is set is a wait for the sender; without it, access was taken away.
+     * Absent on every entry made by opening a share, which had access by then.
+     */
+    awaitingAccess?: boolean
 }
 
 export interface SharedWithMeList {
@@ -620,6 +627,7 @@ export function sharedWithMeToDataset(list: SharedWithMeList, datasetUrl: string
 
         if (ctx.webId) ctxBuilder = ctxBuilder.addStringNoLocale(PMU.sharedWebId, ctx.webId)
         if (ctx.label) ctxBuilder = ctxBuilder.addStringNoLocale(PMU.sharedLabel, ctx.label)
+        if (ctx.awaitingAccess) ctxBuilder = ctxBuilder.addBoolean(PMU.sharedAwaitingAccess, true)
 
         ds = setThing(ds, ctxBuilder.build())
     }
@@ -645,6 +653,7 @@ export function datasetToSharedWithMe(dataset: SolidDataset, datasetUrl: string)
             const ctx: SharedContext = { podUrl, addedAt }
             if (webId) ctx.webId = webId
             if (label) ctx.label = label
+            if (getBoolean(t, PMU.sharedAwaitingAccess)) ctx.awaitingAccess = true
             return ctx
         })
         .filter((c): c is SharedContext => c !== null)
@@ -661,6 +670,13 @@ export interface SharedListContext {
     ownerWebId?: string
     label?: string
     addedAt: string
+    /**
+     * Set when an accepted invite recorded this before any access existed, and
+     * cleared the first time it opens (`withAccessConfirmed`). A refusal while
+     * it is set is a wait for the sender; without it, access was taken away.
+     * Absent on every entry made by opening a share, which had access by then.
+     */
+    awaitingAccess?: boolean
 }
 
 export interface SharedListsWithMe {
@@ -689,6 +705,7 @@ export function sharedListsWithMeToDataset(data: SharedListsWithMe, datasetUrl: 
 
         if (item.ownerWebId) itemBuilder = itemBuilder.addStringNoLocale(PMU.sharedWebId, item.ownerWebId)
         if (item.label) itemBuilder = itemBuilder.addStringNoLocale(PMU.sharedListLabel, item.label)
+        if (item.awaitingAccess) itemBuilder = itemBuilder.addBoolean(PMU.sharedAwaitingAccess, true)
 
         ds = setThing(ds, itemBuilder.build())
     }
@@ -716,6 +733,7 @@ export function datasetToSharedListsWithMe(dataset: SolidDataset, datasetUrl: st
             const ctx: SharedListContext = { listId, listUrl, podUrl, addedAt }
             if (ownerWebId) ctx.ownerWebId = ownerWebId
             if (label) ctx.label = label
+            if (getBoolean(t, PMU.sharedAwaitingAccess)) ctx.awaitingAccess = true
             return ctx
         })
         .filter((c): c is SharedListContext => c !== null)

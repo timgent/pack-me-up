@@ -450,32 +450,36 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
     })
 })
 
-// ── Shares accepted but not yet granted ───────────────────────────────────────
+// ── Shares accepted but not yet granted, and shares taken away ───────────────
 
 // Accepting an invite records the share on the invitee's side straight away,
 // but access only arrives when the sender's app next runs. Until then the
 // entry has to say so, rather than vanish or offer an Open that is refused.
-describe('SharingSettingsPage — shares still waiting on the sender', () => {
+// Once it has opened, being refused means something else: access revoked.
+describe('SharingSettingsPage — shares waiting on the sender, and shares revoked', () => {
     const mockCheck = vi.mocked(checkSharedAccess)
     const ALICE_POD = 'https://alice.example.org/'
     const ALICE = 'https://alice.example.org/profile/card#me'
+    const LIST_URL = `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl`
 
     beforeEach(() => {
         vi.clearAllMocks()
         mockCheck.mockResolvedValue('open')
     })
 
-    const withSetup = () => ({
+    const withSetup = (awaitingAccess?: boolean, saveSharedWithMe = vi.fn(() => Promise.resolve({ rev: '1' }))) => ({
         getSharedWithMe: vi.fn(() => Promise.resolve({
-            contexts: [{ podUrl: ALICE_POD, webId: ALICE, label: 'Alice Smith', addedAt: '' }],
+            contexts: [{ podUrl: ALICE_POD, webId: ALICE, label: 'Alice Smith', addedAt: '', ...(awaitingAccess ? { awaitingAccess } : {}) }],
             lastModified: '',
         })),
+        saveSharedWithMe,
     })
-    const withList = () => ({
+    const withList = (awaitingAccess?: boolean, saveSharedListsWithMe = vi.fn(() => Promise.resolve({ rev: '1' }))) => ({
         getSharedListsWithMe: vi.fn(() => Promise.resolve({
-            lists: [{ listId: 'list-123', listUrl: `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl`, podUrl: ALICE_POD, ownerWebId: ALICE, label: 'Ski trip', addedAt: '' }],
+            lists: [{ listId: 'list-123', listUrl: LIST_URL, podUrl: ALICE_POD, ownerWebId: ALICE, label: 'Ski trip', addedAt: '', ...(awaitingAccess ? { awaitingAccess } : {}) }],
             lastModified: '',
         })),
+        saveSharedListsWithMe,
     })
 
     it('checks each shared setup and list for access', async () => {
@@ -483,13 +487,13 @@ describe('SharingSettingsPage — shares still waiting on the sender', () => {
 
         await waitFor(() => {
             expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'setup', podUrl: ALICE_POD })
-            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'list', listUrl: `${ALICE_POD}pack-me-up/packing-lists/list-123.ttl` })
+            expect(mockCheck).toHaveBeenCalledWith(mockSession, { kind: 'list', listUrl: LIST_URL })
         })
     })
 
-    it('says a setup is waiting on the sender, and does not offer to open it', async () => {
-        mockCheck.mockResolvedValue('waiting')
-        renderPage(withSetup())
+    it('says a setup never yet opened is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withSetup(true))
 
         expect(await screen.findByText(/waiting for Alice Smith to open Pack Me Up/i)).toBeTruthy()
         expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
@@ -497,12 +501,32 @@ describe('SharingSettingsPage — shares still waiting on the sender', () => {
         expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
     })
 
-    it('says a list is waiting on the sender, and does not offer to open it', async () => {
-        mockCheck.mockResolvedValue('waiting')
-        renderPage(withList())
+    it('says a list never yet opened is waiting on the sender, and does not offer to open it', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withList(true))
 
         expect(await screen.findByText(/waiting for .* to open Pack Me Up/i)).toBeTruthy()
         expect(screen.getByText('Ski trip')).toBeTruthy()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+    })
+
+    // A share that has opened before and is now refused was taken away —
+    // telling them to wait for the sender would have them wait for ever.
+    it('says a setup that has opened before has been revoked', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withSetup())
+
+        expect(await screen.findByText(/Alice Smith has stopped sharing this with you/i)).toBeTruthy()
+        expect(screen.queryByText(/waiting for/i)).toBeNull()
+        expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
+        expect(screen.getByRole('button', { name: /remove/i })).toBeTruthy()
+    })
+
+    it('says a list that has opened before has been revoked', async () => {
+        mockCheck.mockResolvedValue('refused')
+        renderPage(withList())
+
+        expect(await screen.findByText(/has stopped sharing this with you/i)).toBeTruthy()
         expect(screen.queryByRole('button', { name: /^open$/i })).toBeNull()
     })
 
@@ -511,6 +535,33 @@ describe('SharingSettingsPage — shares still waiting on the sender', () => {
 
         await waitFor(() => expect(mockCheck).toHaveBeenCalled())
         expect(await screen.findByRole('button', { name: /^open$/i })).toBeTruthy()
-        expect(screen.queryByText(/waiting for/i)).toBeNull()
+        expect(screen.queryByText(/waiting for|stopped sharing/i)).toBeNull()
+    })
+
+    // Otherwise a later revocation would still read as a wait.
+    it('remembers that a waiting setup has now opened', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withSetup(true, save))
+
+        await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+            contexts: [expect.not.objectContaining({ awaitingAccess: true })],
+        })))
+    })
+
+    it('remembers that a waiting list has now opened', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withList(true, save))
+
+        await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+            lists: [expect.not.objectContaining({ awaitingAccess: true })],
+        })))
+    })
+
+    it('writes nothing for a share that was never waiting', async () => {
+        const save = vi.fn(() => Promise.resolve({ rev: '1' }))
+        renderPage(withSetup(undefined, save))
+
+        await screen.findByRole('button', { name: /^open$/i })
+        expect(save).not.toHaveBeenCalled()
     })
 })

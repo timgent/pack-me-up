@@ -30,6 +30,7 @@ vi.mock('./DatabaseContext', () => ({
 }))
 
 import { useSolidPod } from './SolidPodContext'
+import { useDatabase } from './DatabaseContext'
 import { getSolidProfile } from '../services/solidPod'
 
 const mockUseSolidPod = vi.mocked(useSolidPod)
@@ -393,5 +394,47 @@ describe('Navigation – theme control and the mobile top bar', () => {
         fireEvent.click(within(mobileBar()).getByRole('button', { name: /your profile/i }))
 
         expect(screen.getByTestId('mobile-menu').className).toContain('block')
+    })
+})
+
+// ── Context switcher ─────────────────────────────────────────────────────────
+
+describe('Navigation — switching to a setup shared with me', () => {
+    const INRUPT_POD = 'https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/'
+
+    function withShared(contexts: { podUrl: string; webId?: string; label?: string; addedAt: string }[]) {
+        vi.mocked(useDatabase).mockReturnValue({
+            db: { getSharedWithMe: vi.fn().mockResolvedValue({ contexts, lastModified: '' }) },
+            loginSyncVersion: 0,
+            loginSyncInProgress: false,
+        } as unknown as ReturnType<typeof useDatabase>)
+    }
+
+    beforeEach(() => signedIn())
+
+    // An Inrupt Pod's address is a UUID on a storage host: it names nobody,
+    // and as the widest option it also set the width of the whole control.
+    it('names a shared setup by whose it is, not by its storage address', async () => {
+        withShared([{ podUrl: INRUPT_POD, webId: 'https://id.inrupt.com/timgent', addedAt: '' }])
+        renderNav()
+
+        const option = await screen.findByRole('option', { name: /timgent/i })
+        expect(option.textContent).toBe('timgent on id.inrupt.com')
+        expect(screen.queryByRole('option', { name: INRUPT_POD })).toBeNull()
+    })
+
+    it('prefers the name it has on record', async () => {
+        withShared([{ podUrl: INRUPT_POD, webId: 'https://id.inrupt.com/timgent', label: 'Tim Gent', addedAt: '' }])
+        renderNav()
+
+        expect(await screen.findByRole('option', { name: 'Tim Gent' })).toBeTruthy()
+    })
+
+    it('never shows a raw address even with no owner on record', async () => {
+        withShared([{ podUrl: INRUPT_POD, addedAt: '' }])
+        renderNav()
+
+        const select = await screen.findByRole('combobox', { name: /switch context/i })
+        expect(within(select).queryByText(INRUPT_POD)).toBeNull()
     })
 })

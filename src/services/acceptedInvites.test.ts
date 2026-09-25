@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { invitedListId, withAcceptedInvite, type AcceptedInvite } from './acceptedInvites'
+import { invitedListId, withAcceptedInvite, withAccessConfirmed, type AcceptedInvite } from './acceptedInvites'
 import type { SharedListsWithMe, SharedWithMeList } from './rdfSerialization'
 
 const POD = 'https://alice.example.org/'
@@ -35,7 +35,7 @@ describe('withAcceptedInvite', () => {
         it('is recorded as a setup shared with me, before any access exists', () => {
             const { sharedWithMe, sharedListsWithMe } = withAcceptedInvite(invite, noSetups, noLists, NOW)
 
-            expect(sharedWithMe?.contexts).toEqual([{ podUrl: POD, webId: OWNER, label: 'Alice Smith', addedAt: NOW }])
+            expect(sharedWithMe?.contexts).toEqual([{ podUrl: POD, webId: OWNER, label: 'Alice Smith', addedAt: NOW, awaitingAccess: true }])
             expect(sharedWithMe?.lastModified).toBe(NOW)
             // Nothing to write on the other document.
             expect(sharedListsWithMe).toBeNull()
@@ -47,8 +47,17 @@ describe('withAcceptedInvite', () => {
             expect(sharedWithMe?.contexts[0]).not.toHaveProperty('label')
         })
 
-        it('changes nothing when that setup is already recorded', () => {
+        // Shared, revoked, then invited again: until the new grant lands this
+        // is a wait again, not a revocation.
+        it('marks an already recorded setup as waiting again', () => {
             const existing: SharedWithMeList = { contexts: [{ podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z' }], lastModified: '2026-02-02T00:00:00.000Z' }
+
+            expect(withAcceptedInvite(invite, existing, noLists, NOW).sharedWithMe?.contexts)
+                .toEqual([{ podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }])
+        })
+
+        it('changes nothing when that setup is already waiting', () => {
+            const existing: SharedWithMeList = { contexts: [{ podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }], lastModified: '2026-02-02T00:00:00.000Z' }
 
             expect(withAcceptedInvite(invite, existing, noLists, NOW).sharedWithMe).toBeNull()
         })
@@ -75,13 +84,23 @@ describe('withAcceptedInvite', () => {
                 ownerWebId: OWNER,
                 label: 'Ski trip',
                 addedAt: NOW,
+                awaitingAccess: true,
             }])
             expect(sharedWithMe).toBeNull()
         })
 
-        it('changes nothing when that list is already recorded', () => {
+        it('marks an already recorded list as waiting again', () => {
             const existing: SharedListsWithMe = {
                 lists: [{ listId: 'list-123', listUrl: 'x', podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z' }],
+                lastModified: '2026-02-02T00:00:00.000Z',
+            }
+
+            expect(withAcceptedInvite(invite, noSetups, existing, NOW).sharedListsWithMe?.lists[0].awaitingAccess).toBe(true)
+        })
+
+        it('changes nothing when that list is already waiting', () => {
+            const existing: SharedListsWithMe = {
+                lists: [{ listId: 'list-123', listUrl: 'x', podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }],
                 lastModified: '2026-02-02T00:00:00.000Z',
             }
 
@@ -95,5 +114,38 @@ describe('withAcceptedInvite', () => {
 
             expect(result).toEqual({ sharedWithMe: null, sharedListsWithMe: null })
         })
+    })
+})
+
+// The first time a share opens, it stops being a wait — so that a later
+// refusal can be told for what it is: access taken away.
+describe('withAccessConfirmed', () => {
+    const LIST_URL = `${POD}pack-me-up/packing-lists/list-123.ttl`
+    const setups: SharedWithMeList = {
+        contexts: [{ podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }, { podUrl: 'https://carol.example.org/', addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }],
+        lastModified: '2026-02-02T00:00:00.000Z',
+    }
+    const lists: SharedListsWithMe = {
+        lists: [{ listId: 'list-123', listUrl: LIST_URL, podUrl: POD, addedAt: '2026-02-02T00:00:00.000Z', awaitingAccess: true }],
+        lastModified: '2026-02-02T00:00:00.000Z',
+    }
+
+    it('clears the wait on the setup that opened, and only that one', () => {
+        const updated = withAccessConfirmed(setups, { kind: 'setup', podUrl: POD }, NOW)
+
+        expect(updated?.contexts[0]).not.toHaveProperty('awaitingAccess')
+        expect(updated?.contexts[1].awaitingAccess).toBe(true)
+        expect(updated?.lastModified).toBe(NOW)
+    })
+
+    it('clears the wait on the list that opened', () => {
+        const updated = withAccessConfirmed(lists, { kind: 'list', listUrl: LIST_URL }, NOW)
+
+        expect(updated?.lists[0]).not.toHaveProperty('awaitingAccess')
+    })
+
+    it('changes nothing when there was no wait to clear', () => {
+        expect(withAccessConfirmed(noSetups, { kind: 'setup', podUrl: POD }, NOW)).toBeNull()
+        expect(withAccessConfirmed({ ...setups, contexts: [{ podUrl: POD, addedAt: '' }] }, { kind: 'setup', podUrl: POD }, NOW)).toBeNull()
     })
 })

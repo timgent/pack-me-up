@@ -28,6 +28,7 @@ import type { PackingList } from '../create-packing-list/types'
 import { useSharedListsSync } from '../hooks/useSharedListsSync'
 import { useSharedWithMeSync } from '../hooks/useSharedWithMeSync'
 import { useSharedAccess } from '../hooks/useSharedAccess'
+import { withAccessConfirmed } from '../services/acceptedInvites'
 import { SolidPodPrompt } from '../components/SolidPodPrompt'
 import { Button } from '../components/Button'
 import { CollaboratorIdentity } from '../components/CollaboratorIdentity'
@@ -76,14 +77,23 @@ function FullSetupIntro() {
 }
 
 /**
- * A share accepted by invite, whose sender's app has not run since. Nothing
- * can grant on their behalf while they are away, so this is a wait, and it
- * is said as one — not an error, and not an Open that leads to a refusal.
+ * Why a share that is refused cannot be opened — and there are two reasons,
+ * which call for opposite things from the reader.
+ *
+ * Never yet opened (`awaitingAccess`): an accepted invite whose sender's app
+ * has not run since. Nothing can grant on their behalf while they are away, so
+ * this is a wait, said as one. Opened before: they have stopped sharing it,
+ * and waiting would be waiting for ever — so it says so, and Remove is the
+ * way to tidy it away.
  */
-function WaitingOnSender({ ownerName }: { ownerName: string }) {
-    return (
+function ShareUnavailable({ ownerName, awaitingAccess }: { ownerName: string; awaitingAccess?: boolean }) {
+    return awaitingAccess ? (
         <span className="text-xs text-amber-700 dark:text-amber-300">
             Waiting for {ownerName} to open Pack Me Up — you can open this once they have
+        </span>
+    ) : (
+        <span className="text-xs text-red-700 dark:text-red-300">
+            {ownerName} has stopped sharing this with you — ask them to share it again, or remove it
         </span>
     )
 }
@@ -135,6 +145,31 @@ export function SharingSettingsPage() {
         ...sharedLists.map(ctx => ({ key: `list:${ctx.listUrl}`, target: { kind: 'list' as const, listUrl: ctx.listUrl } })),
     ], [sharedContexts, sharedLists])
     const shareAccess = useSharedAccess(accessTargets, session)
+
+    // A share that was waiting and has now opened stops waiting, so that a
+    // later refusal reads as what it is: access taken away.
+    useEffect(() => {
+        const now = new Date().toISOString()
+        if (sharedWithMe) {
+            for (const ctx of sharedWithMe.contexts) {
+                if (!ctx.awaitingAccess || shareAccess[`setup:${ctx.podUrl}`] !== 'open') continue
+                const updated = withAccessConfirmed(sharedWithMe, { kind: 'setup', podUrl: ctx.podUrl }, now)
+                if (updated) saveSharedWithMe(updated).catch(err => reportError(err, 'SharingSettingsPage: failed to record that a share opened'))
+                break
+            }
+        }
+        if (sharedListsWithMeData) {
+            for (const ctx of sharedListsWithMeData.lists) {
+                if (!ctx.awaitingAccess || shareAccess[`list:${ctx.listUrl}`] !== 'open') continue
+                const updated = withAccessConfirmed(sharedListsWithMeData, { kind: 'list', listUrl: ctx.listUrl }, now)
+                if (updated) saveSharedListsWithMe(updated).catch(err => reportError(err, 'SharingSettingsPage: failed to record that a share opened'))
+                break
+            }
+        }
+    // Re-runs when an answer arrives or a save lands; each pass clears one
+    // entry, and the saved document drives the next.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shareAccess, sharedWithMe, sharedListsWithMeData])
 
     // Section 4: individual lists I've shared
     const [ownLists, setOwnLists] = useState<PackingList[]>([])
@@ -535,16 +570,16 @@ export function SharingSettingsPage() {
                     <ul className="space-y-2">
                         {sharedContexts.map(ctx => {
                             const ownerName = ctx.label ?? resolveOwnerDisplayName(podNames[ctx.podUrl], ctx.webId, ctx.podUrl)
-                            const waiting = shareAccess[`setup:${ctx.podUrl}`] === 'waiting'
+                            const refused = shareAccess[`setup:${ctx.podUrl}`] === 'refused'
                             return (
                                 <li key={ctx.podUrl} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
                                     <div className="flex flex-col flex-1 min-w-0">
                                         <span className="text-sm text-gray-800 dark:text-gray-100 truncate" title={ctx.podUrl}>
                                             {ownerName}
                                         </span>
-                                        {waiting && <WaitingOnSender ownerName={ownerName} />}
+                                        {refused && <ShareUnavailable ownerName={ownerName} awaitingAccess={ctx.awaitingAccess} />}
                                     </div>
-                                    {!waiting && <button
+                                    {!refused && <button
                                         onClick={() => navigate(`/pod/${encodeURIComponent(ctx.podUrl)}/view-lists`)}
                                         className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                     >
@@ -576,7 +611,7 @@ export function SharingSettingsPage() {
                     <ul className="space-y-2">
                         {sharedLists.map(ctx => {
                             const ownerName = resolveOwnerDisplayName(listOwnerNames[ctx.listId], ctx.ownerWebId, ctx.podUrl)
-                            const waiting = shareAccess[`list:${ctx.listUrl}`] === 'waiting'
+                            const refused = shareAccess[`list:${ctx.listUrl}`] === 'refused'
                             return (
                                 <li key={`${ctx.listId}-${ctx.podUrl}`} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
                                     <div className="flex flex-col flex-1 min-w-0">
@@ -586,9 +621,9 @@ export function SharingSettingsPage() {
                                         <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={ctx.podUrl}>
                                             {ownerName}
                                         </span>
-                                        {waiting && <WaitingOnSender ownerName={ownerName} />}
+                                        {refused && <ShareUnavailable ownerName={ownerName} awaitingAccess={ctx.awaitingAccess} />}
                                     </div>
-                                    {!waiting && <button
+                                    {!refused && <button
                                         onClick={() => navigate(buildSharedListPath(ctx.listId, ctx.podUrl, ctx.ownerWebId ?? undefined))}
                                         className="ml-3 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 transition-colors"
                                     >

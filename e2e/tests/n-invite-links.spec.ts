@@ -170,4 +170,19 @@ test.describe('N – Invite links', () => {
         await expect(pageB.getByText(/can't open this yet/i)).toBeHidden({ timeout: 20_000 })
         await expect(pageB.getByText(/Viewing/i)).toBeVisible({ timeout: 20_000 })
     })
+
+    test('N7: once the inviter revokes, the invitee is told it was revoked, not to keep waiting', async () => {
+        await pageA.goto('/#/sharing')
+        const revoke = pageA.getByRole('button', { name: `Revoke access for ${inviteeWebId}` })
+        await expect(revoke).toBeVisible({ timeout: 20_000 })
+        await revoke.click()
+        await expect(revoke).not.toBeVisible({ timeout: 10_000 })
+
+        await pageB.goto('/#/sharing')
+        await pageB.reload()
+        // It opened in N6, so a refusal now is access taken away. Before this
+        // it read "Waiting for … to open Pack Me Up", which never ends.
+        await expect(pageB.getByText(/has stopped sharing this with you/i)).toBeVisible({ timeout: 20_000 })
+        await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeHidden()
+    })
 })

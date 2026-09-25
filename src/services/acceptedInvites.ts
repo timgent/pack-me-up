@@ -46,17 +46,23 @@ export function withAcceptedInvite(
     now: string,
 ): { sharedWithMe: SharedWithMeList | null; sharedListsWithMe: SharedListsWithMe | null } {
     if (invite.kind === 'full-setup') {
-        if (sharedWithMe.contexts.some(c => c.podUrl === invite.podUrl)) {
-            return { sharedWithMe: null, sharedListsWithMe: null }
-        }
+        const existing = sharedWithMe.contexts.find(c => c.podUrl === invite.podUrl)
+        // Already waiting: nothing to add. Already recorded but not waiting —
+        // shared before, perhaps revoked, now invited again — is a wait again
+        // until the new grant lands; if it never went away, the Sharing page
+        // sees it open and clears the wait at once.
+        if (existing?.awaitingAccess) return { sharedWithMe: null, sharedListsWithMe: null }
         return {
             sharedWithMe: {
-                contexts: [...sharedWithMe.contexts, {
-                    podUrl: invite.podUrl,
-                    webId: invite.ownerWebId,
-                    ...(invite.ownerName ? { label: invite.ownerName } : {}),
-                    addedAt: now,
-                }],
+                contexts: existing
+                    ? sharedWithMe.contexts.map(c => (c === existing ? { ...c, awaitingAccess: true } : c))
+                    : [...sharedWithMe.contexts, {
+                        podUrl: invite.podUrl,
+                        webId: invite.ownerWebId,
+                        ...(invite.ownerName ? { label: invite.ownerName } : {}),
+                        addedAt: now,
+                        awaitingAccess: true,
+                    }],
                 lastModified: now,
             },
             sharedListsWithMe: null,
@@ -64,21 +70,58 @@ export function withAcceptedInvite(
     }
 
     const listId = invite.listId
-    if (!listId || sharedListsWithMe.lists.some(l => l.listId === listId)) {
-        return { sharedWithMe: null, sharedListsWithMe: null }
-    }
+    if (!listId) return { sharedWithMe: null, sharedListsWithMe: null }
+    const existing = sharedListsWithMe.lists.find(l => l.listId === listId)
+    if (existing?.awaitingAccess) return { sharedWithMe: null, sharedListsWithMe: null }
     return {
         sharedWithMe: null,
         sharedListsWithMe: {
-            lists: [...sharedListsWithMe.lists, {
-                listId,
-                listUrl: `${invite.podUrl}${POD_CONTAINERS.PACKING_LISTS}${listId}.ttl`,
-                podUrl: invite.podUrl,
-                ownerWebId: invite.ownerWebId,
-                ...(invite.label ? { label: invite.label } : {}),
-                addedAt: now,
-            }],
+            lists: existing
+                ? sharedListsWithMe.lists.map(l => (l === existing ? { ...l, awaitingAccess: true } : l))
+                : [...sharedListsWithMe.lists, {
+                    listId,
+                    listUrl: `${invite.podUrl}${POD_CONTAINERS.PACKING_LISTS}${listId}.ttl`,
+                    podUrl: invite.podUrl,
+                    ownerWebId: invite.ownerWebId,
+                    ...(invite.label ? { label: invite.label } : {}),
+                    addedAt: now,
+                    awaitingAccess: true,
+                }],
             lastModified: now,
         },
     }
+}
+
+/**
+ * The shared-with-me document with the wait cleared on a share that has just
+ * been seen to open, or null when there was no wait to clear.
+ *
+ * This is what makes a later refusal mean something: once a share has opened,
+ * being turned away is access taken away, not a sender who has yet to run the
+ * app. Every place that sees a share open calls it — the Sharing page's check,
+ * and opening the share itself.
+ */
+export function withAccessConfirmed(list: SharedWithMeList, target: { kind: 'setup'; podUrl: string }, now: string): SharedWithMeList | null
+export function withAccessConfirmed(list: SharedListsWithMe, target: { kind: 'list'; listUrl: string }, now: string): SharedListsWithMe | null
+export function withAccessConfirmed(
+    list: SharedWithMeList | SharedListsWithMe,
+    target: { kind: 'setup'; podUrl: string } | { kind: 'list'; listUrl: string },
+    now: string,
+): SharedWithMeList | SharedListsWithMe | null {
+    const confirm = <T extends { awaitingAccess?: boolean }>(entries: T[], matches: (entry: T) => boolean): T[] | null => {
+        if (!entries.some(e => matches(e) && e.awaitingAccess)) return null
+        return entries.map(e => {
+            if (!matches(e) || !e.awaitingAccess) return e
+            const { awaitingAccess: _cleared, ...rest } = e
+            return rest as T
+        })
+    }
+    if ('contexts' in list) {
+        if (target.kind !== 'setup') return null
+        const contexts = confirm(list.contexts, c => c.podUrl === target.podUrl)
+        return contexts ? { contexts, lastModified: now } : null
+    }
+    if (target.kind !== 'list') return null
+    const lists = confirm(list.lists, l => l.listUrl === target.listUrl)
+    return lists ? { lists, lastModified: now } : null
 }

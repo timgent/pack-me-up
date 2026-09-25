@@ -144,9 +144,13 @@ where everybody starts. Four rules:
   only to the inviter's Pod, so `AcceptInvitePage` also records the share in the
   invitee's own `shared-with-me` / `shared-lists-with-me` (`acceptedInvites.ts`)
   — otherwise their Sharing page has nothing to show for it, before access
-  arrives or after. Whether access has arrived is worked out live
-  (`sharedAccess.ts`), not stored: a refused read shows "Waiting for … to open
-  Pack Me Up" in place of Open, and turns into an ordinary entry by itself.
+  arrives or after. Whether a share opens is worked out live
+  (`sharedAccess.ts`); what a refusal *means* is stored. An entry made by
+  accepting carries `awaitingAccess` until it first opens (`withAccessConfirmed`,
+  called wherever a share is seen to open), so a refusal while it is set reads
+  "Waiting for … to open Pack Me Up", and one after reads as revoked — never an
+  endless wait. Entries without the flag all came from opening a share, so they
+  had access, which is why no migration was needed.
 - **Redemption is app-wide, and pages re-read when it fires.** It is mounted in
   `App.tsx`, not on the Sharing page — the sender is waiting to hear it worked,
   not planning a visit to settings. `InviteRedemptionContext` is the signal that

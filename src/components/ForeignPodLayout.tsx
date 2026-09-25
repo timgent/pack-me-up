@@ -57,14 +57,19 @@ export function ForeignPodLayout() {
                 const name = await getPodOwnerName(session!, foreignPodUrl, webId)
                 setOwnerName(name)
 
-                const needsUpdate = !existing || (webId && !existing.webId) || (name && !existing.label)
+                // An entry recorded by accepting an invite is waiting until it
+                // first opens — which is now. Clearing it is what lets a later
+                // refusal read as revoked rather than as still waiting.
+                const needsUpdate = !existing || (webId && !existing.webId) || (name && !existing.label) || existing.awaitingAccess
                 if (!needsUpdate) return
 
                 const updated: SharedWithMeList = {
                     contexts: existing
-                        ? list.contexts.map(c => c.podUrl === foreignPodUrl
-                            ? { ...c, ...(webId ? { webId } : {}), ...(name ? { label: name } : {}) }
-                            : c)
+                        ? list.contexts.map(c => {
+                            if (c.podUrl !== foreignPodUrl) return c
+                            const { awaitingAccess: _opened, ...rest } = c
+                            return { ...rest, ...(webId ? { webId } : {}), ...(name ? { label: name } : {}) }
+                        })
                         : [...list.contexts, {
                             podUrl: foreignPodUrl,
                             addedAt: new Date().toISOString(),

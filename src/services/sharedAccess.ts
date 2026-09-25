@@ -3,19 +3,18 @@ import type { AppSession } from '../types/AppSession'
 import { isAuthenticationError, verifyForeignPodAccess } from './solidPod'
 
 /**
- * Whether something recorded as shared with me can be opened yet.
+ * Whether something recorded as shared with me can be opened right now.
  *
- * An accepted invite is recorded straight away (`acceptedInvites.ts`), but the
- * access behind it only arrives when the sender's app next runs. Until then
- * the share is `waiting`, and the Sharing page says so rather than offering an
- * Open that leads to a refusal. Worked out live rather than stored, so it
- * turns into an ordinary entry by itself the first time the grant is there.
+ * `refused` means one of two things, and the entry's `awaitingAccess` says
+ * which: an accepted invite whose sender's app has not run since (a wait), or
+ * a share that has opened before and has since been revoked. Worked out live
+ * rather than stored, so an entry changes by itself when access does.
  *
- * Only a refusal counts as waiting. A check that could not be made at all —
+ * Only a refusal counts. A check that could not be made at all —
  * offline, a server down — says nothing about access, and opening the share
  * is where the app explains what it can.
  */
-export type SharedAccessState = 'open' | 'waiting'
+export type SharedAccessState = 'open' | 'refused'
 
 export type SharedAccessTarget =
     | { kind: 'setup'; podUrl: string }
@@ -24,11 +23,11 @@ export type SharedAccessTarget =
 export async function checkSharedAccess(session: AppSession, target: SharedAccessTarget): Promise<SharedAccessState> {
     try {
         if (target.kind === 'setup') {
-            return (await verifyForeignPodAccess(session, target.podUrl)) ? 'open' : 'waiting'
+            return (await verifyForeignPodAccess(session, target.podUrl)) ? 'open' : 'refused'
         }
         await getSolidDataset(target.listUrl, { fetch: session.fetch })
         return 'open'
     } catch (err) {
-        return isAuthenticationError(err) ? 'waiting' : 'open'
+        return isAuthenticationError(err) ? 'refused' : 'open'
     }
 }

@@ -32,14 +32,14 @@ describe('checkSharedAccess', () => {
         })
 
         // An accepted invite that the sender's app has not yet run to grant.
-        it('is waiting while it is refused', async () => {
+        it('is refused while it is refused', async () => {
             mockVerify.mockResolvedValue(false)
-            expect(await checkSharedAccess(session, { kind: 'setup', podUrl: POD })).toBe('waiting')
+            expect(await checkSharedAccess(session, { kind: 'setup', podUrl: POD })).toBe('refused')
         })
 
         // Offline, or the server is down: that says nothing about access, and
         // opening it is where the app explains what it can.
-        it('is not called waiting when the check itself could not be made', async () => {
+        it('is not called refused when the check itself could not be made', async () => {
             mockVerify.mockRejectedValue(new Error('network'))
             expect(await checkSharedAccess(session, { kind: 'setup', podUrl: POD })).toBe('open')
         })
@@ -52,12 +52,12 @@ describe('checkSharedAccess', () => {
             expect(mockGetSolidDataset).toHaveBeenCalledWith(LIST_URL, { fetch: session.fetch })
         })
 
-        it.each([401, 403])('is waiting while it answers %i', async statusCode => {
+        it.each([401, 403])('is refused while it answers %i', async statusCode => {
             mockGetSolidDataset.mockRejectedValue({ statusCode })
-            expect(await checkSharedAccess(session, { kind: 'list', listUrl: LIST_URL })).toBe('waiting')
+            expect(await checkSharedAccess(session, { kind: 'list', listUrl: LIST_URL })).toBe('refused')
         })
 
-        it('is not called waiting for any other failure', async () => {
+        it('is not called refused for any other failure', async () => {
             mockGetSolidDataset.mockRejectedValue({ statusCode: 404 })
             expect(await checkSharedAccess(session, { kind: 'list', listUrl: LIST_URL })).toBe('open')
         })

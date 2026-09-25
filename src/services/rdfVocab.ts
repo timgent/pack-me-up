@@ -128,6 +128,8 @@ export const PMU = {
     sharedWebId: `${PMU_NS}sharedWebId`,
     sharedLabel: `${PMU_NS}sharedLabel`,
     sharedAddedAt: `${PMU_NS}sharedAddedAt`,
+    /** True from accepting an invite until the share first opens; absent after. */
+    sharedAwaitingAccess: `${PMU_NS}sharedAwaitingAccess`,
 
     // DeletedPackingLists classes. A deleted list leaves a tombstone rather than
     // simply vanishing: a device that still holds a copy has no other way to
