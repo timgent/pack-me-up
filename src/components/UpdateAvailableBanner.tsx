@@ -25,7 +25,7 @@ export function UpdateAvailableBanner({ onReload }: UpdateAvailableBannerProps) 
             <button
                 type="button"
                 onClick={onReload}
-                className="text-sm font-bold text-accent-900 dark:text-accent-200 underline shrink-0"
+                className="text-sm font-bold text-accent-900 dark:text-accent-200 underline shrink-0 cursor-pointer"
             >
                 Reload
             </button>

@@ -1,7 +1,14 @@
 import { Capacitor } from '@capacitor/core'
 import { registerSW } from 'virtual:pwa-register'
 
-export type UpdateServiceWorker = (reloadPage?: boolean) => Promise<void>
+export type ApplyUpdate = () => void
+
+/**
+ * How long Reload waits for the new worker to take over before reloading
+ * regardless. A reload that lands on the old worker only brings the banner
+ * back; a button that does nothing leaves the user stuck.
+ */
+export const RELOAD_FALLBACK_MS = 3000
 
 /**
  * Registers the app's service worker, skipped on Capacitor's native shell —
@@ -15,7 +22,51 @@ export type UpdateServiceWorker = (reloadPage?: boolean) => Promise<void>
  * returned function. The alternative, `autoUpdate`, reloads the instant the
  * new worker activates, which could land mid-edit on a packing list.
  */
-export function registerPwaServiceWorker(onNeedRefresh: () => void): UpdateServiceWorker | undefined {
+export function registerPwaServiceWorker(
+    onNeedRefresh: () => void,
+    reloadPage: () => void = () => window.location.reload(),
+): ApplyUpdate | undefined {
     if (Capacitor.isNativePlatform()) return undefined
-    return registerSW({ onNeedRefresh })
+    let registration: ServiceWorkerRegistration | undefined
+    const updateSW = registerSW({
+        onNeedRefresh,
+        onRegisteredSW: (_url, r) => {
+            registration = r
+        },
+    })
+    return () => applyUpdate(updateSW, registration, reloadPage)
+}
+
+/**
+ * Hands over to the waiting worker, then reloads the page ourselves. The
+ * plugin's own `updateSW(true)` only reloads on `controllerchange`, and a tab
+ * the old worker never controlled — a first visit, or after a hard reload —
+ * gets no such event, so Reload silently did nothing there. The worker's own
+ * `activated` state is reported either way.
+ */
+function applyUpdate(
+    updateSW: () => Promise<void>,
+    registration: ServiceWorkerRegistration | undefined,
+    reloadPage: () => void,
+) {
+    let reloaded = false
+    const reloadOnce = () => {
+        if (reloaded) return
+        reloaded = true
+        reloadPage()
+    }
+
+    // Nothing waiting (another tab may have applied it already): a plain
+    // reload picks up whichever worker is active now.
+    const waiting = registration?.waiting
+    if (!waiting) {
+        reloadOnce()
+        return
+    }
+
+    waiting.addEventListener('statechange', () => {
+        if (waiting.state === 'activated' || waiting.state === 'redundant') reloadOnce()
+    })
+    setTimeout(reloadOnce, RELOAD_FALLBACK_MS)
+    void updateSW()
 }
