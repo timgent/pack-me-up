@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.18.0 (versionCode 19) — 2026-09-25
+- Accepted invites now appear right away, no reload needed
+- "Whose data am I viewing" moved into the account menu
+- Shared setups are named in the account switcher, and a revoked share now reads differently from one still pending
+- Shared-setup banner is now full width, with an easy way back to your own lists
+- Simplified Sharing page, and a clearer confirmation when a share succeeds
+
 ## 1.17.0 (versionCode 18) — 2026-09-25
 - New: invite links — share access with a link, no need to exchange addresses
 - Share and invite links now always open to the right place
