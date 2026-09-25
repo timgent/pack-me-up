@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import React from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Navigation } from './Navigation'
 import { ThemeProvider } from './ThemeContext'
 
@@ -397,10 +397,14 @@ describe('Navigation – theme control and the mobile top bar', () => {
     })
 })
 
-// ── Context switcher ─────────────────────────────────────────────────────────
+// ── Whose data you are viewing ───────────────────────────────────────────────
 
-describe('Navigation — switching to a setup shared with me', () => {
+// It lived in the header as a select, which crowded the nav links at mid widths
+// and so was hidden below lg — leaving phones and narrow windows without it.
+// In the account menu it is there at every width.
+describe('Navigation — viewing a setup shared with me', () => {
     const INRUPT_POD = 'https://storage.inrupt.com/d8c8c02b-b47c-48e9-b737-619f2958689f/'
+    const ALICE_POD = 'https://alice.example.org/'
 
     function withShared(contexts: { podUrl: string; webId?: string; label?: string; addedAt: string }[]) {
         vi.mocked(useDatabase).mockReturnValue({
@@ -410,31 +414,127 @@ describe('Navigation — switching to a setup shared with me', () => {
         } as unknown as ReturnType<typeof useDatabase>)
     }
 
+    function renderAt(path: string) {
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <ThemeProvider>
+                    <Navigation />
+                    <Routes>
+                        <Route path="*" element={<LocationProbe />} />
+                    </Routes>
+                </ThemeProvider>
+            </MemoryRouter>
+        )
+    }
+
+    function LocationProbe() {
+        const location = useLocation()
+        return <div data-testid="location">{location.pathname}</div>
+    }
+
+    const viewing = (root: HTMLElement) => within(within(root).getByRole('group', { name: /viewing/i }))
+
+    // Opened once the shared list has loaded; opening inside a waitFor would
+    // toggle it shut again on every retry.
+    async function openWithViewing(reads = 1) {
+        await waitFor(() => expect(vi.mocked(useDatabase)().db.getSharedWithMe).toHaveBeenCalledTimes(reads))
+        await act(async () => {})
+        openAccountMenu()
+    }
+
     beforeEach(() => signedIn())
 
-    // An Inrupt Pod's address is a UUID on a storage host: it names nobody,
-    // and as the widest option it also set the width of the whole control.
-    it('names a shared setup by whose it is, not by its storage address', async () => {
-        withShared([{ podUrl: INRUPT_POD, webId: 'https://id.inrupt.com/timgent', addedAt: '' }])
+    it('is no longer a select in the header', async () => {
+        withShared([{ podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' }])
         renderNav()
 
-        const option = await screen.findByRole('option', { name: /timgent/i })
-        expect(option.textContent).toBe('timgent on id.inrupt.com')
-        expect(screen.queryByRole('option', { name: INRUPT_POD })).toBeNull()
+        await waitFor(() => expect(vi.mocked(useDatabase)().db.getSharedWithMe).toHaveBeenCalled())
+        expect(screen.queryByRole('combobox')).toBeNull()
     })
 
-    it('prefers the name it has on record', async () => {
-        withShared([{ podUrl: INRUPT_POD, webId: 'https://id.inrupt.com/timgent', label: 'Tim Gent', addedAt: '' }])
-        renderNav()
+    it('lists your data and each shared setup in the account menu, by name', async () => {
+        withShared([
+            { podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' },
+            // An Inrupt Pod's address is a UUID on a storage host: named for the person.
+            { podUrl: INRUPT_POD, webId: 'https://id.inrupt.com/timgent', addedAt: '' },
+        ])
+        renderAt('/view-lists')
 
-        expect(await screen.findByRole('option', { name: 'Tim Gent' })).toBeTruthy()
+        await openWithViewing()
+        const group = viewing(desktopBar())
+        expect(group.getByRole('button', { name: /your data/i })).toBeTruthy()
+        expect(group.getByRole('button', { name: /Alice Smith/ })).toBeTruthy()
+        expect(group.getByRole('button', { name: /timgent on id\.inrupt\.com/ })).toBeTruthy()
+        expect(group.queryByText(INRUPT_POD)).toBeNull()
     })
 
-    it('never shows a raw address even with no owner on record', async () => {
-        withShared([{ podUrl: INRUPT_POD, addedAt: '' }])
+    it('marks the one on screen', async () => {
+        withShared([{ podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' }])
+        renderAt(`/pod/${encodeURIComponent(ALICE_POD)}/view-lists`)
+
+        await openWithViewing()
+        const group = viewing(desktopBar())
+        expect(group.getByRole('button', { name: /Alice Smith/ }).getAttribute('aria-current')).toBe('true')
+        expect(group.getByRole('button', { name: /your data/i }).getAttribute('aria-current')).toBeNull()
+    })
+
+    it('switches to a shared setup, and back to your own', async () => {
+        withShared([{ podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' }])
+        renderAt('/view-lists')
+
+        await openWithViewing()
+        fireEvent.click(viewing(desktopBar()).getByRole('button', { name: /Alice Smith/ }))
+        expect(screen.getByTestId('location').textContent).toBe(`/pod/${encodeURIComponent(ALICE_POD)}/view-lists`)
+
+        openAccountMenu()
+        fireEvent.click(viewing(desktopBar()).getByRole('button', { name: /your data/i }))
+        expect(screen.getByTestId('location').textContent).toBe('/view-lists')
+    })
+
+    it('has nothing to offer when nothing is shared with you', async () => {
+        withShared([])
         renderNav()
 
-        const select = await screen.findByRole('combobox', { name: /switch context/i })
-        expect(within(select).queryByText(INRUPT_POD)).toBeNull()
+        openAccountMenu()
+        await waitFor(() => expect(vi.mocked(useDatabase)().db.getSharedWithMe).toHaveBeenCalled())
+        expect(screen.queryByRole('group', { name: /viewing/i })).toBeNull()
+    })
+
+    // A household is one to three; a menu that grows without end is not a menu.
+    it('lists five and points to the Sharing page for the rest', async () => {
+        withShared(Array.from({ length: 7 }, (_, i) => ({ podUrl: `https://p${i}.example.org/`, label: `Person ${i}`, addedAt: '' })))
+        renderAt('/view-lists')
+
+        await openWithViewing()
+        const group = viewing(desktopBar())
+        expect(group.getAllByRole('button', { name: /Person/ })).toHaveLength(5)
+        expect(group.getByRole('link', { name: /all shared with me/i }).getAttribute('href')).toBe('/sharing')
+    })
+
+    it('offers the same on a phone, in the mobile menu', async () => {
+        withShared([{ podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' }])
+        renderAt('/view-lists')
+
+        await waitFor(() => expect(vi.mocked(useDatabase)().db.getSharedWithMe).toHaveBeenCalled())
+        await act(async () => {})
+        fireEvent.click(screen.getByRole('button', { name: /open main menu/i }))
+
+        const mobile = screen.getByTestId('mobile-menu')
+        expect(viewing(mobile).getByRole('button', { name: /Alice Smith/ })).toBeTruthy()
+    })
+
+    // Opening a shared setup records it; the menu should know without a
+    // fresh sign-in, which is all that used to re-read it.
+    it('picks up a setup recorded since sign-in when the page changes', async () => {
+        const getSharedWithMe = vi.fn().mockResolvedValue({ contexts: [], lastModified: '' })
+        vi.mocked(useDatabase).mockReturnValue({ db: { getSharedWithMe }, loginSyncVersion: 0, loginSyncInProgress: false } as unknown as ReturnType<typeof useDatabase>)
+        renderAt('/view-lists')
+        await waitFor(() => expect(getSharedWithMe).toHaveBeenCalledTimes(1))
+
+        getSharedWithMe.mockResolvedValue({ contexts: [{ podUrl: ALICE_POD, label: 'Alice Smith', addedAt: '' }], lastModified: '' })
+        fireEvent.click(screen.getAllByRole('link', { name: 'Sharing' })[0])
+
+        await openWithViewing(2)
+        expect(viewing(desktopBar()).getByRole('button', { name: /Alice Smith/ })).toBeTruthy()
     })
 })

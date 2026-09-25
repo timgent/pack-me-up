@@ -1,5 +1,4 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDownIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect } from 'react'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
@@ -7,7 +6,7 @@ import { SolidProviderSelector } from './SolidProviderSelector'
 import { AccountMenu, ProfileBadge } from './AccountMenu'
 import { profileDisplayName, useSolidProfile } from '../hooks/useSolidProfile'
 import type { SharedContext } from '../services/rdfSerialization'
-import { resolveOwnerDisplayName } from '../services/solidPod'
+import { ViewingSwitcher } from './ViewingSwitcher'
 
 /**
  * The one thing the nav owes a signed-in user whose Pod is unreachable: which of
@@ -33,11 +32,13 @@ export const Navigation = () => {
     const navigate = useNavigate()
     const [sharedContexts, setSharedContexts] = useState<SharedContext[]>([])
 
+    // Re-read on navigation as well as sign-in: opening a shared setup records
+    // it, and the "Viewing" list should know straight away. A local read.
     useEffect(() => {
         db.getSharedWithMe()
             .then(swm => setSharedContexts(swm.contexts))
             .catch(() => {})
-    }, [db, loginSyncVersion])
+    }, [db, loginSyncVersion, location.pathname])
 
     const profile = useSolidProfile(webId, session)
     const displayName = profileDisplayName(profile, webId)
@@ -51,6 +52,9 @@ export const Navigation = () => {
     const podMatch = /^\/pod\/([^/]+)/.exec(location.pathname)
     const currentForeignEncoded = podMatch?.[1] ?? null
     const inForeignContext = currentForeignEncoded !== null
+    const currentForeignPodUrl = currentForeignEncoded ? decodeURIComponent(currentForeignEncoded) : null
+    const switchTo = (podUrl: string | null) =>
+        navigate(podUrl ? `/pod/${encodeURIComponent(podUrl)}/view-lists` : '/view-lists')
 
     // When viewing a foreign pod, contextual links stay inside that pod's routes
     const viewListsPath = inForeignContext ? `/pod/${currentForeignEncoded}/view-lists` : '/view-lists'
@@ -121,55 +125,22 @@ export const Navigation = () => {
                             {showsAsSignedIn ? (
                                 <div className="flex items-center gap-3">
                                     {isReconnecting && <OfflineBadge />}
-                                    {/*
-                                      * The context switcher stays out here rather than
-                                      * inside the account menu, so moving between
-                                      * setups is one step. Wide screens only: between
-                                      * md and lg it crowded the nav links into each
-                                      * other, and there `ForeignPodBanner` already says
-                                      * whose data this is and offers the way back.
-                                      *
-                                      * A select is as wide as its widest option, so
-                                      * options are named for people, never Pod
-                                      * addresses — an Inrupt one is a UUID on a storage
-                                      * host, which named nobody and stretched the
-                                      * control across the bar — and it is capped too.
-                                      */}
-                                    {sharedContexts.length > 0 && (
-                                        // The browser's own arrow sits hard against the
-                                        // edge, and padding does not move it everywhere
-                                        // (Chrome on macOS pins it) — so it is hidden and
-                                        // drawn here instead, with room around it.
-                                        <div className="relative hidden lg:block">
-                                            <select
-                                                value={currentForeignEncoded ?? '__own__'}
-                                                onChange={e => {
-                                                    const val = e.target.value
-                                                    if (val === '__own__') navigate('/view-lists')
-                                                    else navigate(`/pod/${val}/view-lists`)
-                                                }}
-                                                className="appearance-none max-w-[12rem] truncate text-sm font-medium bg-white/20 text-white rounded-lg pl-3 pr-8 py-1 border-0 focus:ring-0 cursor-pointer"
-                                                aria-label="Switch context"
-                                            >
-                                                <option value="__own__" className="text-gray-900 dark:text-gray-100">Your data</option>
-                                                {sharedContexts.map(ctx => (
-                                                    <option
-                                                        key={ctx.podUrl}
-                                                        value={encodeURIComponent(ctx.podUrl)}
-                                                        className="text-gray-900 dark:text-gray-100"
-                                                    >
-                                                        {ctx.label ?? resolveOwnerDisplayName(null, ctx.webId, ctx.podUrl)}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <ChevronDownIcon aria-hidden="true" className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
-                                        </div>
-                                    )}
                                     <AccountMenu
                                         webId={webId ?? ''}
                                         displayName={displayName}
                                         photoUrl={profile.photo}
                                         onLogout={handleLogout}
+                                        viewing={sharedContexts.length > 0
+                                            ? close => (
+                                                <ViewingSwitcher
+                                                    tone="menu"
+                                                    contexts={sharedContexts}
+                                                    currentPodUrl={currentForeignPodUrl}
+                                                    onSwitch={podUrl => { close(); switchTo(podUrl) }}
+                                                    onClose={close}
+                                                />
+                                            )
+                                            : undefined}
                                     />
                                 </div>
                             ) : (
@@ -296,6 +267,20 @@ export const Navigation = () => {
                                     {isReconnecting && (
                                         <div className="px-3 pb-2">
                                             <OfflineBadge />
+                                        </div>
+                                    )}
+                                    {/* Only while open: the phone menu is in the DOM when hidden,
+                                        and a second "Viewing … Your data" there read as a
+                                        duplicate of the banner to anything scanning the page. */}
+                                    {isOpen && sharedContexts.length > 0 && (
+                                        <div className="px-1 pb-2">
+                                            <ViewingSwitcher
+                                                tone="dark"
+                                                contexts={sharedContexts}
+                                                currentPodUrl={currentForeignPodUrl}
+                                                onSwitch={podUrl => { setIsOpen(false); switchTo(podUrl) }}
+                                                onClose={() => setIsOpen(false)}
+                                            />
                                         </div>
                                     )}
                                     <Link
