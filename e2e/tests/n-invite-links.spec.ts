@@ -117,11 +117,11 @@ test.describe('N – Invite links', () => {
         await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeVisible({ timeout: 20_000 })
     })
 
-    test('N4: the inviter opens the app and the invitee is granted access', async () => {
-        // A fresh load is the moment redemption runs — the same thing that
-        // happens when they next pick up their phone.
-        await pageA.goto('/#/sharing')
-        await pageA.reload()
+    test('N4: the inviter, still on the Sharing page, sees the invitee granted access without reloading', async () => {
+        // Same room: pageA has sat on the Sharing page since N2, before the
+        // acceptance, so the check at sign-in has already run and found
+        // nothing. Only the page's own polling can pick this up.
+        await expect(pageA).toHaveURL(/#\/sharing/)
 
         await expect(pageA.getByRole('heading', { name: /people with your full setup/i }).or(
             pageA.getByText(/people with your full setup/i),

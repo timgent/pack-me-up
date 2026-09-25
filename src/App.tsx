@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/react'
+import { useMemo } from 'react'
 import { HashRouter } from 'react-router-dom'
 import { Route } from 'react-router-dom'
 import { Routes } from 'react-router-dom'
@@ -53,9 +54,10 @@ function DefaultRedirect() {
  * that it worked, not to go looking. Renders nothing; it only acts.
  */
 function InviteRedemption({ children }: { children: React.ReactNode }) {
-  const { redeemed } = useInviteRedemption()
-  // Pages that show who has access re-read when this moves.
-  return <InviteRedemptionContext.Provider value={redeemed.length}>{children}</InviteRedemptionContext.Provider>
+  const { redeemed, redeemNow } = useInviteRedemption()
+  // Pages that show who has access re-read when the version moves.
+  const value = useMemo(() => ({ version: redeemed.length, redeemNow }), [redeemed.length, redeemNow])
+  return <InviteRedemptionContext.Provider value={value}>{children}</InviteRedemptionContext.Provider>
 }
 
 function App() {

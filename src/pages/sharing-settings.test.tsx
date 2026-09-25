@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -55,6 +55,7 @@ vi.mock('../services/invites', async importOriginal => {
 vi.mock('../services/sharedAccess', () => ({ checkSharedAccess: vi.fn(() => Promise.resolve('open')) }))
 
 import { listInvites, deleteInvite } from '../services/invites'
+import { InviteRedemptionContext } from '../components/InviteRedemptionContext'
 import { checkSharedAccess } from '../services/sharedAccess'
 import { useDatabase } from '../components/DatabaseContext'
 import { useSolidPod } from '../components/SolidPodContext'
@@ -333,6 +334,24 @@ describe('SharingSettingsPage — share your full setup', () => {
         const banner = await screen.findByText(/your full setup is shared with/i)
         expect(banner.textContent).toContain('alice.example.com')
         expect(banner.textContent).not.toContain('/profile/card#me')
+    })
+
+    // It answers the Share button, so it belongs straight under it — not
+    // below "Your own address", which is about the other direction.
+    it('confirms the share right under the Share button, above your own address', async () => {
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'https://alice.example.com/profile/card#me' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        const banner = await screen.findByText(/your full setup is shared with/i)
+        const button = screen.getByRole('button', { name: /share my setup/i })
+        const yourAddress = screen.getByText(/your own address/i)
+        const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        expect(follows(button, banner)).toBe(true)
+        expect(follows(banner, yourAddress)).toBe(true)
     })
 
     it('never offers to share with the person doing the sharing', async () => {
@@ -627,5 +646,79 @@ describe('SharingSettingsPage — shared with me', () => {
         expect(await screen.findByText(/nothing has been shared with you yet/i)).toBeTruthy()
         expect(screen.queryByText(/no shared pods yet/i)).toBeNull()
         expect(screen.queryByText(/no individual lists yet/i)).toBeNull()
+    })
+})
+
+// ── Waiting on an invite, in the same room ────────────────────────────────────
+
+// An invite is only granted when this app checks the Pod, which used to be
+// once per sign-in — so an invitee accepting across the table stayed invisible
+// until the inviter reloaded. While an invite is out, the page keeps asking.
+describe('SharingSettingsPage — noticing an acceptance without a reload', () => {
+    const POLL_MS = 5_000
+    const outstanding = {
+        token: 'tok-dddddddddddddddddddd',
+        kind: 'full-setup' as const,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        acceptedBy: [],
+        url: 'https://pod.example.com/pack-me-up/invites/tok-dddddddddddddddddddd',
+    }
+
+    function renderWithRedemption(redeemNow: () => Promise<number>) {
+        const db: Partial<PackingAppDatabase> = {
+            getSharedWithMe: vi.fn(() => Promise.resolve({ contexts: [], lastModified: '' })),
+            saveSharedWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+            getSharedListsWithMe: vi.fn(() => Promise.resolve({ lists: [], lastModified: '' })),
+            saveSharedListsWithMe: vi.fn(() => Promise.resolve({ rev: '1' })),
+            getAllPackingLists: vi.fn(() => Promise.resolve([])),
+            getQuestionSet: vi.fn(() => Promise.resolve({ questions: [], people: [] })),
+        }
+        mockUseDatabase.mockReturnValue({ db } as ReturnType<typeof useDatabase>)
+        mockUseSolidPod.mockReturnValue({ session: mockSession, isLoggedIn: true } as ReturnType<typeof useSolidPod>)
+        return render(
+            <InviteRedemptionContext.Provider value={{ version: 0, redeemNow }}>
+                <MemoryRouter><SharingSettingsPage /></MemoryRouter>
+            </InviteRedemptionContext.Provider>,
+        )
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.useFakeTimers({ shouldAdvanceTime: true })
+    })
+    afterEach(() => vi.useRealTimers())
+
+    it('keeps checking for an acceptance while an invite is out', async () => {
+        vi.mocked(listInvites).mockResolvedValue([outstanding])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+        await screen.findByRole('heading', { name: /invite links you've sent/i })
+
+        await vi.advanceTimersByTimeAsync(POLL_MS)
+        await vi.advanceTimersByTimeAsync(POLL_MS)
+
+        expect(redeemNow.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('does not check when no invite is out', async () => {
+        vi.mocked(listInvites).mockResolvedValue([])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+        await screen.findByRole('heading', { name: /share your full setup/i })
+
+        await vi.advanceTimersByTimeAsync(POLL_MS * 3)
+
+        expect(redeemNow).not.toHaveBeenCalled()
+    })
+
+    it('checks straight away when asked, and says so when nobody has accepted yet', async () => {
+        vi.mocked(listInvites).mockResolvedValue([outstanding])
+        const redeemNow = vi.fn(() => Promise.resolve(0))
+        renderWithRedemption(redeemNow)
+
+        fireEvent.click(await screen.findByRole('button', { name: /check now/i }))
+
+        await waitFor(() => expect(redeemNow).toHaveBeenCalled())
+        expect(await screen.findByText(/nobody has accepted yet/i)).toBeTruthy()
     })
 })

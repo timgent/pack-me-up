@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { StoredInvite } from '../services/invites'
 
 const mockListInvites = vi.fn<() => Promise<StoredInvite[]>>()
@@ -177,5 +177,65 @@ describe('useInviteRedemption', () => {
 
         await new Promise(r => setTimeout(r, 0))
         expect(mockShowToast).not.toHaveBeenCalled()
+    })
+
+    // Same room: they tap Accept, and the inviter should not have to reload
+    // the app to see it. The Sharing page asks again while an invite is out.
+    describe('checking again on demand', () => {
+        it('grants what has been accepted since the first look', async () => {
+            const { result } = renderHook(() => useInviteRedemption())
+            await waitFor(() => expect(mockListInvites).toHaveBeenCalledTimes(1))
+
+            mockListInvites.mockResolvedValue([invite({ acceptedBy: [BOB] })])
+            let count = -1
+            await act(async () => { count = await result.current.redeemNow() })
+
+            expect(count).toBe(1)
+            expect(mockGrantFull).toHaveBeenCalledWith(session, POD, BOB)
+        })
+
+        it('reports nothing done, quietly, when nobody has accepted yet', async () => {
+            const { result } = renderHook(() => useInviteRedemption())
+            await waitFor(() => expect(mockListInvites).toHaveBeenCalledTimes(1))
+
+            let count = -1
+            await act(async () => { count = await result.current.redeemNow() })
+
+            expect(count).toBe(0)
+            expect(mockShowToast).not.toHaveBeenCalled()
+        })
+
+        // Pages re-read when the count moves; a second redemption of one
+        // invite must move it again, not land on the same number.
+        it('counts every redemption, so pages re-read after the second too', async () => {
+            mockListInvites.mockResolvedValue([invite({ acceptedBy: [BOB] })])
+            const { result } = renderHook(() => useInviteRedemption())
+            await waitFor(() => expect(result.current.redeemed).toHaveLength(1))
+
+            mockListInvites.mockResolvedValue([invite({ token: 'tok-bbbbbbbbbbbbbbbbbbbb', acceptedBy: [CAROL] })])
+            await act(async () => { await result.current.redeemNow() })
+
+            expect(result.current.redeemed).toHaveLength(2)
+        })
+
+        it('does not run two checks at once', async () => {
+            const { result } = renderHook(() => useInviteRedemption())
+            await waitFor(() => expect(mockListInvites).toHaveBeenCalledTimes(1))
+
+            await act(async () => { await Promise.all([result.current.redeemNow(), result.current.redeemNow()]) })
+
+            expect(mockListInvites).toHaveBeenCalledTimes(2)
+        })
+
+        it('does nothing when signed out', async () => {
+            mockSolidPod.mockReturnValue({ session: null, isLoggedIn: false })
+            const { result } = renderHook(() => useInviteRedemption())
+
+            let count = -1
+            await act(async () => { count = await result.current.redeemNow() })
+
+            expect(count).toBe(0)
+            expect(mockListInvites).not.toHaveBeenCalled()
+        })
     })
 })

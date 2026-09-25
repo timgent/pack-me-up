@@ -1,4 +1,4 @@
-import { CheckCircleIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSolidPod } from '../components/SolidPodContext'
@@ -38,7 +38,7 @@ import { ShareableLink } from '../components/ShareableLink'
 import { WebIdField } from '../components/WebIdField'
 import { YourSharingAddress } from '../components/YourSharingAddress'
 import { ShareByAddress } from '../components/ShareByAddress'
-import { useInviteRedemptionVersion } from '../components/InviteRedemptionContext'
+import { useInviteRedemptionVersion, useRedeemInvitesNow } from '../components/InviteRedemptionContext'
 import { useKnownPeople } from '../hooks/useKnownPeople'
 import { deleteInvite, listInvites, type StoredInvite } from '../services/invites'
 import { useWebIdLookup } from '../hooks/useWebIdLookup'
@@ -47,6 +47,9 @@ import {
     getPendingSignInAction,
     setPendingSignInAction,
 } from '../utils/pendingSignInAction'
+
+/** How often an open Sharing page looks for an accepted invite. */
+const INVITE_POLL_MS = 5_000
 
 type ListSharingStatus = { collaborators: string[]; isPublic: boolean } | 'loading' | 'error'
 
@@ -216,6 +219,30 @@ export function SharingSettingsPage() {
     }, [session, ownPodUrl, redemptionVersion])
 
     useEffect(() => { loadInvites() }, [loadInvites])
+
+    // Granting only happens when this app checks the Pod — once per sign-in
+    // on its own, so somebody accepting across the table stayed invisible
+    // until a reload. While an invite is out and this page is on screen, keep
+    // asking; a grant bumps the redemption version, which re-reads the lists
+    // above and, once nothing is outstanding, stops this.
+    const redeemNow = useRedeemInvitesNow()
+    const hasOutstandingInvite = pendingInvites.length > 0
+    useEffect(() => {
+        if (!hasOutstandingInvite) return
+        const id = setInterval(() => {
+            if (document.visibilityState === 'visible') redeemNow()
+        }, INVITE_POLL_MS)
+        return () => clearInterval(id)
+    }, [hasOutstandingInvite, redeemNow])
+
+    const [inviteCheck, setInviteCheck] = useState<'checking' | 'none' | null>(null)
+    const handleCheckInvites = async () => {
+        setInviteCheck('checking')
+        const granted = await redeemNow()
+        // A grant announces itself with a toast and drops off the list; only
+        // "nothing yet" needs saying here.
+        setInviteCheck(granted > 0 ? null : 'none')
+    }
 
     const handleRevokeInvite = async (invite: StoredInvite) => {
         if (!session) return
@@ -471,6 +498,20 @@ export function SharingSettingsPage() {
                     >
                         {isGranting ? 'Sharing…' : 'Share my setup'}
                     </button>
+                    {inviteLink && (
+                        <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
+                            <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
+                                <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                Your full setup is shared
+                                {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                They now have your question set and all your packing lists. Send them this
+                                link so they can open it:
+                            </p>
+                            <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
+                        </div>
+                    )}
                     {/* Theirs is what this path needs; yours is what the same path
                         needs when it runs the other way. */}
                     {session?.info.webId && (
@@ -482,20 +523,6 @@ export function SharingSettingsPage() {
                     )}
                 </ShareByAddress>
 
-                {inviteLink && (
-                    <div className="mt-2 rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-2">
-                        <p className="flex items-center gap-1.5 text-sm font-semibold text-primary-900 dark:text-primary-200">
-                            <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                            Your full setup is shared
-                            {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
-                        </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                            They now have your question set and all your packing lists. Send them this
-                            link so they can open it:
-                        </p>
-                        <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
-                    </div>
-                )}
 
                 {collaborators.length > 0 && (
                     <>
@@ -522,7 +549,23 @@ export function SharingSettingsPage() {
             {/* Invite links that have been handed out and not yet used up. */}
             {pendingInvites.length > 0 && (
                 <section className="space-y-3">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Invite links you've sent</h2>
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Invite links you've sent</h2>
+                        <button
+                            type="button"
+                            onClick={handleCheckInvites}
+                            disabled={inviteCheck === 'checking'}
+                            className="inline-flex shrink-0 items-center gap-1 px-3 py-1 text-xs font-semibold rounded-md bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60 disabled:opacity-50 transition-colors"
+                        >
+                            <ArrowPathIcon aria-hidden="true" className={`h-3.5 w-3.5 ${inviteCheck === 'checking' ? 'animate-spin' : ''}`} />
+                            {inviteCheck === 'checking' ? 'Checking…' : 'Check now'}
+                        </button>
+                    </div>
+                    {inviteCheck === 'none' && (
+                        <p role="status" className="text-sm text-gray-500 dark:text-gray-400">
+                            Nobody has accepted yet. This page keeps checking while it's open.
+                        </p>
+                    )}
                     <ul className="space-y-2">
                         {pendingInvites.map(invite => (
                             <li key={invite.url} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2">
