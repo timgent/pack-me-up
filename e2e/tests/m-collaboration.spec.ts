@@ -85,6 +85,8 @@ test.describe('M – Full pod collaboration', () => {
 
     test('M2: Owner grants full access to collaborator and gets invite link', async () => {
         await pageA.goto('/#/sharing')
+        // The address path sits behind the invite link, closed until asked for.
+        await pageA.getByText(/use a sharing address instead/i).click()
         await pageA.getByLabel(/their sharing address/i).fill(collabWebId)
         await pageA.getByRole('button', { name: /share my setup/i }).click()
 

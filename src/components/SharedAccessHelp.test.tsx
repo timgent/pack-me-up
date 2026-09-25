@@ -56,6 +56,16 @@ describe('SharedAccessHelp', () => {
             expect(screen.getByRole('button', { name: /copy my address/i })).toBeTruthy()
         })
 
+        // An invite link lands on whichever account accepts it, so it fixes a
+        // mixed-up address without either of them having to find the right one.
+        it('suggests asking for an invite link before swapping addresses', () => {
+            const { container } = render(<SharedAccessHelp what="list" isLoggedIn webId={WEB_ID} />)
+
+            const body = container.textContent ?? ''
+            expect(body.search(/new invite link/i)).toBeGreaterThan(-1)
+            expect(body.search(/new invite link/i)).toBeLessThan(body.search(/or send them your address/i))
+        })
+
         it('offers both explanations rather than only the alarming one', () => {
             render(<SharedAccessHelp what="list" isLoggedIn webId={WEB_ID} />)
 

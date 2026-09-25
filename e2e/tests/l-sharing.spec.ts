@@ -69,6 +69,7 @@ test.describe('L – Sharing a packing list', () => {
 
         // Enter User B's WebID then submit via the dialog's Share button (not the toolbar one)
         const collabWebId = `http://localhost:${CSS_PORT}/${COLLAB_POD_NAME}/profile/card#me`
+        await pageA.getByRole('dialog').getByText(/use a sharing address instead/i).click()
         await pageA.getByPlaceholder(/profile\/card#me/i).fill(collabWebId)
         await pageA.getByRole('dialog').getByRole('button', { name: 'Share' }).click()
 

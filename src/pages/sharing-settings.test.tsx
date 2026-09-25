@@ -164,13 +164,13 @@ describe('SharingSettingsPage — share your full setup', () => {
         renderPage()
 
         expect(await screen.findByRole('heading', { name: /share your full setup/i })).toBeTruthy()
-        expect(screen.getByText(/let someone else use your questions and lists/i)).toBeTruthy()
+        expect(screen.getByText(/let someone else use your questions/i)).toBeTruthy()
     })
 
     it('spells out that the question set and every list go together', async () => {
         renderPage()
 
-        expect(await screen.findByText(/your question set and every packing list/i)).toBeTruthy()
+        expect(await screen.findByText(/your questions and every packing list/i)).toBeTruthy()
     })
 
     it('keeps the copy relationship-agnostic', async () => {
@@ -178,8 +178,6 @@ describe('SharingSettingsPage — share your full setup', () => {
 
         await screen.findByRole('heading', { name: /share your full setup/i })
         expect(container.textContent).not.toMatch(/partner/i)
-        // Breadth is shown by example rather than assumed
-        expect(container.textContent).toMatch(/families/i)
     })
 
     it('points single-list sharing somewhere else so the two are not confused', async () => {
@@ -213,7 +211,28 @@ describe('SharingSettingsPage — share your full setup', () => {
         // The address field is the path that needs something only the other
         // person has; the link is the path that needs nothing.
         expect(await screen.findByRole('button', { name: /create invite link/i })).toBeTruthy()
-        expect(screen.getByText(/or share with an address you already have/i)).toBeTruthy()
+        // Still there for whoever wants it, but closed: laid out beside the
+        // link it was a second way of doing the same thing, read by everybody.
+        const disclosure = screen.getByText(/use a sharing address instead/i).closest('details')
+        expect(disclosure?.open).toBe(false)
+        expect(disclosure?.contains(screen.getByLabelText(/webid/i))).toBe(true)
+    })
+
+    it('keeps the pitch to a sentence', async () => {
+        renderPage()
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        expect(screen.queryByText(/scout troops/i)).toBeNull()
+        expect(screen.getByText(/just one list\?/i)).toBeTruthy()
+    })
+
+    it('only lists who has the full setup when somebody does', async () => {
+        renderPage()
+
+        await screen.findByRole('heading', { name: /share your full setup/i })
+        await waitFor(() => expect(vi.mocked(getFullCollaborators)).toHaveBeenCalled())
+        expect(screen.queryByText(/people with your full setup/i)).toBeNull()
+        expect(screen.queryByText(/haven't shared your full setup/i)).toBeNull()
     })
 
     it('lists an invite link that has been sent but not used', async () => {
@@ -279,6 +298,10 @@ describe('SharingSettingsPage — share your full setup', () => {
         // and until this the app showed theirs nowhere they could copy it.
         expect(await screen.findByText('https://me.example.com/profile#me')).toBeTruthy()
         expect(screen.getByRole('button', { name: /copy my address/i })).toBeTruthy()
+        // With the address path, not heading the page: only somebody sharing
+        // by address needs it.
+        expect(screen.getByText(/use a sharing address instead/i).closest('details')
+            ?.contains(screen.getByText('https://me.example.com/profile#me'))).toBe(true)
     })
 
     it('offers someone you already know instead of asking for their address again', async () => {
@@ -293,6 +316,8 @@ describe('SharingSettingsPage — share your full setup', () => {
 
         await waitFor(() => expect((screen.getByLabelText(/webid/i) as HTMLInputElement).value)
             .toBe('https://bob.example.com/profile/card#me'))
+        // Opened, so the pick and the Share button are on screen.
+        expect(screen.getByText(/use a sharing address instead/i).closest('details')?.open).toBe(true)
     })
 
     it('confirms the share by naming the person, not reciting their address', async () => {
@@ -394,7 +419,8 @@ describe('SharingSettingsPage — share your full setup', () => {
         setPendingSignInAction({ type: 'share-full-setup' })
         renderPage()
 
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/webid/i)))
+        // The invite link, now the way to share, rather than the address field.
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: /create invite link/i })))
         // Consumed, so a later visit does not steal focus again
         expect(getPendingSignInAction()).toBeNull()
     })
@@ -433,8 +459,10 @@ describe('SharingSettingsPage — full setup vs individual lists', () => {
             ] as unknown as PackingList[])),
         })
 
-        expect(await screen.findByText(/haven't shared any individual lists yet/i)).toBeTruthy()
-        expect(screen.queryByText(/Alps hut trip/)).toBeNull()
+        await waitFor(() => expect(vi.mocked(getCollaborators)).toHaveBeenCalled())
+        // Nothing individually shared, so no section saying so.
+        await waitFor(() => expect(screen.queryByText(/Alps hut trip/)).toBeNull())
+        expect(screen.queryByRole('heading', { name: /individual lists i've shared/i })).toBeNull()
     })
 
     it('still lists a genuinely individually shared list', async () => {
@@ -563,5 +591,41 @@ describe('SharingSettingsPage — shares waiting on the sender, and shares revok
 
         await screen.findByRole('button', { name: /^open$/i })
         expect(save).not.toHaveBeenCalled()
+    })
+})
+
+// ── Shared with me, as one section ────────────────────────────────────────────
+
+describe('SharingSettingsPage — shared with me', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    // Whole setups and single lists were two sections with two empty states;
+    // to the person receiving them they are one question — what do I have?
+    it('lists setups and single lists together, each saying what it is', async () => {
+        renderPage({
+            getSharedWithMe: vi.fn(() => Promise.resolve({
+                contexts: [{ podUrl: 'https://alice.example.org/', label: 'Alice Smith', addedAt: '' }],
+                lastModified: '',
+            })),
+            getSharedListsWithMe: vi.fn(() => Promise.resolve({
+                lists: [{ listId: 'l1', listUrl: 'https://bob.example.org/pack-me-up/packing-lists/l1.ttl', podUrl: 'https://bob.example.org/', label: 'Ski trip', addedAt: '' }],
+                lastModified: '',
+            })),
+        })
+
+        await screen.findByText('Ski trip')
+        const section = (await screen.findByRole('heading', { name: /^shared with me$/i })).closest('section')!
+        expect(section.textContent).toMatch(/Alice Smith/)
+        expect(section.textContent).toMatch(/Full setup/)
+        expect(section.textContent).toMatch(/Ski trip/)
+        expect(screen.queryByRole('heading', { name: /individual lists shared with me/i })).toBeNull()
+    })
+
+    it('says so once when nothing has been shared', async () => {
+        renderPage()
+
+        expect(await screen.findByText(/nothing has been shared with you yet/i)).toBeTruthy()
+        expect(screen.queryByText(/no shared pods yet/i)).toBeNull()
+        expect(screen.queryByText(/no individual lists yet/i)).toBeNull()
     })
 })

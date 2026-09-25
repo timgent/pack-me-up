@@ -564,8 +564,8 @@ test.describe('C – Contextual sign-in prompts (logged out)', () => {
     await page.waitForURL(/#\/sharing/, { timeout: 8_000 })
 
     await expect(page.getByRole('heading', { name: 'Share your full setup' })).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByText(/let someone else use your questions and lists/i)).toBeVisible()
-    await expect(page.getByText(/sharing just one list\?/i)).toBeVisible()
+    await expect(page.getByText(/let someone else use your questions/i)).toBeVisible()
+    await expect(page.getByText(/just one list\?/i)).toBeVisible()
     await expect(page.getByText(/please log in/i)).toHaveCount(0)
 
     // Sign-in is offered framed around the payoff, and backing out remembers nothing

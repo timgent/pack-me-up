@@ -61,8 +61,8 @@ export function CreateInviteLink({ session, podUrl, kind, listId, label, subject
                     Invite link ready
                 </p>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Send this to them. When they open it and accept, they'll be added the next
-                    time you open Pack Me Up — you don't need their address at all.
+                    Send this to them. Once they accept, they're added the next time you open
+                    Pack Me Up.
                 </p>
                 <ShareableLink
                     // `shareOrigin()`, never this device's: inside the native
@@ -82,10 +82,6 @@ export function CreateInviteLink({ session, podUrl, kind, listId, label, subject
                 <LinkIcon aria-hidden="true" className="h-4 w-4" />
                 {isCreating ? 'Creating…' : 'Create invite link'}
             </Button>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-                Don't know their address? Send a link instead — they accept, and their address
-                comes back on its own.
-            </p>
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
     )

@@ -41,11 +41,13 @@ const renderIt = (props = {}) => render(
 )
 
 describe('CreateInviteLink', () => {
-    it('leads with the fact that no address is needed', () => {
-        renderIt()
+    // It is the main way to share now, not the alternative to an address, so
+    // it no longer needs a sentence explaining itself.
+    it('is a button and nothing more until used', () => {
+        const { container } = renderIt()
 
         expect(screen.getByRole('button', { name: /create invite link/i })).toBeTruthy()
-        expect(screen.getByText(/don't know their address/i)).toBeTruthy()
+        expect(container.querySelector('p')).toBeNull()
     })
 
     it('creates an invite of the kind it was given', async () => {

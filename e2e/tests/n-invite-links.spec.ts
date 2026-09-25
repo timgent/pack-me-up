@@ -162,7 +162,7 @@ test.describe('N – Invite links', () => {
         await pageB.reload()
 
         await expect(pageB.getByText(/waiting for .* to open Pack Me Up/i)).toBeHidden({ timeout: 20_000 })
-        const shared = pageB.locator('section', { has: pageB.getByRole('heading', { name: /data shared with me/i }) })
+        const shared = pageB.locator('section', { has: pageB.getByRole('heading', { name: /^shared with me$/i }) })
         await shared.getByRole('button', { name: /^open$/i }).click()
 
         await pageB.waitForURL(/#\/pod\//, { timeout: 10_000 })
