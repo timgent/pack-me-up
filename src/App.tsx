@@ -10,6 +10,7 @@ import { SessionExpiredBanner } from './components/SessionExpiredBanner'
 import { OfflineBanner } from './components/OfflineBanner'
 import { UpdateAvailableBanner } from './components/UpdateAvailableBanner'
 import { AndroidTestBanner } from './components/AndroidTestBanner'
+import { PageBannerSlot, PageBannerSlotProvider } from './components/PageBannerSlot'
 import { usePwaUpdate } from './hooks/usePwaUpdate'
 import { ToastProvider } from './components/ToastContext'
 import { ThemeProvider } from './components/ThemeContext'
@@ -66,6 +67,7 @@ function App() {
           <DatabaseProvider>
             <HashRouter>
               <InviteRedemption>
+              <PageBannerSlotProvider>
               <Analytics />
               {/* Column layout keeps the footer at the bottom of short pages rather
                   than floating it under the content. */}
@@ -75,6 +77,8 @@ function App() {
                 <OfflineBanner />
                 {needsRefresh && <UpdateAvailableBanner onReload={reload} />}
                 <AndroidTestBanner />
+                {/* Banners a route renders, e.g. whose shared setup is on screen. */}
+                <PageBannerSlot />
                 <div className="flex-1 container mx-auto px-4 py-8">
                   <Routes>
                     <Route path="/" element={<DefaultRedirect />} />
@@ -109,6 +113,7 @@ function App() {
                 </div>
                 <Footer />
               </div>
+              </PageBannerSlotProvider>
               </InviteRedemption>
             </HashRouter>
           </DatabaseProvider>

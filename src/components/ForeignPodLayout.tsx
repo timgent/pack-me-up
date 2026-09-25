@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Outlet, useParams, Navigate, useSearchParams } from 'react-router-dom'
 import { ForeignPodContext } from './ForeignPodContext'
 import { SharedAccessHelp } from './SharedAccessHelp'
+import { ForeignPodBanner } from './ForeignPodBanner'
 import { useSolidPod } from './SolidPodContext'
 import { useDatabase } from './DatabaseContext'
 import {
@@ -117,9 +118,10 @@ export function ForeignPodLayout() {
 
     return (
         <ForeignPodContext.Provider value={{ foreignPodUrl }}>
-            <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 px-4 py-2 text-sm text-blue-800 dark:text-blue-200 -mx-4 -mt-8 mb-6">
-                Viewing <span className="font-semibold" title={foreignPodUrl}>{ownerName ?? (resolvedWebId ? friendlyPodName(resolvedWebId) : null) ?? friendlyPodName(foreignPodUrl)}</span>'s data
-            </div>
+            <ForeignPodBanner
+                podUrl={foreignPodUrl}
+                ownerName={ownerName ?? (resolvedWebId ? friendlyPodName(resolvedWebId) : null) ?? friendlyPodName(foreignPodUrl)}
+            />
             <Outlet />
         </ForeignPodContext.Provider>
     )

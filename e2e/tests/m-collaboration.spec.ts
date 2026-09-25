@@ -176,6 +176,21 @@ test.describe('M – Full pod collaboration', () => {
         }
     })
 
+    test('M8b: Collab goes back to their own lists from the full-width banner', async () => {
+        await pageB.goto(inviteLink)
+        const banner = pageB.getByTestId('foreign-pod-banner')
+        await expect(banner).toBeVisible({ timeout: 20_000 })
+
+        // Edge to edge, like the app's other banners — not inset in the page.
+        const box = await banner.boundingBox()
+        expect(box?.x).toBe(0)
+        expect(box?.width).toBe(pageB.viewportSize()?.width)
+
+        await banner.getByRole('link', { name: /back to my lists/i }).click()
+        await pageB.waitForURL(/#\/view-lists$/, { timeout: 10_000 })
+        await expect(pageB.getByText(/viewing.*data/i)).not.toBeVisible()
+    })
+
     test('M9: Owner revokes access; collab is told what to do about it', async ({ browser }) => {
         // Owner revokes
         await pageA.goto('/#/sharing')
