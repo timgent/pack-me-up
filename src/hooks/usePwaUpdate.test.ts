@@ -41,7 +41,7 @@ describe('usePwaUpdate', () => {
         const { result } = renderHook(() => usePwaUpdate())
         act(() => result.current.reload())
 
-        expect(update).toHaveBeenCalledWith(true)
+        expect(update).toHaveBeenCalled()
     })
 
     it('reload() is a no-op when nothing was registered (e.g. native shell)', () => {

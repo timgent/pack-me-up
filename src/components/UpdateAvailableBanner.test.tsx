@@ -18,4 +18,12 @@ describe('UpdateAvailableBanner', () => {
 
         expect(onReload).toHaveBeenCalled()
     })
+
+    // Tailwind v4's preflight gives buttons `cursor: default`, so a text-styled
+    // button looked like a link but showed no pointer on hover.
+    it('shows a pointer cursor over the button', () => {
+        render(<UpdateAvailableBanner onReload={vi.fn()} />)
+
+        expect(screen.getByRole('button', { name: /reload/i }).className).toMatch(/\bcursor-pointer\b/)
+    })
 })

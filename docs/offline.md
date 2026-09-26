@@ -143,4 +143,8 @@ Two things this deliberately does not do:
   still shows the account, the banner, and the lists that were made online.
 - `pwaUpdate.test.ts`, `usePwaUpdate.test.ts`, `UpdateAvailableBanner.test.tsx` —
   the service worker is skipped on the Capacitor shell, and an update waits
-  for the banner rather than reloading on its own.
+  for the banner rather than reloading on its own. Pressing Reload reloads
+  the page itself once the new worker activates (with a timeout fallback)
+  rather than relying on the plugin's `controllerchange` hook, which never
+  fires in a tab the old worker wasn't controlling — a first visit, or after
+  a hard reload — and left the button doing nothing.

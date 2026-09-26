@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { registerPwaServiceWorker, type UpdateServiceWorker } from '../services/pwaUpdate'
+import { registerPwaServiceWorker, type ApplyUpdate } from '../services/pwaUpdate'
 
 /**
  * Registers the service worker once per app lifetime and exposes whether a
@@ -9,7 +9,7 @@ import { registerPwaServiceWorker, type UpdateServiceWorker } from '../services/
  */
 export function usePwaUpdate() {
     const [needsRefresh, setNeedsRefresh] = useState(false)
-    const updateRef = useRef<UpdateServiceWorker | undefined>(undefined)
+    const updateRef = useRef<ApplyUpdate | undefined>(undefined)
     const registered = useRef(false)
 
     useEffect(() => {
@@ -19,7 +19,7 @@ export function usePwaUpdate() {
     }, [])
 
     const reload = () => {
-        updateRef.current?.(true)
+        updateRef.current?.()
     }
 
     return { needsRefresh, reload }
