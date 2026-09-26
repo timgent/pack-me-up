@@ -60,10 +60,6 @@ export function CreateInviteLink({ session, podUrl, kind, listId, label, subject
                 <p className="text-sm font-semibold text-primary-900 dark:text-primary-200">
                     Invite link ready
                 </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Send this to them. Once they accept, they're added the next time you open
-                    Pack Me Up.
-                </p>
                 <ShareableLink
                     // `shareOrigin()`, never this device's: inside the native
                     // shell the runtime origin is `https://localhost`, and this
@@ -72,6 +68,12 @@ export function CreateInviteLink({ session, podUrl, kind, listId, label, subject
                     label="Invite link"
                     subject={subject}
                 />
+                {/* The wait is the one thing about an invite nobody would
+                    guess, so it is said — under the link, not in front of it
+                    (#360). "Send this to them" went: the buttons say that. */}
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Once they accept, they're added the next time you open Pack Me Up.
+                </p>
             </div>
         )
     }

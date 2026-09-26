@@ -30,10 +30,7 @@ export function YourSharingAddress({
 }) {
     return (
         <div className={`rounded-xl border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/40 p-4 space-y-3 ${className}`}>
-            <div className="space-y-1">
-                <h3 className="text-sm font-bold text-primary-900 dark:text-primary-200">{title}</h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{description}</p>
-            </div>
+            <h3 className="text-sm font-bold text-primary-900 dark:text-primary-200">{title}</h3>
 
             {/* Selectable, wrapping, and whole: someone whose clipboard is
                 blocked still has to be able to get at it. */}
@@ -55,6 +52,10 @@ export function YourSharingAddress({
                 qrHint="They can point a camera at this instead of typing it."
                 errorContext="YourSharingAddress"
             />
+
+            {/* Under the address and its buttons rather than between the title
+                and them: the address is what they came for (#360). */}
+            <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
         </div>
     )
 }
