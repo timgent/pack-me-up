@@ -39,6 +39,7 @@ test.describe('E – Solid Pod Authentication', () => {
     await logoutViaAccountMenu(page)
     await expect(page.getByRole('button', { name: 'Sync & Share' })).toBeVisible({ timeout: 8_000 })
     await expect(accountMenu(page)).not.toBeVisible()
+    await expect(page).toHaveURL(/\/home$/)
   })
 
   test('E3: Backups link appears only when logged in', async ({ authedPage: page }) => {

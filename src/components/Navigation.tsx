@@ -68,8 +68,11 @@ export const Navigation = () => {
         return login(issuer)
     }
 
+    // Whatever page you were on belonged to the account that just left; home is
+    // where a signed-out visitor starts.
     const handleLogout = async () => {
         await logout()
+        navigate('/home')
     }
 
     return (
