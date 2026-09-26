@@ -51,18 +51,33 @@ Associated Domains on iOS, once real values are in.
 
 ## What hasn't been verified on a real device
 
-Nothing here can be exercised without an Android device/emulator or a Mac
-with Xcode, neither of which this development environment has. Once the
-placeholders above are real:
+Most development environments can't exercise this at all — no Android
+device/emulator, no Mac with Xcode. A later run had both, though, and got
+further than an explicit `am start`: see the "Addendum" section of the
+[manual test report](https://github.com/timgent/pack-me-up/blob/agent-testing/2026-09-26-issue-359-deep-links/README.md)
+on the `agent-testing` branch for the concrete run and screenshots.
 
-- Android: `adb shell am start -a android.intent.action.VIEW -d
-  "https://packmeup.tim-gent.com/#/view-lists/<id>?pod=<encoded>"
-  com.timgent.packmeup` should bring the app to the foreground on that route
-  even without a tap (this works regardless of asset-link verification, since
-  an explicit `am start` matches the intent-filter directly — verification
-  only governs whether tapping a real link from another app, e.g. Chrome or
-  Messages, prefers the app over the browser).
+- Android — two recipes, proving different things:
+  - `adb shell am start -a android.intent.action.VIEW -d
+    "https://packmeup.tim-gent.com/#/view-lists/<id>?pod=<encoded>"
+    com.timgent.packmeup` brings the app to the foreground on that route even
+    without a tap (this works regardless of asset-link verification, since an
+    explicit `am start` matches the intent-filter directly). It only proves
+    the intent-filter and `deepLinks.ts` are shaped right, not that a real
+    tap would prefer the app over the browser.
+  - `adb shell pm set-app-links --package com.timgent.packmeup STATE_APPROVED
+    packmeup.tim-gent.com` (Android's own supported way to test App Links
+    without real Play App Signing credentials) followed by an **implicit**
+    `am start -a android.intent.action.VIEW -d "<url>" -c
+    android.intent.category.BROWSABLE` (no package named) exercises the
+    actual resolution path a tap takes. This is the stronger test, and it's
+    the one the addendum above ran — for all three real link shapes, warm
+    and cold start.
 - iOS: tap a share link from Messages/Notes with the app installed and
-  confirm it opens the app rather than Safari.
+  confirm it opens the app rather than Safari. `xcrun simctl openurl` isn't a
+  substitute — it still needs the entitlement to make it into the real code
+  signature (a real Team ID, per the placeholders above), which a Simulator
+  build without one won't have; `codesign -d --entitlements -` on the built
+  `.app` will show an empty entitlements set until it does.
 - Both: confirm the destination (`ForeignPodLayout`, `view-packing-list`)
   ends up in the same state a browser open of the same URL would.
