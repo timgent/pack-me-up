@@ -249,6 +249,56 @@ describe('Navigation – signed-in account menu', () => {
     })
 })
 
+// Signing out left you on whatever page you were on — often a list that now
+// belongs to nobody on screen. Home is where a signed-out visitor starts.
+describe('Navigation – signing out', () => {
+    function LocationProbe() {
+        const location = useLocation()
+        return <div data-testid="location">{location.pathname}</div>
+    }
+
+    function renderAt(path: string) {
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <ThemeProvider>
+                    <Navigation />
+                    <Routes>
+                        <Route path="*" element={<LocationProbe />} />
+                    </Routes>
+                </ThemeProvider>
+            </MemoryRouter>
+        )
+    }
+
+    let logout: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+        mockGetSolidProfile.mockResolvedValue({ name: null, photo: null })
+        signedIn()
+        logout = vi.fn().mockResolvedValue(undefined)
+        mockUseSolidPod.mockReturnValue({ ...mockUseSolidPod(), logout })
+    })
+
+    it('takes you to the home page from the account menu', async () => {
+        renderAt('/view-lists')
+
+        openAccountMenu()
+        fireEvent.click(within(desktopBar()).getByRole('button', { name: 'Logout' }))
+
+        await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/home'))
+        expect(logout).toHaveBeenCalledOnce()
+    })
+
+    it('takes you to the home page from the mobile menu', async () => {
+        renderAt('/manage-questions')
+
+        fireEvent.click(within(screen.getByTestId('mobile-menu')).getByRole('button', { name: 'Logout' }))
+
+        await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/home'))
+        expect(logout).toHaveBeenCalledOnce()
+    })
+})
+
 describe('Navigation – signed-out auth control', () => {
     beforeEach(() => {
         mockUseSolidPod.mockReturnValue({
