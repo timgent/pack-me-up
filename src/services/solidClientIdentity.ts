@@ -17,9 +17,15 @@
  * The native shell is served from `https://localhost` by Capacitor, so it never
  * matched the hosted document's redirect URI and fell through to dynamic
  * registration on every install — which is why phones lost their session on a
- * schedule the web app never saw. `public/client-id.json` now lists the
- * loopback redirect URI, and the native app uses the hosted document like the
- * deployed site does.
+ * schedule the web app never saw. It now has a hosted document of its own.
+ *
+ * Its own, rather than a line in the website's, because since #358 the native
+ * app signs in through the system browser (a Custom Tab, SFSafariViewController)
+ * and the provider hands the result back on a private-use scheme. `oidc-provider`
+ * — behind CSS and Inrupt's ESS — refuses a custom scheme in a `web` client's
+ * document, and one bad redirect URI invalidates the whole document: adding it to
+ * `client-id.json` would stop the *website* signing in. A `native` document is the
+ * only place it can go. See docs/native-sign-in.md.
  */
 
 /**
@@ -33,12 +39,30 @@
 export const HOSTED_CLIENT_ID_URL = 'https://packmeup.tim-gent.com/client-id.json'
 
 /**
- * The redirect URI the native shell sends. Capacitor serves the app over its
- * https scheme on both platforms (see `capacitor.config.ts`), so iOS and Android
- * share one loopback origin. `public/client-id.json` must list this, or the
- * provider refuses the login outright.
+ * The native app's Client ID Document (`public/client-id-native.json`).
+ * Hardcoded for the same reason as `HOSTED_CLIENT_ID_URL`;
+ * `VITE_NATIVE_CLIENT_ID_URL` overrides it, which is how E2E suite J and a
+ * preview build tested natively point at a document of their own.
  */
-export const NATIVE_REDIRECT_URI = 'https://localhost/'
+export const HOSTED_NATIVE_CLIENT_ID_URL = 'https://packmeup.tim-gent.com/client-id-native.json'
+
+/**
+ * Where the provider sends the system browser once the user has signed in.
+ * RFC 8252 §7.1's reverse-domain private-use scheme: Android's intent-filter and
+ * iOS's `CFBundleURLTypes` route it to this app, and nothing else on the device
+ * can claim it without also claiming our bundle id. `client-id-native.json` must
+ * list it.
+ */
+export const NATIVE_AUTH_REDIRECT_URI = 'com.timgent.packmeup:/auth-callback'
+
+/**
+ * The redirect URI app versions released before #358 send: they sign in inside
+ * the WebView, whose origin is Capacitor's `https://localhost` on both platforms
+ * (see `capacitor.config.ts`). Nothing current sends it, but phones that have not
+ * updated still do — `public/client-id.json` must keep listing it, or they cannot
+ * log in at all.
+ */
+export const LEGACY_NATIVE_REDIRECT_URI = 'https://localhost/'
 
 export type SolidClientDetails =
     | { client_id: string }
@@ -46,16 +70,21 @@ export type SolidClientDetails =
 
 export function solidClientDetails({
     clientIdUrl,
+    nativeClientIdUrl,
     isNativePlatform,
     origin,
 }: {
     /** `VITE_CLIENT_ID_URL`, when the build sets one. */
     clientIdUrl?: string
+    /** `VITE_NATIVE_CLIENT_ID_URL`, when the build sets one. */
+    nativeClientIdUrl?: string
     isNativePlatform: boolean
     origin: string
 }): SolidClientDetails {
+    // Checked first: the website's document cannot list the native redirect URI,
+    // so a native build must never pick it up from VITE_CLIENT_ID_URL.
+    if (isNativePlatform) return { client_id: nativeClientIdUrl || HOSTED_NATIVE_CLIENT_ID_URL }
     if (clientIdUrl) return { client_id: clientIdUrl }
-    if (isNativePlatform) return { client_id: HOSTED_CLIENT_ID_URL }
 
     // A web origin with no hosted document — localhost or a preview deploy.
     // Dynamic registration is the only option, and its fragility matters less

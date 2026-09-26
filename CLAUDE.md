@@ -7,6 +7,12 @@ Run tests: `npm test` — type checks first (`npm run typecheck`), then runs vit
 persistence guard below fails the same command locally and in CI. `npm run test:watch`
 skips the type check.
 
+E2E runs against `npm run build:e2e` (mode `e2e`, `.env.e2e`), not a plain build —
+Playwright's `webServer` builds it before serving, so `npm run test:e2e` and CI both get
+it. It points the native sign-in path at the Client ID Document global setup serves, and
+keeps Sentry off while suite J poses as the native app. A preview server you left running
+from a plain build is reused locally and will fail J6.
+
 ### E2E pod isolation
 
 Each serial suite that writes to a Solid pod **must use its own dedicated pod user** — never share `testuser` (or any other pod) between suites that run concurrently. Add new user constants to `playwright.config.ts` and create the account in `e2e/global-setup.ts`.
@@ -15,6 +21,7 @@ Each serial suite that writes to a Solid pod **must use its own dedicated pod us
 |-------|----------|
 | E, J (read-only tests), Z | `testuser` |
 | J5 (writes a list) | `juser` |
+| J6 (native sign-in) | `jnative` |
 | F | `fuser` |
 | G | `guser` |
 | H | `huser` |
@@ -46,9 +53,9 @@ Never end a session because a request failed. `@uvdsl/solid-oidc-client-browser`
 - **Never let the app be a dynamic client in production.** The native shell is
   served from `https://localhost`, so it fell through to dynamic client
   registration — and a registration the provider reclaims answers the next refresh
-  with `invalid_client`, which is terminal. `solidClientIdentity.ts` decides this,
-  and `public/client-id.json` must keep listing the native redirect URI or the
-  mobile app cannot log in at all.
+  with `invalid_client`, which is terminal. `solidClientIdentity.ts` decides this:
+  the website uses `public/client-id.json`, the native app
+  `public/client-id-native.json`.
 
 A fourth rule follows from the first: **a session that cannot be reached is not a
 session that has ended.** `isReconnecting` (`SolidPodContext`) is that state, and
@@ -56,12 +63,27 @@ while it holds, the app keeps the account on screen and opens the identity's own
 PouchDB namespace from `rememberedSession.ts` rather than the empty local one —
 otherwise being offline looks exactly like being logged out (#342).
 
+**The native app signs in through the system browser, never its WebView** (#358).
+`nativeLogin.ts` opens the provider in a Custom Tab / SFSafariViewController, and the
+provider returns on the private-use scheme `com.timgent.packmeup:/auth-callback`. That
+redirect lives only in `client-id-native.json` (`application_type: native`):
+`oidc-provider` rejects a custom scheme in a web client's document, and one bad entry
+invalidates the whole document — put it in `client-id.json` and the *website* stops
+signing in. `client-id.json` must keep `https://localhost/` for app versions released
+before #358, or phones that have not updated cannot log in at all. The library's own
+login and callback cannot do this (one navigates the page, the other sends the page's
+URL as `redirect_uri`), so `ResilientSession.beginExternalLogin`/`completeExternalLogin`
+do both halves, and bank the tokens before verifying them, as every refresh does.
+`docs/native-sign-in.md` has the flow and what still needs a real device.
+
 `docs/staying-signed-in.md` has the full trace of the logout bugs these rules came
 from, and `docs/offline.md` covers what the app does with no network.
 `SolidPodContext.resilience.test.tsx`, `SolidPodContext.offline.test.tsx`,
 `ResilientSession.test.ts` and e2e suite J pin the behaviour; suite J in particular
-asserts that a 401 does *not* sign the user out, and that a pod it cannot reach
-leaves the user signed in with their lists on screen.
+asserts that a 401 does *not* sign the user out, that a pod it cannot reach
+leaves the user signed in with their lists on screen, and (J6/J7, through the fake
+native bridge in `e2e/helpers/native-shell.ts`) that the native app signs in through
+the system browser against a real CSS.
 
 ## Sharing
 

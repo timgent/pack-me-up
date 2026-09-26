@@ -107,6 +107,18 @@ describe('initSentry', () => {
         expect(init).not.toHaveBeenCalled()
     })
 
+    it('does not initialise Sentry in the E2E build, even posing as the native app', () => {
+        // Suite J drives the native sign-in path by making Capacitor report a
+        // native platform — which on its own would count as a real user's phone.
+        vi.stubEnv('MODE', 'e2e')
+        mockIsNativePlatform.mockReturnValue(true)
+        servedFrom('localhost')
+
+        initSentry()
+
+        expect(init).not.toHaveBeenCalled()
+    })
+
     it('initialises Sentry in production builds', () => {
         vi.stubEnv('MODE', 'production')
 

@@ -6,6 +6,7 @@ import {
     jwtVerify,
     createRemoteJWKSet,
     calculateJwkThumbprint,
+    generateKeyPair,
     type JWTVerifyGetKey,
 } from 'jose'
 import { logAuthEvent, reportSessionEnded } from './authLog'
@@ -73,6 +74,54 @@ const TRANSIENT_RETRY_DELAYS_MS = [5_000, 15_000, 45_000, 120_000, 300_000]
 const REFRESH_LOCK = 'pmu-solid-token-refresh'
 
 /**
+ * Where a sign-in through the system browser waits for its callback.
+ * localStorage rather than the library's sessionStorage: the user can spend
+ * minutes in the browser, and Android is free to kill the app meanwhile — the
+ * callback then arrives in a new process, which must still be able to finish.
+ */
+const PENDING_EXTERNAL_LOGIN_KEY = 'pmu-pending-external-login'
+
+/** A sign-in not finished in this long is abandoned; its callback is refused. */
+const PENDING_EXTERNAL_LOGIN_TTL_MS = 15 * 60 * 1000
+
+interface PendingExternalLogin {
+    idp: string
+    tokenEndpoint: string
+    jwksUri: string
+    clientId: string
+    redirectUri: string
+    codeVerifier: string
+    state: string
+    startedAt: number
+}
+
+function readPendingExternalLogin(): PendingExternalLogin | undefined {
+    try {
+        const stored = localStorage.getItem(PENDING_EXTERNAL_LOGIN_KEY)
+        return stored ? (JSON.parse(stored) as PendingExternalLogin) : undefined
+    } catch {
+        return undefined
+    }
+}
+
+function clearPendingExternalLogin(): void {
+    try { localStorage.removeItem(PENDING_EXTERNAL_LOGIN_KEY) } catch { /* nothing to clear */ }
+}
+
+function base64Url(bytes: Uint8Array): string {
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** RFC 7636 PKCE, S256 — the same shape the library produces. */
+async function createPkcePair(): Promise<{ verifier: string; challenge: string }> {
+    const verifier = `${crypto.randomUUID()}-${crypto.randomUUID()}`
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
+    return { verifier, challenge: base64Url(digest) }
+}
+
+const trimTrailingSlash = (url: string) => (url.endsWith('/') ? url.slice(0, -1) : url)
+
+/**
  * Thrown when the provider has rejected the grant itself. This is the only
  * failure that genuinely ends a session — everything else is worth retrying.
  */
@@ -81,6 +130,21 @@ export class SessionEndedError extends Error {
     constructor(reason: string, message?: string) {
         super(message ?? `Solid session ended: ${reason}`)
         this.name = 'SessionEndedError'
+        this.reason = reason
+    }
+}
+
+/**
+ * A sign-in through the system browser that cannot be completed. `reason` says
+ * why: the provider's own `error` code, or one of ours — `no-pending-login`,
+ * `expired`, `state-mismatch`, `issuer-mismatch`, `redirect-mismatch`,
+ * `token-request-failed`.
+ */
+export class ExternalLoginError extends Error {
+    readonly reason: string
+    constructor(reason: string, message?: string) {
+        super(message ?? `Sign-in could not be completed: ${reason}`)
+        this.name = 'ExternalLoginError'
         this.reason = reason
     }
 }
@@ -185,6 +249,8 @@ export interface ResilientSessionOptions extends Omit<SessionOptions, 'database'
 export class ResilientSession extends SessionCore {
     /** SessionCore keeps its database private, so we hold our own handle. */
     private readonly db: SessionIDB
+    /** And its client details, which the external-agent login needs. */
+    private readonly clientDetails: ConstructorParameters<typeof SessionCore>[0]
     private readonly resolveJwks: (jwksUri: string) => JWTVerifyGetKey
     private readonly transientRetryDelaysMs: readonly number[]
     private renewalTimer: ReturnType<typeof setTimeout> | undefined
@@ -206,6 +272,7 @@ export class ResilientSession extends SessionCore {
         const { resolveJwks, transientRetryDelaysMs, ...coreOptions } = sessionOptions
         super(clientDetails, { ...coreOptions, database })
         this.db = database
+        this.clientDetails = clientDetails
         this.resolveJwks = resolveJwks ?? jwksFor
         this.transientRetryDelaysMs = transientRetryDelaysMs ?? TRANSIENT_RETRY_DELAYS_MS
     }
@@ -283,6 +350,166 @@ export class ResilientSession extends SessionCore {
         this.cancelRenewal()
         logAuthEvent('logout.requested')
         await super.logout()
+    }
+
+    /**
+     * Starts a sign-in in an external user agent — the system browser — rather
+     * than by navigating this page, which is what the library's `login()` does.
+     * The native app needs this (#358): RFC 8252 rules out an embedded WebView
+     * for authorization requests. `open` receives the authorize URL; the provider
+     * answers on `redirectUri`, which whoever catches it hands to
+     * `completeExternalLogin`.
+     *
+     * Always a Client ID Document: a dynamic registration is exactly what the
+     * native app must never be (see solidClientIdentity.ts).
+     */
+    async beginExternalLogin(idp: string, redirectUri: string, open: (url: string) => Promise<void>): Promise<void> {
+        const clientId = this.clientDetails && 'client_id' in this.clientDetails ? this.clientDetails.client_id : undefined
+        if (!clientId) {
+            throw new Error('Signing in through the system browser needs a Client ID Document.')
+        }
+
+        const response = await fetch(`${new URL(idp).origin}/.well-known/openid-configuration`)
+        if (!response.ok) throw new Error(`Could not read the provider configuration: HTTP ${response.status}`)
+        const configuration = (await response.json()) as {
+            issuer: string
+            authorization_endpoint: string
+            token_endpoint: string
+            jwks_uri: string
+        }
+        // RFC 9207: the provider we asked for must be the one that answers.
+        if (trimTrailingSlash(configuration.issuer) !== trimTrailingSlash(idp)) {
+            throw new Error(`RFC 9207 - the provider's issuer ${configuration.issuer} is not ${idp}`)
+        }
+
+        const { verifier, challenge } = await createPkcePair()
+        const state = crypto.randomUUID()
+        const pending: PendingExternalLogin = {
+            idp: configuration.issuer,
+            tokenEndpoint: configuration.token_endpoint,
+            jwksUri: configuration.jwks_uri,
+            clientId,
+            redirectUri,
+            codeVerifier: verifier,
+            state,
+            startedAt: Date.now(),
+        }
+        localStorage.setItem(PENDING_EXTERNAL_LOGIN_KEY, JSON.stringify(pending))
+
+        const authorize = new URL(configuration.authorization_endpoint)
+        authorize.search = new URLSearchParams({
+            response_type: 'code',
+            redirect_uri: redirectUri,
+            scope: 'openid offline_access webid',
+            client_id: clientId,
+            code_challenge_method: 'S256',
+            code_challenge: challenge,
+            state,
+            // CSS v7 only issues a refresh token when consent is asked for — the
+            // library sends this for the same reason.
+            prompt: 'consent',
+        }).toString()
+
+        logAuthEvent('login.external-agent-opened', { idp: configuration.issuer })
+        await open(authorize.toString())
+    }
+
+    /** Whether a sign-in through the system browser is waiting for its callback. */
+    hasPendingExternalLogin(): boolean {
+        return readPendingExternalLogin() !== undefined
+    }
+
+    /**
+     * Finishes a sign-in `beginExternalLogin` started, from the URL the provider
+     * sent the browser back to.
+     *
+     * Everything that can reject the callback is checked before anything is
+     * written: a stray, forged or stale callback must not cost the session this
+     * device already has. After the exchange, the rule every refresh follows
+     * holds here too — the tokens are stored before verification, the one step
+     * that can still throw.
+     */
+    async completeExternalLogin(callbackUrl: string): Promise<void> {
+        const pending = readPendingExternalLogin()
+        if (!pending) throw new ExternalLoginError('no-pending-login')
+        if (Date.now() - pending.startedAt > PENDING_EXTERNAL_LOGIN_TTL_MS) {
+            clearPendingExternalLogin()
+            throw new ExternalLoginError('expired')
+        }
+
+        const callback = new URL(callbackUrl)
+        if (callbackUrl.split(/[?#]/)[0] !== pending.redirectUri) {
+            throw new ExternalLoginError('redirect-mismatch')
+        }
+        // Not ours: leave the pending sign-in alone, so a forged callback cannot
+        // cancel the one the user is part-way through.
+        if (callback.searchParams.get('state') !== pending.state) {
+            throw new ExternalLoginError('state-mismatch')
+        }
+        const providerError = callback.searchParams.get('error')
+        if (providerError) {
+            clearPendingExternalLogin()
+            throw new ExternalLoginError(providerError, callback.searchParams.get('error_description') ?? undefined)
+        }
+        if (callback.searchParams.get('iss') !== pending.idp) {
+            throw new ExternalLoginError('issuer-mismatch')
+        }
+        const code = callback.searchParams.get('code')
+        if (!code) throw new ExternalLoginError('no-code')
+
+        // A code is single-use: from here on, this attempt is spent either way.
+        clearPendingExternalLogin()
+
+        const keyPair = await generateKeyPair('ES256') as StoredKeyPair
+        let response: Response
+        try {
+            response = await fetch(pending.tokenEndpoint, {
+                method: 'POST',
+                headers: {
+                    dpop: await createTokenEndpointDPoP(pending.tokenEndpoint, keyPair),
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code,
+                    code_verifier: pending.codeVerifier,
+                    // What the provider sent the browser to, which is what it
+                    // checks — not this page's URL, as the library would send.
+                    redirect_uri: pending.redirectUri,
+                    client_id: pending.clientId,
+                }),
+            })
+        } catch (error) {
+            throw new ExternalLoginError('token-request-failed', `Could not reach the token endpoint: ${String(error)}`)
+        }
+        if (!response.ok) {
+            throw new ExternalLoginError('token-request-failed', `Token endpoint returned ${response.status}`)
+        }
+        const tokens = (await response.json()) as TokenResponse
+
+        await this.db.init()
+        try {
+            await Promise.all([
+                this.db.setItem('idp', pending.idp),
+                this.db.setItem('jwks_uri', pending.jwksUri),
+                this.db.setItem('token_endpoint', pending.tokenEndpoint),
+                this.db.setItem('client_id', pending.clientId),
+                this.db.setItem('dpop_keypair', keyPair),
+                this.db.setItem('refresh_token', tokens.refresh_token),
+            ])
+        } finally {
+            try { this.db.close() } catch { /* already closed */ }
+        }
+
+        await this.verifyAccessToken(tokens.access_token, {
+            idp: pending.idp,
+            jwksUri: pending.jwksUri,
+            clientId: pending.clientId,
+            keyPair,
+        })
+        await this.setTokenDetails({ ...tokens, dpop_key_pair: keyPair } as Parameters<SessionCore['setTokenDetails']>[0])
+        this.transientFailures = 0
+        this.dispatchStateChangeEvent()
     }
 
     /** True once the access token is inside the pre-expiry buffer. */

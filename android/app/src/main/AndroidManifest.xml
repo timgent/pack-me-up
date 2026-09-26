@@ -34,6 +34,19 @@
                 <data android:scheme="https" android:host="packmeup.tim-gent.com" />
             </intent-filter>
 
+            <!-- Sign-in callback (#358). The provider's page opens in a Chrome
+                 Custom Tab, not the WebView, and sends the user back to
+                 com.timgent.packmeup:/auth-callback — a private-use scheme
+                 (RFC 8252 §7.1), listed in public/client-id-native.json. With
+                 launchMode singleTask, arriving here also clears the Custom Tab.
+                 See docs/native-sign-in.md. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.timgent.packmeup" />
+            </intent-filter>
+
         </activity>
 
         <provider

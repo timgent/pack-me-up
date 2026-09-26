@@ -22,6 +22,20 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Sign-in callback (#358): the provider returns the user from
+	     SFSafariViewController to com.timgent.packmeup:/auth-callback, listed in
+	     public/client-id-native.json. See docs/native-sign-in.md. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.timgent.packmeup.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.timgent.packmeup</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

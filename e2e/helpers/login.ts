@@ -60,6 +60,32 @@ export async function loginToCss(
   await page.getByLabel('Search providers or paste your Pod URL').fill(cssIssuer)
   await page.getByRole('button', { name: `Connect to ${cssIssuer.replace(/\/$/, '')}` }).click()
 
+  await signInAndConsentAtCss(page, cssIssuer, email, password)
+
+  // CSS redirects to the SPA root with OAuth params (?code=...&state=...&iss=...)
+  // The app processes the callback and navigates to the return route.
+  await page.waitForURL(/localhost:4173/, { timeout: 20_000 })
+  // Wait for logged-in state (skip if the caller expects a migration prompt to block the nav)
+  if (options?.waitForLoggedIn !== false) {
+    await accountMenu(page).first().waitFor({ timeout: 20_000 })
+  }
+}
+
+/**
+ * The provider's half of a sign-in: CSS's password form, then its consent
+ * page. On the web this happens in the app's own tab; for the native app (#358)
+ * it happens in the system browser, which suite J plays with a popup.
+ *
+ * CSS v7 flow: /.oidc/auth → /.account/ → /.account/login/password/, a
+ * JS-driven form whose button starts disabled, then /.account/oidc/prompt/,
+ * whose #authorize button JS enables once it has loaded the account's WebIDs.
+ */
+export async function signInAndConsentAtCss(
+  page: Page,
+  cssIssuer: string,
+  email: string,
+  password: string,
+): Promise<void> {
   // Wait for navigation to CSS password login page specifically.
   // (CSS redirects: /.oidc/auth → /.account/ → /.account/login/password/)
   await page.waitForURL(
@@ -96,12 +122,4 @@ export async function loginToCss(
     return btn && !btn.disabled
   }, { timeout: 10_000 })
   await authorizeBtn.click()
-
-  // CSS redirects to the SPA root with OAuth params (?code=...&state=...&iss=...)
-  // The app processes the callback and navigates to the return route.
-  await page.waitForURL(/localhost:4173/, { timeout: 20_000 })
-  // Wait for logged-in state (skip if the caller expects a migration prompt to block the nav)
-  if (options?.waitForLoggedIn !== false) {
-    await accountMenu(page).first().waitFor({ timeout: 20_000 })
-  }
 }

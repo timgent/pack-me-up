@@ -1,7 +1,16 @@
 import { test, expect } from '../fixtures'
-import { accountMenu, loginToCss, waitForLiveSession } from '../helpers/login'
+import { accountMenu, loginToCss, signInAndConsentAtCss, waitForLiveSession } from '../helpers/login'
 import { fillPersonRequiredFields } from '../helpers/wizard'
-import { JUSER_EMAIL, JUSER_PASSWORD } from '../../playwright.config'
+import { emitNativeEvent, runAsNativeApp } from '../helpers/native-shell'
+import {
+  APP_URL,
+  JUSER_EMAIL,
+  JUSER_PASSWORD,
+  JNATIVE_EMAIL,
+  JNATIVE_PASSWORD,
+  NATIVE_CLIENT_ID_URL,
+} from '../../playwright.config'
+import { NATIVE_AUTH_REDIRECT_URI } from '../../src/services/solidClientIdentity'
 
 const CSS_ISSUER = process.env.CSS_ISSUER ?? 'http://localhost:4001'
 const TEST_POD_NAME = 'testuser'
@@ -156,6 +165,103 @@ test.describe('J – Session Expiry', () => {
       await page.reload()
 
       await expect(page.getByText(listName)).toBeVisible({ timeout: 30_000 })
+    } finally {
+      await ctx.close()
+    }
+  })
+
+  /**
+   * The native app signs in through the system browser, not its own WebView
+   * (#358) — RFC 8252 rules out embedded user agents for authorization
+   * requests, and the WebView let the app reach the password field.
+   *
+   * There is no Custom Tab in Chromium, so this plays one: `runAsNativeApp`
+   * stands in for Capacitor's native bridge, and opens the Browser plugin's
+   * tab as a popup. The custom-scheme redirect CSS answers with is what the OS
+   * would route back to the app; it is handed over as the `appUrlOpen` event
+   * the OS would deliver.
+   *
+   * Everything on the provider's side is real: CSS fetches the native Client
+   * ID Document (served by global setup), validates its custom-scheme redirect,
+   * and issues the tokens the app then refreshes from after a reload.
+   */
+  test('J6: the native app signs in through the system browser, never its own WebView', async ({ browser }) => {
+    const ctx = await browser.newContext()
+    await runAsNativeApp(ctx)
+    const page = await ctx.newPage()
+    const appNavigations: string[] = []
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) appNavigations.push(frame.url()) })
+    const requests: string[] = []
+    ctx.on('request', request => { requests.push(request.url()) })
+
+    try {
+      await page.goto('/')
+      await page.getByRole('button', { name: 'Sync & Share' }).click()
+      await page.getByLabel('Search providers or paste your Pod URL').fill(CSS_ISSUER)
+
+      const browserTab = page.waitForEvent('popup')
+      const callback = ctx.waitForEvent('response', {
+        predicate: response => (response.headers()['location'] ?? '').startsWith(NATIVE_AUTH_REDIRECT_URI),
+        timeout: 60_000,
+      })
+      await page.getByRole('button', { name: `Connect to ${CSS_ISSUER}` }).click()
+
+      const tab = await browserTab
+      await expect(page.getByText(/opens in your browser/i)).toBeVisible()
+      await signInAndConsentAtCss(tab, CSS_ISSUER, JNATIVE_EMAIL, JNATIVE_PASSWORD)
+      const callbackUrl = (await callback).headers()['location']
+
+      // The request the provider saw: the native client, returning to the app's scheme.
+      const authorize = new URL(requests.find(url => url.includes('/.oidc/auth?')) ?? 'about:blank')
+      expect(authorize.searchParams.get('client_id')).toBe(NATIVE_CLIENT_ID_URL)
+      expect(authorize.searchParams.get('redirect_uri')).toBe(NATIVE_AUTH_REDIRECT_URI)
+
+      await emitNativeEvent(page, 'App', 'appUrlOpen', { url: callbackUrl })
+
+      await waitForLiveSession(page)
+      // The tab is dismissed and the provider picker is out of the way.
+      await expect.poll(() => tab.isClosed()).toBe(true)
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      // The app's own page never left the app — the provider only ever loaded in the tab.
+      expect(appNavigations.length).toBeGreaterThan(0)
+      for (const url of appNavigations) expect(new URL(url).origin).toBe(APP_URL)
+
+      // What was banked is a session the app can come back to.
+      await page.reload()
+      await waitForLiveSession(page)
+      await expect(expiredBanner(page)).not.toBeVisible()
+    } finally {
+      await ctx.close()
+    }
+  })
+
+  /**
+   * The other way out of the tab: closing it. The native app never navigates
+   * away, so nothing reloads to reset the provider picker — without the
+   * outcome `login()` now reports, it would sit on "Connecting…" for good.
+   * No sign-in happens here, so no pod is touched.
+   */
+  test('J7: closing the system browser mid sign-in leaves the app ready to try again', async ({ browser }) => {
+    const ctx = await browser.newContext()
+    await runAsNativeApp(ctx)
+    const page = await ctx.newPage()
+    try {
+      await page.goto('/')
+      await page.getByRole('button', { name: 'Sync & Share' }).click()
+      await page.getByLabel('Search providers or paste your Pod URL').fill(CSS_ISSUER)
+      const browserTab = page.waitForEvent('popup')
+      await page.getByRole('button', { name: `Connect to ${CSS_ISSUER}` }).click()
+      const tab = await browserTab
+      await expect(page.getByText(/opens in your browser/i)).toBeVisible()
+
+      // The user backs out of the provider's page; the OS reports the tab gone.
+      await tab.close()
+      await emitNativeEvent(page, 'Browser', 'browserFinished', {})
+
+      // Back to the list, no error — and still signed out, with nothing lost.
+      await expect(page.getByLabel('Search providers or paste your Pod URL')).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByRole('alert')).toHaveCount(0)
+      await expect(accountMenu(page)).toHaveCount(0)
     } finally {
       await ctx.close()
     }
