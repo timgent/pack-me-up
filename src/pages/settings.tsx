@@ -10,6 +10,10 @@ import { ThemeChoice } from '../components/ThemeChoice'
  * a desktop — from the footer, the account menu and the mobile menu alike.
  *
  * Nothing here needs a session; anything that does belongs in the account menu.
+ *
+ * Controls go straight under their headings. The theme choice used to sit
+ * below three lines explaining Light, Dark and System — which its own labels
+ * already say — so changing the theme meant reading past its manual (#360).
  */
 export const SettingsPage = () => {
     return (
@@ -18,11 +22,6 @@ export const SettingsPage = () => {
 
             <section className="space-y-3">
                 <h2 className="text-xl font-bold text-primary-900 dark:text-primary-200">Appearance</h2>
-                <p className="text-gray-700 dark:text-gray-300">
-                    Choose how Pack Me Up looks. <strong>System</strong> follows your device's
-                    setting and keeps following it as it changes — including when your device
-                    switches to dark in the evening.
-                </p>
                 <ThemeChoice />
             </section>
         </div>

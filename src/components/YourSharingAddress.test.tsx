@@ -105,4 +105,15 @@ describe('YourSharingAddress', () => {
         expect(screen.getByText('Send them this address')).toBeTruthy()
         expect(screen.getByText('They shared with a different one.')).toBeTruthy()
     })
+
+    // The address is the thing they came for; the sentence about it is
+    // secondary, so it sits under the address and its buttons (#360).
+    it('shows the address and its actions before the explanation', () => {
+        render(<YourSharingAddress webId={WEB_ID} description="Why you would send this." />)
+
+        const after = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+        const description = screen.getByText('Why you would send this.')
+        expect(after(screen.getByText(WEB_ID), description)).toBe(true)
+        expect(after(screen.getByRole('button', { name: /copy my address/i }), description)).toBe(true)
+    })
 })

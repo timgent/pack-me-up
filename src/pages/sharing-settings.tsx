@@ -59,15 +59,20 @@ type ListSharingStatus = { collaborators: string[]; isPublic: boolean } | 'loadi
  * thing anyone wants. Two sentences: what they get, and where to go for less.
  * Relationship-agnostic, so nobody has to be someone's "partner" to see
  * themselves in it.
+ *
+ * It goes *under* the button, never above it (#360). Both sentences teach
+ * something the heading can't — that later lists come too and that they can
+ * edit, and where single-list sharing lives — but nobody should have to read
+ * them to reach the control.
  */
 function FullSetupIntro() {
     return (
-        <div className="space-y-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-                Let someone else use your questions and every packing list — including ones you
-                make later. They can view and edit them.
+        <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
+            <p>
+                Your questions and every packing list, including ones you make later. They can
+                view and edit them.
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p>
                 Just one list? Open it and choose <strong>Share</strong>.
             </p>
         </div>
@@ -421,10 +426,10 @@ export function SharingSettingsPage() {
                 <h1 className="text-3xl font-bold text-primary-900 dark:text-primary-200">Sharing</h1>
                 <section className="space-y-4">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
-                    <FullSetupIntro />
                     <Button type="button" variant="primary" onClick={() => setSignInPromptOpen(true)}>
                         Sign in to share your setup
                     </Button>
+                    <FullSetupIntro />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         Everything you have made so far stays on this device until you sign in — nothing
                         is shared before you say who with.
@@ -460,7 +465,6 @@ export function SharingSettingsPage() {
             {/* Section 1: Share the whole setup — questions + every list */}
             <section ref={fullSetupRef} className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Share your full setup</h2>
-                <FullSetupIntro />
                 {session && ownPodUrl && (
                     <CreateInviteLink
                         session={session}
@@ -470,6 +474,7 @@ export function SharingSettingsPage() {
                         onCreated={invite => setPendingInvites(current => [...current, invite])}
                     />
                 )}
+                <FullSetupIntro />
 
                 {/* One tap for people the device already knows — kept in view,
                     unlike the typed address, because it asks nothing of anyone. */}
@@ -505,11 +510,12 @@ export function SharingSettingsPage() {
                                 Your full setup is shared
                                 {sharedWith && ` with ${sharedWithProfile.name ?? friendlyWebIdName(sharedWith)}`}
                             </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                                They now have your question set and all your packing lists. Send them this
-                                link so they can open it:
-                            </p>
+                            {/* The line above already says they have everything;
+                                what is left to say is what the link is for. */}
                             <ShareableLink link={inviteLink} label="Invite link" subject="my questions and packing lists" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Send them this link so they can open it.
+                            </p>
                         </div>
                     )}
                     {/* Theirs is what this path needs; yours is what the same path

@@ -45,6 +45,20 @@ describe('SettingsPage', () => {
     })
 
     /*
+     * The control speaks for itself: its labels already say Light / Dark /
+     * System, and three lines explaining them sat between the heading and the
+     * thing people came to change (#360).
+     */
+    it('puts the theme control straight under its heading, with no prose to read past', () => {
+        renderPage()
+
+        const heading = screen.getByRole('heading', { level: 2, name: 'Appearance' })
+        const section = heading.closest('section')!
+        expect(heading.nextElementSibling?.tagName).toBe('FIELDSET')
+        expect(section.querySelector('p')).toBeNull()
+    })
+
+    /*
      * The page has to work signed out — that is why the theme control lives here
      * and not only in the account menu, which a signed-out user has no way to
      * open. It takes no session props at all, so this is a rendering assertion.
