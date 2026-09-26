@@ -22,6 +22,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Android App Links: a tap on a shared link (packmeup.tim-gent.com)
+                 opens this app instead of the browser. Verified against
+                 public/.well-known/assetlinks.json — see docs/deep-linking.md
+                 for what still has to be filled in before verification passes.
+                 Kept as its own filter, per Android App Links convention. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="packmeup.tim-gent.com" />
+            </intent-filter>
+
         </activity>
 
         <provider

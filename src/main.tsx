@@ -8,6 +8,7 @@ import App from './App.tsx'
 import { ErrorFallback } from './components/ErrorFallback.tsx'
 import { initSentry } from './sentry.ts'
 import { installOpenInvocationHandler } from './capability/openInvocation.ts'
+import { installDeepLinkHandler } from './services/deepLinks.ts'
 
 initSentry()
 
@@ -15,6 +16,10 @@ initSentry()
 // Application Capability `#open={open}` invocation in the fragment, which is
 // not a shape HashRouter can route. See src/capability/openInvocation.ts.
 installOpenInvocationHandler()
+
+// A shared link tapped with the app installed arrives as a native
+// `appUrlOpen` event rather than a page load — see services/deepLinks.ts.
+installDeepLinkHandler()
 
 // The native shell draws under the status and gesture bars, so the safe-area
 // insets in index.css apply there. A browser tab renders inside the browser's

@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appID": "REPLACE_WITH_TEAM_ID.com.packmeup.app",
+        "paths": ["*"]
+      }
+    ]
+  }
+}
