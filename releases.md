@@ -1,5 +1,8 @@
 # Release Notes
 
+## 1.20.0 (versionCode 21) — 2026-10-14
+- Maintenance release, no user-facing changes
+
 ## 1.19.0 (versionCode 20) — 2026-10-14
 - Shared links now open directly in the app instead of the browser
 - Signing out now takes you back to the home page
