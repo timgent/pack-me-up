@@ -1,5 +1,10 @@
 # Release Notes
 
+## 1.19.0 (versionCode 20) — 2026-10-14
+- Shared links now open directly in the app instead of the browser
+- Signing out now takes you back to the home page
+- Fixed the update banner's Reload button so it actually reloads
+
 ## 1.18.0 (versionCode 19) — 2026-09-25
 - Accepted invites now appear right away, no reload needed
 - "Whose data am I viewing" moved into the account menu
