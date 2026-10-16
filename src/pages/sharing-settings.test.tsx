@@ -68,6 +68,9 @@ const mockUseDatabase = vi.mocked(useDatabase)
 const mockUseSolidPod = vi.mocked(useSolidPod)
 const mockSaveRdfToPod = vi.mocked(saveRdfToPod)
 
+/** Whether `b` comes after `a` in the document — i.e. is read after it. */
+const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
 const mockSession = { info: { isLoggedIn: true, webId: 'https://me.example.com/profile#me' }, fetch: vi.fn() }
 
 function renderPage(dbOverrides: Partial<PackingAppDatabase> = {}) {
@@ -165,7 +168,25 @@ describe('SharingSettingsPage — share your full setup', () => {
         renderPage()
 
         expect(await screen.findByRole('heading', { name: /share your full setup/i })).toBeTruthy()
-        expect(screen.getByText(/let someone else use your questions/i)).toBeTruthy()
+        expect(await screen.findByRole('button', { name: /create invite link/i })).toBeTruthy()
+    })
+
+    // The control goes first; what it shares is worth saying, but underneath
+    // it, not as something to read past on the way to it (#360).
+    it('puts the invite button above the explanation of what it shares', async () => {
+        renderPage()
+
+        const button = await screen.findByRole('button', { name: /create invite link/i })
+        expect(follows(button, screen.getByText(/your questions and every packing list/i))).toBe(true)
+        expect(follows(button, screen.getByText(/just one list\?/i))).toBe(true)
+    })
+
+    it('puts the sign-in button above the explanation when logged out', async () => {
+        renderLoggedOut()
+
+        const button = await screen.findByRole('button', { name: /sign in to share your setup/i })
+        expect(follows(button, screen.getByText(/your questions and every packing list/i))).toBe(true)
+        expect(follows(button, screen.getByText(/stays on this device/i))).toBe(true)
     })
 
     it('spells out that the question set and every list go together', async () => {
@@ -349,9 +370,25 @@ describe('SharingSettingsPage — share your full setup', () => {
         const banner = await screen.findByText(/your full setup is shared with/i)
         const button = screen.getByRole('button', { name: /share my setup/i })
         const yourAddress = screen.getByText(/your own address/i)
-        const follows = (a: Node, b: Node) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
         expect(follows(button, banner)).toBe(true)
         expect(follows(banner, yourAddress)).toBe(true)
+    })
+
+    it('hands over the link first and says what to do with it after', async () => {
+        renderPage()
+
+        fireEvent.change(await screen.findByLabelText(/webid/i), {
+            target: { value: 'https://alice.example.com/profile/card#me' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /share my setup/i }))
+
+        const banner = await screen.findByText(/your full setup is shared with/i)
+        const link = screen.getByRole('textbox', { name: /invite link/i })
+        const instruction = screen.getByText(/send them this link/i)
+        expect(follows(banner, link)).toBe(true)
+        expect(follows(link, instruction)).toBe(true)
+        // The banner's heading already says they have everything.
+        expect(screen.queryByText(/they now have your question set/i)).toBeNull()
     })
 
     it('never offers to share with the person doing the sharing', async () => {

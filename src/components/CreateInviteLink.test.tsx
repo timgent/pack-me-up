@@ -67,8 +67,10 @@ describe('CreateInviteLink', () => {
 
         const field = await screen.findByRole('textbox', { name: /invite link/i })
         expect((field as HTMLInputElement).value).toContain(`/#/invite/${created.token}`)
-        // The delay is stated up front rather than discovered later.
-        expect(screen.getByText(/next time you open Pack Me Up/i)).toBeTruthy()
+        // The delay is stated rather than discovered later — but under the
+        // link, which is what they came for (#360).
+        const delay = screen.getByText(/next time you open Pack Me Up/i)
+        expect(field.compareDocumentPosition(delay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('builds the link on the app’s public origin, not the device’s', async () => {
