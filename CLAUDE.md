@@ -127,9 +127,10 @@ stay in view above it, and picking one opens it. Four rules:
   permission, why an invite link is not a peephole (nobody holding it can
   *read*, so two invitees never learn of each other), and why revoking is a
   DELETE. `inviteUrlFor` is where a token becomes a path segment, so it refuses
-  anything not shaped like one. Accepting is a SPARQL Update PATCH, not an
-  N3 Patch: Inrupt's ACP Pods refused the N3 Patch under a public Append grant,
-  and E2E suite N only runs on WAC, so it could not tell.
+  anything not shaped like one. Accepting is a SPARQL Update PATCH, never an
+  N3 Patch: Inrupt's ESS does not support N3 Patch at all (Inrupt confirmed
+  it; `Accept-Patch` says so), and E2E suite N runs on Community Solid Server,
+  which accepts both, so it could not tell. Any new PATCH follows the same rule.
   `docs/invite-links-on-acp-pods.md` has the investigation.
 - **What arrives is never trusted; what was sent is.** The appended WebID was
   written by a stranger. What gets granted is decided by the *invite* — the

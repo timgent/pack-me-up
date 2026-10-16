@@ -959,12 +959,12 @@ export function datasetToInvite(dataset: SolidDataset, datasetUrl: string): Invi
  * inviter's Pod, only add one triple to one resource.
  *
  * SPARQL Update (`application/sparql-update`) rather than N3-Patch
- * (`text/n3`): Inrupt's ESS does not accept an N3-Patch on an ACP-protected
- * resource under a plain `acl:Append` grant — it refuses the identical
- * insert with 403, and only stops refusing once the grant also includes
- * `acl:Write`, which defeats the point of an append-only invite (see
- * docs/invite-links-on-acp-pods.md). The same insert as SPARQL Update
- * succeeds under Append alone, on both ESS and Community Solid Server.
+ * (`text/n3`): Inrupt's ESS does not support N3-Patch at all — SPARQL Update
+ * is the only PATCH format it accepts, and it says so in `Accept-Patch`
+ * (confirmed by Inrupt support). Community Solid Server accepts both, so
+ * SPARQL Update is the one format every Pod we meet understands. See
+ * docs/invite-links-on-acp-pods.md for how the unsupported format showed up
+ * as a 403 rather than a 415.
  */
 export function inviteAcceptancePatch(datasetUrl: string, webId: string): string {
     // The WebID is written into a document body as an IRI. It comes from the

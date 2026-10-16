@@ -8,6 +8,15 @@ this doc for the change and the reasoning; the rest of this document is the
 investigation that found it, kept for the reasoning trail and because the
 diagnostic recipes in it are reusable for the next Solid interop surprise.
 
+**Root cause, confirmed by Inrupt (September 2026):** ESS does not support
+N3 Patch at all. SPARQL Update is the only PATCH format it accepts, which is
+why its responses advertise `Accept-Patch: application/sparql-update`. So
+SPARQL Update is the correct fix, not a workaround, and there is no
+authorization bug. The mid-investigation theory that ESS wrongly requires
+`acl:Write` for an insert-only N3 Patch (finding "(B2)" below) was wrong.
+Inrupt also agreed that their documentation is misleading on this and said
+they will fix it in an upcoming release. See "Inrupt's answer" at the bottom.
+
 Sentry: `JAVASCRIPT-REACT-1A` (`InviteAcceptError`, 2 events, production).
 
 ## The symptom
@@ -221,6 +230,10 @@ from the same already-authenticated solidcommunity.net session.
 **Result: 415 Unsupported Media Type** — not 2xx, and not 403 either. This is
 more informative than either clean outcome would have been on its own:
 
+*(Hindsight: the (B2) reading below turned out to be wrong. ESS does not
+support N3 Patch at all, so the 415 was the real answer and the 403 came from
+the same cause. See "Inrupt's answer" at the bottom.)*
+
 - **The 403 → 415 transition is itself evidence for (B2).** If ESS's
   authorization check for this resource were unaffected by adding `write`,
   the request should still have failed with 403 before ever reaching content
@@ -422,16 +435,25 @@ independent, publicly-resolvable identity (`pack-me-up-test` on
 solidcommunity.net, a different provider entirely), landed on the app's
 "Accepted" screen exactly as intended.
 
-**The full picture, now that it's resolved:** ESS's N3-Patch handler appears
-to require `acl:Write` for *any* N3 Patch against an ACP-controlled resource,
-even an insert-only one — contradicting Inrupt's own docs, which is why
-append-only + N3-Patch got 403, and write + N3-Patch got past authorization
-only to hit 415 (ESS's PATCH-body handling for N3-Patch on this resource type
-appears to not be fully wired up, or requires something this investigation
-didn't isolate further, now moot). ESS's SPARQL-Update handler, by contrast,
-correctly recognises an `INSERT DATA`-only patch as sufficient for `acl:Append`
-alone. Community Solid Server accepts both formats and was already passing
-suite N on N3-Patch, so switching to SPARQL-Update changes nothing there.
+**The full picture, now that it's resolved** (corrected after Inrupt's reply,
+below): ESS does not support N3 Patch, so the only real failure was the 415.
+Our reading of the earlier 403 is that it came from the same cause. A server
+that cannot parse the patch body cannot tell that it only inserts, so the
+safe choice is to authorize it as a full modification, which needs
+`acl:Write`. Under append-only that gave 403 before the body was ever
+looked at. Adding Write let the request past authorization, where it hit the
+format check and got 415. That is our inference from the behaviour, not
+something Inrupt stated, but it fits every observation without an
+authorization bug. ESS handles an `INSERT DATA`-only SPARQL Update under
+`acl:Append` alone, as documented. Community Solid Server accepts both
+formats and was already passing suite N on N3-Patch, so switching to
+SPARQL-Update changes nothing there.
+
+**The lesson worth keeping:** before any other theory, check which PATCH
+formats a server supports. It lists them in the `Accept-Patch` header of any
+response, and ESS's answer would have settled this at the start. A
+permission error can hide a format problem, so a 403 on a PATCH is not proof
+that the grant is wrong.
 
 **The change**, both non-N3, both minimal:
 
@@ -462,3 +484,19 @@ present (CSS accepts N3-Patch fine). Worth adding:
   worth doing if a test ACP server becomes available — but is no longer
   blocking, since this fix has been proven against the real Inrupt Pod by
   hand.
+
+## Inrupt's answer
+
+We filed the findings above with Inrupt support. Their reply, in summary:
+
+- ESS does not support N3 Patch (`text/n3`) at all. The only PATCH format it
+  accepts is SPARQL Update (`application/sparql-update`), and its responses
+  say so with `Accept-Patch: application/sparql-update`.
+- So switching the accept-invite PATCH to SPARQL Update is the correct fix,
+  not just a workaround. It is not an authorization bug.
+- They agreed their documentation is misleading on this and said they will
+  update it in an upcoming release.
+
+This closes the investigation. Nothing in `createInvite` or
+`acceptInvite` needs to change. The ACP-vacuous-guard issue (finding 3)
+still stands on its own.
