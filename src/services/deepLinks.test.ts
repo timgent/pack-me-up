@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { PUBLIC_APP_ORIGIN } from './publicAppOrigin'
+import { NATIVE_AUTH_REDIRECT_URI } from './solidClientIdentity'
 
 const mockIsNativePlatform = vi.fn(() => false)
 const mockAddListener = vi.fn()
@@ -52,6 +53,10 @@ describe('routeFromDeepLink', () => {
 
     it('returns null for a string that is not a URL at all', () => {
         expect(routeFromDeepLink('not a url')).toBeNull()
+    })
+
+    it('leaves the sign-in callback alone, which is nativeLogin.ts\'s to handle', () => {
+        expect(routeFromDeepLink(`${NATIVE_AUTH_REDIRECT_URI}?code=c&state=s#/view-lists`)).toBeNull()
     })
 
     it('returns null when there is no hash to route to', () => {

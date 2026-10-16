@@ -1,6 +1,8 @@
 import { useMemo, useState, type KeyboardEvent } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Modal } from './Modal';
 import { Input } from './Input';
+import type { LoginOutcome } from '../services/nativeLogin';
 
 export interface SolidProvider {
   name: string;
@@ -77,10 +79,22 @@ function getLastUsedIssuer(): string | null {
 interface SolidProviderSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (issuer: string) => void | Promise<void>;
+  /**
+   * Starts the sign-in. The web app navigates away to the provider, so how it
+   * resolves hardly matters there; the native app signs in through the system
+   * browser without leaving this page, and says how that ended (#358).
+   */
+  onSelect: (issuer: string) => void | Promise<void | LoginOutcome>;
+  /** The provider opens in the system browser rather than this page — the native app. */
+  opensInBrowser?: boolean;
 }
 
-export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProviderSelectorProps) {
+export function SolidProviderSelector({
+  isOpen,
+  onClose,
+  onSelect,
+  opensInBrowser = Capacitor.isNativePlatform(),
+}: SolidProviderSelectorProps) {
   const [query, setQuery] = useState('');
   const [connectingTo, setConnectingTo] = useState<SolidProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,10 +124,14 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
     setConnectingTo(provider);
     setError(null);
     try {
-      await onSelect(provider.issuer);
+      const outcome = await onSelect(provider.issuer);
       // Only a connection that got as far as the provider's redirect is worth
       // remembering — a typo'd pod URL must not become next time's default.
       localStorage.setItem(LAST_PROVIDER_KEY, provider.issuer);
+      // The native app never navigates away, so the picker has to step aside
+      // itself: gone once signed in, back to the list if the browser was closed.
+      if (outcome === 'signed-in') handleClose();
+      if (outcome === 'cancelled') setConnectingTo(null);
     } catch {
       setConnectingTo(null);
       setError(`Couldn't connect to ${provider.issuer}. Check the address and try again.`);
@@ -174,7 +192,9 @@ export function SolidProviderSelector({ isOpen, onClose, onSelect }: SolidProvid
             </svg>
             <p className="text-sm text-gray-700 dark:text-gray-300">Connecting to {connectingTo.name}…</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              You'll be taken to your provider to sign in.
+              {opensInBrowser
+                ? "Your provider opens in your browser. Sign in there and you'll come straight back here."
+                : "You'll be taken to your provider to sign in."}
             </p>
           </div>
         ) : (

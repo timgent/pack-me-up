@@ -9,9 +9,9 @@ const SENTRY_DSN = 'https://a331ffe142776c6dd8d5fcecfb2a4a97@o4511757730578432.i
 /**
  * Is this bundle being served by a developer machine's own web server?
  *
- * The build mode alone doesn't answer that: `npm run test:e2e` runs
- * `npm run build` and serves the result with `vite preview`, so the E2E suite
- * drives a *production* build — DSN, `environment: 'production'` and all. Every
+ * The build mode alone doesn't answer that: `npm run test:e2e` used to run
+ * `npm run build` and serve the result with `vite preview`, so the E2E suite
+ * drove a *production* build — DSN, `environment: 'production'` and all. Every
  * run, local and on every PR in CI, reported the suite's own failures into the
  * live project; the Community Solid Server the tests talk to lives on
  * localhost:4001 and is stopped between suites, which is where the stream of
@@ -33,11 +33,13 @@ function isLocalWebServer() {
 
 // Local dev, test runs and E2E runs report to the console instead of Sentry, so
 // day-to-day development doesn't fill the project's error quota with noise from work
-// in progress. Set VITE_SENTRY_ENABLED=true to opt a local build back in (e.g. to
+// in progress. The E2E build (`npm run build:e2e`, mode `e2e`) is ruled out by mode
+// as well as by origin: suite J poses as the native app to drive its sign-in path,
+// and the native app is exactly what the origin check lets through. Set VITE_SENTRY_ENABLED=true to opt a local build back in (e.g. to
 // verify a Sentry change end to end, including against a preview build).
 function isSentryEnabled() {
   if (import.meta.env.VITE_SENTRY_ENABLED === 'true') return true
-  if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') return false
+  if (['development', 'test', 'e2e'].includes(import.meta.env.MODE)) return false
   return !isLocalWebServer()
 }
 

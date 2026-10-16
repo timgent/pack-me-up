@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
-import { existsSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { createServer } from 'http'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { solidDatasetAsTurtle, createSolidDataset } from '@inrupt/solid-client'
@@ -15,6 +16,8 @@ import {
   GUSER_EMAIL, GUSER_PASSWORD, GUSER_POD_NAME,
   HUSER_EMAIL, HUSER_PASSWORD, HUSER_POD_NAME,
   JUSER_EMAIL, JUSER_PASSWORD, JUSER_POD_NAME,
+  JNATIVE_EMAIL, JNATIVE_PASSWORD, JNATIVE_POD_NAME,
+  NATIVE_CLIENT_ID_PORT, NATIVE_CLIENT_ID_URL,
   LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME,
   MUSER_EMAIL, MUSER_PASSWORD, MUSER_POD_NAME,
   NUSER_EMAIL, NUSER_PASSWORD, NUSER_POD_NAME,
@@ -39,6 +42,30 @@ async function waitForUrl(url: string, maxWaitMs = 90_000): Promise<void> {
     await new Promise(r => setTimeout(r, 500))
   }
   throw new Error(`${url} did not become available within ${maxWaitMs}ms`)
+}
+
+/**
+ * Serves the native app's Client ID Document for suite J's native sign-in (J6).
+ *
+ * The real one (public/client-id-native.json) names the production URL as its
+ * `client_id`, and CSS refuses a document that is not about the URL it fetched
+ * it from — so this is the same document, re-addressed to where CSS can reach
+ * it. Everything else, redirect URI and `application_type` included, is the
+ * shipped file's, so the test exercises what providers will actually be given.
+ */
+function serveNativeClientIdDocument(): void {
+  const shipped = JSON.parse(readFileSync(path.resolve(__dirname, '../public/client-id-native.json'), 'utf8'))
+  const body = JSON.stringify({ ...shipped, client_id: NATIVE_CLIENT_ID_URL })
+  const server = createServer((req, res) => {
+    if (req.url !== new URL(NATIVE_CLIENT_ID_URL).pathname) {
+      res.writeHead(404).end()
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/ld+json' }).end(body)
+  })
+  server.listen(NATIVE_CLIENT_ID_PORT)
+  // Lives exactly as long as the test run; never what keeps it alive.
+  server.unref()
 }
 
 export default async function globalSetup() {
@@ -76,6 +103,12 @@ export default async function globalSetup() {
 
   await createCssAccount(CSS_PORT, JUSER_EMAIL, JUSER_PASSWORD, JUSER_POD_NAME)
   console.log(`[setup] J-suite account created: ${JUSER_EMAIL}`)
+
+  await createCssAccount(CSS_PORT, JNATIVE_EMAIL, JNATIVE_PASSWORD, JNATIVE_POD_NAME)
+  console.log(`[setup] J-suite native sign-in account created: ${JNATIVE_EMAIL}`)
+
+  serveNativeClientIdDocument()
+  console.log(`[setup] Native Client ID Document served at ${NATIVE_CLIENT_ID_URL}`)
 
   await createCssAccount(CSS_PORT, LUSER_EMAIL, LUSER_PASSWORD, LUSER_POD_NAME)
   console.log(`[setup] L-suite account created: ${LUSER_EMAIL}`)

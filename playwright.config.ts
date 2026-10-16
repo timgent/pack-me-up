@@ -34,6 +34,16 @@ export const LUSER_POD_NAME = 'luser'
 export const JUSER_EMAIL = 'juser@example.com'
 export const JUSER_PASSWORD = 'test1234'
 export const JUSER_POD_NAME = 'juser'
+// J6 signs in the way the native app does (#358). Signing in syncs, and a sync
+// can write, so it gets a pod of its own.
+export const JNATIVE_EMAIL = 'jnative@example.com'
+export const JNATIVE_PASSWORD = 'test1234'
+export const JNATIVE_POD_NAME = 'jnative'
+// The native app identifies itself with its own Client ID Document, which CSS
+// must be able to fetch. Global setup serves one here; `.env.e2e` points the
+// E2E build (`npm run build:e2e`) at it.
+export const NATIVE_CLIENT_ID_PORT = 4002
+export const NATIVE_CLIENT_ID_URL = `http://localhost:${NATIVE_CLIENT_ID_PORT}/client-id-native.json`
 // N exercises invite links, which need two Pods that no other suite touches:
 // the invitee's WebID is written into the inviter's Pod and then granted access
 // to everything in it.
@@ -79,9 +89,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run preview',
+    // The suite drives the E2E build (`--mode e2e`, `.env.e2e`), never a plain
+    // one: it points the native sign-in path (suite J, J6/J7) at the Client ID
+    // Document global setup serves, and keeps Sentry off. Built here rather than
+    // by whoever runs Playwright, so a stale or plain `dist` cannot be what's
+    // under test.
+    command: 'npm run build:e2e && npm run preview',
     url: APP_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 240_000,
   },
 })

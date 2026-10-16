@@ -4,6 +4,7 @@ import { SessionIDB } from "@uvdsl/solid-oidc-client-browser";
 import { Capacitor } from "@capacitor/core";
 import { ResilientSession, SessionEndedError } from "../services/ResilientSession";
 import { solidClientDetails } from "../services/solidClientIdentity";
+import { createSystemBrowserLogin, type LoginOutcome, type SystemBrowserLogin } from "../services/nativeLogin";
 import { onAppResumed } from "../services/appResume";
 import { logAuthEvent } from "../services/authLog";
 import { resetPodSessionCaches } from "../services/solidPod";
@@ -39,7 +40,12 @@ interface SolidPodContextValue {
    */
   webId: string | undefined;
   isLoading: boolean;
-  login: (oidcIssuer: string, returnTo?: string) => Promise<void>;
+  /**
+   * Starts signing in. On the web this navigates to the provider and resolves
+   * `redirected`; the native app signs in through the system browser without
+   * leaving the page, and resolves once that is over (#358).
+   */
+  login: (oidcIssuer: string, returnTo?: string) => Promise<LoginOutcome>;
   logout: () => Promise<void>;
 }
 
@@ -54,6 +60,20 @@ const RECOVERY_DELAYS_MS = [1_000, 3_000, 8_000, 20_000, 45_000, 90_000];
  * stares at a spinner while it does.
  */
 const STARTUP_RESTORE_BUDGET_MS = 4_000;
+
+/**
+ * Where to go once a sign-in lands: back where the user started, unless that was
+ * only somewhere the app happened to open — then to the redirect page, which
+ * picks between their lists and the wizard once it knows what this identity's
+ * pod holds (#334). Clearing the key matters there: the redirect page re-reads
+ * it, and a leftover "/home" would put them straight back where they started.
+ */
+function takeAuthReturnRoute(): string {
+  const returnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY) ?? "";
+  if (!isNeutralAuthReturnRoute(returnTo)) return returnTo;
+  sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+  return "/solid-pod-handle-redirect";
+}
 
 export function SolidPodProvider({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -103,6 +123,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     uvdslSessionRef.current = new ResilientSession(
       solidClientDetails({
         clientIdUrl: import.meta.env.VITE_CLIENT_ID_URL as string | undefined,
+        nativeClientIdUrl: import.meta.env.VITE_NATIVE_CLIENT_ID_URL as string | undefined,
         isNativePlatform: Capacitor.isNativePlatform(),
         origin: window.location.origin || "http://localhost",
       }),
@@ -240,19 +261,7 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
           // redirect_uri registered with the IdP can be the plain SPA root ("/").
           logAuthEvent("login.completed", { webId: uvdslSession.webId });
           uvdslSession.scheduleRenewal();
-          const storedReturnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY);
-          let returnTo = storedReturnTo ?? "";
-          if (isNeutralAuthReturnRoute(returnTo)) {
-            // Nowhere the user asked to come back to — the home page is where
-            // they happened to be when they signed in, not a destination. Hand
-            // it to the redirect page, which picks between their lists and the
-            // wizard once it knows what this identity's pod holds (#334).
-            // Clearing the key matters: the reload below re-reads it, and a
-            // leftover "/home" would put them straight back where they started.
-            sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
-            returnTo = "/solid-pod-handle-redirect";
-          }
-          window.location.replace("/#" + returnTo);
+          window.location.replace("/#" + takeAuthReturnRoute());
           return;
         }
 
@@ -325,12 +334,40 @@ export function SolidPodProvider({ children }: { children: ReactNode }) {
     return () => uvdslSession.cancelRenewal();
   }, [isLoggedIn, uvdslSession]);
 
-  const login = async (oidcIssuer: string, returnTo?: string) => {
+  // The native app signs in through the system browser (services/nativeLogin.ts),
+  // so the provider's page never loads in this WebView. Listening from mount,
+  // not from the tap: the callback can be what launched the app, when Android
+  // killed it while the user was in the browser.
+  const systemBrowserLoginRef = useRef<SystemBrowserLogin | undefined>(undefined);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const systemBrowserLogin = createSystemBrowserLogin(uvdslSession, {
+      onSignedIn: () => {
+        uvdslSession.scheduleRenewal();
+        // Nothing reloads here, unlike the web callback: route in place, the way
+        // services/deepLinks.ts does — HashRouter listens for popstate.
+        window.history.replaceState(null, "", "#" + takeAuthReturnRoute());
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      },
+    });
+    systemBrowserLoginRef.current = systemBrowserLogin;
+    return () => {
+      systemBrowserLogin.dispose();
+      systemBrowserLoginRef.current = undefined;
+    };
+  }, [uvdslSession]);
+
+  const login = async (oidcIssuer: string, returnTo?: string): Promise<LoginOutcome> => {
     const currentLocation = returnTo || window.location.hash.substring(1) || "/";
     sessionStorage.setItem(AUTH_RETURN_TO_KEY, currentLocation);
+    if (systemBrowserLoginRef.current) {
+      logAuthEvent("login.redirecting", { oidcIssuer, via: "system-browser" });
+      return systemBrowserLoginRef.current.start(oidcIssuer);
+    }
     const redirectUri = (window.location.origin || "http://localhost") + "/";
     logAuthEvent("login.redirecting", { oidcIssuer });
     await uvdslSession.login(oidcIssuer, redirectUri);
+    return "redirected";
   };
 
   const logout = async () => {

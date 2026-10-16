@@ -150,6 +150,11 @@ dynamically, where a lost session costs nothing.
 Because the client id is stored per session, existing installs keep the dynamic
 client they logged in with. The change takes effect at the next login.
 
+Since #358 the native app signs in through the system browser and has a hosted
+document of its own, `public/client-id-native.json` — see
+[native-sign-in.md](native-sign-in.md). `https://localhost/` stays in
+`client-id.json` for app versions released before that.
+
 ### 9. A transient failure could be nobody's job
 
 `ResilientSession` retries within one `restore()`, and `SolidPodContext` retries

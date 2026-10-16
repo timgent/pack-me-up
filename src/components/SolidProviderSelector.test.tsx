@@ -211,6 +211,45 @@ describe('SolidProviderSelector', () => {
       await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/couldn't connect/i))
       expect(searchBox()).toBeTruthy()
     })
+
+    it('stays on the spinner once the web app is on its way to the provider', async () => {
+      const onClose = vi.fn()
+      const onSelect = vi.fn().mockResolvedValue('redirected')
+      render(<SolidProviderSelector {...defaultProps} onClose={onClose} onSelect={onSelect} />)
+      clickOption('Inrupt PodSpaces')
+      await waitFor(() => expect(localStorage.getItem(LAST_PROVIDER_KEY)).toBe('https://login.inrupt.com'))
+      expect(screen.getByText(/connecting to inrupt podspaces/i)).toBeTruthy()
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    // The native app signs in through the system browser (#358), in this same
+    // page — nothing navigates away, so the picker has to get out of the way
+    // itself, or go back to the list if the user closed the browser.
+    it('closes once the native app has signed in', async () => {
+      const onClose = vi.fn()
+      const onSelect = vi.fn().mockResolvedValue('signed-in')
+      render(<SolidProviderSelector {...defaultProps} onClose={onClose} onSelect={onSelect} />)
+      clickOption('Inrupt PodSpaces')
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('goes back to the list, without an error, when the user closes the browser', async () => {
+      const onClose = vi.fn()
+      const onSelect = vi.fn().mockResolvedValue('cancelled')
+      render(<SolidProviderSelector {...defaultProps} onClose={onClose} onSelect={onSelect} />)
+      clickOption('Inrupt PodSpaces')
+      await waitFor(() => expect(searchBox()).toBeTruthy())
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(screen.queryByText(/connecting to/i)).toBeNull()
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('says what to expect when the provider opens in the browser', async () => {
+      const onSelect = vi.fn().mockReturnValue(new Promise<void>(() => {}))
+      render(<SolidProviderSelector {...defaultProps} onSelect={onSelect} opensInBrowser />)
+      clickOption('Inrupt PodSpaces')
+      await waitFor(() => expect(screen.getByText(/opens in your browser/i)).toBeTruthy())
+    })
   })
 })
 

@@ -3,7 +3,7 @@ import { render, screen, act, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SolidPodProvider, useSolidPod } from './SolidPodContext'
 import { ResilientSession } from '../services/ResilientSession'
-import { HOSTED_CLIENT_ID_URL } from '../services/solidClientIdentity'
+import { HOSTED_NATIVE_CLIENT_ID_URL } from '../services/solidClientIdentity'
 import { ToastProvider } from './ToastContext'
 
 function Wrapper({ children }: { children: React.ReactNode }) {
@@ -63,7 +63,18 @@ vi.mock('@capacitor/core', () => ({
 }))
 
 vi.mock('@capacitor/app', () => ({
-    App: { addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }) },
+    App: {
+        addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
+        getLaunchUrl: vi.fn().mockResolvedValue(undefined),
+    },
+}))
+
+vi.mock('@capacitor/browser', () => ({
+    Browser: {
+        open: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
+    },
 }))
 
 /** The ResilientSession instance the provider constructed. */
@@ -411,7 +422,7 @@ describe('SolidPodContext — the client it presents itself as', () => {
         mockIsNativePlatform.mockReturnValue(false)
     })
 
-    it('gives the native app the hosted Client ID Document, not a throwaway registration', () => {
+    it('gives the native app its hosted Client ID Document, not a throwaway registration', () => {
         // The shell is served from https://localhost, which never matched the
         // hosted document, so it used to register dynamically on every install —
         // and a dynamic registration the provider reclaims answers the next
@@ -421,7 +432,7 @@ describe('SolidPodContext — the client it presents itself as', () => {
         render(<Wrapper><Consumer /></Wrapper>)
 
         expect(vi.mocked(ResilientSession).mock.calls[0][0]).toEqual({
-            client_id: HOSTED_CLIENT_ID_URL,
+            client_id: HOSTED_NATIVE_CLIENT_ID_URL,
         })
     })
 })
